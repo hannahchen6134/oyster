@@ -5,11 +5,14 @@ import { URL } from 'node:url';
 
 loadDotEnv_();
 
+const OLD_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwlJl-3pZQoEK_Ly8BV9bq9STg5HonveFkm9bUCPL1FOgIQ9l79wSBiXgsGaOUp9yG4/exec';
+const CURRENT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyJXkvmRNcMvkuCUoBQcbnrkWaXrL3gdp_bgv0igfiZ49_YZQR0aXo1vfFMVoYiMtgy3Q/exec';
+
 const CONFIG = {
   port: Number(process.env.PORT || 8787),
   lineChannelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
   lineChannelSecret: process.env.LINE_CHANNEL_SECRET || '',
-  appsScriptApiUrl: process.env.APPS_SCRIPT_API_URL || '',
+  appsScriptApiUrl: normalizeAppsScriptUrl_(process.env.APPS_SCRIPT_API_URL || ''),
   appsScriptApiToken: process.env.APPS_SCRIPT_API_TOKEN || ''
 };
 
@@ -156,6 +159,13 @@ const server = http.createServer(async (req, res) => {
 server.listen(CONFIG.port, () => {
   console.log(`oyster-care-line-backend listening on ${CONFIG.port}`);
 });
+
+function normalizeAppsScriptUrl_(url) {
+  const normalized = String(url || '').trim();
+  if (!normalized) return CURRENT_APPS_SCRIPT_URL;
+  if (normalized === OLD_APPS_SCRIPT_URL) return CURRENT_APPS_SCRIPT_URL;
+  return normalized;
+}
 
 function loadDotEnv_() {
   var envPath = new URL('./.env', import.meta.url);
