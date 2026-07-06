@@ -7,9 +7,10 @@ loadDotEnv_();
 
 const DEPRECATED_APPS_SCRIPT_URLS = new Set([
   'https://script.google.com/macros/s/AKfycbwlJl-3pZQoEK_Ly8BV9bq9STg5HonveFkm9bUCPL1FOgIQ9l79wSBiXgsGaOUp9yG4/exec',
-  'https://script.google.com/macros/s/AKfycbyJXkvmRNcMvkuCUoBQcbnrkWaXrL3gdp_bgv0igfiZ49_YZQR0aXo1vfFMVoYiMtgy3Q/exec'
+  'https://script.google.com/macros/s/AKfycbyJXkvmRNcMvkuCUoBQcbnrkWaXrL3gdp_bgv0igfiZ49_YZQR0aXo1vfFMVoYiMtgy3Q/exec',
+  'https://script.google.com/macros/s/AKfycbxQTFyQ7PBl1SD6IkKk5_dYRixGuzKMYZfdEXs4HxsRa6TSu_XekY_kqUphTC2H29Df2A/exec'
 ]);
-const CURRENT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxQTFyQ7PBl1SD6IkKk5_dYRixGuzKMYZfdEXs4HxsRa6TSu_XekY_kqUphTC2H29Df2A/exec';
+const CURRENT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxAtjdHf6slobcUIt9FnO7P4Nxof21nWvX04pQrb_7ae-wur19phGk-C8Tfo3xXJ5G3nQ/exec';
 
 const CONFIG = {
   port: Number(process.env.PORT || 8787),
