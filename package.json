@@ -1,0 +1,14 @@
+{
+  "name": "oyster-care-line-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "start:manager": "node manager.js",
+    "start:server": "node server.js"
+  },
+  "devDependencies": {
+    "localtunnel": "^2.0.2"
+  }
+}

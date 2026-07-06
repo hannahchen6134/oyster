@@ -1,0 +1,10 @@
+node_modules/
+.env
+*.log
+server.out.log
+server.err.log
+ssh-tunnel.out.log
+ssh-tunnel.err.log
+tunnel.out.log
+tunnel.err.log
+manager.log

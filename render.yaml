@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: oyster-care-line-backend
+    runtime: node
+    plan: starter
+    autoDeploy: true
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: LINE_CHANNEL_ACCESS_TOKEN
+        sync: false
+      - key: LINE_CHANNEL_SECRET
+        sync: false
+      - key: APPS_SCRIPT_API_URL
+        sync: false
+      - key: APPS_SCRIPT_API_TOKEN
+        sync: false
