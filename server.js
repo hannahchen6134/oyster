@@ -5,8 +5,11 @@ import { URL } from 'node:url';
 
 loadDotEnv_();
 
-const OLD_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwlJl-3pZQoEK_Ly8BV9bq9STg5HonveFkm9bUCPL1FOgIQ9l79wSBiXgsGaOUp9yG4/exec';
-const CURRENT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyJXkvmRNcMvkuCUoBQcbnrkWaXrL3gdp_bgv0igfiZ49_YZQR0aXo1vfFMVoYiMtgy3Q/exec';
+const DEPRECATED_APPS_SCRIPT_URLS = new Set([
+  'https://script.google.com/macros/s/AKfycbwlJl-3pZQoEK_Ly8BV9bq9STg5HonveFkm9bUCPL1FOgIQ9l79wSBiXgsGaOUp9yG4/exec',
+  'https://script.google.com/macros/s/AKfycbyJXkvmRNcMvkuCUoBQcbnrkWaXrL3gdp_bgv0igfiZ49_YZQR0aXo1vfFMVoYiMtgy3Q/exec'
+]);
+const CURRENT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxQTFyQ7PBl1SD6IkKk5_dYRixGuzKMYZfdEXs4HxsRa6TSu_XekY_kqUphTC2H29Df2A/exec';
 
 const CONFIG = {
   port: Number(process.env.PORT || 8787),
@@ -163,7 +166,7 @@ server.listen(CONFIG.port, () => {
 function normalizeAppsScriptUrl_(url) {
   const normalized = String(url || '').trim();
   if (!normalized) return CURRENT_APPS_SCRIPT_URL;
-  if (normalized === OLD_APPS_SCRIPT_URL) return CURRENT_APPS_SCRIPT_URL;
+  if (DEPRECATED_APPS_SCRIPT_URLS.has(normalized)) return CURRENT_APPS_SCRIPT_URL;
   return normalized;
 }
 
