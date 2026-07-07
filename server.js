@@ -24,6 +24,7 @@ const REQUEST_TIMEOUT_MS = 15000;
 const APPS_SCRIPT_RETRY_DELAYS_MS = [0, 1200, 3000];
 const LINE_REPLY_RETRY_DELAYS_MS = [0, 800];
 const LINE_PUSH_RETRY_DELAYS_MS = [0, 800, 2000];
+const EARLY_ACK_TEXT = '已收到，整理中...';
 const processedEventKeys = new Map();
 const pendingEvents = [];
 let isQueueRunning = false;
@@ -218,6 +219,19 @@ async function sendLineSummaryWithFallback(event, text) {
   throw new Error('No replyToken or push target available');
 }
 
+async function sendEarlyAckIfPossible(event) {
+  if (!event?.replyToken) return false;
+
+  try {
+    await replyLineText(event.replyToken, EARLY_ACK_TEXT);
+    console.log('[line] early ack sent');
+    return true;
+  } catch (error) {
+    console.warn('[line] early ack failed:', error.message);
+    return false;
+  }
+}
+
 async function processTextEvent(job) {
   const { event, eventKey } = job;
 
@@ -231,6 +245,7 @@ async function processTextEvent(job) {
         text: String(event.message?.text || '')
       })
     );
+    const earlyAckSent = await sendEarlyAckIfPossible(event);
     const result = await saveLineMessageToAppsScript(event);
     console.log(
       '[line] apps-script saved:',
@@ -240,7 +255,17 @@ async function processTextEvent(job) {
       })
     );
     if (result.replyText) {
-      const strategy = await sendLineSummaryWithFallback(event, result.replyText);
+      let strategy = '';
+      if (earlyAckSent) {
+        const targetId = getPushTargetId(event);
+        if (!targetId) {
+          throw new Error('Early ack sent but no push target available');
+        }
+        await pushLineText(targetId, result.replyText);
+        strategy = 'push-after-ack';
+      } else {
+        strategy = await sendLineSummaryWithFallback(event, result.replyText);
+      }
       console.log('[line] summary delivery strategy:', strategy);
     }
 
