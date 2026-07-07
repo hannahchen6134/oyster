@@ -20,6 +20,13 @@ const CONFIG = {
   appsScriptApiToken: process.env.APPS_SCRIPT_API_TOKEN || ''
 };
 
+const REQUEST_TIMEOUT_MS = 15000;
+const APPS_SCRIPT_RETRY_DELAYS_MS = [0, 1200, 3000];
+const LINE_REPLY_RETRY_DELAYS_MS = [0, 800];
+const processedEventKeys = new Map();
+const pendingEvents = [];
+let isQueueRunning = false;
+
 function sendJson(res, statusCode, body) {
   res.writeHead(statusCode, { 'Content-Type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify(body));
@@ -43,6 +50,76 @@ function verifyLineSignature(rawBody, signature) {
   return digest === signature;
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function shouldRetryStatus(statusCode) {
+  return statusCode === 408 || statusCode === 425 || statusCode === 429 || statusCode >= 500;
+}
+
+async function fetchWithRetry(url, options, retryDelaysMs, label) {
+  let lastError = null;
+
+  for (let attempt = 0; attempt < retryDelaysMs.length; attempt += 1) {
+    if (retryDelaysMs[attempt] > 0) {
+      await sleep(retryDelaysMs[attempt]);
+    }
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+      });
+
+      if (response.ok || !shouldRetryStatus(response.status) || attempt === retryDelaysMs.length - 1) {
+        return response;
+      }
+
+      lastError = new Error(`${label} temporary failure ${response.status}`);
+    } catch (error) {
+      lastError = error;
+      if (attempt === retryDelaysMs.length - 1) {
+        throw error;
+      }
+    }
+  }
+
+  throw lastError || new Error(`${label} failed`);
+}
+
+function getEventKey(event) {
+  return [
+    String(event.timestamp || ''),
+    String(event.replyToken || ''),
+    String(event.source?.type || ''),
+    String(event.source?.userId || ''),
+    String(event.source?.groupId || ''),
+    String(event.source?.roomId || ''),
+    String(event.message?.id || ''),
+    String(event.message?.text || '')
+  ].join('|');
+}
+
+function rememberProcessedEvent(eventKey) {
+  processedEventKeys.set(eventKey, Date.now());
+  pruneProcessedEvents();
+}
+
+function hasProcessedEvent(eventKey) {
+  pruneProcessedEvents();
+  return processedEventKeys.has(eventKey);
+}
+
+function pruneProcessedEvents() {
+  const cutoff = Date.now() - 1000 * 60 * 60 * 12;
+  for (const [eventKey, timestamp] of processedEventKeys.entries()) {
+    if (timestamp < cutoff) {
+      processedEventKeys.delete(eventKey);
+    }
+  }
+}
+
 async function saveLineMessageToAppsScript(event) {
   const body = new URLSearchParams({
     action: 'saveLineMessage',
@@ -56,13 +133,13 @@ async function saveLineMessageToAppsScript(event) {
     roomId: String(event.source?.roomId || '')
   });
 
-  const response = await fetch(CONFIG.appsScriptApiUrl, {
+  const response = await fetchWithRetry(CONFIG.appsScriptApiUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
     },
     body
-  });
+  }, APPS_SCRIPT_RETRY_DELAYS_MS, 'Apps Script');
 
   const data = await response.json();
   if (!response.ok || !data.ok) {
@@ -72,7 +149,7 @@ async function saveLineMessageToAppsScript(event) {
 }
 
 async function replyLineText(replyToken, text) {
-  const response = await fetch('https://api.line.me/v2/bot/message/reply', {
+  const response = await fetchWithRetry('https://api.line.me/v2/bot/message/reply', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -82,7 +159,7 @@ async function replyLineText(replyToken, text) {
       replyToken,
       messages: [{ type: 'text', text }]
     })
-  });
+  }, LINE_REPLY_RETRY_DELAYS_MS, 'LINE reply');
 
   if (!response.ok) {
     const body = await response.text();
@@ -90,11 +167,14 @@ async function replyLineText(replyToken, text) {
   }
 }
 
-async function processTextEvent(event) {
+async function processTextEvent(job) {
+  const { event, eventKey } = job;
+
   try {
     console.log(
       '[line] incoming text:',
       JSON.stringify({
+        eventKey,
         timestamp: event.timestamp || '',
         sourceType: event.source?.type || '',
         text: String(event.message?.text || '')
@@ -112,9 +192,40 @@ async function processTextEvent(event) {
       await replyLineText(event.replyToken, result.replyText);
       console.log('[line] reply sent');
     }
+
+    rememberProcessedEvent(eventKey);
   } catch (error) {
-    console.error('Webhook handling failed:', error);
+    console.error('Webhook handling failed:', eventKey, error);
   }
+}
+
+async function runPendingQueue() {
+  if (isQueueRunning) return;
+  isQueueRunning = true;
+
+  try {
+    while (pendingEvents.length > 0) {
+      const job = pendingEvents.shift();
+      await processTextEvent(job);
+    }
+  } finally {
+    isQueueRunning = false;
+    if (pendingEvents.length > 0) {
+      void runPendingQueue();
+    }
+  }
+}
+
+function enqueueEvent(event) {
+  const eventKey = getEventKey(event);
+
+  if (hasProcessedEvent(eventKey) || pendingEvents.some((job) => job.eventKey === eventKey)) {
+    console.log('[line] duplicated event skipped:', eventKey);
+    return;
+  }
+
+  pendingEvents.push({ event, eventKey });
+  void runPendingQueue();
 }
 
 async function handleWebhook(req, res) {
@@ -130,9 +241,7 @@ async function handleWebhook(req, res) {
 
   for (const event of events) {
     if (!event || event.type !== 'message' || event.message?.type !== 'text') continue;
-    queueMicrotask(() => {
-      processTextEvent(event);
-    });
+    enqueueEvent(event);
   }
 
   return sendJson(res, 200, { ok: true });
@@ -144,7 +253,9 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && url.pathname === '/') {
     return sendJson(res, 200, {
       ok: true,
-      service: 'oyster-care-line-backend'
+      service: 'oyster-care-line-backend',
+      queueLength: pendingEvents.length,
+      processedEventCacheSize: processedEventKeys.size
     });
   }
 
