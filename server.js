@@ -23,6 +23,7 @@ const CONFIG = {
 const REQUEST_TIMEOUT_MS = 15000;
 const APPS_SCRIPT_RETRY_DELAYS_MS = [0, 1200, 3000];
 const LINE_REPLY_RETRY_DELAYS_MS = [0, 800];
+const LINE_PUSH_RETRY_DELAYS_MS = [0, 800, 2000];
 const processedEventKeys = new Map();
 const pendingEvents = [];
 let isQueueRunning = false;
@@ -167,6 +168,56 @@ async function replyLineText(replyToken, text) {
   }
 }
 
+function getPushTargetId(event) {
+  return String(
+    event?.source?.userId ||
+    event?.source?.groupId ||
+    event?.source?.roomId ||
+    ''
+  ).trim();
+}
+
+async function pushLineText(targetId, text) {
+  const response = await fetchWithRetry('https://api.line.me/v2/bot/message/push', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${CONFIG.lineChannelAccessToken}`
+    },
+    body: JSON.stringify({
+      to: targetId,
+      messages: [{ type: 'text', text }]
+    })
+  }, LINE_PUSH_RETRY_DELAYS_MS, 'LINE push');
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`LINE push failed ${response.status}: ${body}`);
+  }
+}
+
+async function sendLineSummaryWithFallback(event, text) {
+  const targetId = getPushTargetId(event);
+
+  if (event.replyToken) {
+    try {
+      await replyLineText(event.replyToken, text);
+      console.log('[line] reply sent');
+      return 'reply';
+    } catch (error) {
+      console.warn('[line] reply failed, trying push fallback:', error.message);
+    }
+  }
+
+  if (targetId) {
+    await pushLineText(targetId, text);
+    console.log('[line] push fallback sent');
+    return 'push';
+  }
+
+  throw new Error('No replyToken or push target available');
+}
+
 async function processTextEvent(job) {
   const { event, eventKey } = job;
 
@@ -188,9 +239,9 @@ async function processTextEvent(job) {
         replyText: String(result.replyText || '').slice(0, 120)
       })
     );
-    if (event.replyToken && result.replyText) {
-      await replyLineText(event.replyToken, result.replyText);
-      console.log('[line] reply sent');
+    if (result.replyText) {
+      const strategy = await sendLineSummaryWithFallback(event, result.replyText);
+      console.log('[line] summary delivery strategy:', strategy);
     }
 
     rememberProcessedEvent(eventKey);
