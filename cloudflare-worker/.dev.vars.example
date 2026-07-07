@@ -1,0 +1,5 @@
+LINE_CHANNEL_ACCESS_TOKEN=
+LINE_CHANNEL_SECRET=
+APPS_SCRIPT_API_URL=https://script.google.com/macros/s/AKfycbxAtjdHf6slobcUIt9FnO7P4Nxof21nWvX04pQrb_7ae-wur19phGk-C8Tfo3xXJ5G3nQ/exec
+APPS_SCRIPT_API_TOKEN=oyster-line-sync-20260704
+EARLY_ACK_TEXT=已收到，整理中...
