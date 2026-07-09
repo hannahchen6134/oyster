@@ -146,7 +146,7 @@ async function handleTextMessage(event, env, baseUrl) {
       }
       const newPet = await createPet(db, lineUserId, { petName: intent.name });
       if (!pets.length) await updateUser(db, lineUserId, { defaultPetId: newPet.petId });
-      await replyOrPush(env, event, `🐱 已建立貓咪「${intent.name}」！\n現在就可以輸入「水 20」開始記錄。\n生日、體重、疾病備註可到照護站（輸入「網站」）補齊。`);
+      await replyOrPush(env, event, `🐾 已建立貓咪「${intent.name}」！\n現在就可以輸入「水 20」開始記錄。\n生日、體重、疾病備註可到照護站（輸入「網站」）補齊。`);
       return;
     }
 
@@ -211,7 +211,7 @@ async function handleRecord(env, event, pet, record, lineUserId) {
 
   if (record.category === 'water') {
     log.waterMl = record.amount;
-    description = `💧 水 ${record.amount} ml`;
+    description = `水 ${record.amount} ml`;
   } else if (record.category === 'food') {
     const foods = await listFoods(db, lineUserId);
     const matched = matchFood(foods, record.itemName, record.foodType);
@@ -220,26 +220,26 @@ async function handleRecord(env, event, pet, record, lineUserId) {
       log.itemName = matched.displayName;
       log.kcal = Math.round(record.amount * Number(matched.kcalPerGram || 0) * 10) / 10;
       log.waterMl = Math.round(record.amount * Number(matched.waterRatio || 0) * 10) / 10;
-      description = `🍚 ${record.foodType} ${matched.displayName} ${record.amount} g（熱量 ${log.kcal} kcal、水分 ${log.waterMl} ml）`;
+      description = `${record.foodType} ${matched.displayName} ${record.amount} g（熱量 ${log.kcal} kcal、水分 ${log.waterMl} ml）`;
     } else {
-      description = `🍚 ${record.foodType}${record.itemName ? ` ${record.itemName}` : ''} ${record.amount} g`;
+      description = `${record.foodType}${record.itemName ? ` ${record.itemName}` : ''} ${record.amount} g`;
       hints.push('這個品項還沒設定熱量/水分公式，本筆先照原樣記錄。到照護站「設定 → 食物」新增後，之後會自動計算。');
     }
   } else if (record.category === 'med') {
     const label = [record.medSlot, record.itemName].filter(Boolean).join(' ');
-    description = `💊 藥${label ? ` ${label}` : ''} ${record.medStatus}`;
+    description = `藥${label ? ` ${label}` : ''} ${record.medStatus}`;
   } else if (record.category === 'vomit') {
-    description = `🤮 嘔吐${record.note ? `：${record.note}` : ''}`;
+    description = `嘔吐${record.note ? `：${record.note}` : ''}`;
   } else if (record.category === 'stool') {
-    description = `💩 便便${record.note ? `：${record.note}` : ''}`;
+    description = `便便${record.note ? `：${record.note}` : ''}`;
   } else if (record.category === 'mood') {
-    description = `🐱 精神${record.note ? `：${record.note}` : ''}`;
+    description = `精神${record.note ? `：${record.note}` : ''}`;
   } else {
-    description = `📝 備註：${record.note}`;
+    description = `備註：${record.note}`;
   }
 
   if (record.dayOffset || record.time) {
-    description += `\n🕐 記錄時間：${eventDateTime}`;
+    description += `\n（記錄時間 ${eventDateTime}）`;
   }
 
   await insertLog(db, log);

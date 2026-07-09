@@ -80,6 +80,7 @@ CREATE TABLE IF NOT EXISTS vet_visits (
   petId TEXT NOT NULL,
   vetId TEXT NOT NULL DEFAULT '',
   visitDate TEXT NOT NULL DEFAULT '',
+  visitTime TEXT NOT NULL DEFAULT '',
   reason TEXT NOT NULL DEFAULT '',
   doctorInstruction TEXT NOT NULL DEFAULT '',
   nextVisitDate TEXT NOT NULL DEFAULT '',

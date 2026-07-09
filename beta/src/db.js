@@ -329,10 +329,20 @@ export async function createSession(db, lineUserId) {
   return token;
 }
 
+// 滑動延長：只要有在使用就自動續期，超過 30 天沒開才會真的過期。
+// 剩餘效期低於 25 天才寫回，避免每個 API 請求都多一次寫入。
+const SESSION_RENEW_THRESHOLD_MS = (SESSION_DAYS - 5) * 24 * 60 * 60 * 1000;
+
 export async function getSessionUser(db, token) {
   if (!token) return null;
   const session = await db.prepare('SELECT * FROM sessions WHERE token = ?').bind(token).first();
   if (!session) return null;
   if (String(session.expiresAt) < nowIso()) return null;
+
+  const remainingMs = new Date(session.expiresAt).getTime() - Date.now();
+  if (remainingMs < SESSION_RENEW_THRESHOLD_MS) {
+    const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    await db.prepare('UPDATE sessions SET expiresAt = ? WHERE token = ?').bind(expiresAt, token).run();
+  }
   return session.lineUserId;
 }

@@ -4,189 +4,225 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>貓貓照護站 Beta</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&family=Noto+Serif+TC:wght@500;600&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #f6f1e8;
-      --surface: rgba(255, 252, 247, 0.96);
-      --surface-strong: #fffdfa;
-      --ink: #223235;
-      --muted: #667673;
-      --line: rgba(34, 50, 53, 0.12);
-      --brand: #255b53;
-      --brand-soft: #d9e8e2;
-      --warn: #b4544d;
-      --warn-soft: #f9e0dc;
-      --shadow: 0 18px 48px rgba(34, 50, 53, 0.09);
-      --radius-lg: 22px;
-      --radius-md: 16px;
+      --bg: #f7f4ee;
+      --surface: #fffefb;
+      --surface-soft: #fbf9f4;
+      --ink: #2b2a26;
+      --ink-soft: #55534b;
+      --muted: #8b867a;
+      --line: #e8e3d8;
+      --line-strong: #d9d2c3;
+      --brand: #37584d;
+      --brand-deep: #2b463d;
+      --brand-tint: #eef1ec;
+      --warn: #a4524b;
+      --warn-tint: #f7ebe8;
+      --radius: 14px;
+      --shadow: 0 1px 2px rgba(43, 42, 38, 0.04), 0 10px 30px rgba(43, 42, 38, 0.05);
+      --serif: "Noto Serif TC", "Songti TC", serif;
     }
     * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
     body {
       margin: 0;
       min-height: 100vh;
       font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+      font-size: 15px;
+      line-height: 1.65;
       color: var(--ink);
-      background:
-        radial-gradient(circle at top left, rgba(37, 91, 83, 0.14), transparent 28%),
-        radial-gradient(circle at top right, rgba(212, 131, 86, 0.14), transparent 30%),
-        linear-gradient(180deg, #fbf8f2 0%, #f2ebdf 100%);
+      background: var(--bg);
     }
-    .shell { width: min(980px, calc(100% - 24px)); margin: 0 auto; padding: 18px 0 80px; }
+    .shell { width: min(880px, calc(100% - 32px)); margin: 0 auto; padding: 40px 0 96px; }
     .panel {
       background: var(--surface);
-      border: 1px solid rgba(37, 91, 83, 0.1);
+      border: 1px solid var(--line);
       box-shadow: var(--shadow);
-      border-radius: var(--radius-lg);
-      padding: 20px;
-      margin-top: 16px;
+      border-radius: var(--radius);
+      padding: 26px 28px;
+      margin-top: 20px;
     }
-    h1 { margin: 0; font-size: clamp(22px, 4vw, 30px); }
-    h2 { margin: 0 0 12px; font-size: 19px; }
-    h3 { margin: 0 0 8px; font-size: 16px; }
-    .muted { color: var(--muted); font-size: 14px; }
+    h1 {
+      margin: 0; font-family: var(--serif); font-weight: 600;
+      font-size: clamp(22px, 4vw, 28px); letter-spacing: 0.01em; line-height: 1.35;
+    }
+    h2 { margin: 0 0 14px; font-family: var(--serif); font-weight: 600; font-size: 18px; letter-spacing: 0.02em; }
+    h3 { margin: 0 0 8px; font-weight: 600; font-size: 15px; }
+    .muted { color: var(--muted); font-size: 13.5px; }
     .topbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
     .topbar .spacer { flex: 1; }
     .eyebrow {
-      display: inline-flex; align-items: center; padding: 7px 12px; border-radius: 999px;
-      background: rgba(37, 91, 83, 0.1); color: var(--brand); font-size: 13px; font-weight: 800;
+      display: inline-block; color: var(--brand); font-size: 12px; font-weight: 600;
+      letter-spacing: 0.24em; text-transform: uppercase;
     }
-    .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    .tabs { display: flex; flex-wrap: wrap; gap: 2px; margin: 22px -28px -26px; padding: 0 28px; border-top: 1px solid var(--line); }
     .tab {
-      border: 1px solid var(--line); background: var(--surface-strong); color: var(--ink);
-      border-radius: 999px; padding: 10px 18px; cursor: pointer; font: inherit; font-weight: 700;
+      border: none; background: none; color: var(--muted); cursor: pointer; font: inherit;
+      font-weight: 500; padding: 13px 14px 15px; border-bottom: 2px solid transparent; margin-bottom: -1px;
+      transition: color 0.15s;
     }
-    .tab.active { background: linear-gradient(135deg, #255b53, #36766b); color: #fff; border-color: transparent; }
+    .tab:hover { color: var(--ink); }
+    .tab.active { color: var(--brand-deep); font-weight: 600; border-bottom-color: var(--brand); }
     input, select, textarea, button { font: inherit; }
     input, select, textarea {
-      width: 100%; border: 1px solid var(--line); border-radius: 12px;
-      background: var(--surface-strong); padding: 10px 12px; color: var(--ink);
+      width: 100%; border: 1px solid var(--line-strong); border-radius: 10px;
+      background: var(--surface); padding: 9px 12px; color: var(--ink);
     }
     textarea { min-height: 72px; resize: vertical; }
     input:focus, select:focus, textarea:focus {
-      outline: none; border-color: rgba(37, 91, 83, 0.45); box-shadow: 0 0 0 4px rgba(37, 91, 83, 0.08);
+      outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px rgba(55, 88, 77, 0.1);
     }
-    label { font-size: 13px; font-weight: 800; color: #4a635e; display: block; margin-bottom: 6px; }
-    .btn { border: none; border-radius: 999px; padding: 10px 16px; cursor: pointer; font-weight: 800; }
-    .btn-primary { background: linear-gradient(135deg, #255b53, #36766b); color: #fff; }
-    .btn-secondary { background: rgba(37, 91, 83, 0.08); color: var(--brand); }
-    .btn-danger { background: rgba(180, 84, 77, 0.1); color: var(--warn); }
-    .btn-sm { padding: 7px 12px; font-size: 13px; }
-    .grid { display: grid; gap: 12px; }
+    label { font-size: 13px; font-weight: 600; color: var(--ink-soft); display: block; margin-bottom: 6px; }
+    .btn {
+      border: 1px solid transparent; border-radius: 10px; padding: 9px 16px; cursor: pointer;
+      font-weight: 600; font-size: 14px; transition: background 0.15s, border-color 0.15s;
+    }
+    .btn-primary { background: var(--brand); color: #fff; }
+    .btn-primary:hover { background: var(--brand-deep); }
+    .btn-secondary { background: transparent; border-color: var(--line-strong); color: var(--ink-soft); }
+    .btn-secondary:hover { border-color: var(--brand); color: var(--brand-deep); }
+    .btn-danger { background: transparent; border-color: transparent; color: var(--warn); }
+    .btn-danger:hover { background: var(--warn-tint); }
+    .btn-sm { padding: 6px 12px; font-size: 13px; }
+    .grid { display: grid; gap: 10px; }
     .grid-2 { grid-template-columns: 1fr 1fr; }
     .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-    .stat-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-    .card { padding: 14px 16px; border-radius: var(--radius-md); background: var(--surface-strong); border: 1px solid var(--line); }
-    .stat-label { color: var(--muted); font-size: 13px; font-weight: 700; }
-    .stat-value { margin-top: 6px; font-size: clamp(20px, 3vw, 28px); font-weight: 900; line-height: 1.1; }
-    .stat-sub { margin-top: 6px; color: #536562; font-size: 13px; line-height: 1.5; }
+    .stat-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+    .card { padding: 14px 16px; border-radius: 12px; background: var(--surface-soft); border: 1px solid var(--line); }
+    .stat-label { color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0.08em; }
+    .stat-value { margin-top: 5px; font-size: clamp(19px, 2.6vw, 24px); font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; }
+    .stat-sub { margin-top: 5px; color: var(--ink-soft); font-size: 12.5px; line-height: 1.5; }
     .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
     .toolbar input[type="date"] { width: auto; }
     .entry {
-      display: grid; grid-template-columns: 74px 1fr auto; gap: 12px; align-items: start;
-      padding: 12px 14px; border-radius: var(--radius-md);
-      background: var(--surface-strong); border: 1px solid var(--line);
+      display: grid; grid-template-columns: 64px 1fr auto; gap: 14px; align-items: start;
+      padding: 14px 4px; border-bottom: 1px solid var(--line);
     }
-    .entry-time { font-size: 19px; font-weight: 900; }
+    .entry:last-child { border-bottom: none; }
+    .entry-time { font-size: 15px; font-weight: 600; color: var(--ink-soft); font-variant-numeric: tabular-nums; padding-top: 3px; }
     .chips { display: flex; flex-wrap: wrap; gap: 6px; }
     .chip {
-      display: inline-flex; align-items: center; padding: 5px 10px; border-radius: 999px;
-      background: rgba(37, 91, 83, 0.08); color: var(--brand); font-size: 13px; font-weight: 800;
+      display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px;
+      background: var(--brand-tint); color: var(--brand-deep); font-size: 13px; font-weight: 500;
     }
-    .chip.warn { background: var(--warn-soft); color: var(--warn); }
-    .entry-note { color: #4a5b58; font-size: 14px; line-height: 1.6; white-space: pre-wrap; margin-top: 6px; }
-    .entry-actions { display: flex; flex-direction: column; gap: 6px; }
+    .chip.warn { background: var(--warn-tint); color: var(--warn); }
+    .entry-note { color: var(--ink-soft); font-size: 14px; line-height: 1.6; white-space: pre-wrap; margin-top: 6px; }
+    .entry-actions { display: flex; gap: 4px; }
     .empty {
-      padding: 22px; border-radius: var(--radius-md); border: 1px dashed rgba(37, 91, 83, 0.25);
-      background: rgba(255, 255, 255, 0.55); color: var(--muted); text-align: center;
+      padding: 26px; border-radius: 12px; border: 1px dashed var(--line-strong);
+      color: var(--muted); text-align: center; font-size: 14px;
     }
     .doctor-note {
-      margin-top: 14px; padding: 14px 16px; border-radius: var(--radius-md);
-      background: linear-gradient(135deg, rgba(37, 91, 83, 0.08), rgba(255, 255, 255, 0.84));
-      border: 1px solid rgba(37, 91, 83, 0.1); line-height: 1.75; color: #445754; font-size: 14px;
+      margin-top: 16px; padding: 14px 18px; border-radius: 0 12px 12px 0;
+      background: var(--surface-soft); border-left: 3px solid var(--brand);
+      line-height: 1.75; color: var(--ink-soft); font-size: 14px;
     }
+    .section-head { display: flex; align-items: center; gap: 10px; margin-top: 26px; margin-bottom: 10px; }
+    .section-head h2 { margin: 0; flex: 1; }
+    /* 看診 */
+    .visit-item {
+      display: flex; align-items: flex-start; gap: 12px; padding: 12px 16px;
+      border-radius: 12px; background: var(--brand-tint); border: 1px solid var(--line);
+    }
+    .visit-item .info { flex: 1; min-width: 0; }
+    .visit-item .title { font-weight: 600; font-size: 14px; }
+    .visit-item .sub { color: var(--ink-soft); font-size: 13px; margin-top: 2px; line-height: 1.55; }
     /* 月曆 */
-    .cal-head { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 12px; }
-    .cal-title { font-size: 18px; font-weight: 900; min-width: 130px; text-align: center; }
-    .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
-    .cal-dow { text-align: center; font-size: 12px; font-weight: 800; color: var(--muted); padding: 4px 0; }
+    .cal-head { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 14px; }
+    .cal-title { font-family: var(--serif); font-size: 17px; font-weight: 600; min-width: 130px; text-align: center; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+    .cal-dow { text-align: center; font-size: 11.5px; font-weight: 600; color: var(--muted); padding: 4px 0; letter-spacing: 0.1em; }
     .cal-cell {
-      min-height: 76px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface-strong);
-      padding: 6px; font-size: 11px; cursor: pointer; overflow: hidden;
+      min-height: 74px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface);
+      padding: 6px 7px; font-size: 11px; cursor: pointer; overflow: hidden; transition: border-color 0.15s;
     }
-    .cal-cell:hover { border-color: rgba(37, 91, 83, 0.45); }
+    .cal-cell:hover { border-color: var(--brand); }
     .cal-cell.blank { visibility: hidden; }
-    .cal-cell.today { border-color: var(--brand); box-shadow: 0 0 0 2px rgba(37, 91, 83, 0.18); }
-    .cal-cell.norec { background: rgba(255, 255, 255, 0.45); color: var(--muted); }
-    .cal-cell.warn { background: #fdf1ef; border-color: rgba(180, 84, 77, 0.3); }
-    .cal-daynum { font-weight: 900; font-size: 13px; }
-    .cal-line { margin-top: 2px; white-space: nowrap; }
-    .cal-flags { margin-top: 2px; font-size: 12px; }
+    .cal-cell.today { border-color: var(--brand); box-shadow: inset 0 0 0 1px var(--brand); }
+    .cal-cell.norec { background: transparent; color: var(--muted); }
+    .cal-cell.warn { background: var(--warn-tint); border-color: rgba(164, 82, 75, 0.3); }
+    .cal-daynum { font-weight: 600; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+    .cal-line { margin-top: 2px; white-space: nowrap; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+    .cal-flags { margin-top: 2px; font-size: 11.5px; }
     /* 表格 */
     .table-wrap { overflow-x: auto; }
-    table { border-collapse: collapse; width: 100%; font-size: 13px; }
+    table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
     th, td { border-bottom: 1px solid var(--line); padding: 8px 10px; text-align: right; white-space: nowrap; }
     th:first-child, td:first-child { text-align: left; }
-    th { color: var(--muted); font-size: 12px; }
-    tr.warn td { background: rgba(180, 84, 77, 0.05); }
+    th { color: var(--muted); font-size: 12px; font-weight: 600; }
+    tr.warn td { background: rgba(164, 82, 75, 0.05); }
     /* 設定 */
-    .settings-nav { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+    .settings-nav { display: flex; flex-wrap: wrap; gap: 2px; margin: -26px -28px 18px; padding: 0 28px; border-bottom: 1px solid var(--line); }
+    .settings-nav .tab { padding: 12px 13px 14px; }
     .list-item {
-      display: flex; align-items: center; gap: 10px; padding: 12px 14px;
-      border-radius: var(--radius-md); background: var(--surface-strong); border: 1px solid var(--line);
+      display: flex; align-items: center; gap: 10px; padding: 13px 4px;
+      border-bottom: 1px solid var(--line);
     }
+    .list-item:last-child { border-bottom: none; }
     .list-item .info { flex: 1; min-width: 0; }
-    .list-item .title { font-weight: 800; }
-    .list-item .sub { color: var(--muted); font-size: 13px; margin-top: 2px; line-height: 1.5; }
+    .list-item .title { font-weight: 600; font-size: 14.5px; }
+    .list-item .sub { color: var(--muted); font-size: 13px; margin-top: 2px; line-height: 1.55; }
     /* Modal */
     .modal-backdrop {
       position: fixed; inset: 0; display: none; align-items: flex-start; justify-content: center;
-      padding: 24px 12px; background: rgba(17, 24, 24, 0.5); z-index: 40; overflow-y: auto;
+      padding: 24px 12px; background: rgba(31, 30, 27, 0.45); z-index: 40; overflow-y: auto;
     }
     .modal-backdrop.open { display: flex; }
     .modal {
-      width: min(560px, 100%); background: var(--surface-strong); border-radius: var(--radius-lg);
-      padding: 20px; box-shadow: var(--shadow); margin: auto 0;
+      width: min(540px, 100%); background: var(--surface); border-radius: var(--radius);
+      padding: 24px 26px; box-shadow: var(--shadow); margin: auto 0;
     }
-    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
-    .field { margin-bottom: 12px; }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+    .field { margin-bottom: 13px; }
     .toast {
-      position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%);
-      background: #223235; color: #fff; padding: 10px 18px; border-radius: 999px;
+      position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%);
+      background: var(--ink); color: #fff; padding: 10px 18px; border-radius: 10px;
       font-size: 14px; z-index: 60; opacity: 0; transition: opacity 0.25s; pointer-events: none;
       max-width: 90vw;
     }
     .toast.show { opacity: 1; }
     .loading { opacity: 0.55; pointer-events: none; }
     .hidden { display: none !important; }
+    /* 登入 */
+    .login-wrap { min-height: calc(100vh - 140px); display: flex; align-items: center; justify-content: center; }
+    .login-card { max-width: 460px; width: 100%; text-align: center; padding: 44px 32px; }
+    .login-steps { margin: 26px auto 0; max-width: 340px; text-align: left; display: grid; gap: 0; }
+    .login-step { display: flex; gap: 14px; align-items: baseline; padding: 11px 2px; border-bottom: 1px solid var(--line); }
+    .login-step:last-child { border-bottom: none; }
+    .login-step .num { font-family: var(--serif); color: var(--brand); font-weight: 600; font-size: 15px; }
     @media (max-width: 760px) {
+      .shell { padding-top: 16px; }
+      .panel { padding: 20px 18px; }
+      .tabs { margin: 18px -18px -20px; padding: 0 10px; }
+      .settings-nav { margin: -20px -18px 16px; padding: 0 10px; }
       .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .grid-2 { grid-template-columns: 1fr; }
-      .entry { grid-template-columns: 1fr; }
+      .entry { grid-template-columns: 1fr; gap: 6px; }
       .entry-actions { flex-direction: row; }
-      .cal-cell { min-height: 62px; }
+      .cal-cell { min-height: 62px; padding: 4px 5px; }
     }
   </style>
 </head>
 <body>
   <div class="shell">
     <!-- 登入畫面 -->
-    <section id="loginView" class="panel hidden" style="text-align:center;padding:40px 24px">
-      <div style="font-size:52px;line-height:1">🐱</div>
-      <div class="eyebrow" style="margin-top:14px">貓貓照護站 Beta</div>
-      <h1 style="margin-top:12px">請先從 LINE 取得登入連結</h1>
-      <div style="max-width:420px;margin:20px auto 0;text-align:left;display:grid;gap:10px">
-        <div class="card" style="display:flex;gap:12px;align-items:center">
-          <span class="chip">1</span><span>打開「貓貓照護管家 Beta」官方 LINE</span>
+    <section id="loginView" class="login-wrap hidden">
+      <div class="panel login-card">
+        <div class="eyebrow">Cat Care · Beta</div>
+        <h1 style="margin-top:14px">貓貓照護站</h1>
+        <p class="muted" style="margin-top:10px">請先從 LINE 取得登入連結</p>
+        <div class="login-steps">
+          <div class="login-step"><span class="num">1</span><span>打開「貓貓照護管家 Beta」官方 LINE</span></div>
+          <div class="login-step"><span class="num">2</span><span>輸入 <b>網站</b> 兩個字</span></div>
+          <div class="login-step"><span class="num">3</span><span>點機器人回覆的專屬連結</span></div>
         </div>
-        <div class="card" style="display:flex;gap:12px;align-items:center">
-          <span class="chip">2</span><span>輸入 <b>網站</b> 兩個字</span>
-        </div>
-        <div class="card" style="display:flex;gap:12px;align-items:center">
-          <span class="chip">3</span><span>點機器人回覆的專屬連結（30 天內有效）</span>
-        </div>
+        <p class="muted" style="margin-top:22px">連結會隨使用自動延長效期，超過 30 天未使用才會過期；<br>過期時再輸入一次「網站」即可。</p>
       </div>
-      <p class="muted" style="margin-top:18px">連結過期了？再輸入一次「網站」就會拿到新的。</p>
     </section>
 
     <!-- 主畫面 -->
@@ -194,18 +230,18 @@
       <section class="panel">
         <div class="topbar">
           <div>
-            <div class="eyebrow">🐱 貓貓照護站 Beta</div>
-            <h1 style="margin-top:10px"><span id="petTitle">貓貓</span> 的照護紀錄</h1>
+            <div class="eyebrow">Cat Care · Beta</div>
+            <h1 style="margin-top:8px"><span id="petTitle">貓貓</span> 的照護紀錄</h1>
           </div>
           <div class="spacer"></div>
           <select id="petSelect" aria-label="選擇貓咪" style="width:auto;min-width:104px"></select>
           <button class="btn btn-secondary btn-sm" id="logoutBtn" type="button">登出</button>
         </div>
         <div class="tabs">
-          <button class="tab active" data-tab="today" type="button">📅 今日明細</button>
-          <button class="tab" data-tab="calendar" type="button">🗓️ 月曆</button>
-          <button class="tab" data-tab="trend" type="button">📈 近30天</button>
-          <button class="tab" data-tab="settings" type="button">⚙️ 設定</button>
+          <button class="tab active" data-tab="today" type="button">每日明細</button>
+          <button class="tab" data-tab="calendar" type="button">月曆</button>
+          <button class="tab" data-tab="trend" type="button">近 30 天</button>
+          <button class="tab" data-tab="settings" type="button">設定</button>
         </div>
       </section>
 
@@ -229,11 +265,18 @@
         <div class="doctor-note">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px">
             <b style="font-size:14px">給醫生的一句話</b>
-            <button class="btn btn-secondary btn-sm" id="copyDoctorBtn" type="button">📋 複製</button>
+            <button class="btn btn-secondary btn-sm" id="copyDoctorBtn" type="button">複製</button>
           </div>
           <div id="doctorNote">今天還沒有紀錄。</div>
         </div>
-        <h2 style="margin-top:18px">當日紀錄</h2>
+        <div class="section-head">
+          <h2>看診</h2>
+          <button class="btn btn-secondary btn-sm" id="addVisitBtn" type="button">＋ 記錄看診</button>
+        </div>
+        <div class="grid" id="dayVisitList"></div>
+        <div class="section-head">
+          <h2>當日紀錄</h2>
+        </div>
         <div class="grid" id="logList"></div>
       </section>
 
@@ -264,11 +307,11 @@
       <!-- 設定 -->
       <section class="panel hidden" id="settingsView">
         <div class="settings-nav">
-          <button class="tab active" data-settings="pets" type="button">🐱 貓咪</button>
-          <button class="tab" data-settings="foods" type="button">🍚 食物</button>
-          <button class="tab" data-settings="meds" type="button">💊 藥物</button>
-          <button class="tab" data-settings="vets" type="button">🏥 醫院醫生</button>
-          <button class="tab" data-settings="visits" type="button">📋 回診資料</button>
+          <button class="tab active" data-settings="pets" type="button">貓咪</button>
+          <button class="tab" data-settings="foods" type="button">食物</button>
+          <button class="tab" data-settings="meds" type="button">藥物</button>
+          <button class="tab" data-settings="vets" type="button">醫院醫生</button>
+          <button class="tab" data-settings="visits" type="button">回診資料</button>
         </div>
         <div class="toolbar" style="margin-bottom:12px">
           <div class="muted" id="settingsHint"></div>
@@ -387,17 +430,74 @@
 
     // ---------- 今日明細 ----------
     const CATEGORY_LABEL = {
-      water: '💧 喝水', food: '🍚 食物', med: '💊 藥物',
-      vomit: '🤮 嘔吐', stool: '💩 便便', mood: '🐱 精神', note: '📝 備註'
+      water: '喝水', food: '食物', med: '藥物',
+      vomit: '嘔吐', stool: '便便', mood: '精神', note: '備註'
     };
 
     async function loadDay() {
       if (!state.petId) return;
       $('dayPicker').value = state.date;
-      const data = await api(`day?petId=${state.petId}&date=${state.date}`);
+      const [data, visitsData, vetsData] = await Promise.all([
+        api(`day?petId=${state.petId}&date=${state.date}`),
+        api(`visits?petId=${state.petId}`),
+        api('vets')
+      ]);
       state.dayLogs = data.logs;
+      state.visits = visitsData.rows;
+      state.vets = vetsData.rows;
       renderSummary(data.summary);
+      renderDayVisits();
       renderLogs(data.logs);
+    }
+
+    function vetLabel(vet) {
+      if (!vet) return '';
+      return [vet.hospitalName, vet.doctorName].filter(Boolean).join('・');
+    }
+
+    function renderDayVisits() {
+      const vetsById = Object.fromEntries(state.vets.map((vet) => [vet.vetId, vet]));
+      const visits = state.visits.filter((visit) => visit.visitDate === state.date || visit.nextVisitDate === state.date);
+      const container = $('dayVisitList');
+      if (!visits.length) {
+        container.innerHTML = '';
+        return;
+      }
+      container.innerHTML = visits.map((visit) => {
+        const isNextOnly = visit.visitDate !== state.date && visit.nextVisitDate === state.date;
+        const title = isNextOnly
+          ? `預定回診${visit.visitTime ? `・${visit.visitTime}` : ''}`
+          : `看診${visit.visitTime ? `・${visit.visitTime}` : ''}`;
+        const sub = [vetLabel(vetsById[visit.vetId]), visit.reason, visit.doctorInstruction].filter(Boolean).join('｜');
+        return `
+          <div class="visit-item">
+            <div class="info">
+              <div class="title">${esc(title)}</div>
+              <div class="sub">${esc(sub || '尚未填寫醫院與原因')}</div>
+            </div>
+            <button class="btn btn-secondary btn-sm" data-visit-edit="${esc(visit.visitId)}" type="button">編輯</button>
+            <button class="btn btn-danger btn-sm" data-visit-del="${esc(visit.visitId)}" type="button">刪除</button>
+          </div>`;
+      }).join('');
+    }
+
+    function openDayVisitModal(visit) {
+      const spec = SETTINGS_SPEC.visits;
+      const prefill = visit || { visitDate: state.date };
+      const html = spec.fields.map((field) =>
+        `<div class="field"><label>${esc(field.label)}</label>${settingsFieldHtml(field, prefill?.[field.name])}</div>`).join('');
+      openModal(visit ? '編輯看診紀錄' : '記錄看診', html, async (form) => {
+        const body = { petId: state.petId };
+        for (const field of spec.fields) {
+          const el = form.querySelector(`[name="${field.name}"]`);
+          body[field.name] = el.value.trim();
+        }
+        if (!body.visitDate) throw new Error('請填看診日');
+        if (visit) await api(`visits/${visit.visitId}`, { method: 'PUT', body: JSON.stringify(body) });
+        else await api('visits', { method: 'POST', body: JSON.stringify(body) });
+        toast('已儲存看診紀錄');
+        await loadDay();
+      });
     }
 
     function renderSummary(s) {
@@ -452,8 +552,8 @@
         if (log.category === 'water') chips.push(`<span class="chip">${fmt(log.waterMl || log.amount)} ml</span>`);
         if (log.category === 'food') {
           chips.push(`<span class="chip">${esc(log.foodType)}${log.itemName ? ` ・ ${esc(log.itemName)}` : ''} ${fmt(log.amount)} g</span>`);
-          if (log.kcal) chips.push(`<span class="chip">🔥 ${fmt(log.kcal)} kcal</span>`);
-          if (log.waterMl) chips.push(`<span class="chip">💧 ${fmt(log.waterMl)} ml</span>`);
+          if (log.kcal) chips.push(`<span class="chip">${fmt(log.kcal)} kcal</span>`);
+          if (log.waterMl) chips.push(`<span class="chip">水 ${fmt(log.waterMl)} ml</span>`);
         }
         if (log.category === 'med') {
           const warn = log.medStatus !== '已吃';
@@ -730,15 +830,16 @@
         perPet: true,
         fields: [
           { name: 'visitDate', label: '看診日', type: 'date' },
-          { name: 'vetId', label: '醫院', type: 'vetSelect' },
+          { name: 'visitTime', label: '看診時間', type: 'time' },
+          { name: 'vetId', label: '醫院醫生', type: 'vetSelect' },
           { name: 'reason', label: '原因' },
           { name: 'doctorInstruction', label: '醫生交代事項', type: 'textarea' },
           { name: 'nextVisitDate', label: '下次回診日', type: 'date' },
           { name: 'note', label: '備註', type: 'textarea' }
         ],
         render: (row, ctx) => ({
-          title: `${row.visitDate || '（未填看診日）'}${row.nextVisitDate ? ` → 下次 ${row.nextVisitDate}` : ''}`,
-          sub: [ctx.vetsById[row.vetId]?.hospitalName, row.reason, row.doctorInstruction].filter(Boolean).join('｜') || '—'
+          title: `${row.visitDate || '（未填看診日）'}${row.visitTime ? ` ${row.visitTime}` : ''}${row.nextVisitDate ? ` → 下次 ${row.nextVisitDate}` : ''}`,
+          sub: [vetLabel(ctx.vetsById[row.vetId]), row.reason, row.doctorInstruction].filter(Boolean).join('｜') || '—'
         })
       }
     };
@@ -889,6 +990,23 @@
         return switchTab('today');
       }
 
+      const visitEditBtn = event.target.closest('[data-visit-edit]');
+      if (visitEditBtn) {
+        const visit = state.visits.find((entry) => entry.visitId === visitEditBtn.dataset.visitEdit);
+        return openDayVisitModal(visit);
+      }
+      const visitDelBtn = event.target.closest('[data-visit-del]');
+      if (visitDelBtn) {
+        if (!confirm('確定要刪除這筆看診紀錄嗎？')) return;
+        try {
+          await api(`visits/${visitDelBtn.dataset.visitDel}`, { method: 'DELETE' });
+          toast('已刪除看診紀錄');
+          return loadDay();
+        } catch (error) {
+          return toast(error.message, true);
+        }
+      }
+
       const editBtn = event.target.closest('[data-edit]');
       if (editBtn) {
         const id = editBtn.dataset.edit;
@@ -952,6 +1070,7 @@
       state.meds = (await api(`meds?petId=${state.petId}`)).rows;
       openLogModal(null);
     });
+    $('addVisitBtn').addEventListener('click', () => openDayVisitModal(null));
     $('calPrevBtn').addEventListener('click', () => {
       const [year, month] = state.calMonth.split('-').map(Number);
       const date = new Date(year, month - 2, 1);

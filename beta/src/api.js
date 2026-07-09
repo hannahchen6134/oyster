@@ -55,7 +55,7 @@ const RESOURCES = {
     idColumn: 'visitId',
     petColumn: 'petId',
     fields: {
-      petId: 'text', vetId: 'text', visitDate: 'text', reason: 'text',
+      petId: 'text', vetId: 'text', visitDate: 'text', visitTime: 'text', reason: 'text',
       doctorInstruction: 'text', nextVisitDate: 'text', note: 'text'
     },
     required: ['petId']

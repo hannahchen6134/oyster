@@ -8,3 +8,4 @@ ssh-tunnel.err.log
 tunnel.out.log
 tunnel.err.log
 manager.log
+.wrangler/
