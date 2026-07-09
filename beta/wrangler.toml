@@ -13,7 +13,7 @@ run_worker_first = ["/webhook", "/api/*", "/healthz"]
 binding = "DB"
 database_name = "cat-care-beta"
 # 執行 `wrangler d1 create cat-care-beta` 後，把回傳的 database_id 貼到這裡
-database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+database_id = "90d45beb-2d37-4315-bad0-c9fd9a378a9b"
 
 [observability.logs]
 enabled = true
