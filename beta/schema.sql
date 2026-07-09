@@ -1,4 +1,4 @@
--- 毛孩照護管家 Beta — Cloudflare D1 資料庫結構
+-- 貓貓照護管家 Beta — Cloudflare D1 資料庫結構
 -- 依照執行企畫書第 7 節資料表規格建立。
 -- eventDateTime 為事件實際發生時間（Asia/Taipei，格式 YYYY-MM-DD HH:MM），createdAt 為資料建立時間。
 -- 刪除一律使用 isDeleted 軟刪除，不直接清除資料。

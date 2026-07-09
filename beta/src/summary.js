@@ -1,6 +1,6 @@
-// 毛孩照護管家 Beta — 每日總結計算（純函式，可單元測試）
+// 貓貓照護管家 Beta — 每日總結計算（純函式，可單元測試）
 //
-// computeDailySummary(logs) 輸入某毛孩某一天的 logs（未刪除），輸出 daily_summary 欄位
+// computeDailySummary(logs) 輸入某貓咪某一天的 logs（未刪除），輸出 daily_summary 欄位
 // 與回覆文字需要的補充資訊（各類備註清單）。
 
 function toNumber(value) {

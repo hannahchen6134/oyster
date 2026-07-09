@@ -1,13 +1,13 @@
 {
-  "name": "pet-care-beta",
+  "name": "cat-care-beta",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "db:init": "wrangler d1 execute pet-care-beta --remote --file=./schema.sql",
-    "db:init:local": "wrangler d1 execute pet-care-beta --local --file=./schema.sql",
+    "db:init": "wrangler d1 execute cat-care-beta --remote --file=./schema.sql",
+    "db:init:local": "wrangler d1 execute cat-care-beta --local --file=./schema.sql",
     "test": "node --test"
   },
   "devDependencies": {

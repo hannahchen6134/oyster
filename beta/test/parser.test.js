@@ -126,7 +126,9 @@ test('驗收：查詢指令', () => {
   assert.deepEqual(parseMessage('說明'), { type: 'query', query: 'help' });
 });
 
-test('新增毛孩 蚵仔', () => {
+test('新增貓咪 蚵仔（含舊寫法相容）', () => {
+  assert.deepEqual(parseMessage('新增貓咪 蚵仔'), { type: 'addPet', name: '蚵仔' });
+  assert.deepEqual(parseMessage('新增貓貓 蚵仔'), { type: 'addPet', name: '蚵仔' });
   assert.deepEqual(parseMessage('新增毛孩 蚵仔'), { type: 'addPet', name: '蚵仔' });
 });
 

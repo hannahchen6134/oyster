@@ -1,4 +1,4 @@
-name = "pet-care-beta"
+name = "cat-care-beta"
 main = "src/index.js"
 compatibility_date = "2026-07-01"
 
@@ -11,8 +11,8 @@ run_worker_first = ["/webhook", "/api/*", "/healthz"]
 
 [[d1_databases]]
 binding = "DB"
-database_name = "pet-care-beta"
-# 執行 `wrangler d1 create pet-care-beta` 後，把回傳的 database_id 貼到這裡
+database_name = "cat-care-beta"
+# 執行 `wrangler d1 create cat-care-beta` 後，把回傳的 database_id 貼到這裡
 database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
 
 [observability.logs]

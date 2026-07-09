@@ -316,7 +316,7 @@ async function handleCrud(db, spec, request, url, method, resourceId, lineUserId
     const values = [];
     for (const [key, kind] of Object.entries(spec.fields)) {
       if (!(key in body)) continue;
-      if (key === 'petId') continue; // 不允許把資料搬到別隻毛孩
+      if (key === 'petId') continue; // 不允許把資料搬到別隻貓咪
       sets.push(`${key} = ?`);
       values.push(kind === 'number' ? Number(body[key] || 0) : String(body[key] ?? ''));
     }

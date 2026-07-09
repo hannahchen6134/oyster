@@ -1,4 +1,4 @@
-// D1 資料存取層：使用者、毛孩、食物、紀錄、每日總結重算、session
+// D1 資料存取層：使用者、貓咪、食物、紀錄、每日總結重算、session
 // 規則：所有刪除都是 isDeleted 軟刪除；logs 有任何變動就重算該日 daily_summary。
 
 import { computeDailySummary } from './summary.js';
@@ -64,7 +64,7 @@ export async function createPet(db, ownerLineUserId, fields = {}) {
     .bind(
       petId,
       ownerLineUserId,
-      String(fields.petName || '毛孩'),
+      String(fields.petName || '貓貓'),
       String(fields.species || '貓'),
       String(fields.birthday || ''),
       String(fields.breed || ''),
@@ -79,7 +79,7 @@ export async function createPet(db, ownerLineUserId, fields = {}) {
   return getPet(db, petId);
 }
 
-// 使用者「目前操作的毛孩」：defaultPetId 優先，否則取第一隻
+// 使用者「目前操作的貓咪」：defaultPetId 優先，否則取第一隻
 export async function resolveDefaultPet(db, user, pets) {
   if (!pets.length) return null;
   if (user?.defaultPetId) {

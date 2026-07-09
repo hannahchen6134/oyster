@@ -1,4 +1,4 @@
-# 毛孩照護管家 Beta
+# 貓貓照護管家 Beta
 
 用 LINE 快速記，照護站完整看與修改，回診時不再靠印象。
 
@@ -27,7 +27,7 @@ Cloudflare Worker（beta/src）──── D1 資料庫（SQLite）
 ### 1. 建立 Beta 官方 LINE
 
 1. 到 [LINE Developers Console](https://developers.line.biz/console/) 建立新 Provider（或用現有的）
-2. 建立 **Messaging API** channel，名稱例如「毛孩照護管家 Beta」（不要用蚵仔正式版的 channel！）
+2. 建立 **Messaging API** channel，名稱例如「貓貓照護管家 Beta」（不要用蚵仔正式版的 channel！）
 3. 記下 **Channel secret**（Basic settings 分頁）
 4. 到 Messaging API 分頁發行 **Channel access token**
 5. 關閉「自動回應訊息」、關閉「加入好友的歡迎訊息」（LINE Official Account Manager → 回應設定）
@@ -40,7 +40,7 @@ npm install
 npx wrangler login                 # 登入你的 Cloudflare 帳號
 
 # 建立 D1 資料庫，把回傳的 database_id 貼進 wrangler.toml
-npx wrangler d1 create pet-care-beta
+npx wrangler d1 create cat-care-beta
 
 # 建立資料表
 npm run db:init
@@ -53,20 +53,20 @@ npx wrangler secret put LINE_CHANNEL_SECRET
 npm run deploy
 ```
 
-部署完成會顯示網址，例如 `https://pet-care-beta.你的帳號.workers.dev`。
+部署完成會顯示網址，例如 `https://cat-care-beta.你的帳號.workers.dev`。
 
 ### 3. 串接 webhook
 
 回到 LINE Developers → Messaging API 分頁：
 
-- **Webhook URL** 填 `https://pet-care-beta.你的帳號.workers.dev/webhook`
+- **Webhook URL** 填 `https://cat-care-beta.你的帳號.workers.dev/webhook`
 - 打開 **Use webhook**
 - 按 **Verify** 應顯示 Success
 
 ### 4. 開始使用
 
 1. 用 QR code 加 Beta 官方帳號好友
-2. 輸入 `新增毛孩 蚵仔`
+2. 輸入 `新增貓咪 蚵仔`
 3. 輸入 `水 20` → 應回覆這筆紀錄＋今日累積
 4. 輸入 `網站` → 點連結開啟照護站，到「設定 → 食物」建立食物公式（kcal/g、水分比例）
 5. 之後輸入 `乾糧 希爾斯 4g` 就會自動計算熱量與水分
@@ -85,7 +85,7 @@ npm run deploy
 | 補登 | `昨天 21:30 水 20`、`前天 乾糧 4g` | 事件時間記在指定時間 |
 | 查詢 | `今天`、`近7天`、`月曆`、`回診` | |
 | 網站 | `網站` | 取得照護站登入連結（30 天有效） |
-| 毛孩 | `新增毛孩 蚵仔`、`蚵仔 水 20` | 多隻毛孩時訊息開頭加名字指定 |
+| 貓咪 | `新增貓咪 蚵仔`、`蚵仔 水 20` | 多隻貓咪時訊息開頭加名字指定 |
 | 說明 | `說明` | 指令教學 |
 
 ## 照護站功能
@@ -94,7 +94,7 @@ npm run deploy
   當日時間軸，每筆可**編輯**（含日期時間，跨日會自動重算兩天）與**刪除**（軟刪除），可新增/補登
 - **月曆**：每日顯示水分、熱量、用藥（⚠️ 表示漏餵/吐掉/拒吃）、🤮💩、🏥 回診日；點日期進當日明細
 - **近30天**：每日總結表格，異常日整列淡紅標示
-- **設定**：毛孩、食物公式、藥物、醫院醫生、回診資料，全部可新增/修改/刪除
+- **設定**：貓咪、食物公式、藥物、醫院醫生、回診資料，全部可新增/修改/刪除
 
 ## 開發
 
@@ -123,7 +123,7 @@ npm run dev       # wrangler dev 本機開發
 | 1 | 正式版只讀盤點 | ✅ 已完成（正式版零修改） |
 | 2 | Beta 資料表 | ✅ `schema.sql` |
 | 3 | LINE 記錄＋今日總計 | ✅ |
-| 4 | 設定頁（毛孩/食物/藥物/醫院醫生） | ✅ |
+| 4 | 設定頁（貓咪/食物/藥物/醫院醫生） | ✅ |
 | 5 | 明細修改/刪除＋重算 | ✅ |
 | 6 | 網站月曆 | ✅ |
 | 7 | LINE 查詢（今天/近7天/月曆/回診） | ✅ |
@@ -139,4 +139,4 @@ npm run dev       # wrangler dev 本機開發
 - LINE Login（LIFF）取代連結登入（目前 token 連結對 Beta 夠用）
 - 金流與方案（企畫書明定 Beta 不做）
 
-⚠️ 本服務僅協助記錄與整理，不提供醫療診斷；毛孩健康問題請諮詢獸醫師。
+⚠️ 本服務僅協助記錄與整理，不提供醫療診斷；貓咪健康問題請諮詢獸醫師。

@@ -1,4 +1,4 @@
-// 毛孩照護管家 Beta — LINE 中文指令解析（純函式，可單元測試）
+// 貓貓照護管家 Beta — LINE 中文指令解析（純函式，可單元測試）
 //
 // parseMessage(text) 回傳 intent：
 //   { type: 'record', record: { category, foodType, itemName, amount, unit,
@@ -115,7 +115,8 @@ export function parseMessage(rawText) {
     }
   }
 
-  const addPetMatch = text.match(/^新增毛孩\s*(.+)$/);
+  // 「新增貓咪」為主，保留「新增毛孩」「新增貓貓」相容
+  const addPetMatch = text.match(/^新增(?:貓咪|貓貓|毛孩)\s*(.+)$/);
   if (addPetMatch) {
     return { type: 'addPet', name: addPetMatch[1].trim() };
   }

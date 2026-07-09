@@ -1,4 +1,4 @@
-// 毛孩照護管家 Beta — Cloudflare Worker 入口
+// 貓貓照護管家 Beta — Cloudflare Worker 入口
 // /webhook  → LINE Messaging API webhook（驗簽後直接處理、直接 reply，不需早回 ack）
 // /api/*    → 照護站 REST API
 // 其餘路徑 → 照護站網站（public/ 靜態資源）
@@ -43,7 +43,7 @@ export default {
       return handleApi(request, env, url);
     }
     if (url.pathname === '/healthz') {
-      return jsonResponse({ ok: true, service: 'pet-care-beta', now: new Date().toISOString() });
+      return jsonResponse({ ok: true, service: 'cat-care-beta', now: new Date().toISOString() });
     }
     return env.ASSETS.fetch(request);
   }
@@ -117,14 +117,14 @@ async function handleTextMessage(event, env, baseUrl) {
 
   const pets = await listPets(db, lineUserId);
 
-  // 多毛孩：訊息開頭是毛孩名（或 @毛孩名）時指定該毛孩
+  // 多貓咪：訊息開頭是貓咪名（或 @貓咪名）時指定該貓咪
   let text = normalizeText(event.message?.text || '');
   let pet = await resolveDefaultPet(db, user, pets);
   for (const candidate of pets) {
     for (const prefix of [candidate.petName, `@${candidate.petName}`]) {
       if (text === prefix) {
         pet = candidate;
-        text = '今天'; // 只打毛孩名 → 看該毛孩今天總結
+        text = '今天'; // 只打貓咪名 → 看該貓咪今天總結
         break;
       }
       if (text.startsWith(`${prefix} `)) {
@@ -146,13 +146,13 @@ async function handleTextMessage(event, env, baseUrl) {
       }
       const newPet = await createPet(db, lineUserId, { petName: intent.name });
       if (!pets.length) await updateUser(db, lineUserId, { defaultPetId: newPet.petId });
-      await replyOrPush(env, event, `🐾 已建立毛孩「${intent.name}」！\n現在就可以輸入「水 20」開始記錄。\n物種、生日、體重可到照護站（輸入「網站」）補齊。`);
+      await replyOrPush(env, event, `🐱 已建立貓咪「${intent.name}」！\n現在就可以輸入「水 20」開始記錄。\n生日、體重、疾病備註可到照護站（輸入「網站」）補齊。`);
       return;
     }
 
     case 'record': {
       if (!pet) {
-        pet = await createPet(db, lineUserId, { petName: '毛孩' });
+        pet = await createPet(db, lineUserId, { petName: '貓貓' });
         await updateUser(db, lineUserId, { defaultPetId: pet.petId });
       }
       await handleRecord(env, event, pet, intent.record, lineUserId);
@@ -265,7 +265,7 @@ async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId) {
   }
 
   if (!pet) {
-    await replyOrPush(env, event, '還沒有建立毛孩，先輸入「新增毛孩 名字」吧！');
+    await replyOrPush(env, event, '還沒有建立貓咪，先輸入「新增貓咪 名字」吧！');
     return;
   }
 
