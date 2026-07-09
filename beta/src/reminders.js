@@ -13,7 +13,21 @@ export function parseReminderSettings(pet) {
 
 export function hasAnyReminder(pet) {
   const s = parseReminderSettings(pet);
-  return Boolean(s.med || s.water || s.appetite || s.stool);
+  return Boolean(s.med || s.water || s.appetite || s.stool || s.visit);
+}
+
+// 回診前一天晚上提醒
+export function visitReminderMessage(pet, visits, vetsById, dateLabel) {
+  const lines = [`🏥 回診提醒（${pet.petName}）`, `明天 ${dateLabel}`];
+  for (const visit of visits) {
+    if (visit.visitTime) lines.push(`時間 ${visit.visitTime}`);
+    const vet = vetsById[visit.vetId];
+    const where = vet ? [vet.hospitalName, vet.doctorName].filter(Boolean).join('・') : '';
+    if (where) lines.push(where);
+    if (visit.reason) lines.push(`原因：${visit.reason}`);
+  }
+  lines.push('', '回診前輸入「近7天」', '可先看近況摘要 🐾');
+  return lines.join('\n');
 }
 
 function average(values) {

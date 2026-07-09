@@ -6,7 +6,8 @@
 import { parseMessage, matchFood, normalizeText } from './parser.js';
 import { handleApi } from './api.js';
 import { verifyLineSignature, replyOrPush, pushText, getProfile } from './line.js';
-import { hasAnyReminder, buildReminderLines, reminderMessage } from './reminders.js';
+import { hasAnyReminder, parseReminderSettings, buildReminderLines, reminderMessage, visitReminderMessage } from './reminders.js';
+import { shortDate } from './replies.js';
 import {
   ensureUser, updateUser, listPets, createPet, resolveDefaultPet,
   listFoods, insertLog, recomputeDay, getRecentSummaries,
@@ -60,14 +61,36 @@ async function runDailyReminders(env) {
   const today = taipeiToday();
   const { results: pets } = await db.prepare('SELECT * FROM pets WHERE isDeleted = 0').all();
 
+  const tomorrow = addDays(today, 1);
+
   for (const pet of pets || []) {
     try {
       if (!hasAnyReminder(pet) || !pet.ownerLineUserId) continue;
+      const settings = parseReminderSettings(pet);
+
       const rows = await getRecentSummaries(db, pet.petId, today, 8);
       const lines = buildReminderLines(pet, rows);
-      if (!lines.length) continue;
-      await pushText(env, pet.ownerLineUserId, reminderMessage(pet, lines));
-      console.log(JSON.stringify({ step: 'reminder_sent', petId: pet.petId, count: lines.length }));
+      if (lines.length) {
+        await pushText(env, pet.ownerLineUserId, reminderMessage(pet, lines));
+        console.log(JSON.stringify({ step: 'reminder_sent', petId: pet.petId, count: lines.length }));
+      }
+
+      // 明天有回診 → 今晚另外提醒一則
+      if (settings.visit) {
+        const { results: visits } = await db
+          .prepare(
+            `SELECT * FROM vet_visits WHERE petId = ? AND isDeleted = 0
+             AND (visitDate = ? OR nextVisitDate = ?)`
+          )
+          .bind(pet.petId, tomorrow, tomorrow)
+          .all();
+        if (visits?.length) {
+          const vets = await listVetsByOwner(db, pet.ownerLineUserId);
+          const vetsById = Object.fromEntries(vets.map((vet) => [vet.vetId, vet]));
+          await pushText(env, pet.ownerLineUserId, visitReminderMessage(pet, visits, vetsById, shortDate(tomorrow)));
+          console.log(JSON.stringify({ step: 'visit_reminder_sent', petId: pet.petId }));
+        }
+      }
     } catch (error) {
       console.error('reminder failed:', pet.petId, error.message);
     }
