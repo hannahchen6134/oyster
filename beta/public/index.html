@@ -188,10 +188,25 @@
       border: 1px solid var(--line-strong); color: var(--ink-soft); font-size: 12.5px; font-weight: 500;
       background: var(--sheet);
     }
-    .chip:first-child { border-color: rgba(35, 82, 63, 0.45); color: var(--green); background: var(--green-tint); }
     .chip.warn { border-color: rgba(191, 59, 32, 0.4); color: var(--seal); background: var(--seal-tint); }
     .entry-note { color: var(--ink-soft); font-size: 14px; line-height: 1.6; white-space: pre-wrap; margin-top: 6px; }
     .entry-actions { display: flex; gap: 4px; }
+    /* 區塊卡：每個段落用柔影優雅區隔 */
+    .block {
+      background: linear-gradient(180deg, #ffffff, var(--sheet-soft));
+      border: 1px solid var(--line); border-radius: var(--radius);
+      box-shadow: var(--shadow-soft);
+      padding: 18px 20px; margin-top: 24px;
+    }
+    .block .section-head { margin-top: 0; margin-bottom: 10px; }
+    .block .empty { background: none; border: none; padding: 18px 8px; }
+    /* 類別色：低飽和的莫蘭迪色分類 */
+    .chip-water { background: #edf3f6; color: #47708a; border-color: #cfdfe8; }
+    .chip-dry { background: #f5f1e3; color: #7a662f; border-color: #e3d9bd; }
+    .chip-wet { background: #f7efe4; color: #8a5e35; border-color: #e8d7c0; }
+    .chip-kcal { background: #f8f2e5; color: #91702f; border-color: #ecdfc0; }
+    .chip-med { background: var(--green-tint); color: var(--green); border-color: rgba(35, 82, 63, 0.3); }
+    .chip-neutral { background: var(--sheet-soft); color: var(--ink-soft); border-color: var(--line-strong); }
     .empty {
       padding: 30px 20px; border: 1px dashed var(--line-strong); border-radius: var(--radius);
       color: var(--muted); text-align: center; font-size: 14px; background: var(--sheet-soft);
@@ -406,15 +421,19 @@
           </div>
           <div id="doctorNote">今天還沒有紀錄。</div>
         </div>
-        <div class="section-head">
-          <h2>看診</h2>
-          <button class="btn btn-secondary btn-sm" id="addVisitBtn" type="button">＋ 記錄看診</button>
+        <div class="block">
+          <div class="section-head">
+            <h2>看診</h2>
+            <button class="btn btn-secondary btn-sm" id="addVisitBtn" type="button">＋ 記錄看診</button>
+          </div>
+          <div class="grid" id="dayVisitList"></div>
         </div>
-        <div class="grid" id="dayVisitList"></div>
-        <div class="section-head">
-          <h2>當日紀錄</h2>
+        <div class="block">
+          <div class="section-head">
+            <h2>當日紀錄</h2>
+          </div>
+          <div class="grid" id="logList"></div>
         </div>
-        <div class="grid" id="logList"></div>
       </section>
 
       <!-- 月曆 -->
@@ -431,8 +450,8 @@
       <!-- 近30天 -->
       <section class="panel hidden" id="trendView">
         <h2>近 30 天總覽</h2>
-        <div id="trendCharts"></div>
-        <div class="table-wrap">
+        <div class="block" style="margin-top:14px"><div id="trendCharts"></div></div>
+        <div class="block table-wrap">
           <table>
             <thead>
               <tr><th>日期</th><th>總水分</th><th>喝水</th><th>食物水</th><th>乾糧 g</th><th>濕/罐 g</th><th>熱量</th><th>藥✓</th><th>藥⚠️</th><th>吐</th><th>便</th><th>筆數</th></tr>
@@ -459,7 +478,7 @@
         <div class="grid" id="settingsList"></div>
       </section>
 
-      <footer class="colophon">記錄是最好的陪伴</footer>
+      <footer class="colophon">輕鬆記錄守護毛孩</footer>
     </div>
   </div>
 
@@ -709,16 +728,22 @@
         return;
       }
       container.innerHTML = logs.map((log) => {
-        const chips = [`<span class="chip">${CATEGORY_LABEL[log.category] || log.category}</span>`];
-        if (log.category === 'water') chips.push(`<span class="chip">${fmt(log.waterMl || log.amount)} ml</span>`);
+        // 類別 → 低飽和色系：喝水藍、乾糧麥色、罐頭陶土、熱量琥珀、藥松綠、其他中性
+        const foodChipClass = log.foodType === '乾糧' ? 'chip-dry' : 'chip-wet';
+        const catChipClass = {
+          water: 'chip-water', food: foodChipClass, med: 'chip-med',
+          vomit: 'chip-neutral', stool: 'chip-neutral', mood: 'chip-neutral', note: 'chip-neutral'
+        }[log.category] || 'chip-neutral';
+        const chips = [`<span class="chip ${catChipClass}">${CATEGORY_LABEL[log.category] || log.category}</span>`];
+        if (log.category === 'water') chips.push(`<span class="chip chip-water">${fmt(log.waterMl || log.amount)} ml</span>`);
         if (log.category === 'food') {
-          chips.push(`<span class="chip">${esc(log.foodType)}${log.itemName ? ` ・ ${esc(log.itemName)}` : ''} ${fmt(log.amount)} g</span>`);
-          if (log.kcal) chips.push(`<span class="chip">${fmt(log.kcal)} kcal</span>`);
-          if (log.waterMl) chips.push(`<span class="chip">水 ${fmt(log.waterMl)} ml</span>`);
+          chips.push(`<span class="chip ${foodChipClass}">${esc(log.foodType)}${log.itemName ? ` ・ ${esc(log.itemName)}` : ''} ${fmt(log.amount)} g</span>`);
+          if (log.kcal) chips.push(`<span class="chip chip-kcal">${fmt(log.kcal)} kcal</span>`);
+          if (log.waterMl) chips.push(`<span class="chip chip-water">水 ${fmt(log.waterMl)} ml</span>`);
         }
         if (log.category === 'med') {
           const warn = log.medStatus !== '已吃';
-          chips.push(`<span class="chip${warn ? ' warn' : ''}">${esc([log.medSlot, log.itemName].filter(Boolean).join(' ') || '藥')} ${esc(log.medStatus)}</span>`);
+          chips.push(`<span class="chip ${warn ? 'warn' : 'chip-med'}">${esc([log.medSlot, log.itemName].filter(Boolean).join(' ') || '藥')} ${esc(log.medStatus)}</span>`);
         }
         if (log.category === 'vomit') chips.push('<span class="chip warn">需留意</span>');
         return `
