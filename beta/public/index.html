@@ -64,16 +64,6 @@
       background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.045'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
     }
     .panel { margin-top: 30px; }
-    /* 印章：寵物名首字，蓋在頁首右側 */
-    .seal-mark {
-      width: 44px; height: 44px; flex: none; display: flex; align-items: center; justify-content: center;
-      background: radial-gradient(circle at 34% 30%, #d0492a, var(--seal) 64%, #a83318);
-      color: #fff; font-family: var(--serif); font-weight: 700; font-size: 22px;
-      border-radius: 6px; transform: rotate(-3deg);
-      box-shadow: inset 0 0 6px rgba(120, 30, 10, 0.55), 0 3px 10px rgba(191, 59, 32, 0.28);
-      text-shadow: 0 0 2px rgba(120, 30, 10, 0.4);
-      user-select: none;
-    }
     .date-line {
       margin-top: 8px; font-family: var(--serif); font-size: 14px;
       color: var(--muted); letter-spacing: 0.14em;
@@ -250,8 +240,8 @@
     .cal-cell:hover { border-color: rgba(35, 82, 63, 0.55); box-shadow: var(--shadow-soft); }
     .cal-cell.blank { visibility: hidden; }
     .cal-daynum {
-      font-weight: 600; font-size: 12.5px; font-variant-numeric: tabular-nums;
-      width: 21px; height: 21px; display: inline-flex; align-items: center; justify-content: center;
+      font-family: var(--serif); font-weight: 600; font-size: 16px; font-variant-numeric: tabular-nums;
+      width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center;
       border-radius: 50%;
     }
     .cal-cell.today .cal-daynum { background: var(--seal); color: #fff; box-shadow: 0 0 0 3px rgba(191, 59, 32, 0.15); }
@@ -380,7 +370,6 @@
             <div class="date-line" id="dateLine"></div>
           </div>
           <div class="spacer"></div>
-          <div class="seal-mark" id="petSeal" aria-hidden="true">貓</div>
           <select id="petSelect" aria-label="選擇貓咪" style="width:auto;min-width:104px"></select>
           <button class="btn btn-secondary btn-sm" id="logoutBtn" type="button">登出</button>
         </div>
@@ -1236,7 +1225,6 @@
       state.pets = data.pets;
       if (!state.pets.length) {
         $('petTitle').textContent = '貓貓';
-        $('petSeal').textContent = '貓';
         $('petSelect').innerHTML = '<option>尚無貓咪</option>';
         return;
       }
@@ -1248,7 +1236,6 @@
       $('petSelect').innerHTML = state.pets.map((pet) =>
         `<option value="${esc(pet.petId)}" ${pet.petId === state.petId ? 'selected' : ''}>${esc(pet.petName)}</option>`).join('');
       $('petTitle').textContent = currentPet()?.petName || '貓貓';
-      $('petSeal').textContent = ($('petTitle').textContent)[0];
     }
 
     async function bootstrap() {
@@ -1354,7 +1341,6 @@
     $('petSelect').addEventListener('change', async (event) => {
       state.petId = event.target.value;
       $('petTitle').textContent = currentPet()?.petName || '貓貓';
-      $('petSeal').textContent = ($('petTitle').textContent)[0];
       state.meds = (await api(`meds?petId=${state.petId}`)).rows;
       await api('me', { method: 'PUT', body: JSON.stringify({ defaultPetId: state.petId }) }).catch(() => {});
       const activeTab = document.querySelector('.tabs .tab.active')?.dataset.tab || 'today';
