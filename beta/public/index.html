@@ -469,6 +469,7 @@
           <button class="tab" data-settings="meds" type="button">藥物</button>
           <button class="tab" data-settings="vets" type="button">醫院醫生</button>
           <button class="tab" data-settings="visits" type="button">回診資料</button>
+          <button class="tab" data-settings="goals" type="button">每日目標</button>
         </div>
         <div class="toolbar" style="margin-bottom:12px">
           <div class="muted" id="settingsHint"></div>
@@ -1141,10 +1142,69 @@
       }
     };
 
+    // 每日目標：一隻貓咪一組（水量 / 熱量 / 該餵的藥時段），LINE 總結會顯示還差多少
+    function renderGoalsForm() {
+      const pet = currentPet();
+      const container = $('settingsList');
+      if (!pet) {
+        container.innerHTML = '<div class="empty">先建立貓咪才能設定目標。</div>';
+        return;
+      }
+      let slots = [];
+      try { slots = JSON.parse(pet.goalMedSlots || '[]'); } catch (error) { /* ignore */ }
+      const slotBox = (slot) => `
+        <label style="display:inline-flex;align-items:center;gap:6px;margin:0 16px 0 0;font-size:14px;font-weight:500;letter-spacing:0">
+          <input type="checkbox" name="goalSlot" value="${slot}" style="width:auto" ${slots.includes(slot) ? 'checked' : ''}>${slot}
+        </label>`;
+      container.innerHTML = `
+        <div class="block" style="margin-top:0">
+          <div class="grid grid-2">
+            <div class="field"><label>每日水分目標（ml，0 = 不設定）</label>
+              <input type="number" id="goalWater" min="0" step="1" value="${esc(pet.goalWaterMl || 0)}"></div>
+            <div class="field"><label>每日熱量目標（kcal，0 = 不設定）</label>
+              <input type="number" id="goalKcal" min="0" step="1" value="${esc(pet.goalKcal || 0)}"></div>
+          </div>
+          <div class="field"><label>每天要餵的藥（勾選時段）</label>
+            <div style="padding:6px 0">${['早', '中午', '晚'].map(slotBox).join('')}</div>
+            <div class="muted" style="font-size:12.5px">在 LINE 記錄時要帶時段（例如「藥 早 已吃」）才算完成該時段。</div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;margin-top:6px">
+            <button class="btn btn-primary btn-sm" id="goalSaveBtn" type="button">儲存目標</button>
+          </div>
+        </div>`;
+      $('goalSaveBtn').addEventListener('click', async () => {
+        const checked = [...document.querySelectorAll('[name="goalSlot"]:checked')].map((el) => el.value);
+        try {
+          await api(`pets/${pet.petId}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+              goalWaterMl: Number($('goalWater').value || 0),
+              goalKcal: Number($('goalKcal').value || 0),
+              goalMedSlots: JSON.stringify(checked)
+            })
+          });
+          toast('已儲存，之後 LINE 總結會顯示目標進度');
+          await refreshPets();
+        } catch (error) {
+          toast(error.message, true);
+        }
+      });
+    }
+
     async function loadSettings() {
-      const spec = SETTINGS_SPEC[state.settingsTab];
       document.querySelectorAll('[data-settings]').forEach((el) =>
         el.classList.toggle('active', el.dataset.settings === state.settingsTab));
+
+      if (state.settingsTab === 'goals') {
+        $('settingsHint').textContent = '設定每天的照護目標，LINE 每次總結會提醒還差多少，全達成會給你一句鼓勵。';
+        $('settingsAddBtn').classList.add('hidden');
+        await refreshPets();
+        renderGoalsForm();
+        return;
+      }
+      $('settingsAddBtn').classList.remove('hidden');
+
+      const spec = SETTINGS_SPEC[state.settingsTab];
       $('settingsHint').textContent = spec.hint;
 
       let rows = [];

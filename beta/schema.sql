@@ -22,6 +22,9 @@ CREATE TABLE IF NOT EXISTS pets (
   conditionNote TEXT NOT NULL DEFAULT '',
   vaccineNote TEXT NOT NULL DEFAULT '',
   defaultVetId TEXT NOT NULL DEFAULT '',
+  goalWaterMl REAL NOT NULL DEFAULT 0,
+  goalKcal REAL NOT NULL DEFAULT 0,
+  goalMedSlots TEXT NOT NULL DEFAULT '[]',
   isDeleted INTEGER NOT NULL DEFAULT 0,
   createdAt TEXT NOT NULL,
   updatedAt TEXT NOT NULL

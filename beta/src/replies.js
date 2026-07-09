@@ -37,19 +37,90 @@ export function summaryBlock(summary) {
   return lines.join('\n');
 }
 
-export function recordReply(description, petName, summary, hints = []) {
+// ---------- 每日目標 ----------
+
+function parseGoalSlots(pet) {
+  try {
+    const slots = JSON.parse(pet?.goalMedSlots || '[]');
+    return Array.isArray(slots) ? slots.filter(Boolean) : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+const ENCOURAGE_PROGRESS = [
+  '慢慢來，今天還有時間，{name}有你照顧很安心 🐾',
+  '記下來就不會漏，你做得很好',
+  '一步一步來，{name}的健康有你把關',
+  '別擔心，照這個節奏就對了 🐾'
+];
+
+const ENCOURAGE_DONE = [
+  '今日目標全部達成！{name}有你真幸福 🐾',
+  '太棒了，今天的照顧滿分！',
+  '全部完成～給自己一個讚，也給{name}一個摸摸 🐾',
+  '目標達成！安心睡個好覺吧 🐾'
+];
+
+function pickLine(pool, seed, name) {
+  let hash = 0;
+  for (const ch of String(seed)) hash = (hash * 31 + ch.charCodeAt(0)) % 997;
+  return pool[hash % pool.length].replace('{name}', name);
+}
+
+// 有設定目標才出現：列出還差多少，最後給一句鼓勵
+export function goalSection(pet, summary, date) {
+  if (!pet) return '';
+  const goalWater = Number(pet.goalWaterMl) || 0;
+  const goalKcal = Number(pet.goalKcal) || 0;
+  const slots = parseGoalSlots(pet);
+  if (!goalWater && !goalKcal && !slots.length) return '';
+
+  const gaps = [];
+  if (goalWater > 0) {
+    const remain = Math.round((goalWater - (Number(summary.totalWaterMl) || 0)) * 10) / 10;
+    if (remain > 0) gaps.push(`水分還差 ${formatNumber(remain)} ml`);
+  }
+  if (goalKcal > 0) {
+    const remain = Math.round((goalKcal - (Number(summary.kcal) || 0)) * 10) / 10;
+    if (remain > 0) gaps.push(`熱量還差 ${formatNumber(remain)} kcal`);
+  }
+  const doneSlots = new Set(
+    (summary.meds || []).filter((med) => med.status === '已吃').map((med) => med.slot).filter(Boolean)
+  );
+  const missingSlots = slots.filter((slot) => !doneSlots.has(slot));
+  if (missingSlots.length) gaps.push(`${missingSlots.join('、')}的藥還沒餵`);
+
+  const lines = ['── 今日目標 ──'];
+  if (gaps.length) {
+    lines.push(gaps.join('・'));
+    lines.push('', pickLine(ENCOURAGE_PROGRESS, `${date}${pet.petName}`, pet.petName));
+  } else {
+    lines.push(pickLine(ENCOURAGE_DONE, `${date}${pet.petName}`, pet.petName));
+  }
+  return lines.join('\n');
+}
+
+export function recordReply(description, pet, summary, hints = [], date = '') {
+  const petName = pet?.petName || '貓貓';
   const lines = [`✅ 已記錄（${petName}）`, description, '', '── 今日累積 ──', summaryBlock(summary)];
+  const goals = goalSection(pet, summary, date);
+  if (goals) lines.push('', goals);
   for (const hint of hints) {
     if (hint) lines.push('', `※ ${hint}`);
   }
   return lines.join('\n');
 }
 
-export function todayReply(petName, date, summary) {
+export function todayReply(pet, date, summary) {
+  const petName = pet?.petName || '貓貓';
   if (!summary.entryCount) {
     return `📅 ${date}（${petName}）\n今天還沒有任何紀錄。\n輸入「水 20」或「乾糧 品牌 4g」開始記錄。`;
   }
-  return `📅 ${date}（${petName}）共 ${summary.entryCount} 筆\n${summaryBlock(summary)}`;
+  const lines = [`📅 ${date}（${petName}）共 ${summary.entryCount} 筆`, summaryBlock(summary)];
+  const goals = goalSection(pet, summary, date);
+  if (goals) lines.push('', goals);
+  return lines.join('\n');
 }
 
 export function weekReply(petName, rows) {

@@ -243,10 +243,11 @@ async function handleRecord(env, event, pet, record, lineUserId) {
   }
 
   await insertLog(db, log);
-  const summary = await recomputeDay(db, pet.petId, eventDateTime.slice(0, 10));
+  const eventDate = eventDateTime.slice(0, 10);
+  const summary = await recomputeDay(db, pet.petId, eventDate);
 
   // 補登到非今天時，回覆顯示的是「該日」的累積
-  await replyOrPush(env, event, recordReply(description, pet.petName, summary, hints));
+  await replyOrPush(env, event, recordReply(description, pet, summary, hints, eventDate));
 }
 
 async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId) {
@@ -271,7 +272,7 @@ async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId) {
 
   if (query === 'today') {
     const summary = await recomputeDay(db, pet.petId, today);
-    await replyOrPush(env, event, todayReply(pet.petName, today, summary));
+    await replyOrPush(env, event, todayReply(pet, today, summary));
     return;
   }
 
