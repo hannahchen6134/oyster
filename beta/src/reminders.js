@@ -59,7 +59,7 @@ export function buildReminderLines(pet, rows) {
     const avgWater = average(recorded.map((row) => Number(row.totalWaterMl) || 0));
     const todayWater = Number(today.totalWaterMl) || 0;
     if (avgWater > 0 && todayWater < avgWater * 0.6) {
-      lines.push(`今天水分 ${Math.round(todayWater)} ml，比近一週平均（${Math.round(avgWater)} ml）明顯少`);
+      lines.push(`水分只有 ${Math.round(todayWater)} ml\n　（平常約 ${Math.round(avgWater)} ml）`);
     }
   }
 
@@ -67,7 +67,7 @@ export function buildReminderLines(pet, rows) {
     const avgKcal = average(recorded.map((row) => Number(row.kcal) || 0));
     const todayKcal = Number(today.kcal) || 0;
     if (avgKcal > 0 && todayKcal < avgKcal * 0.6) {
-      lines.push(`今天熱量 ${Math.round(todayKcal)} kcal，比近一週平均（${Math.round(avgKcal)} kcal）明顯少`);
+      lines.push(`熱量只有 ${Math.round(todayKcal)} kcal\n　（平常約 ${Math.round(avgKcal)} kcal）`);
     }
   }
 
@@ -86,7 +86,8 @@ export function reminderMessage(pet, lines) {
     `🔔 照護提醒（${pet.petName}）`,
     ...lines.map((line) => `・${line}`),
     '',
-    '做了但忘了記的話，補記一下就好；',
-    '若真的有異常，建議諮詢獸醫師。'
+    '做了但忘了記的話，',
+    '補記一下就好；',
+    '真的有異常請諮詢獸醫師。'
   ].join('\n');
 }

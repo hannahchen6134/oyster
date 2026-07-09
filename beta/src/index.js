@@ -103,7 +103,7 @@ async function handleWebhook(request, env, url) {
     } catch (error) {
       console.error('event handling failed:', error);
       try {
-        await replyOrPush(env, event, '系統忙碌中，這則訊息沒有記錄成功，請再傳一次 🙏');
+        await replyOrPush(env, event, '系統忙碌中，\n這筆沒有記錄成功，\n請再傳一次 🙏');
       } catch (replyError) {
         console.error('error reply failed:', replyError);
       }
@@ -171,7 +171,7 @@ async function handleTextMessage(event, env, baseUrl) {
       }
       const newPet = await createPet(db, lineUserId, { petName: intent.name });
       if (!pets.length) await updateUser(db, lineUserId, { defaultPetId: newPet.petId });
-      await replyOrPush(env, event, `🐾 已建立貓咪「${intent.name}」！\n現在就可以輸入「水 20」開始記錄。\n生日、體重、疾病備註可到照護站（輸入「網站」）補齊。`);
+      await replyOrPush(env, event, `🐾 已建立貓咪「${intent.name}」！\n輸入「水 20」開始記錄。\n生日體重等資料，\n可到照護站補齊。`);
       return;
     }
 
@@ -245,10 +245,10 @@ async function handleRecord(env, event, pet, record, lineUserId) {
       log.itemName = matched.displayName;
       log.kcal = Math.round(record.amount * Number(matched.kcalPerGram || 0) * 10) / 10;
       log.waterMl = Math.round(record.amount * Number(matched.waterRatio || 0) * 10) / 10;
-      description = `${record.foodType} ${matched.displayName} ${record.amount} g（熱量 ${log.kcal} kcal、水分 ${log.waterMl} ml）`;
+      description = `${record.foodType} ${matched.displayName} ${record.amount} g`;
     } else {
       description = `${record.foodType}${record.itemName ? ` ${record.itemName}` : ''} ${record.amount} g`;
-      hints.push('這個品項還沒設定熱量/水分公式，本筆先照原樣記錄。到照護站「設定 → 食物」新增後，之後會自動計算。');
+      hints.push('這個品項還沒設定公式，\n先照原樣記錄。\n到照護站「設定→食物」\n新增後會自動算熱量。');
     }
   } else if (record.category === 'med') {
     const label = [record.medSlot, record.itemName].filter(Boolean).join(' ');
@@ -264,7 +264,8 @@ async function handleRecord(env, event, pet, record, lineUserId) {
   }
 
   if (record.dayOffset || record.time) {
-    description += `\n（記錄時間 ${eventDateTime}）`;
+    const eventDay = eventDateTime.slice(0, 10);
+    description += `\n（記在 ${Number(eventDay.slice(5, 7))}月${Number(eventDay.slice(8, 10))}日 ${eventDateTime.slice(11)}）`;
   }
 
   await insertLog(db, log);

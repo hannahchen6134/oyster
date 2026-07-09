@@ -1,38 +1,45 @@
 // LINE 回覆文字格式（貓貓照護管家 Beta）
+// 排版原則：每行盡量不超過 12 個全形字，大字體手機也不折行；
+// 日期用「7月10日」格式，避免被 LINE 自動轉成日期連結。
 
 function formatNumber(value) {
   const number = Number(value) || 0;
   return Number.isInteger(number) ? String(number) : number.toFixed(1);
 }
 
-function formatMedLine(meds) {
-  if (!meds.length) return '用藥　尚無紀錄';
-  const parts = meds.map((med) => {
-    const label = [med.slot, med.name].filter(Boolean).join(' ');
-    return `${label ? `${label} ` : ''}${med.status}`;
-  });
-  return `用藥　${parts.join('、')}`;
+// YYYY-MM-DD → 7月10日
+export function shortDate(date) {
+  const value = String(date || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  return `${Number(value.slice(5, 7))}月${Number(value.slice(8, 10))}日`;
 }
 
 export function summaryBlock(summary) {
   const lines = [];
-  lines.push(`水分　${formatNumber(summary.totalWaterMl)} ml（喝水 ${formatNumber(summary.waterMl)}＋食物 ${formatNumber(summary.foodWaterMl)}）`);
+  lines.push(`水分 ${formatNumber(summary.totalWaterMl)} ml`);
 
   const totalFood = (Number(summary.dryFoodG) || 0) + (Number(summary.wetFoodG) || 0) + (Number(summary.otherFoodG) || 0);
-  const foodParts = [`乾 ${formatNumber(summary.dryFoodG)}`, `濕/罐 ${formatNumber(summary.wetFoodG)}`];
-  if (Number(summary.otherFoodG) > 0) foodParts.push(`其他 ${formatNumber(summary.otherFoodG)}`);
-  lines.push(`食物　${formatNumber(totalFood)} g（${foodParts.join('／')}）`);
-  lines.push(`熱量　${formatNumber(summary.kcal)} kcal`);
-  lines.push(formatMedLine(summary.meds || []));
+  lines.push(`食物 ${formatNumber(totalFood)} g`);
+  lines.push(`熱量 ${formatNumber(summary.kcal)} kcal`);
+
+  const meds = summary.meds || [];
+  if (!meds.length) {
+    lines.push('藥 尚無紀錄');
+  } else {
+    for (const med of meds) {
+      const label = [med.slot, med.name].filter(Boolean).join(' ');
+      lines.push(`藥 ${label ? `${label} ` : ''}${med.status}`);
+    }
+  }
 
   const gutParts = [];
-  if (summary.vomitCount > 0) gutParts.push(`嘔吐 ${summary.vomitCount} 次`);
-  if (summary.stoolCount > 0) gutParts.push(`便便 ${summary.stoolCount} 次`);
+  if (summary.vomitCount > 0) gutParts.push(`嘔吐 ${summary.vomitCount}`);
+  if (summary.stoolCount > 0) gutParts.push(`便便 ${summary.stoolCount}`);
   if (gutParts.length) lines.push(gutParts.join('・'));
 
-  if (summary.vomitNotes?.length) lines.push(`　嘔吐：${summary.vomitNotes.join('；')}`);
-  if (summary.stoolNotes?.length) lines.push(`　便便：${summary.stoolNotes.join('；')}`);
-  if (summary.moodNotes?.length) lines.push(`　精神：${summary.moodNotes.join('；')}`);
+  if (summary.vomitNotes?.length) lines.push(`嘔吐：${summary.vomitNotes.join('；')}`);
+  if (summary.stoolNotes?.length) lines.push(`便便：${summary.stoolNotes.join('；')}`);
+  if (summary.moodNotes?.length) lines.push(`精神：${summary.moodNotes.join('；')}`);
 
   return lines.join('\n');
 }
@@ -93,7 +100,7 @@ export function goalSection(pet, summary, date) {
 
   const lines = ['── 今日目標 ──'];
   if (gaps.length) {
-    lines.push(gaps.join('・'));
+    lines.push(...gaps);
     lines.push('', pickLine(ENCOURAGE_PROGRESS, `${date}${pet.petName}`, pet.petName));
   } else {
     lines.push(pickLine(ENCOURAGE_DONE, `${date}${pet.petName}`, pet.petName));
@@ -115,9 +122,9 @@ export function recordReply(description, pet, summary, hints = [], date = '') {
 export function todayReply(pet, date, summary) {
   const petName = pet?.petName || '貓貓';
   if (!summary.entryCount) {
-    return `📅 ${date}（${petName}）\n今天還沒有任何紀錄。\n輸入「水 20」或「乾糧 品牌 4g」開始記錄。`;
+    return `📅 ${shortDate(date)}（${petName}）\n今天還沒有任何紀錄。\n輸入「水 20」開始記錄。`;
   }
-  const lines = [`📅 ${date}（${petName}）共 ${summary.entryCount} 筆`, summaryBlock(summary)];
+  const lines = [`📅 ${shortDate(date)}（${petName}）${summary.entryCount} 筆`, summaryBlock(summary)];
   const goals = goalSection(pet, summary, date);
   if (goals) lines.push('', goals);
   return lines.join('\n');
@@ -126,17 +133,17 @@ export function todayReply(pet, date, summary) {
 export function weekReply(petName, rows) {
   const lines = [`📈 近 7 天（${petName}）`];
   for (const row of rows) {
-    const shortDate = row.date.slice(5).replace('-', '/');
+    const day = `${Number(row.date.slice(5, 7))}/${Number(row.date.slice(8, 10))}`;
     if (!row.entryCount) {
-      lines.push(`${shortDate}　—`);
+      lines.push(`${day} —`);
       continue;
     }
-    const parts = [`水 ${formatNumber(row.totalWaterMl)}`, `熱量 ${formatNumber(row.kcal)}`, `藥 ${row.medTakenCount}`];
-    if (row.vomitCount > 0) parts.push(`吐 ${row.vomitCount}`);
-    if (row.medIssueCount > 0) parts.push(`藥異常 ${row.medIssueCount}`);
-    lines.push(`${shortDate}　${parts.join('｜')}`);
+    const parts = [`水${formatNumber(row.totalWaterMl)}`, `熱${formatNumber(row.kcal)}`, `藥${row.medTakenCount}`];
+    if (row.vomitCount > 0) parts.push(`吐${row.vomitCount}`);
+    if (row.medIssueCount > 0) parts.push(`藥⚠${row.medIssueCount}`);
+    lines.push(`${day} ${parts.join('・')}`);
   }
-  lines.push('', '※ 詳細內容輸入「網站」開啟照護站。');
+  lines.push('', '※ 詳細請開照護站（輸入「網站」）');
   return lines.join('\n');
 }
 
@@ -152,44 +159,47 @@ export function monthReply(petName, monthLabel, rows) {
   };
 
   const lines = [`🗓️ ${monthLabel}（${petName}）`];
-  lines.push(`有紀錄 ${recorded.length} 天／無紀錄 ${noRecordDays} 天`);
+  lines.push(`有紀錄 ${recorded.length} 天`);
+  if (noRecordDays > 0) lines.push(`無紀錄 ${noRecordDays} 天`);
   if (recorded.length) {
-    lines.push(`平均水分 ${formatNumber(avg((row) => row.totalWaterMl))} ml／日`);
-    lines.push(`平均熱量 ${formatNumber(avg((row) => row.kcal))} kcal／日`);
+    lines.push(`日均水分 ${formatNumber(avg((row) => row.totalWaterMl))} ml`);
+    lines.push(`日均熱量 ${formatNumber(avg((row) => row.kcal))} kcal`);
   }
-  if (vomitDays.length) lines.push(`嘔吐日：${vomitDays.join('、')} 號`);
-  if (medIssueDays.length) lines.push(`用藥異常日：${medIssueDays.join('、')} 號`);
-  if (!vomitDays.length && !medIssueDays.length) lines.push('本月沒有嘔吐或用藥異常。');
-  lines.push('', '※ 月曆圖表請輸入「網站」開啟照護站。');
+  if (vomitDays.length) lines.push(`嘔吐日：${vomitDays.map(Number).join('、')} 號`);
+  if (medIssueDays.length) lines.push(`藥異常日：${medIssueDays.map(Number).join('、')} 號`);
+  if (!vomitDays.length && !medIssueDays.length) lines.push('沒有嘔吐或用藥異常');
+  lines.push('', '※ 月曆圖請開照護站');
   return lines.join('\n');
 }
 
 export function visitReply(petName, visits, vetsById) {
   if (!visits.length) {
-    return `${petName} 目前沒有排定的回診。\n可在照護站「設定 → 回診資料」新增，或輸入「網站」開啟。`;
+    return `${petName} 沒有排定的回診。\n可在照護站「設定 → 回診資料」新增。`;
   }
   const lines = [`🏥 回診資訊（${petName}）`];
   for (const visit of visits) {
     const vet = vetsById[visit.vetId];
     const where = vet ? [vet.hospitalName, vet.doctorName].filter(Boolean).join('・') : '';
     const time = visit.visitTime ? ` ${visit.visitTime}` : '';
-    if (visit.nextVisitDate) lines.push(`下次回診：${visit.nextVisitDate}${time}${where ? `（${where}）` : ''}`);
-    else if (visit.visitDate) lines.push(`看診日：${visit.visitDate}${time}${where ? `（${where}）` : ''}`);
+    if (visit.nextVisitDate) lines.push(`下次 ${shortDate(visit.nextVisitDate)}${time}`);
+    else if (visit.visitDate) lines.push(`看診 ${shortDate(visit.visitDate)}${time}`);
+    if (where) lines.push(`　${where}`);
     if (visit.reason) lines.push(`　原因：${visit.reason}`);
     if (visit.doctorInstruction) lines.push(`　醫囑：${visit.doctorInstruction}`);
   }
-  lines.push('', '※ 回診前輸入「近7天」可先看摘要，完整報告請開照護站。');
   return lines.join('\n');
 }
 
 export function websiteReply(url) {
   return [
-    '🔗 你的照護站登入連結：',
+    '🔗 照護站登入連結：',
     url,
     '',
-    '只要持續使用就會自動延長效期，超過 30 天沒開啟才會過期（過期再輸入一次「網站」即可）。',
-    '打開後可查看月曆、修改紀錄、設定貓咪／食物／藥物／回診資料。',
-    '請不要把這個連結傳給別人，拿到連結的人就能看到貓咪的資料。'
+    '有使用就會自動延長效期，',
+    '超過 30 天沒開才會過期，',
+    '過期再輸入「網站」即可。',
+    '',
+    '連結請勿轉傳給別人。'
   ].join('\n');
 }
 
@@ -229,23 +239,36 @@ export function helpText() {
 
 export function welcomeText() {
   return [
-    '歡迎使用貓貓照護管家 Beta 🐾',
+    '歡迎使用貓貓照護管家 🐾',
     '',
-    '先輸入「新增貓咪 名字」建立貓咪檔案，',
-    '之後就能用「水 20」「乾糧 品牌 4g」「藥 已吃」快速記錄，',
-    '輸入「今天」看今日總結，輸入「網站」開啟照護站。',
+    '第一步：',
+    '新增貓咪 名字',
     '',
-    '完整指令請輸入「說明」。'
+    '之後這樣記錄：',
+    '水 20',
+    '乾糧 品牌 4g',
+    '藥 早 已吃',
+    '',
+    '輸入「今天」看總結，',
+    '「網站」開照護站，',
+    '「說明」看完整指令。'
   ].join('\n');
 }
 
 export function unknownReply() {
-  return '看不懂這則訊息。\n輸入「說明」可以看所有指令，例如：水 20、乾糧 希爾斯 4g、藥 已吃、今天。';
+  return [
+    '看不懂這則訊息 🙏',
+    '記錄範例：',
+    '水 20',
+    '乾糧 希爾斯 4g',
+    '藥 早 已吃',
+    '輸入「說明」看完整指令'
+  ].join('\n');
 }
 
 export function invalidReply(reason, category) {
-  if (reason === 'missing_amount' && category === 'water') return '請加上數量，例如「水 20」（單位 ml）。';
-  if (reason === 'missing_amount' && category === 'food') return '請加上克數，例如「乾糧 希爾斯 4g」或「罐頭 皇家 30g」。';
-  if (reason === 'missing_note') return '請在備註後面加上內容，例如「備註 今天有梳毛」。';
+  if (reason === 'missing_amount' && category === 'water') return '請加上數量（ml），例如：\n水 20';
+  if (reason === 'missing_amount' && category === 'food') return '請加上克數，例如：\n乾糧 希爾斯 4g\n罐頭 皇家 30g';
+  if (reason === 'missing_note') return '備註後面要加內容，例如：\n備註 今天有梳毛';
   return unknownReply();
 }
