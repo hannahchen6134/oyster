@@ -152,10 +152,13 @@
     .grid-2 { grid-template-columns: 1fr 1fr; }
     .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 
-    /* 統計列：一列安靜的數字，只有一條細線劃開，不用卡片 */
-    .stat-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px;
-      border-top: 1px solid var(--line); padding-top: 18px; }
-    .card { padding: 0; background: none; border: none; }
+    /* 統計列：柔面小卡浮在紙上，數字用明體 */
+    .stat-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+    .card {
+      padding: 15px 17px 13px; border-radius: var(--radius);
+      background: linear-gradient(180deg, #ffffff, var(--sheet-soft));
+      border: 1px solid var(--line); box-shadow: var(--shadow-soft);
+    }
     .stat-label { color: var(--muted); font-size: 11.5px; font-weight: 600; letter-spacing: 0.16em; }
     .stat-value {
       margin-top: 7px; font-family: var(--serif); font-size: clamp(20px, 2.8vw, 27px);
@@ -166,6 +169,7 @@
       font-size: 12.5px; font-weight: 500; color: var(--muted); margin-left: 4px; letter-spacing: 0.04em;
     }
     .stat-sub { margin-top: 6px; color: var(--ink-soft); font-size: 12.5px; line-height: 1.55; }
+    .stat-value.is-warn-value { color: var(--seal); }
     .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
     .toolbar input[type="date"] { width: auto; }
 
@@ -178,31 +182,41 @@
       font-size: 15px; font-weight: 600; color: var(--ink);
       font-variant-numeric: tabular-nums; padding-top: 2px;
     }
-    .entry-body { font-size: 14.5px; padding-top: 1px; }
-    .entry-body .is-warn { color: var(--seal); }
-    .entry-meta { color: var(--muted); font-size: 13px; margin-left: 8px; }
-    .visit-tag { color: var(--green); font-weight: 600; margin-right: 6px; }
-    .entry-note { color: var(--muted); font-size: 13.5px; line-height: 1.6; white-space: pre-wrap; margin-top: 3px; }
-    .entry-actions { display: flex; gap: 2px; }
-    .link-btn {
-      border: none; background: none; color: var(--muted); font: inherit; font-size: 13px;
-      cursor: pointer; padding: 2px 6px; border-radius: var(--radius-sm); letter-spacing: 0.04em;
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip {
+      display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 999px;
+      border: 1px solid var(--line-strong); color: var(--ink-soft); font-size: 12.5px; font-weight: 500;
+      background: var(--sheet);
     }
-    .link-btn:hover { color: var(--ink); }
-    .link-btn.danger:hover { color: var(--seal); }
-    .link-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(35, 82, 63, 0.22); }
+    .chip:first-child { border-color: rgba(35, 82, 63, 0.45); color: var(--green); background: var(--green-tint); }
+    .chip.warn { border-color: rgba(191, 59, 32, 0.4); color: var(--seal); background: var(--seal-tint); }
+    .entry-note { color: var(--ink-soft); font-size: 14px; line-height: 1.6; white-space: pre-wrap; margin-top: 6px; }
+    .entry-actions { display: flex; gap: 4px; }
     .empty {
       padding: 30px 20px; border: 1px dashed var(--line-strong); border-radius: var(--radius);
       color: var(--muted); text-align: center; font-size: 14px; background: var(--sheet-soft);
     }
     .doctor-note {
-      margin-top: 26px; padding: 2px 0 2px 16px;
-      border-left: 2px solid var(--green);
+      margin-top: 20px; padding: 16px 20px;
+      border: 1px solid rgba(35, 82, 63, 0.14); border-left: 3px solid var(--green);
+      border-radius: var(--radius-sm) var(--radius) var(--radius) var(--radius-sm);
+      background: linear-gradient(135deg, var(--green-tint), rgba(255, 255, 255, 0.7));
+      box-shadow: var(--shadow-soft);
       line-height: 1.75; color: var(--ink-soft); font-size: 14px;
     }
     .doctor-note #doctorNote { font-family: var(--serif); font-size: 14.5px; letter-spacing: 0.02em; }
-    .section-head { display: flex; align-items: center; gap: 14px; margin-top: 36px; margin-bottom: 10px; }
+    .section-head { display: flex; align-items: center; gap: 14px; margin-top: 34px; margin-bottom: 12px; }
     .section-head h2 { margin: 0; flex: 1; }
+    .visit-item {
+      display: flex; align-items: flex-start; gap: 12px; padding: 13px 16px;
+      border: 1px solid rgba(35, 82, 63, 0.14); border-left: 3px solid var(--green);
+      border-radius: var(--radius-sm) var(--radius) var(--radius) var(--radius-sm);
+      background: linear-gradient(180deg, #ffffff, var(--green-tint));
+      box-shadow: var(--shadow-soft);
+    }
+    .visit-item .info { flex: 1; min-width: 0; }
+    .visit-item .title { font-weight: 600; font-size: 14px; }
+    .visit-item .sub { color: var(--ink-soft); font-size: 13px; margin-top: 2px; line-height: 1.55; }
 
     /* 月曆：圓角軟卡月誌格，今天蓋朱紅印 */
     .cal-head { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 16px; }
@@ -379,25 +393,28 @@
           <button class="btn btn-primary btn-sm" id="addLogBtn" type="button">＋ 新增/補登紀錄</button>
         </div>
         <div class="grid stat-grid" style="margin-top:14px">
-          <div class="card"><div class="stat-label">總水分</div><div class="stat-value" id="statWater">0 ml</div><div class="stat-sub" id="statWaterSub"></div></div>
-          <div class="card"><div class="stat-label">食物</div><div class="stat-value" id="statFood">0 g</div><div class="stat-sub" id="statFoodSub"></div></div>
-          <div class="card"><div class="stat-label">熱量</div><div class="stat-value" id="statKcal">0 kcal</div><div class="stat-sub" id="statKcalSub"></div></div>
-          <div class="card"><div class="stat-label">用藥</div><div class="stat-value" id="statMed">—</div><div class="stat-sub" id="statMedSub"></div></div>
-          <div class="card"><div class="stat-label">腸胃重點</div><div class="stat-value" id="statGut">穩定</div><div class="stat-sub" id="statGutSub"></div></div>
+          <div class="card"><div class="stat-label">總水分</div><div class="stat-value" id="statWater">0 ml</div></div>
+          <div class="card"><div class="stat-label">食物</div><div class="stat-value" id="statFood">0 g</div></div>
+          <div class="card"><div class="stat-label">熱量</div><div class="stat-value" id="statKcal">0 kcal</div></div>
+          <div class="card"><div class="stat-label">用藥</div><div class="stat-value" id="statMed">—</div></div>
+          <div class="card"><div class="stat-label">腸胃</div><div class="stat-value" id="statGut">穩定</div></div>
         </div>
         <div class="doctor-note">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:2px">
-            <b style="font-size:13px;letter-spacing:0.08em;color:var(--ink-soft)">給醫生的一句話</b>
-            <button class="link-btn" id="copyDoctorBtn" type="button">複製</button>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px">
+            <b style="font-size:14px">給醫生的一句話</b>
+            <button class="btn btn-secondary btn-sm" id="copyDoctorBtn" type="button">複製</button>
           </div>
           <div id="doctorNote">今天還沒有紀錄。</div>
         </div>
         <div class="section-head">
-          <h2>當日紀錄</h2>
-          <button class="link-btn" id="addVisitBtn" type="button">＋ 記錄看診</button>
+          <h2>看診</h2>
+          <button class="btn btn-secondary btn-sm" id="addVisitBtn" type="button">＋ 記錄看診</button>
         </div>
-        <div class="grid" id="dayVisitList" style="gap:0"></div>
-        <div class="grid" id="logList" style="gap:0"></div>
+        <div class="grid" id="dayVisitList"></div>
+        <div class="section-head">
+          <h2>當日紀錄</h2>
+        </div>
+        <div class="grid" id="logList"></div>
       </section>
 
       <!-- 月曆 -->
@@ -588,18 +605,18 @@
       }
       container.innerHTML = visits.map((visit) => {
         const isNextOnly = visit.visitDate !== state.date && visit.nextVisitDate === state.date;
-        const tag = isNextOnly ? '預定回診' : '看診';
-        const sub = [vetLabel(vetsById[visit.vetId]), visit.reason, visit.doctorInstruction].filter(Boolean).join('・');
+        const title = isNextOnly
+          ? `預定回診${visit.visitTime ? `・${visit.visitTime}` : ''}`
+          : `看診${visit.visitTime ? `・${visit.visitTime}` : ''}`;
+        const sub = [vetLabel(vetsById[visit.vetId]), visit.reason, visit.doctorInstruction].filter(Boolean).join('｜');
         return `
-          <div class="entry">
-            <div class="entry-time">${esc(visit.visitTime || '—')}</div>
-            <div class="entry-body">
-              <span class="visit-tag">${tag}</span>${esc(sub || '尚未填寫醫院與原因')}
+          <div class="visit-item">
+            <div class="info">
+              <div class="title">${esc(title)}</div>
+              <div class="sub">${esc(sub || '尚未填寫醫院與原因')}</div>
             </div>
-            <div class="entry-actions">
-              <button class="link-btn" data-visit-edit="${esc(visit.visitId)}" type="button">編輯</button>
-              <button class="link-btn danger" data-visit-del="${esc(visit.visitId)}" type="button">刪除</button>
-            </div>
+            <button class="btn btn-secondary btn-sm" data-visit-edit="${esc(visit.visitId)}" type="button">編輯</button>
+            <button class="btn btn-danger btn-sm" data-visit-del="${esc(visit.visitId)}" type="button">刪除</button>
           </div>`;
       }).join('');
     }
@@ -650,28 +667,16 @@
 
     function renderSummary(s) {
       setStatValue('statWater', s.totalWaterMl, ' ml');
-      $('statWaterSub').textContent = `喝水 ${fmt(s.waterMl)}＋食物 ${fmt(s.foodWaterMl)}`;
       const totalFood = (s.dryFoodG || 0) + (s.wetFoodG || 0) + (s.otherFoodG || 0);
       setStatValue('statFood', totalFood, ' g');
-      $('statFoodSub').textContent = `乾 ${fmt(s.dryFoodG)}／濕罐 ${fmt(s.wetFoodG)}${s.otherFoodG ? `／其他 ${fmt(s.otherFoodG)}` : ''}`;
       setStatValue('statKcal', s.kcal, ' kcal');
-      $('statKcalSub').textContent = `${s.entryCount} 筆紀錄`;
       const medText = s.meds.length
         ? s.meds.map((m) => `${[m.slot, m.name].filter(Boolean).join(' ')}${m.status}`).join('、')
         : '尚無用藥紀錄';
-      $('statMed').textContent = s.meds.length ? `已餵 ${s.medTakenCount} 次` : '未記錄';
-      $('statMedSub').textContent = medText + (s.medIssueCount ? `（⚠️ 異常 ${s.medIssueCount} 次）` : '');
-
-      if (s.vomitCount > 0) {
-        $('statGut').textContent = '需留意';
-        $('statGutSub').textContent = `嘔吐 ${s.vomitCount} 次${s.stoolCount ? `・便便 ${s.stoolCount} 次` : ''}`;
-      } else if (s.stoolCount > 0) {
-        $('statGut').textContent = '有紀錄';
-        $('statGutSub').textContent = `便便 ${s.stoolCount} 次，無嘔吐`;
-      } else {
-        $('statGut').textContent = '穩定';
-        $('statGutSub').textContent = '沒有嘔吐或便便備註';
-      }
+      $('statMed').textContent = s.meds.length ? `${s.medTakenCount} 次` : '—';
+      $('statMed').classList.toggle('is-warn-value', s.medIssueCount > 0);
+      $('statGut').textContent = s.vomitCount > 0 ? '需留意' : '穩定';
+      $('statGut').classList.toggle('is-warn-value', s.vomitCount > 0);
 
       const pet = currentPet();
       if (!s.entryCount) {
@@ -704,36 +709,28 @@
         return;
       }
       container.innerHTML = logs.map((log) => {
-        let main = '';
-        let meta = '';
-        if (log.category === 'water') {
-          main = `喝水 ${fmt(log.waterMl || log.amount)} ml`;
-        } else if (log.category === 'food') {
-          const name = [log.foodType, log.itemName].filter(Boolean).map(esc).join('・');
-          main = `${name} ${fmt(log.amount)} g`;
-          const parts = [];
-          if (log.kcal) parts.push(`${fmt(log.kcal)} kcal`);
-          if (log.waterMl) parts.push(`水 ${fmt(log.waterMl)} ml`);
-          meta = parts.join('・');
-        } else if (log.category === 'med') {
-          const warn = log.medStatus !== '已吃';
-          const label = [log.medSlot, log.itemName].filter(Boolean).map(esc).join(' ');
-          main = `藥${label ? ` ${label}` : ''}・<span class="${warn ? 'is-warn' : ''}">${esc(log.medStatus)}</span>`;
-        } else {
-          const names = { vomit: '嘔吐', stool: '便便', mood: '精神', note: '備註' };
-          const warn = log.category === 'vomit';
-          main = `<span class="${warn ? 'is-warn' : ''}">${names[log.category] || esc(log.category)}</span>`;
+        const chips = [`<span class="chip">${CATEGORY_LABEL[log.category] || log.category}</span>`];
+        if (log.category === 'water') chips.push(`<span class="chip">${fmt(log.waterMl || log.amount)} ml</span>`);
+        if (log.category === 'food') {
+          chips.push(`<span class="chip">${esc(log.foodType)}${log.itemName ? ` ・ ${esc(log.itemName)}` : ''} ${fmt(log.amount)} g</span>`);
+          if (log.kcal) chips.push(`<span class="chip">${fmt(log.kcal)} kcal</span>`);
+          if (log.waterMl) chips.push(`<span class="chip">水 ${fmt(log.waterMl)} ml</span>`);
         }
+        if (log.category === 'med') {
+          const warn = log.medStatus !== '已吃';
+          chips.push(`<span class="chip${warn ? ' warn' : ''}">${esc([log.medSlot, log.itemName].filter(Boolean).join(' ') || '藥')} ${esc(log.medStatus)}</span>`);
+        }
+        if (log.category === 'vomit') chips.push('<span class="chip warn">需留意</span>');
         return `
           <div class="entry">
             <div class="entry-time">${esc(String(log.eventDateTime).slice(11, 16) || '--:--')}</div>
-            <div class="entry-body">
-              ${main}${meta ? `<span class="entry-meta">${meta}</span>` : ''}
+            <div>
+              <div class="chips">${chips.join('')}</div>
               ${log.note ? `<div class="entry-note">${esc(log.note)}</div>` : ''}
             </div>
             <div class="entry-actions">
-              <button class="link-btn" data-edit="${esc(log.logId)}" type="button">編輯</button>
-              <button class="link-btn danger" data-del="${esc(log.logId)}" type="button">刪除</button>
+              <button class="btn btn-secondary btn-sm" data-edit="${esc(log.logId)}" type="button">編輯</button>
+              <button class="btn btn-danger btn-sm" data-del="${esc(log.logId)}" type="button">刪除</button>
             </div>
           </div>`;
       }).join('');
@@ -1148,8 +1145,8 @@
         return `
           <div class="list-item">
             <div class="info"><div class="title">${esc(view.title)}</div><div class="sub">${esc(view.sub)}</div></div>
-            <button class="link-btn" data-edit="${esc(id)}" type="button">編輯</button>
-            <button class="link-btn danger" data-del="${esc(id)}" type="button">刪除</button>
+            <button class="btn btn-secondary btn-sm" data-edit="${esc(id)}" type="button">編輯</button>
+            <button class="btn btn-danger btn-sm" data-del="${esc(id)}" type="button">刪除</button>
           </div>`;
       }).join('');
     }
