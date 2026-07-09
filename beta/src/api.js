@@ -127,6 +127,10 @@ export async function handleApi(request, env, url) {
       return handleLogs(db, request, method, resourceId, lineUserId);
     }
 
+    if (resource === 'labs') {
+      return handleLabs(db, request, url, method, resourceId, lineUserId);
+    }
+
     if (RESOURCES[resource]) {
       return handleCrud(db, RESOURCES[resource], request, url, method, resourceId, lineUserId);
     }
@@ -237,6 +241,70 @@ async function applyDerivedFields(db, log) {
     }
   }
   return result;
+}
+
+// ---------- labs（血檢：同一天多個項目，一次整份存）----------
+
+async function handleLabs(db, request, url, method, resourceId, lineUserId) {
+  if (method === 'GET') {
+    const petId = url.searchParams.get('petId') || '';
+    if (!(await assertPetOwner(db, petId, lineUserId))) return forbidden();
+    const { results } = await db
+      .prepare('SELECT * FROM labs WHERE petId = ? AND isDeleted = 0 ORDER BY testDate, itemName')
+      .bind(petId)
+      .all();
+    return jsonResponse({ ok: true, rows: results || [] });
+  }
+
+  // 一次存一份報告：覆蓋同一天既有的項目
+  if (method === 'POST' && resourceId === 'bulk') {
+    const body = await request.json();
+    const petId = String(body.petId || '');
+    const testDate = String(body.testDate || '');
+    if (!(await assertPetOwner(db, petId, lineUserId))) return forbidden();
+    if (!isValidDate(testDate)) return jsonResponse({ ok: false, message: '日期格式錯誤' }, 400);
+
+    const now = nowIso();
+    await db
+      .prepare('UPDATE labs SET isDeleted = 1, updatedAt = ? WHERE petId = ? AND testDate = ?')
+      .bind(now, petId, testDate)
+      .run();
+
+    const items = Array.isArray(body.items) ? body.items : [];
+    let saved = 0;
+    for (const item of items) {
+      const itemName = String(item.itemName || '').trim();
+      const value = Number(item.value);
+      if (!itemName || !Number.isFinite(value)) continue;
+      await db
+        .prepare(
+          `INSERT INTO labs (labId, petId, testDate, itemName, value, unit, refLow, refHigh, note, isDeleted, createdAt, updatedAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`
+        )
+        .bind(
+          newId(), petId, testDate, itemName, value,
+          String(item.unit || ''), Number(item.refLow || 0), Number(item.refHigh || 0),
+          String(item.note || ''), now, now
+        )
+        .run();
+      saved += 1;
+    }
+    return jsonResponse({ ok: true, saved });
+  }
+
+  // 刪除某一天的整份報告：DELETE /api/labs/date?petId=&date=
+  if (method === 'DELETE' && resourceId === 'date') {
+    const petId = url.searchParams.get('petId') || '';
+    const date = url.searchParams.get('date') || '';
+    if (!(await assertPetOwner(db, petId, lineUserId))) return forbidden();
+    await db
+      .prepare('UPDATE labs SET isDeleted = 1, updatedAt = ? WHERE petId = ? AND testDate = ?')
+      .bind(nowIso(), petId, date)
+      .run();
+    return jsonResponse({ ok: true });
+  }
+
+  return jsonResponse({ ok: false, message: 'Method not allowed' }, 405);
 }
 
 // ---------- 泛用 CRUD（pets / foods / meds / vets / visits）----------

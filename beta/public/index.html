@@ -451,6 +451,14 @@
       <section class="panel hidden" id="trendView">
         <h2>近 30 天總覽</h2>
         <div class="block" style="margin-top:14px"><div id="trendCharts"></div></div>
+        <div class="block hidden" id="labTrendBlock">
+          <div class="section-head" style="margin-top:0">
+            <h2>血檢趨勢</h2>
+            <select id="labItemSelect" style="width:auto" aria-label="選擇血檢項目"></select>
+          </div>
+          <div id="labChartBox"></div>
+          <p class="muted" style="font-size:12px;margin:8px 0 0">綠色底＝參考範圍，紅點＝超出範圍。數值在照護站「設定 → 血檢」輸入。</p>
+        </div>
         <div class="block table-wrap">
           <table>
             <thead>
@@ -469,6 +477,7 @@
           <button class="tab" data-settings="meds" type="button">藥物</button>
           <button class="tab" data-settings="vets" type="button">醫院醫生</button>
           <button class="tab" data-settings="visits" type="button">回診資料</button>
+          <button class="tab" data-settings="labs" type="button">血檢</button>
           <button class="tab" data-settings="goals" type="button">每日目標</button>
           <button class="tab" data-settings="reminders" type="button">提醒</button>
         </div>
@@ -514,7 +523,9 @@
       meds: [],
       vets: [],
       visits: [],
-      dayLogs: []
+      dayLogs: [],
+      labs: [],
+      labItem: ''
     };
 
     const $ = (id) => document.getElementById(id);
@@ -1025,12 +1036,106 @@
       container.appendChild(lineChart({ title: '熱量', unit: 'kcal', color: '#b3703f', dates, values: series((row) => row.kcal) }));
     }
 
+    // 血檢趨勢：稀疏的檢驗點，畫參考範圍底色，超標的點標紅
+    function labChart(rows) {
+      const W = 640, H = 150, padL = 42, padR = 14, padT = 16, padB = 24;
+      const innerW = W - padL - padR, innerH = H - padT - padB;
+      const n = rows.length;
+      const x = (i) => padL + (n === 1 ? innerW / 2 : (i / (n - 1)) * innerW);
+      const refRow = [...rows].reverse().find((row) => Number(row.refHigh) > 0) || {};
+      const refLow = Number(refRow.refLow) || 0;
+      const refHigh = Number(refRow.refHigh) || 0;
+      const values = rows.map((row) => Number(row.value) || 0);
+      const domain = [...values];
+      if (refHigh > 0) domain.push(refLow, refHigh);
+      let yMin = Math.min(...domain), yMax = Math.max(...domain);
+      const span = (yMax - yMin) || Math.abs(yMax) || 1;
+      yMin = Math.max(0, yMin - span * 0.25);
+      yMax = yMax + span * 0.25;
+      const y = (v) => padT + innerH - ((v - yMin) / (yMax - yMin)) * innerH;
+
+      let band = '';
+      if (refHigh > 0) {
+        const top = Math.max(padT, y(Math.min(refHigh, yMax)));
+        const bottom = Math.min(padT + innerH, y(Math.max(refLow, yMin)));
+        band = `<rect x="${padL}" y="${top.toFixed(1)}" width="${innerW}" height="${Math.max(0, bottom - top).toFixed(1)}" fill="var(--green-tint)" opacity="0.8"></rect>`;
+      }
+      let grid = `<line x1="${padL}" y1="${padT + innerH}" x2="${W - padR}" y2="${padT + innerH}" stroke="var(--line-strong)" stroke-width="1"></line>`;
+      grid += `<text x="${padL - 6}" y="${y(yMax) + 9}" text-anchor="end" font-size="10" fill="var(--muted)">${fmt(yMax)}</text>`;
+      grid += `<text x="${padL - 6}" y="${padT + innerH + 3}" text-anchor="end" font-size="10" fill="var(--muted)">${fmt(yMin)}</text>`;
+
+      const path = rows.map((row, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(row.value).toFixed(1)}`).join('');
+      let dots = '';
+      let labels = '';
+      let ticks = '';
+      const tickEvery = Math.max(1, Math.ceil(n / 6));
+      rows.forEach((row, i) => {
+        const abnormal = refHigh > 0 && (row.value > refHigh || row.value < refLow);
+        dots += `<circle cx="${x(i).toFixed(1)}" cy="${y(row.value).toFixed(1)}" r="3.8" fill="${abnormal ? 'var(--seal)' : '#1e7a52'}" stroke="var(--sheet)" stroke-width="1.5"></circle>`;
+        if (n <= 8) labels += `<text x="${x(i).toFixed(1)}" y="${(y(row.value) - 8).toFixed(1)}" text-anchor="middle" font-size="10.5" fill="var(--ink-soft)">${fmt(row.value)}</text>`;
+        if (i % tickEvery === 0 || i === n - 1) {
+          ticks += `<text x="${x(i).toFixed(1)}" y="${H - 6}" text-anchor="middle" font-size="10" fill="var(--muted)">${Number(row.testDate.slice(5, 7))}/${Number(row.testDate.slice(8, 10))}</text>`;
+        }
+      });
+
+      const unit = rows[rows.length - 1].unit || '';
+      const box = document.createElement('div');
+      box.className = 'chart-wrap';
+      box.innerHTML = `
+        <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="血檢趨勢">
+          ${band}${grid}
+          <path d="${path}" fill="none" stroke="#1e7a52" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path>
+          ${dots}${labels}${ticks}
+        </svg>
+        <div class="chart-tip"></div>`;
+      const svg = box.querySelector('svg');
+      const tip = box.querySelector('.chart-tip');
+      svg.addEventListener('mouseleave', () => { tip.style.opacity = 0; });
+      svg.addEventListener('mousemove', (event) => {
+        const rect = svg.getBoundingClientRect();
+        const relX = ((event.clientX - rect.left) / rect.width) * W;
+        let best = 0, bestDist = Infinity;
+        rows.forEach((row, i) => {
+          const dist = Math.abs(x(i) - relX);
+          if (dist < bestDist) { bestDist = dist; best = i; }
+        });
+        const row = rows[best];
+        tip.textContent = `${row.testDate.slice(5).replace('-', '/')}　${fmt(row.value)} ${unit}`;
+        tip.style.left = `${(x(best) / W) * rect.width}px`;
+        tip.style.top = `${(y(row.value) / H) * rect.height}px`;
+        tip.style.opacity = 1;
+      });
+      return box;
+    }
+
+    function renderLabTrend() {
+      const block = $('labTrendBlock');
+      const itemNames = [...new Set(state.labs.map((row) => row.itemName))];
+      if (!itemNames.length) {
+        block.classList.add('hidden');
+        return;
+      }
+      block.classList.remove('hidden');
+      const select = $('labItemSelect');
+      if (!itemNames.includes(state.labItem)) state.labItem = itemNames[0];
+      select.innerHTML = itemNames.map((name) =>
+        `<option value="${esc(name)}" ${name === state.labItem ? 'selected' : ''}>${esc(name)}</option>`).join('');
+      const rows = state.labs
+        .filter((row) => row.itemName === state.labItem)
+        .sort((a, b) => a.testDate.localeCompare(b.testDate));
+      const boxContainer = $('labChartBox');
+      boxContainer.innerHTML = '';
+      if (rows.length) boxContainer.appendChild(labChart(rows));
+    }
+
     async function loadTrend() {
       if (!state.petId) return;
       const to = todayStr();
       const fromDate = new Date(Date.now() - 29 * 86400000).toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
       const data = await api(`summary?petId=${state.petId}&from=${fromDate}&to=${to}`);
       renderTrendCharts(data.rows, fromDate, to);
+      state.labs = (await api(`labs?petId=${state.petId}`)).rows;
+      renderLabTrend();
       const rows = [...data.rows].reverse();
       if (!rows.length) {
         $('trendBody').innerHTML = '<tr><td colspan="12" style="text-align:center;color:var(--muted)">近 30 天還沒有紀錄</td></tr>';
@@ -1192,6 +1297,105 @@
       });
     }
 
+    // 血檢：常見項目預填單位與參考範圍（可依報告修改），值留空就不會存
+    const LAB_PRESETS = [
+      ['BUN', 'mg/dL', 16, 36], ['CREA', 'mg/dL', 0.8, 2.4], ['SDMA', 'µg/dL', 0, 14],
+      ['磷 P', 'mg/dL', 3.1, 7.5], ['鉀 K', 'mmol/L', 3.5, 5.8], ['ALB', 'g/dL', 2.2, 4],
+      ['TP', 'g/dL', 5.7, 8.9], ['ALT', 'U/L', 12, 130], ['GLU', 'mg/dL', 74, 159],
+      ['HCT', '%', 30, 45], ['WBC', 'K/µL', 5.5, 19.5], ['體重', 'kg', 0, 0]
+    ];
+
+    function labsByDate(rows) {
+      const groups = new Map();
+      for (const row of rows) {
+        if (!groups.has(row.testDate)) groups.set(row.testDate, []);
+        groups.get(row.testDate).push(row);
+      }
+      return [...groups.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+    }
+
+    function renderLabsList() {
+      const container = $('settingsList');
+      const groups = labsByDate(state.labs);
+      if (!groups.length) {
+        container.innerHTML = '<div class="empty">還沒有血檢紀錄，按右上「＋ 新增」輸入第一份報告。</div>';
+        return;
+      }
+      container.innerHTML = groups.map(([date, rows]) => {
+        const sub = rows.map((row) => {
+          const abnormal = row.refHigh > 0 && (row.value > row.refHigh || row.value < row.refLow);
+          return `${row.itemName} ${fmt(row.value)}${abnormal ? '⚠' : ''}`;
+        }).join('・');
+        return `
+          <div class="list-item">
+            <div class="info"><div class="title">${esc(date)}</div><div class="sub">${esc(sub)}</div></div>
+            <button class="btn btn-secondary btn-sm" data-lab-edit="${esc(date)}" type="button">編輯</button>
+            <button class="btn btn-danger btn-sm" data-lab-del="${esc(date)}" type="button">刪除</button>
+          </div>`;
+      }).join('');
+    }
+
+    function openLabModal(date) {
+      const existing = date ? state.labs.filter((row) => row.testDate === date) : [];
+      const byName = Object.fromEntries(existing.map((row) => [row.itemName, row]));
+      const extraRows = existing.filter((row) => !LAB_PRESETS.some(([name]) => name === row.itemName));
+      const presetRow = ([name, unit, low, high]) => {
+        const row = byName[name];
+        return `
+          <div class="grid" style="grid-template-columns:88px 1fr 66px 66px;gap:8px;align-items:center;margin-bottom:8px">
+            <div style="font-size:13px"><b>${name}</b><br><span class="muted" style="font-size:11px">${unit}</span></div>
+            <input type="number" step="any" data-lab-item="${name}" data-lab-unit="${unit}" placeholder="數值" value="${row ? esc(row.value) : ''}">
+            <input type="number" step="any" data-lab-low="${name}" placeholder="低" value="${esc(row ? row.refLow : (low || ''))}" title="參考下限">
+            <input type="number" step="any" data-lab-high="${name}" placeholder="高" value="${esc(row ? row.refHigh : (high || ''))}" title="參考上限">
+          </div>`;
+      };
+      const customRow = (row, index) => `
+        <div class="grid" style="grid-template-columns:88px 1fr 66px 66px;gap:8px;align-items:center;margin-bottom:8px">
+          <input data-lab-cname="${index}" placeholder="項目名" value="${row ? esc(row.itemName) : ''}" style="font-size:13px">
+          <input type="number" step="any" data-lab-cvalue="${index}" placeholder="數值" value="${row ? esc(row.value) : ''}">
+          <input type="number" step="any" data-lab-clow="${index}" placeholder="低" value="${row ? esc(row.refLow) : ''}">
+          <input type="number" step="any" data-lab-chigh="${index}" placeholder="高" value="${row ? esc(row.refHigh) : ''}">
+        </div>`;
+      const html = `
+        <div class="field"><label>檢驗日期</label><input type="date" id="labDate" value="${esc(date || state.date)}" ${date ? 'readonly' : ''}></div>
+        <div class="muted" style="font-size:12.5px;margin-bottom:10px">填有驗的項目就好，空白不會儲存；參考範圍可依報告修改。</div>
+        <div style="display:grid;grid-template-columns:88px 1fr 66px 66px;gap:8px;font-size:11px;color:var(--muted);margin-bottom:4px">
+          <div>項目</div><div>數值</div><div>參考低</div><div>參考高</div>
+        </div>
+        ${LAB_PRESETS.map(presetRow).join('')}
+        <div class="muted" style="font-size:12px;margin:8px 0 6px">其他項目（自訂）</div>
+        ${customRow(extraRows[0], 0)}${customRow(extraRows[1], 1)}`;
+      openModal(date ? `編輯 ${date} 血檢` : '新增血檢報告', html, async () => {
+        const items = [];
+        for (const [name, unit] of LAB_PRESETS) {
+          const value = document.querySelector(`[data-lab-item="${name}"]`).value.trim();
+          if (value === '') continue;
+          items.push({
+            itemName: name, value: Number(value), unit,
+            refLow: Number(document.querySelector(`[data-lab-low="${name}"]`).value || 0),
+            refHigh: Number(document.querySelector(`[data-lab-high="${name}"]`).value || 0)
+          });
+        }
+        for (const index of [0, 1]) {
+          const cname = document.querySelector(`[data-lab-cname="${index}"]`).value.trim();
+          const cvalue = document.querySelector(`[data-lab-cvalue="${index}"]`).value.trim();
+          if (!cname || cvalue === '') continue;
+          items.push({
+            itemName: cname, value: Number(cvalue), unit: '',
+            refLow: Number(document.querySelector(`[data-lab-clow="${index}"]`).value || 0),
+            refHigh: Number(document.querySelector(`[data-lab-chigh="${index}"]`).value || 0)
+          });
+        }
+        if (!items.length) throw new Error('至少填一個數值');
+        await api('labs/bulk', {
+          method: 'POST',
+          body: JSON.stringify({ petId: state.petId, testDate: $('labDate').value, items })
+        });
+        toast('已儲存血檢報告');
+        await loadSettings();
+      });
+    }
+
     // 照護提醒：每晚 21:00 檢查，需要時 LINE 推播
     const REMINDER_ITEMS = [
       { key: 'med', label: '用藥提醒', desc: '晚上 9 點時今天的藥還沒記錄' },
@@ -1241,6 +1445,14 @@
     async function loadSettings() {
       document.querySelectorAll('[data-settings]').forEach((el) =>
         el.classList.toggle('active', el.dataset.settings === state.settingsTab));
+
+      if (state.settingsTab === 'labs') {
+        $('settingsHint').textContent = '一次輸入一份報告，異常值會標 ⚠；趨勢圖在「近 30 天」分頁。';
+        $('settingsAddBtn').classList.remove('hidden');
+        state.labs = (await api(`labs?petId=${state.petId}`)).rows;
+        renderLabsList();
+        return;
+      }
 
       if (state.settingsTab === 'reminders') {
         $('settingsHint').textContent = '挑選你想被提醒的狀況，異常時會主動傳 LINE 給你。';
@@ -1409,6 +1621,20 @@
         return switchTab('today');
       }
 
+      const labEditBtn = event.target.closest('[data-lab-edit]');
+      if (labEditBtn) return openLabModal(labEditBtn.dataset.labEdit);
+      const labDelBtn = event.target.closest('[data-lab-del]');
+      if (labDelBtn) {
+        if (!confirm(`確定刪除 ${labDelBtn.dataset.labDel} 的整份血檢紀錄嗎？`)) return;
+        try {
+          await api(`labs/date?petId=${state.petId}&date=${labDelBtn.dataset.labDel}`, { method: 'DELETE' });
+          toast('已刪除');
+          return loadSettings();
+        } catch (error) {
+          return toast(error.message, true);
+        }
+      }
+
       const visitEditBtn = event.target.closest('[data-visit-edit]');
       if (visitEditBtn) {
         const visit = state.visits.find((entry) => entry.visitId === visitEditBtn.dataset.visitEdit);
@@ -1509,7 +1735,14 @@
       state.calMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
       loadCalendar();
     });
-    $('settingsAddBtn').addEventListener('click', () => openSettingsModal(null));
+    $('labItemSelect').addEventListener('change', (event) => {
+      state.labItem = event.target.value;
+      renderLabTrend();
+    });
+    $('settingsAddBtn').addEventListener('click', () => {
+      if (state.settingsTab === 'labs') return openLabModal(null);
+      openSettingsModal(null);
+    });
     $('modalCancelBtn').addEventListener('click', closeModal);
     $('modalBackdrop').addEventListener('click', (event) => {
       if (event.target === $('modalBackdrop')) closeModal();
