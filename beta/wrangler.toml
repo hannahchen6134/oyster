@@ -1,0 +1,27 @@
+name = "pet-care-beta"
+main = "src/index.js"
+compatibility_date = "2026-07-01"
+
+# 照護站網站（beta/public）由 Worker Static Assets 直接服務。
+# /webhook 與 /api/* 一律先進 Worker 程式。
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = ["/webhook", "/api/*", "/healthz"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "pet-care-beta"
+# 執行 `wrangler d1 create pet-care-beta` 後，把回傳的 database_id 貼到這裡
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+
+[observability.logs]
+enabled = true
+
+[vars]
+# 部署後的網站網址（選填）。留空時會自動使用 Worker 本身的網址。
+APP_BASE_URL = ""
+
+# 機密請用 wrangler secret 設定，不要寫進這個檔案：
+#   wrangler secret put LINE_CHANNEL_ACCESS_TOKEN
+#   wrangler secret put LINE_CHANNEL_SECRET

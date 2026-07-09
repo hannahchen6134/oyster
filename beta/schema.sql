@@ -1,0 +1,168 @@
+-- 毛孩照護管家 Beta — Cloudflare D1 資料庫結構
+-- 依照執行企畫書第 7 節資料表規格建立。
+-- eventDateTime 為事件實際發生時間（Asia/Taipei，格式 YYYY-MM-DD HH:MM），createdAt 為資料建立時間。
+-- 刪除一律使用 isDeleted 軟刪除，不直接清除資料。
+
+CREATE TABLE IF NOT EXISTS users (
+  lineUserId TEXT PRIMARY KEY,
+  displayName TEXT NOT NULL DEFAULT '',
+  defaultPetId TEXT NOT NULL DEFAULT '',
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS pets (
+  petId TEXT PRIMARY KEY,
+  ownerLineUserId TEXT NOT NULL,
+  petName TEXT NOT NULL,
+  species TEXT NOT NULL DEFAULT '貓',
+  birthday TEXT NOT NULL DEFAULT '',
+  breed TEXT NOT NULL DEFAULT '',
+  weightKg REAL NOT NULL DEFAULT 0,
+  conditionNote TEXT NOT NULL DEFAULT '',
+  vaccineNote TEXT NOT NULL DEFAULT '',
+  defaultVetId TEXT NOT NULL DEFAULT '',
+  isDeleted INTEGER NOT NULL DEFAULT 0,
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_pets_owner ON pets(ownerLineUserId, isDeleted);
+
+CREATE TABLE IF NOT EXISTS food_items (
+  foodId TEXT PRIMARY KEY,
+  ownerLineUserId TEXT NOT NULL,
+  brand TEXT NOT NULL DEFAULT '',
+  productName TEXT NOT NULL DEFAULT '',
+  displayName TEXT NOT NULL,
+  foodType TEXT NOT NULL DEFAULT '乾糧',
+  kcalPerGram REAL NOT NULL DEFAULT 0,
+  waterRatio REAL NOT NULL DEFAULT 0,
+  isPrescription INTEGER NOT NULL DEFAULT 0,
+  note TEXT NOT NULL DEFAULT '',
+  isDeleted INTEGER NOT NULL DEFAULT 0,
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_foods_owner ON food_items(ownerLineUserId, isDeleted);
+
+CREATE TABLE IF NOT EXISTS meds (
+  medId TEXT PRIMARY KEY,
+  petId TEXT NOT NULL,
+  medName TEXT NOT NULL,
+  doseAmount REAL NOT NULL DEFAULT 0,
+  doseUnit TEXT NOT NULL DEFAULT '',
+  schedule TEXT NOT NULL DEFAULT '',
+  defaultTimes TEXT NOT NULL DEFAULT '',
+  instruction TEXT NOT NULL DEFAULT '',
+  note TEXT NOT NULL DEFAULT '',
+  isDeleted INTEGER NOT NULL DEFAULT 0,
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_meds_pet ON meds(petId, isDeleted);
+
+CREATE TABLE IF NOT EXISTS vets (
+  vetId TEXT PRIMARY KEY,
+  ownerLineUserId TEXT NOT NULL,
+  hospitalName TEXT NOT NULL DEFAULT '',
+  doctorName TEXT NOT NULL DEFAULT '',
+  phone TEXT NOT NULL DEFAULT '',
+  address TEXT NOT NULL DEFAULT '',
+  note TEXT NOT NULL DEFAULT '',
+  isDeleted INTEGER NOT NULL DEFAULT 0,
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_vets_owner ON vets(ownerLineUserId, isDeleted);
+
+CREATE TABLE IF NOT EXISTS vet_visits (
+  visitId TEXT PRIMARY KEY,
+  petId TEXT NOT NULL,
+  vetId TEXT NOT NULL DEFAULT '',
+  visitDate TEXT NOT NULL DEFAULT '',
+  reason TEXT NOT NULL DEFAULT '',
+  doctorInstruction TEXT NOT NULL DEFAULT '',
+  nextVisitDate TEXT NOT NULL DEFAULT '',
+  note TEXT NOT NULL DEFAULT '',
+  isDeleted INTEGER NOT NULL DEFAULT 0,
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_visits_pet ON vet_visits(petId, isDeleted);
+
+CREATE TABLE IF NOT EXISTS logs (
+  logId TEXT PRIMARY KEY,
+  lineUserId TEXT NOT NULL,
+  petId TEXT NOT NULL,
+  eventDateTime TEXT NOT NULL,
+  category TEXT NOT NULL,
+  itemName TEXT NOT NULL DEFAULT '',
+  foodType TEXT NOT NULL DEFAULT '',
+  foodId TEXT NOT NULL DEFAULT '',
+  amount REAL NOT NULL DEFAULT 0,
+  unit TEXT NOT NULL DEFAULT '',
+  waterMl REAL NOT NULL DEFAULT 0,
+  kcal REAL NOT NULL DEFAULT 0,
+  medStatus TEXT NOT NULL DEFAULT '',
+  medSlot TEXT NOT NULL DEFAULT '',
+  note TEXT NOT NULL DEFAULT '',
+  sourceMessageId TEXT NOT NULL DEFAULT '',
+  isDeleted INTEGER NOT NULL DEFAULT 0,
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL,
+  updatedBy TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_logs_pet_event ON logs(petId, eventDateTime, isDeleted);
+CREATE INDEX IF NOT EXISTS idx_logs_message ON logs(sourceMessageId);
+
+CREATE TABLE IF NOT EXISTS daily_summary (
+  petId TEXT NOT NULL,
+  date TEXT NOT NULL,
+  waterMl REAL NOT NULL DEFAULT 0,
+  foodWaterMl REAL NOT NULL DEFAULT 0,
+  totalWaterMl REAL NOT NULL DEFAULT 0,
+  dryFoodG REAL NOT NULL DEFAULT 0,
+  wetFoodG REAL NOT NULL DEFAULT 0,
+  otherFoodG REAL NOT NULL DEFAULT 0,
+  kcal REAL NOT NULL DEFAULT 0,
+  medJson TEXT NOT NULL DEFAULT '[]',
+  medTakenCount INTEGER NOT NULL DEFAULT 0,
+  medIssueCount INTEGER NOT NULL DEFAULT 0,
+  vomitCount INTEGER NOT NULL DEFAULT 0,
+  stoolCount INTEGER NOT NULL DEFAULT 0,
+  abnormalFlags TEXT NOT NULL DEFAULT '[]',
+  entryCount INTEGER NOT NULL DEFAULT 0,
+  updatedAt TEXT NOT NULL,
+  PRIMARY KEY (petId, date)
+);
+
+CREATE TABLE IF NOT EXISTS share_links (
+  token TEXT PRIMARY KEY,
+  petId TEXT NOT NULL,
+  rangeDays INTEGER NOT NULL DEFAULT 30,
+  expiresAt TEXT NOT NULL,
+  permission TEXT NOT NULL DEFAULT 'vet_viewer',
+  createdAt TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS care_members (
+  memberId TEXT PRIMARY KEY,
+  petId TEXT NOT NULL,
+  ownerLineUserId TEXT NOT NULL,
+  memberLineUserId TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'viewer',
+  status TEXT NOT NULL DEFAULT 'invited',
+  invitedAt TEXT NOT NULL DEFAULT '',
+  acceptedAt TEXT NOT NULL DEFAULT '',
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_members_pet ON care_members(petId, status);
+
+CREATE TABLE IF NOT EXISTS sessions (
+  token TEXT PRIMARY KEY,
+  lineUserId TEXT NOT NULL,
+  expiresAt TEXT NOT NULL,
+  createdAt TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(lineUserId);
