@@ -5,7 +5,8 @@
 
 import { parseMessage, matchFood, normalizeText } from './parser.js';
 import { handleApi } from './api.js';
-import { verifyLineSignature, replyOrPush, getProfile } from './line.js';
+import { verifyLineSignature, replyOrPush, pushText, getProfile } from './line.js';
+import { hasAnyReminder, buildReminderLines, reminderMessage } from './reminders.js';
 import {
   ensureUser, updateUser, listPets, createPet, resolveDefaultPet,
   listFoods, insertLog, recomputeDay, getRecentSummaries,
@@ -46,8 +47,32 @@ export default {
       return jsonResponse({ ok: true, service: 'cat-care-beta', now: new Date().toISOString() });
     }
     return env.ASSETS.fetch(request);
+  },
+
+  // 每晚 21:00（台北）檢查照護提醒
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(runDailyReminders(env));
   }
 };
+
+async function runDailyReminders(env) {
+  const db = env.DB;
+  const today = taipeiToday();
+  const { results: pets } = await db.prepare('SELECT * FROM pets WHERE isDeleted = 0').all();
+
+  for (const pet of pets || []) {
+    try {
+      if (!hasAnyReminder(pet) || !pet.ownerLineUserId) continue;
+      const rows = await getRecentSummaries(db, pet.petId, today, 8);
+      const lines = buildReminderLines(pet, rows);
+      if (!lines.length) continue;
+      await pushText(env, pet.ownerLineUserId, reminderMessage(pet, lines));
+      console.log(JSON.stringify({ step: 'reminder_sent', petId: pet.petId, count: lines.length }));
+    } catch (error) {
+      console.error('reminder failed:', pet.petId, error.message);
+    }
+  }
+}
 
 async function handleWebhook(request, env, url) {
   const rawBody = await request.text();

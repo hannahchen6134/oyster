@@ -18,7 +18,7 @@ const RESOURCES = {
     fields: {
       petName: 'text', species: 'text', birthday: 'text', breed: 'text',
       weightKg: 'number', conditionNote: 'text', vaccineNote: 'text', defaultVetId: 'text',
-      goalWaterMl: 'number', goalKcal: 'number', goalMedSlots: 'text'
+      goalWaterMl: 'number', goalKcal: 'number', goalMedSlots: 'text', reminderJson: 'text'
     },
     required: ['petName']
   },

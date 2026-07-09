@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS pets (
   goalWaterMl REAL NOT NULL DEFAULT 0,
   goalKcal REAL NOT NULL DEFAULT 0,
   goalMedSlots TEXT NOT NULL DEFAULT '[]',
+  reminderJson TEXT NOT NULL DEFAULT '{}',
   isDeleted INTEGER NOT NULL DEFAULT 0,
   createdAt TEXT NOT NULL,
   updatedAt TEXT NOT NULL

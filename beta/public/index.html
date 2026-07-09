@@ -470,6 +470,7 @@
           <button class="tab" data-settings="vets" type="button">醫院醫生</button>
           <button class="tab" data-settings="visits" type="button">回診資料</button>
           <button class="tab" data-settings="goals" type="button">每日目標</button>
+          <button class="tab" data-settings="reminders" type="button">提醒</button>
         </div>
         <div class="toolbar" style="margin-bottom:12px">
           <div class="muted" id="settingsHint"></div>
@@ -1191,9 +1192,63 @@
       });
     }
 
+    // 照護提醒：每晚 21:00 檢查，需要時 LINE 推播
+    const REMINDER_ITEMS = [
+      { key: 'med', label: '用藥提醒', desc: '晚上 9 點時今天的藥還沒記錄' },
+      { key: 'water', label: '喝水量下降', desc: '當天水分比近一週平均少四成以上' },
+      { key: 'appetite', label: '食慾下降', desc: '當天熱量比近一週平均少四成以上' },
+      { key: 'stool', label: '排便提醒', desc: '連續 2 天沒有便便紀錄' }
+    ];
+
+    function renderRemindersForm() {
+      const pet = currentPet();
+      const container = $('settingsList');
+      if (!pet) {
+        container.innerHTML = '<div class="empty">先建立貓咪才能設定提醒。</div>';
+        return;
+      }
+      let settings = {};
+      try { settings = JSON.parse(pet.reminderJson || '{}'); } catch (error) { /* ignore */ }
+      container.innerHTML = `
+        <div class="block" style="margin-top:0">
+          ${REMINDER_ITEMS.map((item) => `
+            <label style="display:flex;align-items:flex-start;gap:10px;padding:10px 2px;border-bottom:1px solid var(--line);cursor:pointer;letter-spacing:0">
+              <input type="checkbox" name="reminderItem" value="${item.key}" style="width:auto;margin-top:4px" ${settings[item.key] ? 'checked' : ''}>
+              <span><b style="font-size:14px">${item.label}</b><br>
+              <span class="muted" style="font-size:12.5px">${item.desc}</span></span>
+            </label>`).join('')}
+          <div class="muted" style="font-size:12.5px;margin-top:10px">每晚 21:00 檢查一次，有需要才會傳 LINE 給你；一切正常就不打擾。</div>
+          <div style="display:flex;justify-content:flex-end;margin-top:10px">
+            <button class="btn btn-primary btn-sm" id="reminderSaveBtn" type="button">儲存提醒設定</button>
+          </div>
+        </div>`;
+      $('reminderSaveBtn').addEventListener('click', async () => {
+        const next = {};
+        document.querySelectorAll('[name="reminderItem"]').forEach((el) => { next[el.value] = el.checked; });
+        try {
+          await api(`pets/${pet.petId}`, {
+            method: 'PUT',
+            body: JSON.stringify({ reminderJson: JSON.stringify(next) })
+          });
+          toast('已儲存，每晚 21:00 會幫你把關');
+          await refreshPets();
+        } catch (error) {
+          toast(error.message, true);
+        }
+      });
+    }
+
     async function loadSettings() {
       document.querySelectorAll('[data-settings]').forEach((el) =>
         el.classList.toggle('active', el.dataset.settings === state.settingsTab));
+
+      if (state.settingsTab === 'reminders') {
+        $('settingsHint').textContent = '挑選你想被提醒的狀況，異常時會主動傳 LINE 給你。';
+        $('settingsAddBtn').classList.add('hidden');
+        await refreshPets();
+        renderRemindersForm();
+        return;
+      }
 
       if (state.settingsTab === 'goals') {
         $('settingsHint').textContent = '設定每天的照護目標，LINE 每次總結會提醒還差多少，全達成會給你一句鼓勵。';
