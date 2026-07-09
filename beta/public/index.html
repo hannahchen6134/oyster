@@ -49,16 +49,42 @@
     }
     .shell { width: min(920px, calc(100% - 28px)); margin: 0 auto; padding: 36px 0 96px; }
 
-    /* 紙面：一整張，頂端墨色規線，浮在柔光桌面上 */
+    /* 紙面：一整張，頂端墨色規線，浮在柔光桌面上，帶紙張顆粒 */
     #appView {
+      position: relative;
       background: var(--sheet);
       border: 1px solid rgba(27, 29, 26, 0.08);
       border-top: 3px solid var(--ink);
       border-radius: 0 0 var(--radius) var(--radius);
       box-shadow: var(--shadow-lift);
-      padding: 36px 48px 50px;
+      padding: 36px 48px 44px;
+    }
+    #appView::before, .login-card::before {
+      content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+      background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.045'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
     }
     .panel { margin-top: 30px; }
+    /* 印章：寵物名首字，蓋在頁首右側 */
+    .seal-mark {
+      width: 44px; height: 44px; flex: none; display: flex; align-items: center; justify-content: center;
+      background: radial-gradient(circle at 34% 30%, #d0492a, var(--seal) 64%, #a83318);
+      color: #fff; font-family: var(--serif); font-weight: 700; font-size: 22px;
+      border-radius: 6px; transform: rotate(-3deg);
+      box-shadow: inset 0 0 6px rgba(120, 30, 10, 0.55), 0 3px 10px rgba(191, 59, 32, 0.28);
+      text-shadow: 0 0 2px rgba(120, 30, 10, 0.4);
+      user-select: none;
+    }
+    .date-line {
+      margin-top: 8px; font-family: var(--serif); font-size: 14px;
+      color: var(--muted); letter-spacing: 0.14em;
+    }
+    /* 頁尾題記 */
+    .colophon {
+      display: flex; align-items: center; gap: 18px; margin-top: 46px;
+      font-family: var(--serif); font-size: 12.5px; color: var(--muted); letter-spacing: 0.3em;
+      white-space: nowrap;
+    }
+    .colophon::before, .colophon::after { content: ''; flex: 1; height: 1px; background: var(--line); }
 
     h1 {
       margin: 0; font-family: var(--serif); font-weight: 700;
@@ -93,6 +119,10 @@
     }
     .tab:hover { color: var(--ink); }
     .tab.active { color: var(--ink); font-weight: 600; border-bottom-color: var(--green); }
+    .tab:focus-visible {
+      outline: none; border-radius: var(--radius-sm);
+      box-shadow: 0 0 0 3px rgba(35, 82, 63, 0.22);
+    }
 
     input, select, textarea, button { font: inherit; }
     input, select, textarea {
@@ -144,6 +174,10 @@
       margin-top: 7px; font-family: var(--serif); font-size: clamp(20px, 2.8vw, 27px);
       font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums;
     }
+    .stat-unit {
+      font-family: "Noto Sans TC", "PingFang TC", sans-serif;
+      font-size: 12.5px; font-weight: 500; color: var(--muted); margin-left: 4px; letter-spacing: 0.04em;
+    }
     .stat-sub { margin-top: 6px; color: var(--ink-soft); font-size: 12.5px; line-height: 1.55; }
     .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
     .toolbar input[type="date"] { width: auto; }
@@ -179,6 +213,7 @@
       box-shadow: var(--shadow-soft);
       line-height: 1.75; color: var(--ink-soft); font-size: 14px;
     }
+    .doctor-note #doctorNote { font-family: var(--serif); font-size: 14.5px; letter-spacing: 0.02em; }
     .section-head { display: flex; align-items: center; gap: 14px; margin-top: 34px; margin-bottom: 12px; }
     .section-head h2 { margin: 0; flex: 1; }
     .visit-item {
@@ -192,37 +227,37 @@
     .visit-item .title { font-weight: 600; font-size: 14px; }
     .visit-item .sub { color: var(--ink-soft); font-size: 13px; margin-top: 2px; line-height: 1.55; }
 
-    /* 月曆：細規線月誌格，今天蓋朱紅印 */
+    /* 月曆：圓角軟卡月誌格，今天蓋朱紅印 */
     .cal-head { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 16px; }
     .cal-title { font-family: var(--serif); font-size: 19px; font-weight: 600; min-width: 132px; text-align: center; letter-spacing: 0.06em; }
-    .cal-grid {
-      display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 0;
-      border-left: 1px solid var(--line); border-top: 2px solid var(--ink);
-      border-radius: 0 0 var(--radius-sm) var(--radius-sm); overflow: hidden;
-      box-shadow: var(--shadow-soft);
-    }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 7px; }
     .cal-dow {
       text-align: center; font-size: 11px; font-weight: 600; color: var(--muted);
-      padding: 8px 0; letter-spacing: 0.18em; background: var(--sheet-soft);
-      border-right: 1px solid var(--line); border-bottom: 1px solid var(--line);
+      padding: 4px 0 6px; letter-spacing: 0.18em;
     }
+    /* 月誌慣例：週日朱、週六綠 */
+    .cal-dow:nth-child(1) { color: rgba(191, 59, 32, 0.7); }
+    .cal-dow:nth-child(7) { color: rgba(35, 82, 63, 0.75); }
+    .cal-cell:nth-child(7n+8):not(.today) .cal-daynum { color: rgba(191, 59, 32, 0.8); }
+    .cal-cell:nth-child(7n+14):not(.today) .cal-daynum { color: rgba(35, 82, 63, 0.85); }
     .cal-cell {
-      min-height: 84px; border-radius: 0; border-right: 1px solid var(--line);
-      border-bottom: 1px solid var(--line); background: var(--sheet);
-      padding: 7px 8px; font-size: 11px; cursor: pointer;
-      overflow: hidden; transition: box-shadow 0.15s, background 0.15s;
+      min-height: 84px; border-radius: var(--radius); border: 1px solid var(--line);
+      background: linear-gradient(180deg, #ffffff, var(--sheet-soft));
+      box-shadow: 0 1px 2px rgba(27, 29, 26, 0.03);
+      padding: 7px 9px; font-size: 11px; cursor: pointer;
+      overflow: hidden; transition: box-shadow 0.15s, border-color 0.15s;
     }
-    .cal-cell:hover { box-shadow: inset 0 0 0 1px var(--green), inset 0 0 18px rgba(35, 82, 63, 0.06); }
-    .cal-cell.blank { background: var(--sheet-soft); cursor: default; visibility: visible; }
-    .cal-cell.blank:hover { box-shadow: none; }
+    .cal-cell:hover { border-color: rgba(35, 82, 63, 0.55); box-shadow: var(--shadow-soft); }
+    .cal-cell.blank { visibility: hidden; }
     .cal-daynum {
       font-weight: 600; font-size: 12.5px; font-variant-numeric: tabular-nums;
       width: 21px; height: 21px; display: inline-flex; align-items: center; justify-content: center;
       border-radius: 50%;
     }
     .cal-cell.today .cal-daynum { background: var(--seal); color: #fff; box-shadow: 0 0 0 3px rgba(191, 59, 32, 0.15); }
-    .cal-cell.norec { background: var(--sheet-soft); color: var(--muted); }
-    .cal-cell.warn { background: var(--seal-tint); }
+    .cal-cell.today { border-color: rgba(191, 59, 32, 0.35); }
+    .cal-cell.norec { background: transparent; box-shadow: none; color: var(--muted); }
+    .cal-cell.warn { background: linear-gradient(180deg, #fdf3ef, var(--seal-tint)); border-color: rgba(191, 59, 32, 0.22); }
     .cal-line { margin-top: 2px; white-space: nowrap; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
     .cal-flags { margin-top: 2px; font-size: 11.5px; }
 
@@ -292,6 +327,7 @@
     /* 登入：置中的一小張紙 */
     .login-wrap { min-height: calc(100vh - 150px); display: flex; align-items: center; justify-content: center; }
     .login-card {
+      position: relative;
       max-width: 440px; width: 100%; text-align: center; padding: 46px 36px 40px;
       background: var(--sheet); border: 1px solid rgba(27, 29, 26, 0.08);
       border-top: 3px solid var(--ink); border-radius: 0 0 var(--radius) var(--radius);
@@ -341,8 +377,10 @@
           <div>
             <div class="eyebrow">Cat Care · Beta</div>
             <h1 style="margin-top:10px"><span id="petTitle">貓貓</span>的照護紀錄</h1>
+            <div class="date-line" id="dateLine"></div>
           </div>
           <div class="spacer"></div>
+          <div class="seal-mark" id="petSeal" aria-hidden="true">貓</div>
           <select id="petSelect" aria-label="選擇貓咪" style="width:auto;min-width:104px"></select>
           <button class="btn btn-secondary btn-sm" id="logoutBtn" type="button">登出</button>
         </div>
@@ -430,6 +468,8 @@
         </div>
         <div class="grid" id="settingsList"></div>
       </section>
+
+      <footer class="colophon">記錄是最好的陪伴</footer>
     </div>
   </div>
 
@@ -617,8 +657,11 @@
       const from = Number(el.dataset.val || 0);
       const target = Number(value) || 0;
       el.dataset.val = target;
+      const render = (value) => {
+        el.innerHTML = `${fmt(value)}<span class="stat-unit">${suffix.trim()}</span>`;
+      };
       if (REDUCED_MOTION || from === target) {
-        el.textContent = `${fmt(target)}${suffix}`;
+        render(target);
         return;
       }
       const start = performance.now();
@@ -626,7 +669,7 @@
       const tick = (now) => {
         const t = Math.min(1, (now - start) / duration);
         const eased = 1 - Math.pow(1 - t, 3);
-        el.textContent = `${fmt(t === 1 ? target : from + (target - from) * eased)}${suffix}`;
+        render(t === 1 ? target : from + (target - from) * eased);
         if (t < 1) requestAnimationFrame(tick);
       };
       requestAnimationFrame(tick);
@@ -877,6 +920,11 @@
       const yMax = Math.ceil(maxRaw / step) * step;
       const x = (i) => padL + (dates.length === 1 ? innerW / 2 : (i / (dates.length - 1)) * innerW);
       const y = (v) => padT + innerH - (v / yMax) * innerH;
+      const gradId = `grad-${Math.random().toString(36).slice(2, 8)}`;
+      const defs = `<defs><linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="${color}" stop-opacity="0.16"></stop>
+        <stop offset="1" stop-color="${color}" stop-opacity="0.02"></stop>
+      </linearGradient></defs>`;
 
       let paths = '';
       let run = [];
@@ -884,7 +932,7 @@
         if (run.length > 1) {
           const d = run.map(([px, py], idx) => `${idx ? 'L' : 'M'}${px.toFixed(1)},${py.toFixed(1)}`).join('');
           const base = `L${run[run.length - 1][0].toFixed(1)},${(padT + innerH).toFixed(1)}L${run[0][0].toFixed(1)},${(padT + innerH).toFixed(1)}Z`;
-          paths += `<path d="${d}${base}" fill="${color}" fill-opacity="0.07" stroke="none"></path>`;
+          paths += `<path d="${d}${base}" fill="url(#${gradId})" stroke="none"></path>`;
           paths += `<path d="${d}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path>`;
         } else if (run.length === 1) {
           paths += `<circle cx="${run[0][0].toFixed(1)}" cy="${run[0][1].toFixed(1)}" r="2.5" fill="${color}"></circle>`;
@@ -897,7 +945,7 @@
       let grid = '';
       for (const ratio of [0.5, 1]) {
         const gy = y(yMax * ratio);
-        grid += `<line x1="${padL}" y1="${gy}" x2="${W - padR}" y2="${gy}" stroke="var(--line)" stroke-width="1"></line>`;
+        grid += `<line x1="${padL}" y1="${gy}" x2="${W - padR}" y2="${gy}" stroke="var(--line)" stroke-width="1" stroke-dasharray="2 5"></line>`;
         grid += `<text x="${padL - 6}" y="${gy + 3.5}" text-anchor="end" font-size="10" fill="var(--muted)">${fmtInt(yMax * ratio)}</text>`;
       }
       grid += `<line x1="${padL}" y1="${padT + innerH}" x2="${W - padR}" y2="${padT + innerH}" stroke="var(--line-strong)" stroke-width="1"></line>`;
@@ -908,7 +956,7 @@
       let endDot = '';
       for (let i = values.length - 1; i >= 0; i -= 1) {
         if (values[i] != null) {
-          endDot = `<circle cx="${x(i)}" cy="${y(values[i])}" r="3.5" fill="${color}" stroke="var(--surface)" stroke-width="1.5"></circle>`;
+          endDot = `<circle cx="${x(i)}" cy="${y(values[i])}" r="3.5" fill="${color}" stroke="var(--sheet)" stroke-width="1.5"></circle>`;
           break;
         }
       }
@@ -923,9 +971,9 @@
         </div>
         <div class="chart-wrap">
           <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(title)}近30天趨勢">
-            ${grid}${paths}${endDot}
+            ${defs}${grid}${paths}${endDot}
             <line class="cross" x1="0" y1="${padT}" x2="0" y2="${padT + innerH}" stroke="var(--line-strong)" stroke-width="1" opacity="0"></line>
-            <circle class="cross-dot" r="3.5" fill="${color}" stroke="var(--surface)" stroke-width="1.5" opacity="0"></circle>
+            <circle class="cross-dot" r="3.5" fill="${color}" stroke="var(--sheet)" stroke-width="1.5" opacity="0"></circle>
             <rect x="${padL}" y="0" width="${innerW}" height="${H}" fill="transparent"></rect>
           </svg>
           <div class="chart-tip"></div>
@@ -1188,6 +1236,7 @@
       state.pets = data.pets;
       if (!state.pets.length) {
         $('petTitle').textContent = '貓貓';
+        $('petSeal').textContent = '貓';
         $('petSelect').innerHTML = '<option>尚無貓咪</option>';
         return;
       }
@@ -1199,6 +1248,7 @@
       $('petSelect').innerHTML = state.pets.map((pet) =>
         `<option value="${esc(pet.petId)}" ${pet.petId === state.petId ? 'selected' : ''}>${esc(pet.petName)}</option>`).join('');
       $('petTitle').textContent = currentPet()?.petName || '貓貓';
+      $('petSeal').textContent = ($('petTitle').textContent)[0];
     }
 
     async function bootstrap() {
@@ -1221,6 +1271,9 @@
 
       $('loginView').classList.add('hidden');
       $('appView').classList.remove('hidden');
+      $('dateLine').textContent = new Date().toLocaleDateString('zh-TW', {
+        year: 'numeric', month: 'long', day: 'numeric', weekday: 'long', timeZone: 'Asia/Taipei'
+      });
       await loadDay();
     }
 
@@ -1301,6 +1354,7 @@
     $('petSelect').addEventListener('change', async (event) => {
       state.petId = event.target.value;
       $('petTitle').textContent = currentPet()?.petName || '貓貓';
+      $('petSeal').textContent = ($('petTitle').textContent)[0];
       state.meds = (await api(`meds?petId=${state.petId}`)).rows;
       await api('me', { method: 'PUT', body: JSON.stringify({ defaultPetId: state.petId }) }).catch(() => {});
       const activeTab = document.querySelector('.tabs .tab.active')?.dataset.tab || 'today';
