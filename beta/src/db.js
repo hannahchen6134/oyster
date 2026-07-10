@@ -79,6 +79,45 @@ export async function createPet(db, ownerLineUserId, fields = {}) {
   return getPet(db, petId);
 }
 
+// LINE 引導建檔用：只更新體重/生日/餵藥時段等基本欄位
+export async function updatePetFields(db, petId, fields) {
+  const sets = [];
+  const values = [];
+  if (fields.weightKg !== undefined) { sets.push('weightKg = ?'); values.push(Number(fields.weightKg) || 0); }
+  if (fields.birthday !== undefined) { sets.push('birthday = ?'); values.push(String(fields.birthday)); }
+  if (fields.goalMedSlots !== undefined) { sets.push('goalMedSlots = ?'); values.push(String(fields.goalMedSlots)); }
+  if (!sets.length) return getPet(db, petId);
+  sets.push('updatedAt = ?');
+  values.push(nowIso());
+  await db.prepare(`UPDATE pets SET ${sets.join(', ')} WHERE petId = ?`).bind(...values, petId).run();
+  return getPet(db, petId);
+}
+
+// LINE 引導建檔用：建立常吃的食物（帶預設熱量水分）
+export async function createFoodItem(db, ownerLineUserId, fields) {
+  const now = nowIso();
+  const foodId = newId();
+  await db
+    .prepare(
+      `INSERT INTO food_items (foodId, ownerLineUserId, brand, productName, displayName, foodType,
+        kcalPerGram, waterRatio, isPrescription, note, isDeleted, createdAt, updatedAt)
+       VALUES (?, ?, '', '', ?, ?, ?, ?, 0, ?, 0, ?, ?)`
+    )
+    .bind(
+      foodId,
+      ownerLineUserId,
+      String(fields.displayName || ''),
+      String(fields.foodType || '罐頭'),
+      Number(fields.kcalPerGram || 0),
+      Number(fields.waterRatio || 0),
+      String(fields.note || ''),
+      now,
+      now
+    )
+    .run();
+  return db.prepare('SELECT * FROM food_items WHERE foodId = ?').bind(foodId).first();
+}
+
 // 使用者「目前操作的貓咪」：defaultPetId 優先，否則取第一隻
 export async function resolveDefaultPet(db, user, pets) {
   if (!pets.length) return null;

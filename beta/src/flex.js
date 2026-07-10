@@ -255,6 +255,29 @@ export function websiteFlex(url) {
   return bubble('照護站登入連結', { type: 'bubble', size: 'mega', header: header('照護站'), body, footer });
 }
 
+// ---------- 歡迎卡（加好友時） ----------
+export function welcomeFlex() {
+  const body = {
+    type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
+    contents: [
+      text(BRAND.tagline, { size: 'xs', color: C.muted, align: 'center', wrap: true }),
+      text('我會陪你記下貓貓的每一天——', { size: 'sm', color: C.inkSoft, wrap: true, margin: 'lg', align: 'center' }),
+      text('吃飯、喝水、用藥、回診，像聊天一樣打字就能記，不用學。', { size: 'sm', color: C.inkSoft, wrap: true, margin: 'sm', align: 'center' }),
+      {
+        type: 'box', layout: 'vertical', margin: 'xl',
+        backgroundColor: '#FBF8F1', cornerRadius: '14px',
+        borderColor: '#E9E0CE', borderWidth: '1px', paddingAll: '14px',
+        contents: [
+          text('第一步', { size: 'xxs', color: C.brand, weight: 'bold', align: 'center' }),
+          text('點下方「幫貓貓建檔」，打上名字送出就完成', { size: 'sm', color: C.ink, wrap: true, align: 'center', margin: 'sm' })
+        ]
+      },
+      text('之後隨時輸入「安心上手」都有小教學陪你', { size: 'xxs', color: C.muted, align: 'center', margin: 'lg' })
+    ]
+  };
+  return bubble(`歡迎加入${BRAND.name}！點「幫貓貓建檔」開始`, { type: 'bubble', size: 'mega', header: header('歡迎回家 🐾'), body });
+}
+
 // ---------- 說明選單卡 ----------
 function menuRow(label, sendText, primary = false) {
   return {

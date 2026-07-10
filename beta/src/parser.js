@@ -136,6 +136,49 @@ export function parseMessage(rawText) {
     return { type: 'addPet', name: addPetMatch[1].trim() };
   }
 
+  // 引導建檔：常吃的食物與餵藥時段
+  if (['設定食物', '建立食物', '新增食物', '設定常吃的食物'].includes(compact)) {
+    return { type: 'foodSetupMenu' };
+  }
+  const foodSetupMatch = text.match(/^(?:設定|新增)(罐頭|乾糧|濕食|零食)\s+(.+?)(?:\s+([0-9.]+))?$/);
+  if (foodSetupMatch) {
+    return {
+      type: 'foodSetup',
+      foodType: foodSetupMatch[1],
+      name: foodSetupMatch[2].trim(),
+      kcalPerGram: foodSetupMatch[3] ? Number(foodSetupMatch[3]) : 0
+    };
+  }
+  if (['設定餵藥', '餵藥設定', '設定用藥'].includes(compact)) {
+    return { type: 'medSetupMenu' };
+  }
+  const medSlotsMatch = text.match(/^餵藥時段\s*(.*)$/);
+  if (medSlotsMatch) {
+    const raw = medSlotsMatch[1];
+    let slots = [];
+    if (!/無|不用|沒有|先不/.test(raw)) {
+      if (raw.includes('早')) slots.push('早');
+      if (raw.includes('中')) slots.push('中午');
+      if (raw.includes('晚')) slots.push('晚');
+    }
+    return { type: 'medSlots', slots };
+  }
+
+  // 貓咪基本資料（LINE 引導建檔）：體重 4.2、生日 2020-01-01
+  const weightMatch = text.match(/^體重\s*([0-9.]+)\s*(?:kg|公斤)?$/i);
+  if (weightMatch) {
+    return { type: 'petField', field: 'weightKg', value: Number(weightMatch[1]) };
+  }
+  const birthdayMatch = text.match(/^生日\s*(.*)$/);
+  if (birthdayMatch) {
+    const raw = birthdayMatch[1].trim();
+    const dateMatch = raw.match(/^(\d{4})[年\/\-.](\d{1,2})[月\/\-.](\d{1,2})日?$/);
+    const value = dateMatch
+      ? `${dateMatch[1]}-${String(dateMatch[2]).padStart(2, '0')}-${String(dateMatch[3]).padStart(2, '0')}`
+      : '';
+    return { type: 'petField', field: 'birthday', value };
+  }
+
   // 修正上一筆：改 54 / 改成54（改數量）、剩 20 / 沒吃完剩20（扣掉）、刪除（刪上一筆）
   if (['刪除', '刪掉', '刪除上一筆', '刪上一筆', '刪除剛剛', '刪掉剛剛'].includes(compact)) {
     return { type: 'deleteLast' };

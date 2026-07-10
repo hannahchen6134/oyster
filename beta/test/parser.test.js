@@ -159,3 +159,16 @@ test('matchFood：忽略已刪除的食物', () => {
   const foods = [{ foodId: 'x', displayName: '希爾斯', brand: '', productName: '', foodType: '乾糧', isDeleted: 1 }];
   assert.equal(matchFood(foods, '希爾斯', '乾糧'), null);
 });
+
+test('引導建檔：體重與生日', () => {
+  assert.deepEqual(parseMessage('體重 4.2'), { type: 'petField', field: 'weightKg', value: 4.2 });
+  assert.deepEqual(parseMessage('生日 2020/1/5'), { type: 'petField', field: 'birthday', value: '2020-01-05' });
+  assert.equal(parseMessage('生日 亂打').value, '');
+});
+
+test('引導建檔：食物與餵藥時段', () => {
+  assert.deepEqual(parseMessage('設定罐頭 主食罐 1.1'), { type: 'foodSetup', foodType: '罐頭', name: '主食罐', kcalPerGram: 1.1 });
+  assert.deepEqual(parseMessage('設定乾糧 腎處方'), { type: 'foodSetup', foodType: '乾糧', name: '腎處方', kcalPerGram: 0 });
+  assert.deepEqual(parseMessage('餵藥時段 早晚').slots, ['早', '晚']);
+  assert.deepEqual(parseMessage('餵藥時段 不用').slots, []);
+});
