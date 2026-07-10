@@ -100,7 +100,7 @@
     }
     .page-head { padding-top: 4px; }
     .tabs {
-      display: flex; flex-wrap: wrap; gap: 26px; margin: 30px 0 0;
+      display: flex; flex-wrap: wrap; gap: 26px; margin: 18px 0 0;
       border-bottom: 1px solid var(--line-strong);
     }
     .tab {
@@ -179,7 +179,13 @@
     .entry {
       display: grid; grid-template-columns: 64px 1fr auto; gap: 14px; align-items: start;
       padding: 13px 2px; border-bottom: 1px solid var(--line);
+      cursor: pointer; border-radius: var(--radius-sm);
+      transition: background 0.12s;
     }
+    .entry:hover { background: rgba(115, 73, 33, 0.04); }
+    .entry .entry-actions { display: none; }
+    .entry.open { background: var(--brand-tint); padding-left: 8px; padding-right: 8px; }
+    .entry.open .entry-actions { display: flex; }
     .entry:last-child { border-bottom: none; }
     .entry-time {
       font-size: 15px; font-weight: 600; color: var(--ink);
@@ -420,9 +426,11 @@
 
     /* 頁面模式：h1 底下的小標，避免和貓名擠成一行亂斷行 */
     .page-mode {
-      margin-top: 8px; font-family: var(--serif); font-size: 16.5px; font-weight: 600;
+      margin-top: 7px; font-family: var(--serif); font-size: 16.5px; font-weight: 600;
       color: var(--brand); letter-spacing: 0.08em;
+      display: flex; align-items: baseline; gap: 4px; flex-wrap: wrap;
     }
+    .date-inline { font-size: 13px; font-weight: 500; color: var(--muted); letter-spacing: 0.1em; }
     /* 快速新增(手機大按鈕)：要一眼看得出是按鈕 */
     .quick-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
     .qbtn {
@@ -464,6 +472,13 @@
     .vs-date { flex: 0 0 60px; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 13px; padding-top: 1px; }
     .vs-val { flex: 1; color: var(--ink); line-height: 1.55; }
     .vs-empty { color: var(--muted); font-size: 13px; padding: 6px 2px; }
+    .fold-inline { margin-top: 10px; }
+    .fold-inline summary {
+      list-style: none; cursor: pointer; text-align: center;
+      font-size: 12.5px; color: var(--brand); padding: 7px 0;
+    }
+    .fold-inline summary::-webkit-details-marker { display: none; }
+    .fold-inline[open] summary { color: var(--muted); }
     /* 今日照護確認卡 */
     .confirm-row { display: flex; gap: 14px; padding: 11px 2px; border-bottom: 1px solid var(--line); font-size: 14.5px; }
     .confirm-row:last-of-type { border-bottom: none; }
@@ -486,6 +501,23 @@
     .onboard-step { display: flex; gap: 12px; padding: 12px 2px; border-bottom: 1px solid var(--line); font-size: 14.5px; }
     .onboard-step:last-child { border-bottom: none; }
     .onboard-step .num { font-family: var(--serif); color: var(--brand); font-weight: 700; }
+    /* PDF 報告：用列印產生（另存為 PDF），畫面上不顯示 */
+    #printReport { display: none; }
+    @media print {
+      body { background: #fff; }
+      .shell, .toast, .modal-backdrop { display: none !important; }
+      #printReport { display: block; font-family: "Noto Sans TC", sans-serif; color: #111; font-size: 12.5px; line-height: 1.7; }
+      #printReport h1 { font-size: 20px; margin: 0 0 2px; font-family: var(--serif); }
+      #printReport h2 { font-size: 14px; margin: 18px 0 6px; border-bottom: 1px solid #999; padding-bottom: 4px; display: block; }
+      #printReport h2::after { display: none; }
+      #printReport .pr-meta { color: #444; font-size: 11.5px; margin-bottom: 4px; }
+      #printReport pre { white-space: pre-wrap; font: 12px/1.8 "Noto Sans TC", sans-serif; margin: 0; }
+      #printReport table { border-collapse: collapse; width: 100%; font-size: 11px; }
+      #printReport th, #printReport td { border: 1px solid #bbb; padding: 4px 6px; text-align: right; }
+      #printReport th:first-child, #printReport td:first-child { text-align: left; }
+      #printReport .pr-foot { margin-top: 22px; color: #666; font-size: 10.5px; border-top: 1px solid #ccc; padding-top: 8px; }
+    }
+
     @media (max-width: 760px) {
       .quick-grid { grid-template-columns: repeat(3, 1fr); gap: 9px; }
       .qbtn { min-height: 50px; font-size: 14.5px; }
@@ -501,7 +533,7 @@
       h1 { font-size: 30px; }
       .date-line { margin-top: 6px; }
       .topbar { row-gap: 14px; }
-      .tabs { gap: 16px; margin-top: 26px; }
+      .tabs { gap: 16px; margin-top: 14px; }
       .panel { margin-top: 28px; }
       .toolbar { row-gap: 12px; }
       .toolbar .btn-primary { width: 100%; order: 9; margin-top: 4px; }
@@ -514,7 +546,7 @@
       .block { margin-top: 26px; padding: 22px 18px; }
       .section-head { margin-top: 34px; }
       .entry { grid-template-columns: 1fr; gap: 6px; padding: 15px 2px; }
-      .entry-actions { flex-direction: row; }
+      .entry.open .entry-actions { flex-direction: row; margin-top: 4px; }
       .cal-cell { min-height: 74px; padding: 5px 6px 7px; }
       .cal-num { font-size: 11px; }
       .colophon { margin-top: 44px; }
@@ -557,14 +589,11 @@
       <header class="page-head">
         <div class="topbar">
           <div>
-            <div class="eyebrow">讓每一次紀錄，都是對貓貓的守護</div>
-            <h1 style="margin-top:10px" id="petTitle">貓貓</h1>
-            <div class="page-mode" id="pageMode">今天的照護確認</div>
-            <div class="date-line" id="dateLine"></div>
+            <h1 id="petTitle">貓貓</h1>
+            <div class="page-mode"><span id="pageMode">今天的照護確認</span><span class="date-inline" id="dateLine"></span></div>
           </div>
           <div class="spacer"></div>
-          <select id="petSelect" aria-label="選擇貓咪" style="width:auto;min-width:104px"></select>
-          <button class="btn btn-secondary btn-sm" id="logoutBtn" type="button">登出</button>
+          <select id="petSelect" class="hidden" aria-label="選擇貓咪" style="width:auto;min-width:104px"></select>
         </div>
         <div class="tabs">
           <button class="tab active" data-tab="today" type="button">今天</button>
@@ -647,10 +676,15 @@
         <div class="block" style="margin-top:14px">
           <div class="section-head">
             <h2>近 7 天摘要</h2>
+            <button class="btn btn-secondary btn-sm" id="pdfReportBtn" type="button">PDF 報告</button>
             <button class="btn btn-primary btn-sm" id="copyVisitSummaryBtn" type="button">複製給醫生</button>
           </div>
           <p class="muted" style="margin:0 0 6px;font-size:12.5px" id="visitRangeLine"></p>
-          <div id="visitSummaryView"><div class="vs-empty">整理中…</div></div>
+          <div id="visitHighlights"></div>
+          <details class="fold-inline">
+            <summary>展開完整摘要 ›</summary>
+            <div id="visitSummaryView" style="margin-top:6px"><div class="vs-empty">整理中…</div></div>
+          </details>
         </div>
         <details class="block fold">
           <summary>
@@ -731,6 +765,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
+  <div id="printReport" aria-hidden="true"></div>
 
   <script>
     'use strict';
@@ -1047,8 +1082,8 @@
         }
         if (log.category === 'vomit') chips.push('<span class="chip warn">需留意</span>');
         return `
-          <div class="entry">
-            <div class="entry-time">${esc(String(log.eventDateTime).slice(11, 16) || '--:--')}<div class="entry-by">${esc(log.caregiverName || '我')}${log.isBackfilled ? '・補登' : ''}</div></div>
+          <div class="entry" data-entry="${esc(log.logId)}">
+            <div class="entry-time">${esc(String(log.eventDateTime).slice(11, 16) || '--:--')}${log.isBackfilled ? '<div class="entry-by">補登</div>' : ''}</div>
             <div>
               <div class="chips">${chips.join('')}</div>
               ${log.note ? `<div class="entry-note">${esc(log.note)}</div>` : ''}
@@ -1436,16 +1471,25 @@
 
       const medRows = [];
       let noMedCount = 0;
+      let medHasIssue = false;
       for (const date of dates) {
         const r = byDate[date];
         let meds = [];
         try { meds = Array.isArray(r?.medJson) ? r.medJson : JSON.parse(r?.medJson || '[]'); } catch (error) { /* ignore */ }
         if (!meds.length) { noMedCount += 1; continue; }
+        if (meds.some((m) => m.status && m.status !== '已吃')) medHasIssue = true;
         medRows.push([label(date), meds.map((m) =>
           `${[m.slot, m.name].filter(Boolean).join(' ') || '藥'} ${MED_LABEL(m.status) || '有紀錄'}`).join('、')]);
       }
       if (medRows.length && noMedCount) medRows.push(['', `其他 ${noMedCount} 天尚未看到用藥紀錄`]);
-      sections.push({ title: '用藥', rows: medRows, emptyText: '這 7 天尚未看到用藥紀錄' });
+      // 畫面版：天天都有記錄且沒有留意事項時，縮成一行（複製給醫生仍保留逐日）
+      const medAllOk = medRows.length >= 5 && !noMedCount && !medHasIssue;
+      sections.push({
+        title: '用藥',
+        rows: medAllOk ? [['', `${medRows.length} 天皆有用藥紀錄`]] : medRows,
+        copyRows: medRows,
+        emptyText: '這 7 天尚未看到用藥紀錄'
+      });
 
       const vomitRows = dates.filter((date) => byDate[date]?.vomitCount > 0)
         .map((date) => [label(date), `${byDate[date].vomitCount} 次`]);
@@ -1483,9 +1527,10 @@
     function visitSummaryCopyText(data) {
       const lines = [`${data.petName}｜近 7 天照護摘要（${data.rangeText}）`];
       for (const sec of data.sections) {
+        const rows = sec.copyRows || sec.rows;
         lines.push('', `【${sec.title}】`);
-        if (!sec.rows.length) { lines.push(sec.emptyText); continue; }
-        for (const [d, v] of sec.rows) lines.push(d ? `${d}　${v}` : v);
+        if (!rows.length) { lines.push(sec.emptyText); continue; }
+        for (const [d, v] of rows) lines.push(d ? `${d}　${v}` : v);
       }
       return lines.join('\n');
     }
@@ -1518,11 +1563,29 @@
       const todayLabel = `${Number(to.slice(5, 7))}月${Number(to.slice(8, 10))}日`;
       $('doctorNote').textContent = buildDoctorNote(dayData.summary, todayLabel);
       renderDayVisits();
-      const vsData = buildVisitSummary(
-        data.rows.filter((row) => row.date >= from7), from7, to, dayData.summary);
+      const rows7 = data.rows.filter((row) => row.date >= from7);
+      const vsData = buildVisitSummary(rows7, from7, to, dayData.summary);
       $('visitRangeLine').textContent = `${vsData.petName}｜${vsData.rangeText}`;
       $('visitSummaryView').innerHTML = visitSummaryHtml(vsData);
       state.visitSummaryCopy = visitSummaryCopyText(vsData);
+      // 本週重點：一眼看完，細節收在「展開完整摘要」
+      const recorded7 = rows7.filter((row) => row.entryCount > 0);
+      const avg7 = (pick) => (recorded7.length
+        ? Math.round(recorded7.reduce((total, row) => total + (Number(pick(row)) || 0), 0) / recorded7.length)
+        : 0);
+      const vomitDays = recorded7.filter((row) => row.vomitCount > 0).length;
+      const issueDays = recorded7.filter((row) => row.medIssueCount > 0).length;
+      const attention = [];
+      if (vomitDays) attention.push(`嘔吐 ${vomitDays} 天`);
+      if (issueDays) attention.push(`用藥留意 ${issueDays} 天`);
+      const highlightRows = [
+        ['紀錄', `${recorded7.length} 天有紀錄`],
+        ['日均水分', recorded7.length ? `${avg7((row) => row.totalWaterMl)} ml` : '—'],
+        ['日均熱量', recorded7.length ? `${avg7((row) => row.kcal)} kcal` : '—'],
+        ['留意', attention.length ? attention.join('・') : '這 7 天都很平穩']
+      ];
+      $('visitHighlights').innerHTML = highlightRows.map(([k, v]) => `
+        <div class="vs-row"><span class="vs-date">${esc(k)}</span><span class="vs-val">${esc(v)}</span></div>`).join('');
       const latestLab = latestLabInfo();
       $('labLatestLine').textContent = latestLab
         ? `最近一次：${latestLab.date}｜${latestLab.text}`
@@ -1876,7 +1939,10 @@
               <div class="info"><b>${esc(title)}</b><span>${esc(desc)}</span></div>
               <span class="chev">›</span>
             </button>`).join('')}
-        </div>`).join('');
+        </div>`).join('') + `
+        <div style="text-align:center;margin-top:26px">
+          <button class="link-btn" id="logoutBtn" type="button">登出照護站</button>
+        </div>`;
     }
 
     async function loadSettings() {
@@ -2023,6 +2089,7 @@
       }
       $('petSelect').innerHTML = state.pets.map((pet) =>
         `<option value="${esc(pet.petId)}" ${pet.petId === state.petId ? 'selected' : ''}>${esc(pet.petName)}</option>`).join('');
+      $('petSelect').classList.toggle('hidden', state.pets.length <= 1);
       $('petTitle').textContent = currentPet()?.petName || '貓貓';
     }
 
@@ -2046,9 +2113,9 @@
 
       $('loginView').classList.add('hidden');
       $('appView').classList.remove('hidden');
-      $('dateLine').textContent = new Date().toLocaleDateString('zh-TW', {
-        year: 'numeric', month: 'long', day: 'numeric', weekday: 'long', timeZone: 'Asia/Taipei'
-      });
+      const tpe = todayStr();
+      const dow = '日一二三四五六'[new Date(`${tpe}T00:00:00`).getDay()];
+      $('dateLine').textContent = `・${Number(tpe.slice(5, 7))}月${Number(tpe.slice(8, 10))}日（${dow}）`;
       await loadDay();
     }
 
@@ -2057,6 +2124,12 @@
       if (tab) {
         if (tab.dataset.tab === 'settings') state.settingsTab = '';
         return switchTab(tab.dataset.tab);
+      }
+
+      if (event.target.closest('#logoutBtn')) {
+        localStorage.removeItem(TOKEN_KEY);
+        location.reload();
+        return;
       }
 
       const settingsTab = event.target.closest('[data-settings]');
@@ -2135,6 +2208,14 @@
         return openSettingsModal(row);
       }
 
+      const entryRow = event.target.closest('.entry[data-entry]');
+      if (entryRow && !event.target.closest('[data-edit], [data-del]')) {
+        const wasOpen = entryRow.classList.contains('open');
+        document.querySelectorAll('.entry.open').forEach((el) => el.classList.remove('open'));
+        if (!wasOpen) entryRow.classList.add('open');
+        return;
+      }
+
       const delBtn = event.target.closest('[data-del]');
       if (delBtn) {
         const id = delBtn.dataset.del;
@@ -2185,6 +2266,42 @@
     }
     $('copyDoctorBtn').addEventListener('click', () =>
       copyText($('doctorNote').textContent, '已複製，可直接貼給醫生。'));
+    // PDF 報告：組一份醫生友善的完整版，開列印視窗（可另存為 PDF）
+    function buildPrintReport() {
+      const pet = currentPet() || {};
+      const today = todayStr();
+      const meta = [
+        pet.birthday ? `生日 ${pet.birthday}` : '',
+        pet.weightKg ? `體重 ${pet.weightKg} kg` : '',
+        pet.chipNumber ? `晶片 ${pet.chipNumber}` : '',
+        pet.conditionNote ? `狀況 ${pet.conditionNote}` : ''
+      ].filter(Boolean).join('｜');
+      const labGroups = new Map();
+      for (const row of state.labs || []) {
+        if (!labGroups.has(row.testDate)) labGroups.set(row.testDate, []);
+        labGroups.get(row.testDate).push(row);
+      }
+      const labHtml = labGroups.size
+        ? `<h2>血檢紀錄</h2>` + [...labGroups.entries()].sort((a, b) => b[0].localeCompare(a[0])).map(([date, rows]) =>
+            `<div class="pr-meta">${esc(date)}</div><div>${rows.map((r) => `${esc(r.itemName)} ${fmt(r.value)}${r.unit ? ` ${esc(r.unit)}` : ''}`).join('、')}</div>`).join('')
+        : '';
+      const tableEl = document.querySelector('#trendView .table-wrap table');
+      $('printReport').innerHTML = `
+        <h1>${esc(pet.petName || '貓貓')}｜照護報告</h1>
+        <div class="pr-meta">${esc(meta || '')}</div>
+        <div class="pr-meta">產生日期 ${esc(today)}・喵喵照護安心管家</div>
+        <h2>近 7 天摘要</h2>
+        <pre>${esc(state.visitSummaryCopy || '')}</pre>
+        ${labHtml}
+        <h2>近 30 天每日總覽</h2>
+        ${tableEl ? tableEl.outerHTML : ''}
+        <div class="pr-foot">本報告由飼主日常記錄產生，僅供獸醫師參考，不作為醫療診斷依據。</div>`;
+    }
+    $('pdfReportBtn').addEventListener('click', () => {
+      buildPrintReport();
+      window.print();
+    });
+
     $('copyVisitSummaryBtn').addEventListener('click', () =>
       copyText(state.visitSummaryCopy || '', '已複製近 7 天摘要，回診時可直接貼給醫生。'));
     $('copyHandoffBtn').addEventListener('click', () =>
@@ -2236,10 +2353,7 @@
         toast(error.message || '儲存失敗', true);
       }
     });
-    $('logoutBtn').addEventListener('click', () => {
-      localStorage.removeItem(TOKEN_KEY);
-      location.reload();
-    });
+
     document.addEventListener('keydown', (event) => {
       if (!$('modalBackdrop').classList.contains('open')) return;
       if (event.key === 'Escape') return closeModal();
