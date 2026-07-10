@@ -504,7 +504,8 @@
     /* PDF 報告：用列印產生（另存為 PDF），畫面上不顯示 */
     #printReport { display: none; }
     @media print {
-      body { background: #fff; }
+      @page { margin: 14mm 13mm; }
+      body { background: #fff; margin: 0; }
       .shell, .toast, .modal-backdrop { display: none !important; }
       #printReport { display: block; font-family: "Noto Sans TC", sans-serif; color: #111; font-size: 12.5px; line-height: 1.7; }
       #printReport h1 { font-size: 20px; margin: 0 0 2px; font-family: var(--serif); }
