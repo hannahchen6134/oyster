@@ -240,17 +240,31 @@ function menuRow(label, sendText, primary = false) {
   };
 }
 
+// 質感小卡格（選單卡共用）：淺米底、細邊框、主標＋一行小字
+function menuCell(label, sub, sendText, primary = false) {
+  return {
+    type: 'box', layout: 'vertical', flex: 1,
+    backgroundColor: primary ? C.brand : '#FBF8F1', cornerRadius: '14px',
+    borderColor: primary ? C.brandDark : '#E9E0CE', borderWidth: '1px',
+    paddingTop: '14px', paddingBottom: '13px', paddingStart: '8px', paddingEnd: '8px',
+    action: { type: 'message', label, text: sendText },
+    contents: [
+      text(label, { align: 'center', weight: 'bold', size: 'md', color: primary ? '#FFFFFF' : '#3F2B18' }),
+      text(sub, { align: 'center', size: 'xxs', color: primary ? '#EFE3D2' : C.muted, margin: 'sm' })
+    ]
+  };
+}
+
 export function menuFlex() {
+  const row = (cells) => ({ type: 'box', layout: 'horizontal', spacing: 'md', margin: 'md', contents: cells });
   const body = {
-    type: 'box', layout: 'vertical', paddingAll: '16px', backgroundColor: BODY_BG,
+    type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
     contents: [
       text(BRAND.tagline, { size: 'xs', color: C.muted, align: 'center', wrap: true }),
-      menuRow(BRAND.onboarding, '安心上手'),
-      menuRow('如何記錄', '如何記錄'),
-      menuRow('如何記餵藥', '如何記餵藥'),
-      menuRow('今日照護確認', '今天'),
-      menuRow('回診摘要', '回診摘要'),
-      menuRow('開啟照護站', '照護站', true)
+      row([menuCell(BRAND.onboarding, '第一次使用看這裡', '安心上手')]),
+      row([menuCell('如何記錄', '打字範例', '如何記錄'), menuCell('如何記餵藥', '藥的記法', '如何記餵藥')]),
+      row([menuCell('今日照護確認', '看今天狀況', '今天'), menuCell('回診摘要', '近 7 天整理', '回診摘要')]),
+      row([menuCell('開啟照護站', '月曆・血檢・設定', '照護站', true)])
     ]
   };
   return bubble('使用說明選單', { type: 'bubble', size: 'mega', header: header('📖 想做什麼？'), body });
@@ -258,18 +272,7 @@ export function menuFlex() {
 
 // ---------- 快速紀錄選單卡 ----------
 export function recordMenuFlex() {
-  // 小卡格：淺米底、細邊框、主標＋一行小字，質感取向
-  const cell = (label, sub, sendText) => ({
-    type: 'box', layout: 'vertical', flex: 1,
-    backgroundColor: '#FBF8F1', cornerRadius: '14px',
-    borderColor: '#E9E0CE', borderWidth: '1px',
-    paddingTop: '14px', paddingBottom: '13px', paddingStart: '8px', paddingEnd: '8px',
-    action: { type: 'message', label, text: sendText },
-    contents: [
-      text(label, { align: 'center', weight: 'bold', size: 'md', color: '#3F2B18' }),
-      text(sub, { align: 'center', size: 'xxs', color: C.muted, margin: 'sm' })
-    ]
-  });
+  const cell = menuCell;
   const row = (cells) => ({ type: 'box', layout: 'horizontal', spacing: 'md', margin: 'md', contents: cells });
   const body = {
     type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
