@@ -304,9 +304,10 @@
     /* 表格：表頭墨線、列規線 */
     .table-wrap { overflow-x: auto; }
     table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
-    th, td { border-bottom: 1px solid var(--line); padding: 8px 10px; text-align: right; white-space: nowrap; }
+    th, td { border-bottom: 1px solid var(--line); padding: 9px 10px; text-align: right; white-space: nowrap; }
     th:first-child, td:first-child { text-align: left; }
-    th { color: var(--ink-soft); font-size: 11.5px; font-weight: 600; letter-spacing: 0.1em; border-bottom: 2px solid var(--ink); }
+    th { color: var(--ink-soft); font-size: 11.5px; font-weight: 600; letter-spacing: 0.1em; border-bottom: 2px solid var(--brand); }
+    tbody tr:nth-child(even) td { background: rgba(115, 73, 33, 0.035); }
     tr.warn td { background: var(--seal-tint); }
 
     /* 設定 */
@@ -440,16 +441,16 @@
     }
     .vs-h:first-child { margin-top: 4px; }
     .vs-h::after { content: ''; flex: 1; height: 1px; background: var(--line); }
-    .vs-row { display: flex; gap: 12px; padding: 7px 2px; border-bottom: 1px dashed var(--line); font-size: 14px; }
+    .vs-row { display: flex; gap: 12px; padding: 8px 2px; border-bottom: 1px dashed var(--line); font-size: 14px; font-variant-numeric: tabular-nums; }
     .vs-row:last-child { border-bottom: none; }
     .vs-date { flex: 0 0 60px; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 13px; padding-top: 1px; }
     .vs-val { flex: 1; color: var(--ink); line-height: 1.55; }
     .vs-empty { color: var(--muted); font-size: 13px; padding: 6px 2px; }
     /* 今日照護確認卡 */
-    .confirm-row { display: flex; gap: 14px; padding: 10px 2px; border-bottom: 1px solid var(--line); font-size: 14.5px; }
+    .confirm-row { display: flex; gap: 14px; padding: 11px 2px; border-bottom: 1px solid var(--line); font-size: 14.5px; }
     .confirm-row:last-of-type { border-bottom: none; }
-    .confirm-label { flex: 0 0 64px; color: var(--muted); }
-    .confirm-value { flex: 1; color: var(--ink); }
+    .confirm-label { flex: 0 0 64px; color: var(--muted); font-size: 13px; padding-top: 1px; letter-spacing: 0.06em; }
+    .confirm-value { flex: 1; color: var(--ink); line-height: 1.65; font-variant-numeric: tabular-nums; }
     .confirm-value.pending { color: var(--muted); }
     .save-state { margin-top: 12px; font-size: 12.5px; color: var(--muted); text-align: right; letter-spacing: .04em; }
     /* 可複製純文字 */

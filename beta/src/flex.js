@@ -16,10 +16,10 @@ const C = {
   tint: '#F4EDE0',
   sheet: '#FDFDFB',
   soft: '#F7F4EC',
-  ink: '#1B1D1A',
-  inkSoft: '#4C5049',
-  muted: '#878B80',
-  line: '#E2E0D6',
+  ink: '#332417',        // 暖墨棕：主文字
+  inkSoft: '#5C4A38',    // 暖棕灰：次要文字
+  muted: '#9A8B7A',      // 暖沙灰：說明文字
+  line: '#EDE4D6',
   seal: '#BF3B20',
   sealTint: '#F9EBE5',
   olive: '#5D6C36',
@@ -48,9 +48,12 @@ function text(content, options = {}) {
 
 function header(title) {
   return {
-    type: 'box', layout: 'vertical', background: HEADER_BG,
-    paddingAll: '14px', paddingStart: '18px',
-    contents: [text(title, { color: '#FFFFFF', weight: 'bold', size: 'sm' })]
+    type: 'box', layout: 'horizontal', background: HEADER_BG,
+    paddingAll: '15px', paddingStart: '20px', paddingEnd: '16px',
+    contents: [
+      text(title, { color: '#FFFFFF', weight: 'bold', size: 'sm', flex: 1 }),
+      text('喵喵照護', { color: '#D9C3A8', size: 'xxs', align: 'end', gravity: 'center', flex: 0 })
+    ]
   };
 }
 
@@ -183,13 +186,13 @@ export function recordFlex({ pet, categoryKey, mainText, subText, summary, date,
   const footer = {
     type: 'box', layout: 'horizontal', spacing: 'sm', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
     contents: [
-      { type: 'button', height: 'sm', style: 'link', color: C.muted,
+      { type: 'button', height: 'sm', style: 'link', color: C.brand,
         action: { type: 'postback', label: '刪除這筆', data: `action=delLog&logId=${logId}`, displayText: '刪除剛剛那筆' } },
       { type: 'button', height: 'sm', style: 'primary', color: C.brand,
         action: { type: 'message', label: '開啟照護站', text: '網站' } }
     ]
   };
-  const headerTitle = title || `✓ 已記錄・${pet?.petName || '貓貓'}`;
+  const headerTitle = title || `已記錄・${pet?.petName || '貓貓'}`;
   return bubble(`${title ? '已更新' : '已記錄'} ${mainText}`, { type: 'bubble', size: 'mega', header: header(headerTitle), body, footer });
 }
 
@@ -227,7 +230,7 @@ export function todayFlex({ pet, date, summary, dateLabel }) {
   };
   return bubble(
     `${dateLabel}（${pet?.petName}）水分 ${fmt(summary.totalWaterMl)} ml・熱量 ${fmt(summary.kcal)} kcal`,
-    { type: 'bubble', size: 'mega', header: header(`📅 ${dateLabel}・${pet?.petName || '貓貓'}`), body, footer }
+    { type: 'bubble', size: 'mega', header: header(`${dateLabel}・${pet?.petName || '貓貓'}`), body, footer }
   );
 }
 
@@ -249,7 +252,7 @@ export function websiteFlex(url) {
         action: { type: 'uri', label: '開啟照護站', uri: url } }
     ]
   };
-  return bubble('照護站登入連結', { type: 'bubble', size: 'mega', header: header('🔗 照護站'), body, footer });
+  return bubble('照護站登入連結', { type: 'bubble', size: 'mega', header: header('照護站'), body, footer });
 }
 
 // ---------- 說明選單卡 ----------
@@ -290,7 +293,7 @@ export function menuFlex() {
       row([menuCell('開啟照護站', '月曆・血檢・設定', '照護站', true)])
     ]
   };
-  return bubble('使用說明選單', { type: 'bubble', size: 'mega', header: header('📖 想做什麼？'), body });
+  return bubble('使用說明選單', { type: 'bubble', size: 'mega', header: header('想做什麼？'), body });
 }
 
 // ---------- 快速紀錄選單卡 ----------
@@ -309,7 +312,7 @@ export function recordMenuFlex() {
       text('補登昨天：昨天 21:30 水 20', { size: 'xxs', color: C.muted, align: 'center', margin: 'lg' })
     ]
   };
-  return bubble('快速紀錄選單', { type: 'bubble', size: 'mega', header: header('✏️ 快速紀錄'), body });
+  return bubble('快速紀錄選單', { type: 'bubble', size: 'mega', header: header('快速紀錄'), body });
 }
 
 // ---------- 近 7 天迷你圖卡（長條＝水分） ----------
@@ -362,7 +365,7 @@ export function weekFlex(petName, rows) {
   };
   return bubble(
     `近 7 天（${petName}）日均水分 ${fmt(avg((row) => row.totalWaterMl))} ml`,
-    { type: 'bubble', size: 'mega', header: header(`📈 近 7 天・${petName}`), body, footer }
+    { type: 'bubble', size: 'mega', header: header(`近 7 天・${petName}`), body, footer }
   );
 }
 
@@ -394,7 +397,7 @@ export function reminderFlex(pet, lines) {
   const footer = {
     type: 'box', layout: 'horizontal', spacing: 'sm', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
     contents: [
-      { type: 'button', height: 'sm', style: 'link', color: C.inkSoft,
+      { type: 'button', height: 'sm', style: 'link', color: C.brand,
         action: { type: 'message', label: '看今天', text: '今天' } },
       { type: 'button', height: 'sm', style: 'primary', color: C.brand,
         action: { type: 'message', label: '開啟照護站', text: '網站' } }
@@ -402,7 +405,7 @@ export function reminderFlex(pet, lines) {
   };
   return bubble(
     `照護提醒（${pet.petName}）${lines.length} 項`,
-    { type: 'bubble', size: 'mega', header: header(`🔔 照護提醒・${pet.petName}`), body, footer }
+    { type: 'bubble', size: 'mega', header: header(`照護提醒・${pet.petName}`), body, footer }
   );
 }
 
@@ -427,7 +430,7 @@ export function visitReminderFlex(pet, visits, vetsById, dateLabel) {
   const footer = {
     type: 'box', layout: 'horizontal', spacing: 'sm', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
     contents: [
-      { type: 'button', height: 'sm', style: 'link', color: C.inkSoft,
+      { type: 'button', height: 'sm', style: 'link', color: C.brand,
         action: { type: 'message', label: '回診摘要', text: '回診摘要' } },
       { type: 'button', height: 'sm', style: 'primary', color: C.brand,
         action: { type: 'message', label: '開啟照護站', text: '網站' } }
@@ -435,6 +438,6 @@ export function visitReminderFlex(pet, visits, vetsById, dateLabel) {
   };
   return bubble(
     `回診提醒：明天 ${dateLabel}`,
-    { type: 'bubble', size: 'mega', header: header(`🏥 回診提醒・${pet.petName}`), body, footer }
+    { type: 'bubble', size: 'mega', header: header(`回診提醒・${pet.petName}`), body, footer }
   );
 }
