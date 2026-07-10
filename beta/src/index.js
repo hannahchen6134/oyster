@@ -63,29 +63,43 @@ export default {
 async function runDailyReminders(env) {
   const db = env.DB;
   const today = taipeiToday();
+  const tomorrow = addDays(today, 1);
   const { results: pets } = await db.prepare('SELECT * FROM pets WHERE isDeleted = 0').all();
 
-  const tomorrow = addDays(today, 1);
-
+  // 以「飼主」為單位合併：一晚最多一次推播（LINE 一次推播計一則，可帶最多 5 張卡）
+  const byOwner = new Map();
   for (const pet of pets || []) {
-    try {
-      if (!hasAnyReminder(pet) || !pet.ownerLineUserId) continue;
-      const settings = parseReminderSettings(pet);
+    if (!pet.ownerLineUserId || !hasAnyReminder(pet)) continue;
+    if (!byOwner.has(pet.ownerLineUserId)) byOwner.set(pet.ownerLineUserId, []);
+    byOwner.get(pet.ownerLineUserId).push(pet);
+  }
 
-      const rows = await getRecentSummaries(db, pet.petId, today, 8);
-      const lines = buildReminderLines(pet, rows);
-      if (lines.length) {
-        try {
-          await pushMessages(env, pet.ownerLineUserId, [reminderFlex(pet, lines)]);
-        } catch (flexError) {
-          console.warn('reminder flex failed, fallback to text:', flexError.message);
-          await pushText(env, pet.ownerLineUserId, reminderMessage(pet, lines));
-        }
-        console.log(JSON.stringify({ step: 'reminder_sent', petId: pet.petId, count: lines.length }));
+  for (const [ownerId, ownerPets] of byOwner) {
+    try {
+      const messages = [];
+      const textFallbacks = [];
+
+      // 照護提醒：多貓合併成一張卡（每行標貓咪名）
+      const petLines = [];
+      for (const pet of ownerPets) {
+        const rows = await getRecentSummaries(db, pet.petId, today, 8);
+        const lines = buildReminderLines(pet, rows);
+        if (lines.length) petLines.push({ pet, lines });
+      }
+      if (petLines.length === 1) {
+        messages.push(reminderFlex(petLines[0].pet, petLines[0].lines));
+        textFallbacks.push(reminderMessage(petLines[0].pet, petLines[0].lines));
+      } else if (petLines.length > 1) {
+        const merged = petLines.flatMap(({ pet, lines }) => lines.map((line) => `【${pet.petName}】${line}`));
+        const groupPet = { petName: `${petLines.length} 隻貓貓` };
+        messages.push(reminderFlex(groupPet, merged));
+        textFallbacks.push(reminderMessage(groupPet, merged));
       }
 
-      // 明天有回診 → 今晚另外提醒一則
-      if (settings.visit) {
+      // 回診提醒：併進同一次推播
+      let vetsById = null;
+      for (const pet of ownerPets) {
+        if (!parseReminderSettings(pet).visit) continue;
         const { results: visits } = await db
           .prepare(
             `SELECT * FROM vet_visits WHERE petId = ? AND isDeleted = 0
@@ -93,20 +107,25 @@ async function runDailyReminders(env) {
           )
           .bind(pet.petId, tomorrow, tomorrow)
           .all();
-        if (visits?.length) {
-          const vets = await listVetsByOwner(db, pet.ownerLineUserId);
-          const vetsById = Object.fromEntries(vets.map((vet) => [vet.vetId, vet]));
-          try {
-            await pushMessages(env, pet.ownerLineUserId, [visitReminderFlex(pet, visits, vetsById, shortDate(tomorrow))]);
-          } catch (flexError) {
-            console.warn('visit flex failed, fallback to text:', flexError.message);
-            await pushText(env, pet.ownerLineUserId, visitReminderMessage(pet, visits, vetsById, shortDate(tomorrow)));
-          }
-          console.log(JSON.stringify({ step: 'visit_reminder_sent', petId: pet.petId }));
+        if (!visits?.length) continue;
+        if (!vetsById) {
+          const vets = await listVetsByOwner(db, ownerId);
+          vetsById = Object.fromEntries(vets.map((vet) => [vet.vetId, vet]));
         }
+        messages.push(visitReminderFlex(pet, visits, vetsById, shortDate(tomorrow)));
+        textFallbacks.push(visitReminderMessage(pet, visits, vetsById, shortDate(tomorrow)));
       }
+
+      if (!messages.length) continue;
+      try {
+        await pushMessages(env, ownerId, messages.slice(0, 5));
+      } catch (flexError) {
+        console.warn('reminder flex failed, fallback to text:', flexError.message);
+        await pushText(env, ownerId, textFallbacks.join('\n\n'));
+      }
+      console.log(JSON.stringify({ step: 'reminder_sent', cards: messages.length }));
     } catch (error) {
-      console.error('reminder failed:', pet.petId, error.message);
+      console.error('reminder push failed:', error.message);
     }
   }
 }
