@@ -258,21 +258,29 @@ export function menuFlex() {
 
 // ---------- 快速紀錄選單卡 ----------
 export function recordMenuFlex() {
-  const body = {
-    type: 'box', layout: 'vertical', paddingAll: '16px', backgroundColor: BODY_BG,
+  // 小卡格：淺米底、細邊框、主標＋一行小字，質感取向
+  const cell = (label, sub, sendText) => ({
+    type: 'box', layout: 'vertical', flex: 1,
+    backgroundColor: '#FBF8F1', cornerRadius: '14px',
+    borderColor: '#E9E0CE', borderWidth: '1px',
+    paddingTop: '14px', paddingBottom: '13px', paddingStart: '8px', paddingEnd: '8px',
+    action: { type: 'message', label, text: sendText },
     contents: [
-      text('想記哪一種？點了會告訴你怎麼打', { size: 'xs', color: C.muted, align: 'center', wrap: true }),
-      { type: 'box', layout: 'horizontal', spacing: 'sm', margin: 'sm', contents: [
-        menuRow('吃飯', '記吃飯'), menuRow('喝水', '記喝水')
-      ] },
-      { type: 'box', layout: 'horizontal', spacing: 'sm', contents: [
-        menuRow('用藥', '記用藥'), menuRow('嘔吐', '記嘔吐')
-      ] },
-      { type: 'box', layout: 'horizontal', spacing: 'sm', contents: [
-        menuRow('排便', '記排便'), menuRow('精神', '記精神')
-      ] },
-      menuRow('其他備註', '記備註'),
-      text('補登昨天：昨天 21:30 水 20', { size: 'xxs', color: C.muted, align: 'center', margin: 'md' })
+      text(label, { align: 'center', weight: 'bold', size: 'md', color: '#3F2B18' }),
+      text(sub, { align: 'center', size: 'xxs', color: C.muted, margin: 'sm' })
+    ]
+  });
+  const row = (cells) => ({ type: 'box', layout: 'horizontal', spacing: 'md', margin: 'md', contents: cells });
+  const body = {
+    type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
+    contents: [
+      text('想記哪一種？點一下就開始', { size: 'xs', color: C.muted, align: 'center' }),
+      row([cell('吃飯', '罐頭・乾糧・零食', '記吃飯'), cell('喝水', '今天喝了多少', '記喝水')]),
+      row([cell('用藥', '已吃・沒餵到', '記用藥'), cell('嘔吐', '顏色與內容', '記嘔吐')]),
+      row([cell('排便', '次數與形狀', '記排便'), cell('精神', '活動力如何', '記精神')]),
+      row([cell('其他備註', '想補充的小事', '記備註')]),
+      { type: 'separator', margin: 'xl', color: '#F0EADF' },
+      text('補登昨天：昨天 21:30 水 20', { size: 'xxs', color: C.muted, align: 'center', margin: 'lg' })
     ]
   };
   return bubble('快速紀錄選單', { type: 'bubble', size: 'mega', header: header('✏️ 快速紀錄'), body });
