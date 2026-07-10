@@ -159,6 +159,8 @@ export function parseMessage(rawText) {
       kcalPerGram: foodSetupMatch[3] ? Number(foodSetupMatch[3]) : 0
     };
   }
+  if (['設定保健品', '設定保健品藥', '保健品藥'].includes(compact)) return { type: 'medAskMenu' };
+  if (['記保健品', '記一個保健品', '建保健品'].includes(compact)) return { type: 'medNamePrompt' };
   if (['設定餵藥', '餵藥設定', '設定用藥'].includes(compact)) {
     return { type: 'medSetupMenu' };
   }

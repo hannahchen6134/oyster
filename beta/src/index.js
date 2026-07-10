@@ -11,7 +11,7 @@ import { hasAnyReminder, parseReminderSettings, buildReminderLines, reminderMess
 import { shortDate } from './replies.js';
 import { recordFlex, todayFlex, websiteFlex, menuFlex, recordMenuFlex, weekFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, menuCell } from './flex.js';
 import {
-  ensureUser, updateUser, listPets, createPet, resolveDefaultPet, getPet, updatePetFields, createFoodItem,
+  ensureUser, updateUser, listPets, createPet, resolveDefaultPet, getPet, updatePetFields, createFoodItem, createMedItem,
   listFoods, getFood, insertLog, getLog, getLastLogByUser, softDeleteLog, updateLog,
   recomputeDay, getRecentSummaries,
   upcomingVisits, listVetsByOwner, createSession
@@ -155,7 +155,7 @@ async function handleWebhook(request, env, url) {
 // Flex 卡片按鈕：目前只有「刪除這筆」
 // ---------- 引導流程卡（一張卡一件事，全部大按鈕；自由輸入用 pendingAction 等待） ----------
 
-function stepMedCard(petName, step = '第 2 步・共 3 步') {
+function stepMedCard(petName, step = '') {
   return onboardCard({
     step,
     title: `${petName}每天需要餵藥嗎？`,
@@ -169,7 +169,7 @@ function stepMedCard(petName, step = '第 2 步・共 3 步') {
   });
 }
 
-function stepFoodCard(step = '第 3 步・共 3 步', subtitle = '建好之後，記錄會自動算熱量和水分') {
+function stepFoodCard(step = '第 2 步・共 3 步', subtitle = '可以建好幾種，乾乾和罐罐都建更好用') {
   return onboardCard({
     step,
     title: '最常吃哪一種？',
@@ -180,6 +180,19 @@ function stepFoodCard(step = '第 3 步・共 3 步', subtitle = '建好之後�
     ],
     skip: { label: '先跳過，之後再建', send: '稍後再說' },
     alt: '最常吃哪一種食物？'
+  });
+}
+
+function medAskCard(petName, step = '第 3 步・共 3 步') {
+  return onboardCard({
+    step,
+    title: `${petName}有固定吃的保健品或藥嗎？`,
+    subtitle: '先記一種就好，名字用自己記得的',
+    rows: [
+      [menuCell('有，幫我記一個', '例如 心臟藥、益生菌', '記保健品')],
+      [menuCell('沒有', '之後需要再設定', '餵藥時段 不用')]
+    ],
+    alt: '有固定吃的保健品或藥嗎？'
   });
 }
 
@@ -236,7 +249,7 @@ function foodDoneCard(name, foodType, info) {
     title: `已建立「${name}」🐾`,
     subtitle: `${foodType}・每克 ${info.kcalPerGram} kcal・水分 ${Math.round(info.waterRatio * 100)}%${info.usedDefault ? '（預設值，照護站可微調）' : ''}`,
     rows: [
-      [menuCell('再建一個', '其他常吃的', '設定食物'), menuCell('完成', '開始使用', '完成設定')]
+      [menuCell('再建一種', '乾乾罐罐都建更好用', '設定食物'), menuCell('下一步：保健品/藥', '有在吃的話', '設定保健品')]
     ],
     alt: `已建立「${name}」`
   });
@@ -271,7 +284,7 @@ async function handlePending(env, event, { db, user, pet, pets, lineUserId, text
       if (!pets.length) await updateUser(db, lineUserId, { defaultPetId: newPet.petId });
     }
     await clear();
-    await replyOrPushFlex(env, event, stepMedCard(newPet.petName), `已幫「${newPet.petName}」建立檔案！每天需要餵藥嗎？（輸入：餵藥時段 早晚）`);
+    await replyOrPushFlex(env, event, stepFoodCard(), `已幫「${newPet.petName}」建立檔案！先建常吃的食物：輸入「設定罐頭」「設定乾糧」等`);
     return true;
   }
 
@@ -323,6 +336,23 @@ async function handlePending(env, event, { db, user, pet, pets, lineUserId, text
     }
     const info = await createGuidedFood(db, lineUserId, foodType, name, kcalIn);
     await replyOrPushFlex(env, event, foodDoneCard(name, foodType, info), `已建立「${name}」（${foodType}）`);
+    return true;
+  }
+
+  if (pending === 'medname' && pet) {
+    if (asIntent.type !== 'unknown' || !text || text.length > 15) { await clear(); return false; }
+    await createMedItem(db, pet.petId, text);
+    await clear();
+    await replyOrPushFlex(env, event, onboardCard({
+      title: `「${text}」多久吃一次？`,
+      subtitle: '選了之後，今日確認和晚上提醒都會幫你看著',
+      rows: [
+        [menuCell('早', '一天一次', '餵藥時段 早'), menuCell('早晚', '一天兩次', '餵藥時段 早晚')],
+        [menuCell('早中晚', '一天三次', '餵藥時段 早中晚'), menuCell('只有晚上', '一天一次', '餵藥時段 晚')]
+      ],
+      skip: { label: '不固定，先這樣', send: '餵藥時段 不用' },
+      alt: `「${text}」多久吃一次？`
+    }), `已記下「${text}」，多久吃一次？（輸入：餵藥時段 早晚）`);
     return true;
   }
 
@@ -440,7 +470,7 @@ async function handleTextMessage(event, env, baseUrl) {
       }
       const newPet = await createPet(db, lineUserId, { petName: intent.name });
       if (!pets.length) await updateUser(db, lineUserId, { defaultPetId: newPet.petId });
-      await replyOrPushFlex(env, event, stepMedCard(newPet.petName), `已幫「${intent.name}」建立檔案！每天需要餵藥嗎？（輸入：餵藥時段 早晚）`);
+      await replyOrPushFlex(env, event, stepFoodCard(), `已幫「${intent.name}」建立檔案！先建常吃的食物：輸入「設定罐頭」「設定乾糧」等`);
       return;
     }
 
@@ -517,7 +547,7 @@ async function handleTextMessage(event, env, baseUrl) {
       await updateUser(db, lineUserId, { pendingAction: `food:${intent.foodType}` });
       await replyOrPushFlex(env, event, onboardCard({
         title: `這個${intent.foodType}叫什麼名字？`,
-        subtitle: '打名字就好；想更準可以加每克熱量，例如：主食罐 1.1',
+        subtitle: '不用完整名字，用自己記得的就好，例如：腎罐、G1乾乾（想更準可加每克熱量：腎罐 1.1）',
         skip: { label: '跳過這題', send: '跳過' },
         alt: `這個${intent.foodType}叫什麼？`
       }), `這個${intent.foodType}叫什麼名字？直接打名字送出`);
@@ -535,6 +565,27 @@ async function handleTextMessage(event, env, baseUrl) {
       return;
     }
 
+    case 'medAskMenu': {
+      await replyOrPushFlex(env, event, medAskCard(pet ? pet.petName : '貓貓'), '有固定吃的保健品或藥嗎？輸入「記保健品」或「餵藥時段 不用」');
+      return;
+    }
+
+    case 'medNamePrompt': {
+      if (!pet) {
+        await updateUser(db, lineUserId, { pendingAction: 'petname' });
+        await replyOrPushFlex(env, event, namePromptCard(), '先幫貓貓建檔：直接打名字送出就好');
+        return;
+      }
+      await updateUser(db, lineUserId, { pendingAction: 'medname' });
+      await replyOrPushFlex(env, event, onboardCard({
+        title: '叫什麼名字呢？',
+        subtitle: '用自己記得的就好，例如：心臟藥、益生菌、腎臟保健粉',
+        skip: { label: '跳過這題', send: '跳過' },
+        alt: '保健品/藥叫什麼名字？'
+      }), '保健品/藥叫什麼名字？直接打名字送出');
+      return;
+    }
+
     case 'medSetupMenu': {
       await replyOrPushFlex(env, event, stepMedCard(pet ? pet.petName : '貓貓', ''), '設定餵藥時段：輸入「餵藥時段 早晚」或「餵藥時段 不用」');
       return;
@@ -547,10 +598,9 @@ async function handleTextMessage(event, env, baseUrl) {
         return;
       }
       await updatePetFields(db, pet.petId, { goalMedSlots: JSON.stringify(intent.slots) });
-      const sub = intent.slots.length
-        ? `收到，每天會幫你確認${intent.slots.join('、')}的藥。最後一題——`
-        : '好，先不設定餵藥。最後一題——';
-      await replyOrPushFlex(env, event, stepFoodCard('第 3 步・共 3 步', `${sub}建好食物，記錄會自動算熱量水分`), '最後一題：最常吃哪種食物？輸入「設定罐頭」等');
+      await replyOrPushFlex(env, event, doneCard(pet.petName), intent.slots.length
+        ? `收到，每天會幫你確認${intent.slots.join('、')}的藥。都準備好了，隨時打「水 60」開始記錄！`
+        : '好，都準備好了！隨時打「水 60」開始記錄');
       return;
     }
 

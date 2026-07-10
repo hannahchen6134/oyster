@@ -118,6 +118,20 @@ export async function createFoodItem(db, ownerLineUserId, fields) {
   return db.prepare('SELECT * FROM food_items WHERE foodId = ?').bind(foodId).first();
 }
 
+// LINE 引導建檔用：建立保健品/藥
+export async function createMedItem(db, petId, medName) {
+  const now = nowIso();
+  const medId = newId();
+  await db
+    .prepare(
+      `INSERT INTO meds (medId, petId, medName, doseAmount, doseUnit, schedule, defaultTimes, instruction, note, isDeleted, createdAt, updatedAt)
+       VALUES (?, ?, ?, 0, '', '', '', '', 'LINE 引導建立', 0, ?, ?)`
+    )
+    .bind(medId, petId, String(medName), now, now)
+    .run();
+  return db.prepare('SELECT * FROM meds WHERE medId = ?').bind(medId).first();
+}
+
 // 使用者「目前操作的貓咪」：defaultPetId 優先，否則取第一隻
 export async function resolveDefaultPet(db, user, pets) {
   if (!pets.length) return null;
