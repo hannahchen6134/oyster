@@ -212,8 +212,8 @@ export function helpText() {
     '',
     '【記錄】直接打字',
     '水 20',
-    '乾糧 希爾斯 4g',
-    '罐頭 皇家 30g',
+    '乾糧 4g',
+    '罐頭 品名 30g',
     '藥 早 已吃',
     '吐 白色泡沫',
     '便 成形偏軟',
@@ -269,7 +269,7 @@ export function unknownReply() {
     '看不懂這則訊息 🙏',
     '記錄範例：',
     '水 20',
-    '乾糧 希爾斯 4g',
+    '乾糧 4g',
     '藥 早 已吃',
     '輸入「說明」看完整指令'
   ].join('\n');
@@ -277,7 +277,7 @@ export function unknownReply() {
 
 export function invalidReply(reason, category) {
   if (reason === 'missing_amount' && category === 'water') return '請加上數量（ml），例如：\n水 20';
-  if (reason === 'missing_amount' && category === 'food') return '請加上克數，例如：\n乾糧 希爾斯 4g\n罐頭 皇家 30g';
+  if (reason === 'missing_amount' && category === 'food') return '請加上克數，例如：\n乾糧 4g\n罐頭 品名 30g';
   if (reason === 'missing_note') return '備註後面要加內容，例如：\n備註 今天有梳毛';
   return unknownReply();
 }
@@ -290,8 +290,8 @@ export function recordTutorial() {
     '',
     '直接打字就會記：',
     '水 20',
-    '乾糧 希爾斯 4g',
-    '罐頭 皇家 30g',
+    '乾糧 4g',
+    '罐頭 品名 30g',
     '吐 白色泡沫',
     '便 成形偏軟',
     '精神 活動力差',
@@ -360,7 +360,7 @@ export function onboardingText() {
 // 快速紀錄選單按下後的小提示
 export function recordPrompt(kind) {
   const prompts = {
-    food: '記吃飯，直接輸入：\n罐頭 30g\n乾糧 希爾斯 4g',
+    food: '記吃飯，直接輸入：\n罐頭 30g\n乾糧 4g',
     water: '記喝水，直接輸入：\n水 20',
     med: '記用藥，直接輸入：\n藥 早 已吃\n狀態：已吃、沒餵到、吐掉、拒吃',
     vomit: '記嘔吐，直接輸入：\n吐 白色泡沫',

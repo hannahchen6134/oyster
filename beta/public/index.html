@@ -216,9 +216,17 @@
     .chip-med { background: var(--brand-tint); color: var(--brand); border-color: rgba(115, 73, 33, 0.35); }
     .chip-neutral { background: var(--sheet-soft); color: var(--ink-soft); border-color: var(--line-strong); }
     .empty {
-      padding: 30px 20px; border: 1px dashed var(--line-strong); border-radius: var(--radius);
+      padding: 26px 20px 30px; border: 1px dashed var(--line-strong); border-radius: var(--radius);
       color: var(--muted); text-align: center; font-size: 14px; background: var(--sheet-soft);
     }
+    /* 空狀態的小線條貓：陪伴感，不搶戲 */
+    .empty::before {
+      content: ''; display: block; width: 52px; height: 44px; margin: 0 auto 10px; opacity: 0.75;
+      background-repeat: no-repeat; background-size: contain; background-position: center;
+      background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 54' fill='none' stroke='%23734921' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 17 L11 5 L22 11'/%3E%3Cpath d='M49 17 L53 5 L42 11'/%3E%3Cellipse cx='32' cy='31' rx='21' ry='18'/%3E%3Ccircle cx='25' cy='29' r='1.6' fill='%23734921' stroke='none'/%3E%3Ccircle cx='39' cy='29' r='1.6' fill='%23734921' stroke='none'/%3E%3Cpath d='M28 35 q2 3 4 0 M32 35 q2 3 4 0'/%3E%3Cpath d='M4 27 l7 1 M4 34 l7 -1 M60 27 l-7 1 M60 34 l-7 -1'/%3E%3C/svg%3E");
+    }
+    /* 標題旁的小肉球（線條版） */
+    .head-paw { width: 24px; height: 21px; flex: none; opacity: 0.8; }
     .doctor-note {
       margin-top: 20px; padding: 16px 20px;
       border: 1px solid rgba(115, 73, 33, 0.14); border-left: 3px solid var(--brand);
@@ -301,8 +309,28 @@
     tr.warn td { background: var(--seal-tint); }
 
     /* 設定 */
-    .settings-nav { display: flex; flex-wrap: wrap; gap: 22px; margin-bottom: 20px; border-bottom: 1px solid var(--line-strong); }
-    .settings-nav .tab { padding: 6px 2px 10px; font-size: 14.5px; }
+    /* 設定：兩層式選單（先分組選單，點進去才是單一功能） */
+    .set-group-title {
+      display: flex; align-items: center; gap: 12px; margin: 26px 2px 8px;
+      font-size: 12.5px; font-weight: 700; letter-spacing: 0.18em; color: var(--brand);
+    }
+    .set-group-title:first-child { margin-top: 0; }
+    .set-group-title::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+    .set-card { padding: 4px 18px; }
+    .set-row {
+      display: flex; width: 100%; align-items: center; gap: 12px; padding: 14px 2px;
+      border: none; background: none; border-bottom: 1px solid var(--line);
+      cursor: pointer; text-align: left; font: inherit;
+    }
+    .set-row:last-child { border-bottom: none; }
+    .set-row .info { flex: 1; min-width: 0; }
+    .set-row .info b { font-size: 15px; }
+    .set-row .info span { display: block; color: var(--muted); font-size: 12.5px; margin-top: 3px; line-height: 1.5; }
+    .set-row .chev { color: var(--brand); font-size: 20px; font-weight: 600; }
+    .set-row:hover .info b { color: var(--brand); }
+    .set-back { display: flex; align-items: baseline; gap: 14px; margin-bottom: 14px; }
+    .set-back .set-title { margin: 0; font-size: 20px; }
+    .set-back .set-title::after { display: none; }
     .list-item { display: flex; align-items: center; gap: 10px; padding: 13px 2px; border-bottom: 1px solid var(--line); }
     .list-item:last-child { border-bottom: none; }
     .list-item .info { flex: 1; min-width: 0; }
@@ -404,18 +432,6 @@
       border-left: 1px solid var(--line); border-right: 1px solid var(--line); text-align: center;
     }
     .date-nav input[type="date"]:focus { box-shadow: none; }
-    /* 動作卡：交接卡/回診整理，一列兩張小卡 */
-    .action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 24px; }
-    .action-card {
-      display: flex; align-items: center; gap: 12px;
-      padding: 14px 16px; border: 1px solid rgba(115, 73, 33, 0.16); border-left: 3px solid var(--brand);
-      border-radius: var(--radius-sm) var(--radius) var(--radius) var(--radius-sm);
-      background: linear-gradient(180deg, #ffffff, var(--brand-tint));
-      box-shadow: var(--shadow-soft);
-    }
-    .action-card .action-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-    .action-card .action-info b { font-size: 14.5px; }
-    .action-card .action-info span { color: var(--ink-soft); font-size: 12.5px; line-height: 1.5; }
     /* 近 7 天摘要：畫面用結構化排版，複製才給純文字 */
     .vs-h {
       display: flex; align-items: center; gap: 12px; margin: 18px 0 4px;
@@ -454,7 +470,6 @@
       .quick-grid { grid-template-columns: repeat(3, 1fr); gap: 9px; }
       .qbtn { min-height: 50px; font-size: 14.5px; }
       .page-mode { font-size: 15.5px; }
-      .action-row { grid-template-columns: 1fr; gap: 12px; }
       .day-toolbar { row-gap: 12px; }
       .day-toolbar .btn-secondary { flex: 1 0 100%; }
       .date-nav { flex: 1; min-width: max-content; }
@@ -481,7 +496,6 @@
       .entry { grid-template-columns: 1fr; gap: 6px; padding: 15px 2px; }
       .entry-actions { flex-direction: row; }
       .cal-cell { min-height: 64px; padding: 4px 5px; }
-      .settings-nav { gap: 16px; }
       .colophon { margin-top: 44px; }
     }
   </style>
@@ -544,6 +558,7 @@
         <div class="block" style="margin-top:0">
           <div class="section-head">
             <h2>快速記一筆</h2>
+            <svg class="head-paw" viewBox="0 0 24 21" fill="none" stroke="var(--brand)" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><ellipse cx="12" cy="14.5" rx="5" ry="4"/><circle cx="5.2" cy="8.6" r="2.1"/><circle cx="12" cy="6.4" r="2.1"/><circle cx="18.8" cy="8.6" r="2.1"/></svg>
           </div>
           <div class="quick-grid">
             <button class="qbtn" data-quick="food" type="button"><span class="q-plus">＋</span>吃飯</button>
@@ -568,23 +583,16 @@
         <div class="block">
           <div class="section-head">
             <h2 id="confirmTitle">今日照護確認</h2>
+            <button class="btn btn-secondary btn-sm" id="copyHandoffBtn" type="button">複製交接卡</button>
           </div>
           <div id="confirmList"></div>
           <div class="save-state" id="saveState"></div>
-        </div>
-        <div class="action-row">
-          <div class="action-card">
-            <div class="action-info"><b>今日交接卡</b><span>複製今天的照護狀況，交接給家人朋友</span></div>
-            <button class="btn btn-secondary btn-sm" id="copyHandoffBtn" type="button">複製</button>
-          </div>
-          <div class="action-card">
-            <div class="action-info"><b>回診整理</b><span>近 7 天摘要，回診時給醫生看</span></div>
-            <button class="btn btn-secondary btn-sm" data-tab="trend" type="button">查看</button>
-          </div>
+          <p class="muted" style="margin:10px 0 0;font-size:12px">「複製交接卡」會把上面的內容變成一段文字，可直接貼給家人朋友。</p>
         </div>
         <div class="block">
           <div class="section-head">
             <h2>當日紀錄</h2>
+            <svg class="head-paw" viewBox="0 0 24 21" fill="none" stroke="var(--brand)" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><ellipse cx="12" cy="14.5" rx="5" ry="4"/><circle cx="5.2" cy="8.6" r="2.1"/><circle cx="12" cy="6.4" r="2.1"/><circle cx="18.8" cy="8.6" r="2.1"/></svg>
           </div>
           <div class="grid" id="logList" style="gap:0"></div>
           <div style="text-align:center;margin-top:8px">
@@ -645,7 +653,7 @@
           </div>
           <p class="muted" id="labLatestLine" style="margin:0 0 8px;font-size:13px"></p>
           <div id="labChartBox"></div>
-          <p class="muted" style="font-size:12px;margin:8px 0 0">底色為你輸入的參考範圍，數值可提供醫生參考。輸入與編輯在「設定 → 血檢紀錄」。</p>
+          <p class="muted" style="font-size:12px;margin:8px 0 0">數值可提供醫生參考，高低請以你的醫生判讀為準。輸入與編輯在「設定 → 血檢紀錄」。</p>
         </div>
         <div class="block"><div class="section-head"><h2>近 30 天趨勢</h2></div><div id="trendCharts"></div></div>
         <div class="block table-wrap">
@@ -660,16 +668,11 @@
 
       <!-- 設定 -->
       <section class="panel hidden" id="settingsView">
-        <div class="settings-nav">
-          <button class="tab" data-settings="onboarding" type="button">安心上手</button>
-          <button class="tab active" data-settings="pets" type="button">貓咪</button>
-          <button class="tab" data-settings="foods" type="button">食物</button>
-          <button class="tab" data-settings="meds" type="button">藥物</button>
-          <button class="tab" data-settings="vets" type="button">醫院醫生</button>
-          <button class="tab" data-settings="visits" type="button">回診資料</button>
-          <button class="tab" data-settings="labs" type="button">血檢</button>
-          <button class="tab" data-settings="goals" type="button">每日目標</button>
-          <button class="tab" data-settings="reminders" type="button">提醒</button>
+        <div id="settingsMenu"></div>
+        <div id="settingsSection" class="hidden">
+        <div class="set-back">
+          <button class="link-btn" id="settingsBackBtn" type="button">‹ 回設定</button>
+          <h2 class="set-title" id="settingsTitle"></h2>
         </div>
         <div class="toolbar" style="margin-bottom:12px">
           <div class="muted" id="settingsHint"></div>
@@ -677,6 +680,7 @@
           <button class="btn btn-primary btn-sm" id="settingsAddBtn" type="button">＋ 新增</button>
         </div>
         <div class="grid" id="settingsList"></div>
+        </div>
       </section>
 
       <footer class="colophon"><svg class="paw" viewBox="0 0 18 16" aria-hidden="true"><ellipse cx="9" cy="11" rx="4.2" ry="3.4" fill="var(--brand)" opacity="0.75"/><circle cx="3.4" cy="6.4" r="1.9" fill="var(--brand)" opacity="0.55"/><circle cx="9" cy="4.6" r="1.9" fill="var(--brand)" opacity="0.55"/><circle cx="14.6" cy="6.4" r="1.9" fill="var(--brand)" opacity="0.55"/></svg>讓每一次紀錄，都是對貓貓的守護</footer>
@@ -709,7 +713,7 @@
       petId: '',
       date: todayStr(),
       calMonth: todayStr().slice(0, 7),
-      settingsTab: 'pets',
+      settingsTab: '',
       foods: [],
       meds: [],
       vets: [],
@@ -1054,7 +1058,7 @@
           <div class="field"><label>食物品項（選了會自動算熱量與水分）</label>
             <select name="foodId"><option value="">— 不指定 —</option>${foodOptions}</select>
           </div>
-          <div class="field"><label>或自訂品項名稱</label><input name="itemNameFood" value="${category === 'food' && !log?.foodId ? esc(log?.itemName ?? '') : ''}" placeholder="例如 希爾斯"></div>
+          <div class="field"><label>或自訂品項名稱</label><input name="itemNameFood" value="${category === 'food' && !log?.foodId ? esc(log?.itemName ?? '') : ''}" placeholder="例如 腎臟處方罐"></div>
         </div>
         <div class="log-med">
           <div class="grid grid-2">
@@ -1285,30 +1289,19 @@
       container.appendChild(lineChart({ title: '熱量', unit: 'kcal', color: '#b3703f', dates, values: series((row) => row.kcal) }));
     }
 
-    // 血檢趨勢：稀疏的檢驗點，畫參考範圍底色，超標的點標紅
+    // 血檢趨勢：稀疏的檢驗點連線（不畫參考範圍，判讀交給醫生）
     function labChart(rows) {
       const W = 640, H = 150, padL = 42, padR = 14, padT = 16, padB = 24;
       const innerW = W - padL - padR, innerH = H - padT - padB;
       const n = rows.length;
       const x = (i) => padL + (n === 1 ? innerW / 2 : (i / (n - 1)) * innerW);
-      const refRow = [...rows].reverse().find((row) => Number(row.refHigh) > 0) || {};
-      const refLow = Number(refRow.refLow) || 0;
-      const refHigh = Number(refRow.refHigh) || 0;
       const values = rows.map((row) => Number(row.value) || 0);
-      const domain = [...values];
-      if (refHigh > 0) domain.push(refLow, refHigh);
-      let yMin = Math.min(...domain), yMax = Math.max(...domain);
+      let yMin = Math.min(...values), yMax = Math.max(...values);
       const span = (yMax - yMin) || Math.abs(yMax) || 1;
       yMin = Math.max(0, yMin - span * 0.25);
       yMax = yMax + span * 0.25;
       const y = (v) => padT + innerH - ((v - yMin) / (yMax - yMin)) * innerH;
 
-      let band = '';
-      if (refHigh > 0) {
-        const top = Math.max(padT, y(Math.min(refHigh, yMax)));
-        const bottom = Math.min(padT + innerH, y(Math.max(refLow, yMin)));
-        band = `<rect x="${padL}" y="${top.toFixed(1)}" width="${innerW}" height="${Math.max(0, bottom - top).toFixed(1)}" fill="var(--brand-tint)" opacity="0.8"></rect>`;
-      }
       let grid = `<line x1="${padL}" y1="${padT + innerH}" x2="${W - padR}" y2="${padT + innerH}" stroke="var(--line-strong)" stroke-width="1"></line>`;
       grid += `<text x="${padL - 6}" y="${y(yMax) + 9}" text-anchor="end" font-size="10" fill="var(--muted)">${fmt(yMax)}</text>`;
       grid += `<text x="${padL - 6}" y="${padT + innerH + 3}" text-anchor="end" font-size="10" fill="var(--muted)">${fmt(yMin)}</text>`;
@@ -1319,8 +1312,7 @@
       let ticks = '';
       const tickEvery = Math.max(1, Math.ceil(n / 6));
       rows.forEach((row, i) => {
-        const abnormal = refHigh > 0 && (row.value > refHigh || row.value < refLow);
-        dots += `<circle cx="${x(i).toFixed(1)}" cy="${y(row.value).toFixed(1)}" r="3.8" fill="${abnormal ? 'var(--seal)' : '#1e7a52'}" stroke="var(--sheet)" stroke-width="1.5"></circle>`;
+        dots += `<circle cx="${x(i).toFixed(1)}" cy="${y(row.value).toFixed(1)}" r="3.8" fill="var(--brand)" stroke="var(--sheet)" stroke-width="1.5"></circle>`;
         if (n <= 8) labels += `<text x="${x(i).toFixed(1)}" y="${(y(row.value) - 8).toFixed(1)}" text-anchor="middle" font-size="10.5" fill="var(--ink-soft)">${fmt(row.value)}</text>`;
         if (i % tickEvery === 0 || i === n - 1) {
           ticks += `<text x="${x(i).toFixed(1)}" y="${H - 6}" text-anchor="middle" font-size="10" fill="var(--muted)">${Number(row.testDate.slice(5, 7))}/${Number(row.testDate.slice(8, 10))}</text>`;
@@ -1332,8 +1324,8 @@
       box.className = 'chart-wrap';
       box.innerHTML = `
         <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="血檢趨勢">
-          ${band}${grid}
-          <path d="${path}" fill="none" stroke="#1e7a52" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path>
+          ${grid}
+          <path d="${path}" fill="none" stroke="var(--brand)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path>
           ${dots}${labels}${ticks}
         </svg>
         <div class="chart-tip"></div>`;
@@ -1548,7 +1540,7 @@
       },
       foods: {
         title: '食物',
-        hint: '設定 kcal/g 與水分比例後，LINE 記錄「乾糧 希爾斯 4g」會自動計算熱量與水分。',
+        hint: '設定每克熱量與水分比例後，LINE 記錄「乾糧 4g」或「罐頭 品名 30g」會自動計算熱量與水分。',
         fields: [
           { name: 'displayName', label: '顯示名稱（LINE 輸入比對用）', required: true },
           { name: 'brand', label: '品牌' },
@@ -1666,12 +1658,12 @@
       });
     }
 
-    // 血檢：常見項目預填單位與參考範圍（可依報告修改），值留空就不會存
+    // 血檢：常見項目預填單位；不收參考範圍（每家醫院標準不同，以醫生判讀為準）
     const LAB_PRESETS = [
-      ['BUN', 'mg/dL', 16, 36], ['CREA', 'mg/dL', 0.8, 2.4], ['SDMA', 'µg/dL', 0, 14],
-      ['磷 P', 'mg/dL', 3.1, 7.5], ['鉀 K', 'mmol/L', 3.5, 5.8], ['ALB', 'g/dL', 2.2, 4],
-      ['TP', 'g/dL', 5.7, 8.9], ['ALT', 'U/L', 12, 130], ['GLU', 'mg/dL', 74, 159],
-      ['HCT', '%', 30, 45], ['WBC', 'K/µL', 5.5, 19.5], ['體重', 'kg', 0, 0]
+      ['BUN', 'mg/dL'], ['CREA', 'mg/dL'], ['SDMA', 'µg/dL'],
+      ['磷 P', 'mg/dL'], ['鉀 K', 'mmol/L'], ['ALB', 'g/dL'],
+      ['TP', 'g/dL'], ['ALT', 'U/L'], ['GLU', 'mg/dL'],
+      ['HCT', '%'], ['WBC', 'K/µL'], ['體重', 'kg']
     ];
 
     function labsByDate(rows) {
@@ -1691,10 +1683,7 @@
         return;
       }
       container.innerHTML = groups.map(([date, rows]) => {
-        const sub = rows.map((row) => {
-          const abnormal = row.refHigh > 0 && (row.value > row.refHigh || row.value < row.refLow);
-          return `${row.itemName} ${fmt(row.value)}${abnormal ? '⚠' : ''}`;
-        }).join('・');
+        const sub = rows.map((row) => `${row.itemName} ${fmt(row.value)}`).join('・');
         return `
           <div class="list-item">
             <div class="info"><div class="title">${esc(date)}</div><div class="sub">${esc(sub)}</div></div>
@@ -1708,29 +1697,22 @@
       const existing = date ? state.labs.filter((row) => row.testDate === date) : [];
       const byName = Object.fromEntries(existing.map((row) => [row.itemName, row]));
       const extraRows = existing.filter((row) => !LAB_PRESETS.some(([name]) => name === row.itemName));
-      const presetRow = ([name, unit, low, high]) => {
+      const presetRow = ([name, unit]) => {
         const row = byName[name];
         return `
-          <div class="grid" style="grid-template-columns:88px 1fr 66px 66px;gap:8px;align-items:center;margin-bottom:8px">
+          <div class="grid" style="grid-template-columns:110px 1fr;gap:8px;align-items:center;margin-bottom:8px">
             <div style="font-size:13px"><b>${name}</b><br><span class="muted" style="font-size:11px">${unit}</span></div>
             <input type="number" step="any" data-lab-item="${name}" data-lab-unit="${unit}" placeholder="數值" value="${row ? esc(row.value) : ''}">
-            <input type="number" step="any" data-lab-low="${name}" placeholder="低" value="${esc(row ? row.refLow : (low || ''))}" title="參考下限">
-            <input type="number" step="any" data-lab-high="${name}" placeholder="高" value="${esc(row ? row.refHigh : (high || ''))}" title="參考上限">
           </div>`;
       };
       const customRow = (row, index) => `
-        <div class="grid" style="grid-template-columns:88px 1fr 66px 66px;gap:8px;align-items:center;margin-bottom:8px">
+        <div class="grid" style="grid-template-columns:110px 1fr;gap:8px;align-items:center;margin-bottom:8px">
           <input data-lab-cname="${index}" placeholder="項目名" value="${row ? esc(row.itemName) : ''}" style="font-size:13px">
           <input type="number" step="any" data-lab-cvalue="${index}" placeholder="數值" value="${row ? esc(row.value) : ''}">
-          <input type="number" step="any" data-lab-clow="${index}" placeholder="低" value="${row ? esc(row.refLow) : ''}">
-          <input type="number" step="any" data-lab-chigh="${index}" placeholder="高" value="${row ? esc(row.refHigh) : ''}">
         </div>`;
       const html = `
         <div class="field"><label>檢驗日期</label><input type="date" id="labDate" value="${esc(date || state.date)}" ${date ? 'readonly' : ''}></div>
-        <div class="muted" style="font-size:12.5px;margin-bottom:10px">填有驗的項目就好，空白不會儲存；參考範圍可依報告修改。</div>
-        <div style="display:grid;grid-template-columns:88px 1fr 66px 66px;gap:8px;font-size:11px;color:var(--muted);margin-bottom:4px">
-          <div>項目</div><div>數值</div><div>參考低</div><div>參考高</div>
-        </div>
+        <div class="muted" style="font-size:12.5px;margin-bottom:10px">填有驗的項目就好，空白不會儲存；數值高低請以你的醫生判讀為準。</div>
         ${LAB_PRESETS.map(presetRow).join('')}
         <div class="muted" style="font-size:12px;margin:8px 0 6px">其他項目（自訂）</div>
         ${customRow(extraRows[0], 0)}${customRow(extraRows[1], 1)}`;
@@ -1739,21 +1721,13 @@
         for (const [name, unit] of LAB_PRESETS) {
           const value = document.querySelector(`[data-lab-item="${name}"]`).value.trim();
           if (value === '') continue;
-          items.push({
-            itemName: name, value: Number(value), unit,
-            refLow: Number(document.querySelector(`[data-lab-low="${name}"]`).value || 0),
-            refHigh: Number(document.querySelector(`[data-lab-high="${name}"]`).value || 0)
-          });
+          items.push({ itemName: name, value: Number(value), unit, refLow: 0, refHigh: 0 });
         }
         for (const index of [0, 1]) {
           const cname = document.querySelector(`[data-lab-cname="${index}"]`).value.trim();
           const cvalue = document.querySelector(`[data-lab-cvalue="${index}"]`).value.trim();
           if (!cname || cvalue === '') continue;
-          items.push({
-            itemName: cname, value: Number(cvalue), unit: '',
-            refLow: Number(document.querySelector(`[data-lab-clow="${index}"]`).value || 0),
-            refHigh: Number(document.querySelector(`[data-lab-chigh="${index}"]`).value || 0)
-          });
+          items.push({ itemName: cname, value: Number(cvalue), unit: '', refLow: 0, refHigh: 0 });
         }
         if (!items.length) throw new Error('至少填一個數值');
         await api('labs/bulk', {
@@ -1836,9 +1810,47 @@
         </div>`;
     }
 
+    // 設定選單：分組 + 每項一句話說明，一次只看一件事
+    const SETTINGS_MENU = [
+      ['開始使用', [
+        ['onboarding', '喵爸媽安心上手', '第一次使用的 5 個小步驟']
+      ]],
+      ['貓咪與日常', [
+        ['pets', '貓咪資料', '名字、生日、體重與健康備註'],
+        ['foods', '常吃的食物', '設定後，記錄會自動算熱量與水分'],
+        ['meds', '用藥清單', '目前在吃的藥與餵藥時間']
+      ]],
+      ['回診與健康', [
+        ['vets', '醫院與醫生', '常去的醫院聯絡資料'],
+        ['visits', '看診紀錄', '每次看診的醫囑與下次回診日'],
+        ['labs', '血檢紀錄', '輸入報告數值，趨勢圖在「回診」頁']
+      ]],
+      ['日常小幫手', [
+        ['goals', '每日目標', '水分熱量目標與每天該餵的藥'],
+        ['reminders', '照護提醒', '想被輕輕提醒的狀況']
+      ]]
+    ];
+    const SETTINGS_TITLE = Object.fromEntries(SETTINGS_MENU.flatMap(([, items]) =>
+      items.map(([key, title]) => [key, title])));
+
+    function renderSettingsMenu() {
+      $('settingsMenu').innerHTML = SETTINGS_MENU.map(([group, items]) => `
+        <div class="set-group-title">${esc(group)}</div>
+        <div class="block set-card" style="margin-top:0">
+          ${items.map(([key, title, desc]) => `
+            <button class="set-row" data-settings="${key}" type="button">
+              <div class="info"><b>${esc(title)}</b><span>${esc(desc)}</span></div>
+              <span class="chev">›</span>
+            </button>`).join('')}
+        </div>`).join('');
+    }
+
     async function loadSettings() {
-      document.querySelectorAll('[data-settings]').forEach((el) =>
-        el.classList.toggle('active', el.dataset.settings === state.settingsTab));
+      const isMenu = !state.settingsTab;
+      $('settingsMenu').classList.toggle('hidden', !isMenu);
+      $('settingsSection').classList.toggle('hidden', isMenu);
+      if (isMenu) return renderSettingsMenu();
+      $('settingsTitle').textContent = SETTINGS_TITLE[state.settingsTab] || '設定';
 
       if (state.settingsTab === 'onboarding') {
         $('settingsHint').textContent = '第一次使用？照著下面 5 步，安心開始。';
@@ -1848,7 +1860,7 @@
       }
 
       if (state.settingsTab === 'labs') {
-        $('settingsHint').textContent = '一次輸入一份報告，數值超出參考範圍會標 ⚠ 供留意；趨勢圖在「回診」頁。';
+        $('settingsHint').textContent = '一次輸入一份報告，填有驗的項目就好；趨勢圖在「回診」頁。';
         $('settingsAddBtn').classList.remove('hidden');
         state.labs = (await api(`labs?petId=${state.petId}`)).rows;
         renderLabsList();
@@ -1889,7 +1901,7 @@
       const ctx = { vetsById: Object.fromEntries(state.vets.map((vet) => [vet.vetId, vet])) };
       const container = $('settingsList');
       if (!rows.length) {
-        container.innerHTML = `<div class="empty">還沒有${spec.title}資料，按右上「＋ 新增」建立。</div>`;
+        container.innerHTML = `<div class="empty">還沒有資料，按上方「＋ 新增」就能建立，之後隨時可以修改。</div>`;
         return;
       }
       container.innerHTML = rows.map((row) => {
@@ -2008,7 +2020,10 @@
 
     document.addEventListener('click', async (event) => {
       const tab = event.target.closest('[data-tab]');
-      if (tab) return switchTab(tab.dataset.tab);
+      if (tab) {
+        if (tab.dataset.tab === 'settings') state.settingsTab = '';
+        return switchTab(tab.dataset.tab);
+      }
 
       const settingsTab = event.target.closest('[data-settings]');
       if (settingsTab) {
@@ -2165,6 +2180,10 @@
     $('labItemSelect').addEventListener('change', (event) => {
       state.labItem = event.target.value;
       renderLabTrend();
+    });
+    $('settingsBackBtn').addEventListener('click', () => {
+      state.settingsTab = '';
+      loadSettings();
     });
     $('settingsAddBtn').addEventListener('click', () => {
       if (state.settingsTab === 'labs') return openLabModal(null);
