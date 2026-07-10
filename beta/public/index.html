@@ -348,16 +348,29 @@
     .login-step .num { font-family: var(--serif); color: var(--brand); font-weight: 600; font-size: 15px; }
 
     @media (max-width: 760px) {
-      .shell { padding-top: 14px; }
-      #appView { padding: 24px 18px 32px; }
-      .tabs { gap: 18px; }
+      /* 手機：留白加大、區塊間距拉開，讓每一段都能呼吸 */
+      .shell { width: calc(100% - 22px); padding-top: 12px; }
+      #appView { padding: 30px 22px 42px; }
+      h1 { font-size: 30px; }
+      .date-line { margin-top: 6px; }
+      .topbar { row-gap: 14px; }
+      .tabs { gap: 16px; margin-top: 26px; }
+      .panel { margin-top: 28px; }
+      .toolbar { row-gap: 12px; }
+      .toolbar .btn-primary { width: 100%; order: 9; margin-top: 4px; }
       .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .grid-2 { grid-template-columns: 1fr; }
-      .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-      .entry { grid-template-columns: 1fr; gap: 6px; }
+      .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+      .stat-grid .card { padding: 16px 18px 14px; }
+      .stat-grid .card:last-child:nth-child(odd) { grid-column: 1 / -1; }
+      .doctor-note { margin-top: 28px; padding: 16px 18px; }
+      .block { margin-top: 30px; padding: 20px 18px; }
+      .section-head { margin-top: 34px; }
+      .entry { grid-template-columns: 1fr; gap: 6px; padding: 15px 2px; }
       .entry-actions { flex-direction: row; }
       .cal-cell { min-height: 64px; padding: 4px 5px; }
       .settings-nav { gap: 16px; }
+      .colophon { margin-top: 44px; }
     }
   </style>
 </head>
