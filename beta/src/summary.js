@@ -12,6 +12,21 @@ function round1(value) {
   return Math.round(value * 10) / 10;
 }
 
+// 罐頭/濕食預設 80% 水分、20% 固形；各品項可在「設定 → 常吃的食物」調整水分比例。
+// 熱量一律用登記的原始克數計算（不用固形量）。
+export const DEFAULT_WET_WATER_RATIO = 0.8;
+
+export function deriveFoodFields(grams, foodType, food) {
+  const g = toNumber(grams);
+  const isWet = foodType === '罐頭' || foodType === '濕食';
+  const ratioRaw = Number(food?.waterRatio);
+  const ratio = ratioRaw > 0 ? ratioRaw : (isWet ? DEFAULT_WET_WATER_RATIO : 0);
+  return {
+    kcal: round1(g * Number(food?.kcalPerGram || 0)),
+    waterMl: round1(g * ratio)
+  };
+}
+
 function timeOf(log) {
   return String(log.eventDateTime || '').slice(11, 16);
 }
@@ -55,7 +70,10 @@ export function computeDailySummary(logs) {
       case 'food': {
         const grams = toNumber(log.amount);
         if (log.foodType === '乾糧') summary.dryFoodG += grams;
-        else if (log.foodType === '罐頭' || log.foodType === '濕食') summary.wetFoodG += grams;
+        else if (log.foodType === '罐頭' || log.foodType === '濕食') {
+          // 罐頭/濕食只計固形量（原始克數 − 水分）
+          summary.wetFoodG += Math.max(0, grams - Math.min(toNumber(log.waterMl), grams));
+        }
         else summary.otherFoodG += grams;
         summary.foodWaterMl += toNumber(log.waterMl);
         summary.kcal += toNumber(log.kcal);

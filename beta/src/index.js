@@ -4,6 +4,7 @@
 // 其餘路徑 → 照護站網站（public/ 靜態資源）
 
 import { parseMessage, matchFood, normalizeText } from './parser.js';
+import { deriveFoodFields } from './summary.js';
 import { handleApi } from './api.js';
 import { verifyLineSignature, replyOrPush, replyOrPushFlex, replyMessages, pushText, pushMessages, getProfile } from './line.js';
 import { hasAnyReminder, parseReminderSettings, buildReminderLines, reminderMessage, visitReminderMessage } from './reminders.js';
@@ -157,6 +158,8 @@ async function handlePostback(event, env) {
   const lineUserId = event.source?.userId;
   const data = new URLSearchParams(String(event.postback?.data || ''));
 
+  if (data.get('action') === 'fillFood') return; // 點品項只是把文字填進輸入框，不需回覆
+
   if (data.get('action') === 'delLog') {
     const log = await getLog(db, data.get('logId') || '');
     if (!log || log.lineUserId !== lineUserId) {
@@ -270,6 +273,32 @@ async function handleTextMessage(event, env, baseUrl) {
     }
 
     case 'recordPrompt': {
+      // 記吃飯：列出自己建好的品項（快速回覆），點了自動填進輸入框，補克數送出即可
+      if (intent.kind === 'food') {
+        const foods = await listFoods(db, lineUserId);
+        if (foods.length && event.replyToken) {
+          const items = foods.slice(0, 13).map((food) => ({
+            type: 'action',
+            action: {
+              type: 'postback',
+              label: `${food.displayName}（${food.foodType}）`.slice(0, 20),
+              data: 'action=fillFood',
+              inputOption: 'openKeyboard',
+              fillInMessage: `${food.foodType} ${food.displayName} `
+            }
+          }));
+          try {
+            await replyMessages(env, event.replyToken, [{
+              type: 'text',
+              text: '想記哪一個品項？\n點了會自動填進輸入框，\n補上克數送出就記好。\n不在清單的直接打\n「罐頭 品名 30g」也可以。',
+              quickReply: { items }
+            }]);
+            return;
+          } catch (error) {
+            console.error('foodPick quickReply failed', error);
+          }
+        }
+      }
       await replyOrPush(env, event, recordPrompt(intent.kind));
       return;
     }
@@ -323,12 +352,11 @@ async function handleFixLast(env, event, lineUserId, intent) {
   const fields = { amount: newAmount };
   if (last.category === 'water') {
     fields.waterMl = newAmount;
-  } else if (last.foodId) {
-    const food = await getFood(db, last.foodId);
-    if (food) {
-      fields.kcal = Math.round(newAmount * Number(food.kcalPerGram || 0) * 10) / 10;
-      fields.waterMl = Math.round(newAmount * Number(food.waterRatio || 0) * 10) / 10;
-    }
+  } else if (last.category === 'food') {
+    const food = last.foodId ? await getFood(db, last.foodId) : null;
+    const derived = deriveFoodFields(newAmount, last.foodType, food);
+    fields.kcal = derived.kcal;
+    fields.waterMl = derived.waterMl;
   }
 
   const updated = await updateLog(db, last.logId, fields, lineUserId);
@@ -415,12 +443,15 @@ async function handleRecord(env, event, pet, record, lineUserId) {
     if (matched) {
       log.foodId = matched.foodId;
       log.itemName = matched.displayName;
-      log.kcal = Math.round(record.amount * Number(matched.kcalPerGram || 0) * 10) / 10;
-      log.waterMl = Math.round(record.amount * Number(matched.waterRatio || 0) * 10) / 10;
+      const derived = deriveFoodFields(record.amount, record.foodType, matched);
+      log.kcal = derived.kcal;
+      log.waterMl = derived.waterMl;
       description = `${record.foodType} ${matched.displayName} ${record.amount} g`;
     } else {
+      const derived = deriveFoodFields(record.amount, record.foodType, null);
+      log.waterMl = derived.waterMl;
       description = `${record.foodType}${record.itemName ? ` ${record.itemName}` : ''} ${record.amount} g`;
-      hints.push('這個品項還沒設定公式，\n先照原樣記錄。\n到照護站「設定→食物」\n新增後會自動算熱量。');
+      hints.push('這個品項還沒設定熱量公式，\n熱量先未計入。\n到照護站「設定→常吃的食物」\n新增後會自動計算。');
     }
   } else if (record.category === 'med') {
     const label = [record.medSlot, record.itemName].filter(Boolean).join(' ');

@@ -659,7 +659,7 @@
         <div class="block table-wrap">
           <table>
             <thead>
-              <tr><th>日期</th><th>總水分</th><th>喝水</th><th>食物水</th><th>乾糧 g</th><th>濕/罐 g</th><th>熱量</th><th>藥記錄</th><th>藥留意</th><th>吐</th><th>便</th><th>筆數</th></tr>
+              <tr><th>日期</th><th>總水分</th><th>喝水</th><th>食物水</th><th>乾糧 g</th><th>罐/濕固形 g</th><th>熱量</th><th>藥記錄</th><th>藥留意</th><th>吐</th><th>便</th><th>筆數</th></tr>
             </thead>
             <tbody id="trendBody"></tbody>
           </table>
@@ -854,9 +854,13 @@
       const lastUpdated = logs.length
         ? logs.reduce((max, l) => (l.updatedAt > max ? l.updatedAt : max), logs[0].updatedAt)
         : '';
+      const noFormula = foodLogs.filter((l) => !(Number(l.kcal) > 0)).length;
+      const foodText = foodLogs.length
+        ? `已紀錄 ${foodLogs.length} 筆，共 ${fmt(totalFood)} g${s.wetFoodG > 0 ? '（罐頭以固形量計）' : ''}${noFormula ? `・${noFormula} 筆未設定公式，熱量未計入` : ''}`
+        : '';
       return {
         rows: [
-          ['吃飯', foodLogs.length ? `已紀錄 ${foodLogs.length} 筆，共 ${fmt(totalFood)} g` : ''],
+          ['吃飯', foodText],
           ['喝水', s.waterMl > 0 ? `已紀錄 ${fmt(s.waterMl)} ml${s.foodWaterMl ? `（含食物水分共 ${fmt(s.totalWaterMl)} ml）` : ''}` : ''],
           ['用藥', medLogs.length ? `今天已紀錄 ${medLogs.length} 次` : ''],
           ['腸胃', s.vomitCount > 0 ? `今天有紀錄嘔吐 ${s.vomitCount} 次` : ''],
@@ -1540,14 +1544,14 @@
       },
       foods: {
         title: '食物',
-        hint: '設定每克熱量與水分比例後，LINE 記錄「乾糧 4g」或「罐頭 品名 30g」會自動計算熱量與水分。',
+        hint: '每個品項填每克熱量與水分比例；熱量用原始克數計算，罐頭/濕食沒填比例時預設 80% 水分、20% 固形。',
         fields: [
           { name: 'displayName', label: '顯示名稱（LINE 輸入比對用）', required: true },
           { name: 'brand', label: '品牌' },
           { name: 'productName', label: '品名' },
           { name: 'foodType', label: '類型', type: 'select', options: ['乾糧', '罐頭', '濕食', '零食', '其他'] },
           { name: 'kcalPerGram', label: '熱量（kcal/g）', type: 'number', step: '0.01' },
-          { name: 'waterRatio', label: '水分比例（0–1，例如 0.8）', type: 'number', step: '0.01' },
+          { name: 'waterRatio', label: '水分比例（0–1；罐頭/濕食沒填時預設 0.8，即 80% 水分 20% 固形）', type: 'number', step: '0.01' },
           { name: 'isPrescription', label: '處方食品', type: 'select', options: [['0', '否'], ['1', '是']] },
           { name: 'note', label: '備註', type: 'textarea' }
         ],

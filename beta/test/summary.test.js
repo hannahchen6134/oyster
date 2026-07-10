@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { computeDailySummary } from '../src/summary.js';
+import { computeDailySummary, deriveFoodFields } from '../src/summary.js';
 
 function log(fields) {
   return {
@@ -35,7 +35,7 @@ test('喝水加總', () => {
   assert.equal(s.totalWaterMl, 50.5);
 });
 
-test('食物：乾濕分類、熱量與食物水分', () => {
+test('食物：乾濕分類、熱量與食物水分（罐頭/濕食只計固形量）', () => {
   const s = computeDailySummary([
     log({ category: 'food', foodType: '乾糧', amount: 40, kcal: 160, waterMl: 3 }),
     log({ category: 'food', foodType: '罐頭', amount: 80, kcal: 72, waterMl: 64 }),
@@ -44,11 +44,24 @@ test('食物：乾濕分類、熱量與食物水分', () => {
     log({ category: 'water', amount: 50, waterMl: 50 })
   ]);
   assert.equal(s.dryFoodG, 40);
-  assert.equal(s.wetFoodG, 100); // 罐頭 + 濕食
+  assert.equal(s.wetFoodG, 21); // 固形量：(80−64)＋(20−15)
   assert.equal(s.otherFoodG, 5);
-  assert.equal(s.kcal, 267);
+  assert.equal(s.kcal, 267); // 熱量照原始克數的登記值
   assert.equal(s.foodWaterMl, 82);
   assert.equal(s.totalWaterMl, 132); // 喝水 50 + 食物 82
+});
+
+test('deriveFoodFields：罐頭未設定公式時預設 80% 水分、熱量 0（未計入）', () => {
+  const d = deriveFoodFields(50, '罐頭', null);
+  assert.equal(d.waterMl, 40);
+  assert.equal(d.kcal, 0);
+  // 有公式：熱量用原始克數，水分用品項比例
+  const d2 = deriveFoodFields(50, '罐頭', { kcalPerGram: 1.2, waterRatio: 0.75 });
+  assert.equal(d2.kcal, 60);
+  assert.equal(d2.waterMl, 37.5);
+  // 乾糧未設定公式不套 80%
+  const d3 = deriveFoodFields(40, '乾糧', null);
+  assert.equal(d3.waterMl, 0);
 });
 
 test('用藥：已吃與異常分開計數', () => {

@@ -7,7 +7,7 @@ import {
   insertLog, getLog, getLogsForDay, updateLog, softDeleteLog,
   recomputeDay, getSummaries, getSessionUser
 } from './db.js';
-import { computeDailySummary } from './summary.js';
+import { computeDailySummary, deriveFoodFields } from './summary.js';
 import { jsonResponse, newId, nowIso, isValidDate, isValidDateTime, taipeiNowDateTime } from './util.js';
 
 const RESOURCES = {
@@ -225,23 +225,24 @@ async function handleLogs(db, request, method, logId, lineUserId) {
 
 // 依類別自動補齊 waterMl / kcal：
 // - water：waterMl = amount
-// - food 且有 foodId：kcal = amount × kcalPerGram、waterMl = amount × waterRatio
+// - food：waterMl 依品項水分比例（罐頭/濕食未設定時預設 80%），
+//         kcal 只在有設定公式的品項計算，且用原始克數
 async function applyDerivedFields(db, log) {
   const result = { ...log };
   if (result.category === 'water') {
     result.waterMl = Number(result.amount || 0);
     result.unit = 'ml';
   }
-  if (result.category === 'food' && result.foodId) {
-    const food = await getFood(db, result.foodId);
+  if (result.category === 'food') {
+    const food = result.foodId ? await getFood(db, result.foodId) : null;
     if (food) {
-      const grams = Number(result.amount || 0);
-      result.kcal = Math.round(grams * Number(food.kcalPerGram || 0) * 10) / 10;
-      result.waterMl = Math.round(grams * Number(food.waterRatio || 0) * 10) / 10;
       if (!result.itemName) result.itemName = food.displayName;
       if (!result.foodType) result.foodType = food.foodType;
-      result.unit = 'g';
     }
+    const derived = deriveFoodFields(result.amount, result.foodType, food);
+    result.kcal = derived.kcal;
+    result.waterMl = derived.waterMl;
+    result.unit = 'g';
   }
   return result;
 }
