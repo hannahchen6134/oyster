@@ -26,7 +26,7 @@ export function visitReminderMessage(pet, visits, vetsById, dateLabel) {
     if (where) lines.push(where);
     if (visit.reason) lines.push(`原因：${visit.reason}`);
   }
-  lines.push('', '回診前輸入「近7天」', '可先看近況摘要 🐾');
+  lines.push('', '回診前輸入「回診摘要」', '可先看近況整理 🐾');
   return lines.join('\n');
 }
 
@@ -69,19 +69,35 @@ export function buildReminderLines(pet, rows) {
     }
   }
 
-  if (settings.water && recorded.length >= 3) {
-    const avgWater = average(recorded.map((row) => Number(row.totalWaterMl) || 0));
+  // 水分：有設每日目標就對照目標；沒設目標才和近一週平均比
+  if (settings.water) {
     const todayWater = Number(today.totalWaterMl) || 0;
-    if (avgWater > 0 && todayWater < avgWater * 0.6) {
-      lines.push(`水分只有 ${Math.round(todayWater)} ml\n　（平常約 ${Math.round(avgWater)} ml）`);
+    const goalWater = Number(pet?.goalWaterMl) || 0;
+    if (goalWater > 0) {
+      if (todayWater < goalWater) {
+        lines.push(`水分 ${Math.round(todayWater)} ml\n　（今日目標 ${Math.round(goalWater)} ml，還差 ${Math.round(goalWater - todayWater)}）`);
+      }
+    } else if (recorded.length >= 3) {
+      const avgWater = average(recorded.map((row) => Number(row.totalWaterMl) || 0));
+      if (avgWater > 0 && todayWater < avgWater * 0.6) {
+        lines.push(`水分只有 ${Math.round(todayWater)} ml\n　（平常約 ${Math.round(avgWater)} ml）`);
+      }
     }
   }
 
-  if (settings.appetite && recorded.length >= 3) {
-    const avgKcal = average(recorded.map((row) => Number(row.kcal) || 0));
+  // 熱量：同水分，有目標先看目標
+  if (settings.appetite) {
     const todayKcal = Number(today.kcal) || 0;
-    if (avgKcal > 0 && todayKcal < avgKcal * 0.6) {
-      lines.push(`熱量只有 ${Math.round(todayKcal)} kcal\n　（平常約 ${Math.round(avgKcal)} kcal）`);
+    const goalKcal = Number(pet?.goalKcal) || 0;
+    if (goalKcal > 0) {
+      if (todayKcal < goalKcal) {
+        lines.push(`熱量 ${Math.round(todayKcal)} kcal\n　（今日目標 ${Math.round(goalKcal)} kcal，還差 ${Math.round(goalKcal - todayKcal)}）`);
+      }
+    } else if (recorded.length >= 3) {
+      const avgKcal = average(recorded.map((row) => Number(row.kcal) || 0));
+      if (avgKcal > 0 && todayKcal < avgKcal * 0.6) {
+        lines.push(`熱量只有 ${Math.round(todayKcal)} kcal\n　（平常約 ${Math.round(avgKcal)} kcal）`);
+      }
     }
   }
 
