@@ -346,3 +346,11 @@ export async function getSessionUser(db, token) {
   }
   return session.lineUserId;
 }
+
+// 使用者最近一筆未刪除的紀錄（給「改 54」「剩 20」「刪除」修正上一筆用）
+export async function getLastLogByUser(db, lineUserId) {
+  return db
+    .prepare('SELECT * FROM logs WHERE lineUserId = ? AND isDeleted = 0 ORDER BY createdAt DESC LIMIT 1')
+    .bind(lineUserId)
+    .first();
+}

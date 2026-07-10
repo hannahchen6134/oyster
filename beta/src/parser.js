@@ -10,7 +10,7 @@
 //
 // category: water | food | med | vomit | stool | mood | note
 
-const WATER_WORDS = new Set(['水', '喝水', '飲水']);
+const WATER_WORDS = new Set(['水', '喝水', '飲水', '喝', '喝了', '喝水了']);
 
 const FOOD_TYPE_WORDS = [
   { type: '乾糧', words: ['乾糧', '飼料', '乾乾'] },
@@ -20,11 +20,14 @@ const FOOD_TYPE_WORDS = [
   { type: '其他', words: ['其他'] }
 ];
 
-const MED_WORDS = new Set(['藥', '用藥', '餵藥', '吃藥']);
-const VOMIT_WORDS = new Set(['吐', '嘔吐']);
-const STOOL_PLAIN_WORDS = new Set(['便', '大便', '便便']);
-const STOOL_DETAIL_WORDS = new Set(['軟便', '血便', '拉肚子', '腹瀉', '便秘']);
+const MED_WORDS = new Set(['藥', '用藥', '餵藥', '吃藥', '吃藥了', '餵藥了', '有吃藥']);
+const VOMIT_WORDS = new Set(['吐', '嘔吐', '吐了', '嘔吐了']);
+const STOOL_PLAIN_WORDS = new Set(['便', '大便', '便便', '大便了', '便了', '便便了', '排便', '拉了']);
+const STOOL_DETAIL_WORDS = new Set(['軟便', '血便', '拉肚子', '腹瀉', '便秘', '拉稀']);
 const MOOD_WORDS = new Set(['精神']);
+const MOOD_DETAIL_WORDS = new Set(['沒精神', '精神差', '活力差', '懶懶的', '沒活力']);
+// 句首的動詞雜訊：吃了罐頭30g、餵了乾糧4g
+const LEAD_VERBS = new Set(['吃了', '餵了', '吃', '餵', '吃掉', '餵食', '有吃', '有餵']);
 const NOTE_WORDS = new Set(['備註', '筆記']);
 
 const MED_STATUS_WORDS = [
@@ -121,6 +124,22 @@ export function parseMessage(rawText) {
     return { type: 'addPet', name: addPetMatch[1].trim() };
   }
 
+  // 修正上一筆：改 54 / 改成54（改數量）、剩 20 / 沒吃完剩20（扣掉）、刪除（刪上一筆）
+  if (['刪除', '刪掉', '刪除上一筆', '刪上一筆', '刪除剛剛', '刪掉剛剛'].includes(compact)) {
+    return { type: 'deleteLast' };
+  }
+  const leftoverFix = compact.match(/^(?:沒吃完|沒喝完)?剩下?(\d+(?:\.\d+)?)(?:g|克|公克|ml|毫升|cc)?$/i);
+  if (leftoverFix) {
+    return { type: 'fixLast', mode: 'subtract', amount: Number(leftoverFix[1]) };
+  }
+  const editFix = compact.match(/^(?:改成?|修改|更正)(\d+(?:\.\d+)?)(?:g|克|公克|ml|毫升|cc)?$/i);
+  if (editFix) {
+    return { type: 'fixLast', mode: 'set', amount: Number(editFix[1]) };
+  }
+  if (['記錯', '記錯了', '打錯', '打錯了', '輸入錯誤'].includes(compact)) {
+    return { type: 'fixHint' };
+  }
+
   let tokens = text.split(' ');
 
   // 時間前綴：昨天 / 前天 / HH:MM（可組合，例如「昨天 21:30 水 20」）
@@ -145,6 +164,19 @@ export function parseMessage(rawText) {
   }
 
   if (tokens.length === 0) return { type: 'unknown' };
+
+  // 「吃了 罐頭 30g」「餵了 乾糧 4g」→ 剝掉開頭動詞
+  if (tokens.length > 1 && LEAD_VERBS.has(tokens[0])) {
+    tokens = tokens.slice(1);
+  } else if (tokens.length >= 1) {
+    // 黏在一起的也切：「吃了罐頭 30g」→「罐頭 30g」
+    for (const verb of ['吃了', '餵了', '吃掉', '餵食', '有吃', '有餵']) {
+      if (tokens[0].length > verb.length && tokens[0].startsWith(verb)) {
+        tokens = [tokens[0].slice(verb.length), ...tokens.slice(1)];
+        break;
+      }
+    }
+  }
 
   const head = tokens[0];
   const rest = tokens.slice(1);
@@ -207,10 +239,11 @@ export function parseMessage(rawText) {
     return { type: 'record', record };
   }
 
-  // 精神
-  if (MOOD_WORDS.has(head)) {
+  // 精神（「沒精神」「活力差」本身就是描述）
+  if (MOOD_WORDS.has(head) || MOOD_DETAIL_WORDS.has(head)) {
     record.category = 'mood';
-    record.note = rest.join(' ');
+    const detail = MOOD_DETAIL_WORDS.has(head) ? [head, ...rest] : rest;
+    record.note = detail.join(' ');
     return { type: 'record', record };
   }
 

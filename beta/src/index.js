@@ -10,8 +10,9 @@ import { hasAnyReminder, parseReminderSettings, buildReminderLines, reminderMess
 import { shortDate } from './replies.js';
 import { recordFlex, todayFlex, websiteFlex, menuFlex, weekFlex, reminderFlex, visitReminderFlex } from './flex.js';
 import {
-  ensureUser, updateUser, listPets, createPet, resolveDefaultPet,
-  listFoods, insertLog, getLog, softDeleteLog, recomputeDay, getRecentSummaries,
+  ensureUser, updateUser, listPets, createPet, resolveDefaultPet, getPet,
+  listFoods, getFood, insertLog, getLog, getLastLogByUser, softDeleteLog, updateLog,
+  recomputeDay, getRecentSummaries,
   upcomingVisits, listVetsByOwner, createSession
 } from './db.js';
 import {
@@ -258,6 +259,21 @@ async function handleTextMessage(event, env, baseUrl) {
       return;
     }
 
+    case 'fixLast': {
+      await handleFixLast(env, event, lineUserId, intent);
+      return;
+    }
+
+    case 'deleteLast': {
+      await handleDeleteLast(env, event, lineUserId);
+      return;
+    }
+
+    case 'fixHint': {
+      await replyOrPush(env, event, '修正上一筆：\n改 54（改數量）\n剩 20（沒吃完扣掉）\n刪除（整筆刪掉）');
+      return;
+    }
+
     case 'invalid': {
       await replyOrPush(env, event, invalidReply(intent.reason, intent.category));
       return;
@@ -267,6 +283,85 @@ async function handleTextMessage(event, env, baseUrl) {
       await replyOrPush(env, event, unknownReply());
     }
   }
+}
+
+// 上一筆的簡短描述（修正/刪除回覆用）
+function describeLog(log) {
+  if (log.category === 'water') return `水 ${log.amount} ml`;
+  if (log.category === 'food') return `${log.foodType}${log.itemName ? ` ${log.itemName}` : ''} ${log.amount} g`;
+  if (log.category === 'med') {
+    const label = [log.medSlot, log.itemName].filter(Boolean).join(' ');
+    return `藥${label ? ` ${label}` : ''} ${log.medStatus}`;
+  }
+  const names = { vomit: '嘔吐', stool: '便便', mood: '精神', note: '備註' };
+  return `${names[log.category] || log.category}${log.note ? `：${log.note}` : ''}`;
+}
+
+// 「改 54」「剩 20」：修正最近一筆的數量
+async function handleFixLast(env, event, lineUserId, intent) {
+  const db = env.DB;
+  const last = await getLastLogByUser(db, lineUserId);
+  if (!last) {
+    await replyOrPush(env, event, '找不到可以修改的紀錄，\n先記一筆吧！');
+    return;
+  }
+  if (!['water', 'food'].includes(last.category)) {
+    await replyOrPush(env, event, `上一筆是「${describeLog(last)}」，\n沒有數量可以改。\n輸入「刪除」可整筆刪掉。`);
+    return;
+  }
+
+  let newAmount = intent.mode === 'set'
+    ? intent.amount
+    : Math.round((Number(last.amount) - intent.amount) * 10) / 10;
+  if (newAmount < 0) newAmount = 0;
+
+  const fields = { amount: newAmount };
+  if (last.category === 'water') {
+    fields.waterMl = newAmount;
+  } else if (last.foodId) {
+    const food = await getFood(db, last.foodId);
+    if (food) {
+      fields.kcal = Math.round(newAmount * Number(food.kcalPerGram || 0) * 10) / 10;
+      fields.waterMl = Math.round(newAmount * Number(food.waterRatio || 0) * 10) / 10;
+    }
+  }
+
+  const updated = await updateLog(db, last.logId, fields, lineUserId);
+  const eventDate = String(updated.eventDateTime).slice(0, 10);
+  const summary = await recomputeDay(db, updated.petId, eventDate);
+  const cardPet = await getPet(db, updated.petId);
+
+  const subParts = [];
+  if (updated.kcal) subParts.push(`${updated.kcal} kcal`);
+  if (updated.category === 'food' && updated.waterMl) subParts.push(`水 ${updated.waterMl} ml`);
+  if (intent.mode === 'subtract') subParts.push(`已扣掉沒吃完的 ${intent.amount}`);
+
+  const categoryKey = updated.category === 'food'
+    ? (updated.foodType === '乾糧' ? 'dry' : 'wet')
+    : updated.category;
+  const fallbackText = recordReply(describeLog(updated), cardPet, summary, [], eventDate);
+  const card = recordFlex({
+    pet: cardPet, categoryKey,
+    mainText: describeLog(updated),
+    subText: subParts.join('・'),
+    summary, date: eventDate,
+    logId: updated.logId,
+    title: `✓ 已更新・${cardPet?.petName || '貓貓'}`
+  });
+  await replyOrPushFlex(env, event, card, fallbackText);
+}
+
+// 「刪除」：刪掉最近一筆
+async function handleDeleteLast(env, event, lineUserId) {
+  const db = env.DB;
+  const last = await getLastLogByUser(db, lineUserId);
+  if (!last) {
+    await replyOrPush(env, event, '沒有可以刪除的紀錄');
+    return;
+  }
+  await softDeleteLog(db, last.logId, lineUserId);
+  const summary = await recomputeDay(db, last.petId, String(last.eventDateTime).slice(0, 10));
+  await replyOrPush(env, event, `🗑 已刪除上一筆\n${describeLog(last)}\n\n今日水分 ${summary.totalWaterMl} ml\n熱量 ${summary.kcal} kcal`);
 }
 
 async function handleRecord(env, event, pet, record, lineUserId) {
@@ -353,12 +448,17 @@ async function handleRecord(env, event, pet, record, lineUserId) {
 
   // 補登到非今天時，回覆顯示的是「該日」的累積
   const fallbackText = recordReply(description, pet, summary, hints, eventDate);
+  const tip = record.category === 'water'
+    ? '記錯了？直接輸入「改 25」'
+    : record.category === 'food'
+      ? '記錯輸入「改 54」・沒吃完輸入「剩 20」'
+      : '';
   const card = recordFlex({
     pet, categoryKey, mainText,
     subText: subParts.join('・'),
     summary, date: eventDate,
     logId: savedLog?.logId || '',
-    hints
+    hints, tip
   });
   await replyOrPushFlex(env, event, card, fallbackText);
 }

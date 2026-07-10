@@ -222,6 +222,23 @@
       line-height: 1.75; color: var(--ink-soft); font-size: 14px;
     }
     .doctor-note #doctorNote { font-family: var(--serif); font-size: 14.5px; letter-spacing: 0.02em; }
+    /* 收合區塊：預設收起，首頁保持乾淨 */
+    details.fold { padding: 0; }
+    .fold summary {
+      list-style: none; cursor: pointer; display: flex; align-items: center; gap: 12px;
+      padding: 15px 20px; font-weight: 600; font-size: 14.5px; color: var(--ink-soft);
+    }
+    .fold summary::-webkit-details-marker { display: none; }
+    .fold .fold-title { flex: 1; }
+    .fold .fold-arrow { color: var(--muted); font-size: 13px; transition: transform 0.15s; }
+    .fold[open] .fold-arrow { transform: rotate(180deg); }
+    .fold[open] summary { color: var(--ink); }
+    .fold .fold-body { padding: 2px 20px 18px; }
+    .fold .doctor-text {
+      font-family: var(--serif); font-size: 14.5px; color: var(--ink-soft);
+      line-height: 1.75; letter-spacing: 0.02em;
+      border-left: 2px solid var(--brand); padding-left: 14px;
+    }
     .section-head { display: flex; align-items: center; gap: 14px; margin-top: 34px; margin-bottom: 12px; }
     .section-head h2 { margin: 0; flex: 1; }
     .visit-item {
@@ -438,20 +455,30 @@
           <div class="card"><div class="stat-label">用藥</div><div class="stat-value" id="statMed">—</div></div>
           <div class="card"><div class="stat-label">腸胃</div><div class="stat-value" id="statGut">穩定</div></div>
         </div>
-        <div class="doctor-note">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px">
-            <b style="font-size:14px">給醫生的一句話</b>
-            <button class="btn btn-secondary btn-sm" id="copyDoctorBtn" type="button">複製</button>
+        <details class="block fold">
+          <summary>
+            <span class="fold-title">給醫生的一句話</span>
+            <span class="fold-arrow">▾</span>
+          </summary>
+          <div class="fold-body">
+            <div id="doctorNote" class="doctor-text">今天還沒有紀錄。</div>
+            <div style="display:flex;justify-content:flex-end;margin-top:10px">
+              <button class="btn btn-secondary btn-sm" id="copyDoctorBtn" type="button">複製</button>
+            </div>
           </div>
-          <div id="doctorNote">今天還沒有紀錄。</div>
-        </div>
-        <div class="block">
-          <div class="section-head">
-            <h2>看診</h2>
-            <button class="btn btn-secondary btn-sm" id="addVisitBtn" type="button">＋ 記錄看診</button>
+        </details>
+        <details class="block fold">
+          <summary>
+            <span class="fold-title" id="visitFoldTitle">看診</span>
+            <span class="fold-arrow">▾</span>
+          </summary>
+          <div class="fold-body">
+            <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+              <button class="btn btn-secondary btn-sm" id="addVisitBtn" type="button">＋ 記錄看診</button>
+            </div>
+            <div class="grid" id="dayVisitList"></div>
           </div>
-          <div class="grid" id="dayVisitList"></div>
-        </div>
+        </details>
         <div class="block">
           <div class="section-head">
             <h2>當日紀錄</h2>
@@ -654,6 +681,7 @@
     function renderDayVisits() {
       const vetsById = Object.fromEntries(state.vets.map((vet) => [vet.vetId, vet]));
       const visits = state.visits.filter((visit) => visit.visitDate === state.date || visit.nextVisitDate === state.date);
+      $('visitFoldTitle').textContent = visits.length ? `看診（${visits.length}）` : '看診';
       const container = $('dayVisitList');
       if (!visits.length) {
         container.innerHTML = '';

@@ -139,7 +139,7 @@ function bubble(altText, contents) {
 }
 
 // ---------- 記錄確認卡 ----------
-export function recordFlex({ pet, categoryKey, mainText, subText, summary, date, logId, hints = [] }) {
+export function recordFlex({ pet, categoryKey, mainText, subText, summary, date, logId, hints = [], title = '', tip = '' }) {
   const style = CATEGORY_STYLE[categoryKey] || CATEGORY_STYLE.note;
   const body = {
     type: 'box', layout: 'vertical', paddingAll: '18px', backgroundColor: BODY_BG,
@@ -154,7 +154,8 @@ export function recordFlex({ pet, categoryKey, mainText, subText, summary, date,
       statRow('熱量', `${fmt(summary.kcal)} kcal`),
       ...goalContents(pet, summary, date),
       ...hints.filter(Boolean).map((hint) =>
-        text(`※ ${hint.replace(/\n/g, '')}`, { size: 'xs', color: C.muted, wrap: true, margin: 'md' }))
+        text(`※ ${hint.replace(/\n/g, '')}`, { size: 'xs', color: C.muted, wrap: true, margin: 'md' })),
+      ...(tip ? [text(tip, { size: 'xxs', color: C.muted, wrap: true, margin: 'lg' })] : [])
     ]
   };
   const footer = {
@@ -166,7 +167,8 @@ export function recordFlex({ pet, categoryKey, mainText, subText, summary, date,
         action: { type: 'message', label: '開啟照護站', text: '網站' } }
     ]
   };
-  return bubble(`已記錄 ${mainText}`, { type: 'bubble', size: 'mega', header: header(`✓ 已記錄・${pet?.petName || '貓貓'}`), body, footer });
+  const headerTitle = title || `✓ 已記錄・${pet?.petName || '貓貓'}`;
+  return bubble(`${title ? '已更新' : '已記錄'} ${mainText}`, { type: 'bubble', size: 'mega', header: header(headerTitle), body, footer });
 }
 
 // ---------- 今日總結卡 ----------
