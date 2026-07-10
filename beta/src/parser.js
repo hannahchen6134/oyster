@@ -136,6 +136,16 @@ export function parseMessage(rawText) {
     return { type: 'addPet', name: addPetMatch[1].trim() };
   }
 
+  // 引導建檔：按鈕觸發的步驟
+  if (['幫貓貓建檔', '開始建檔', '建立貓咪檔案'].includes(compact)) return { type: 'petNamePrompt' };
+  if (['記體重', '補體重'].includes(compact)) return { type: 'petFieldPrompt', field: 'weightKg' };
+  if (['記生日', '補生日'].includes(compact)) return { type: 'petFieldPrompt', field: 'birthday' };
+  if (compact === '補體重生日') return { type: 'petExtraMenu' };
+  const foodPromptMatch = compact.match(/^設定(罐頭|乾糧|濕食|零食)$/);
+  if (foodPromptMatch) return { type: 'foodSetupPrompt', foodType: foodPromptMatch[1] };
+  if (['稍後再說', '先跳過', '跳過'].includes(compact)) return { type: 'skipStep' };
+  if (compact === '完成設定') return { type: 'setupDone' };
+
   // 引導建檔：常吃的食物與餵藥時段
   if (['設定食物', '建立食物', '新增食物', '設定常吃的食物'].includes(compact)) {
     return { type: 'foodSetupMenu' };

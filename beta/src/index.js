@@ -9,7 +9,7 @@ import { handleApi } from './api.js';
 import { verifyLineSignature, replyOrPush, replyOrPushFlex, replyMessages, pushText, pushMessages, getProfile } from './line.js';
 import { hasAnyReminder, parseReminderSettings, buildReminderLines, reminderMessage, visitReminderMessage } from './reminders.js';
 import { shortDate } from './replies.js';
-import { recordFlex, todayFlex, websiteFlex, menuFlex, recordMenuFlex, weekFlex, reminderFlex, visitReminderFlex, welcomeFlex } from './flex.js';
+import { recordFlex, todayFlex, websiteFlex, menuFlex, recordMenuFlex, weekFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, menuCell } from './flex.js';
 import {
   ensureUser, updateUser, listPets, createPet, resolveDefaultPet, getPet, updatePetFields, createFoodItem,
   listFoods, getFood, insertLog, getLog, getLastLogByUser, softDeleteLog, updateLog,
@@ -153,12 +153,184 @@ async function handleWebhook(request, env, url) {
 }
 
 // Flex 卡片按鈕：目前只有「刪除這筆」
-// 快速回覆按鈕：fill 會把文字填進輸入框、msg 直接送出
-function qrFill(label, fill) {
-  return { type: 'action', action: { type: 'postback', label, data: 'action=fill', inputOption: 'openKeyboard', fillInMessage: fill } };
+// ---------- 引導流程卡（一張卡一件事，全部大按鈕；自由輸入用 pendingAction 等待） ----------
+
+function stepMedCard(petName, step = '第 2 步・共 3 步') {
+  return onboardCard({
+    step,
+    title: `${petName}每天需要餵藥嗎？`,
+    subtitle: '選了之後，今日確認和晚上提醒都會幫你看著',
+    rows: [
+      [menuCell('早', '一天一次', '餵藥時段 早'), menuCell('早晚', '一天兩次', '餵藥時段 早晚')],
+      [menuCell('早中晚', '一天三次', '餵藥時段 早中晚'), menuCell('只有晚上', '一天一次', '餵藥時段 晚')],
+      [menuCell('不用餵藥', '之後可以再設定', '餵藥時段 不用')]
+    ],
+    alt: '每天需要餵藥嗎？'
+  });
 }
-function qrMsg(label, textMsg) {
-  return { type: 'action', action: { type: 'message', label, text: textMsg } };
+
+function stepFoodCard(step = '第 3 步・共 3 步', subtitle = '建好之後，記錄會自動算熱量和水分') {
+  return onboardCard({
+    step,
+    title: '最常吃哪一種？',
+    subtitle,
+    rows: [
+      [menuCell('罐頭', '主食罐/副食罐', '設定罐頭'), menuCell('乾糧', '飼料', '設定乾糧')],
+      [menuCell('濕食', '餐包/鮮食', '設定濕食'), menuCell('零食', '凍乾/肉泥', '設定零食')],
+      [menuCell('先跳過', '之後隨時可以建', '稍後再說')]
+    ],
+    alt: '最常吃哪一種食物？'
+  });
+}
+
+function doneCard(petName) {
+  return onboardCard({
+    title: '都準備好了 🐾',
+    subtitle: `現在試試看：直接打「水 60」，就幫${petName}記下第一筆`,
+    rows: [
+      [menuCell('快速紀錄', '點按鈕記錄', '紀錄'), menuCell('今日確認', '看今天狀況', '今天')],
+      [menuCell('補體重生日', '選填', '補體重生日'), menuCell('再新增一隻貓', '多貓家庭', '幫貓貓建檔')],
+      [menuCell('開啟照護站', '月曆・回診・設定', '照護站', true)]
+    ],
+    alt: '都準備好了！'
+  });
+}
+
+function namePromptCard() {
+  return onboardCard({
+    step: '第 1 步・共 3 步',
+    title: '貓貓叫什麼名字？',
+    subtitle: '直接打名字送出就好',
+    rows: [[menuCell('稍後再說', '先自己逛逛', '稍後再說')]],
+    alt: '貓貓叫什麼名字？'
+  });
+}
+
+// 引導建立食物：預設值（罐頭/濕食 1.0 kcal/g・80% 水分；乾糧 3.7・8%；零食 3.0）
+async function createGuidedFood(db, lineUserId, foodType, name, kcalIn) {
+  const isWet = foodType === '罐頭' || foodType === '濕食';
+  const defaults = {
+    kcalPerGram: isWet ? 1.0 : (foodType === '乾糧' ? 3.7 : 3.0),
+    waterRatio: isWet ? 0.8 : (foodType === '乾糧' ? 0.08 : 0)
+  };
+  const kcalPerGram = kcalIn > 0 ? kcalIn : defaults.kcalPerGram;
+  await createFoodItem(db, lineUserId, {
+    displayName: name,
+    foodType,
+    kcalPerGram,
+    waterRatio: defaults.waterRatio,
+    note: kcalIn > 0 ? '' : 'LINE 引導建立（預設值）'
+  });
+  return { kcalPerGram, waterRatio: defaults.waterRatio, usedDefault: !(kcalIn > 0) };
+}
+
+function foodDoneCard(name, foodType, info) {
+  return onboardCard({
+    title: `已建立「${name}」🐾`,
+    subtitle: `${foodType}・每克 ${info.kcalPerGram} kcal・水分 ${Math.round(info.waterRatio * 100)}%${info.usedDefault ? '（預設值，照護站可微調）' : ''}`,
+    rows: [
+      [menuCell('再建一個', '其他常吃的', '設定食物'), menuCell('完成', '開始使用', '完成設定')]
+    ],
+    alt: `已建立「${name}」`
+  });
+}
+
+// 等待中的自由輸入（名字/體重/生日/食物名/克數）；回 true 表示已處理
+async function handlePending(env, event, { db, user, pet, pets, lineUserId, text }) {
+  const pending = user.pendingAction;
+  const clear = () => updateUser(db, lineUserId, { pendingAction: '' });
+
+  if (['跳過', '先跳過', '稍後再說', '取消'].includes(text)) {
+    await clear();
+    if (pending === 'petname' && !pets.length) {
+      await replyOrPushFlex(env, event, onboardCard({
+        title: '好，先自己逛逛 🐾',
+        subtitle: '想開始時輸入「安心上手」，我都在',
+        rows: [[menuCell('安心上手', '上手小教學', '安心上手'), menuCell('開啟照護站', '看看長什麼樣子', '照護站')]]
+      }), '好，想開始時輸入「安心上手」');
+    } else {
+      await replyOrPushFlex(env, event, doneCard(pet?.petName || '貓貓'), '好，隨時打「水 60」開始記錄');
+    }
+    return true;
+  }
+
+  const asIntent = parseMessage(text);
+
+  if (pending === 'petname') {
+    if (asIntent.type !== 'unknown' || text.length > 12 || !text) { await clear(); return false; }
+    let newPet = pets.find((p) => p.petName === text);
+    if (!newPet) {
+      newPet = await createPet(db, lineUserId, { petName: text });
+      if (!pets.length) await updateUser(db, lineUserId, { defaultPetId: newPet.petId });
+    }
+    await clear();
+    await replyOrPushFlex(env, event, stepMedCard(newPet.petName), `已幫「${newPet.petName}」建立檔案！每天需要餵藥嗎？（輸入：餵藥時段 早晚）`);
+    return true;
+  }
+
+  if (pending === 'weight' && pet) {
+    const m = text.match(/^([0-9]+(?:\.[0-9]+)?)\s*(?:kg|公斤)?$/i);
+    if (!m) { await clear(); return false; }
+    await updatePetFields(db, pet.petId, { weightKg: Number(m[1]) });
+    await clear();
+    await replyOrPushFlex(env, event, onboardCard({
+      title: `已記下${pet.petName}的體重 ${m[1]} kg 🐾`,
+      rows: [[menuCell('記生日', '例如 2020-01-01', '記生日'), menuCell('完成', '開始使用', '完成設定')]]
+    }), `已記下體重 ${m[1]} kg`);
+    return true;
+  }
+
+  if (pending === 'birthday' && pet) {
+    const d = text.match(/^(\d{4})[年\/\-.](\d{1,2})[月\/\-.](\d{1,2})日?$/);
+    if (!d) {
+      if (asIntent.type !== 'unknown') { await clear(); return false; }
+      await replyOrPush(env, event, '生日格式像這樣：2020-01-01\n（打「跳過」可以略過）');
+      return true;
+    }
+    const value = `${d[1]}-${String(d[2]).padStart(2, '0')}-${String(d[3]).padStart(2, '0')}`;
+    await updatePetFields(db, pet.petId, { birthday: value });
+    await clear();
+    await replyOrPushFlex(env, event, onboardCard({
+      title: `已記下${pet.petName}的生日 🐾`,
+      subtitle: value,
+      rows: [[menuCell('記體重', '例如 4.2', '記體重'), menuCell('完成', '開始使用', '完成設定')]]
+    }), `已記下生日 ${value}`);
+    return true;
+  }
+
+  if (pending.startsWith('food:')) {
+    if (asIntent.type !== 'unknown') { await clear(); return false; }
+    const foodType = pending.slice(5);
+    const m = text.match(/^(.+?)(?:\s+([0-9.]+))?$/);
+    const name = (m ? m[1] : '').trim();
+    const kcalIn = m && m[2] ? Number(m[2]) : 0;
+    if (!name || name.length > 15) { await clear(); return false; }
+    await clear();
+    const foods = await listFoods(db, lineUserId);
+    if (foods.some((food) => food.displayName === name)) {
+      await replyOrPushFlex(env, event, foodDoneCard(name, foodType, { kcalPerGram: '—', waterRatio: 0, usedDefault: false }), `「${name}」已經建立過了`);
+      return true;
+    }
+    const info = await createGuidedFood(db, lineUserId, foodType, name, kcalIn);
+    await replyOrPushFlex(env, event, foodDoneCard(name, foodType, info), `已建立「${name}」（${foodType}）`);
+    return true;
+  }
+
+  if (pending.startsWith('amount|')) {
+    const base = pending.slice(7);
+    const m = text.match(/^([0-9]+(?:\.[0-9]+)?)\s*(?:g|克|公克|ml|毫升)?$/i);
+    if (!m) { await clear(); return false; }
+    await clear();
+    const intent2 = parseMessage(`${base} ${m[1]}`);
+    if (intent2.type === 'record' && pet) {
+      await handleRecord(env, event, pet, intent2.record, lineUserId);
+      return true;
+    }
+    return false;
+  }
+
+  await clear();
+  return false;
 }
 
 async function handlePostback(event, env) {
@@ -193,17 +365,7 @@ async function handleFollow(event, env) {
   if (profile?.displayName && user.displayName !== profile.displayName) {
     await updateUser(env.DB, lineUserId, { displayName: profile.displayName });
   }
-  try {
-    const card = welcomeFlex();
-    card.quickReply = { items: [
-      qrFill('🐱 幫貓貓建檔', '新增貓咪 '),
-      qrMsg('先看看怎麼用', '安心上手')
-    ] };
-    await replyMessages(env, event.replyToken, [card]);
-  } catch (error) {
-    console.warn('welcome flex failed, fallback to text:', error.message);
-    await replyOrPush(env, event, welcomeText());
-  }
+  await replyOrPushFlex(env, event, welcomeFlex(), welcomeText());
 }
 
 async function handleTextMessage(event, env, baseUrl) {
@@ -251,45 +413,69 @@ async function handleTextMessage(event, env, baseUrl) {
     return;
   }
 
+  // 引導流程等待中的自由輸入（名字/體重/生日/食物名/克數）
+  if (user.pendingAction) {
+    const consumed = await handlePending(env, event, { db, user, pet, pets, lineUserId, text });
+    if (consumed) return;
+  }
+
   const intent = parseMessage(text);
 
   switch (intent.type) {
     case 'addPet': {
       const existing = pets.find((p) => p.petName === intent.name);
       if (existing) {
-        await replyOrPush(env, event, `「${intent.name}」已經建立過了，直接開始記錄吧！`);
+        await replyOrPushFlex(env, event, doneCard(existing.petName), `「${intent.name}」已經建立過了，直接開始記錄吧！`);
         return;
       }
       const newPet = await createPet(db, lineUserId, { petName: intent.name });
       if (!pets.length) await updateUser(db, lineUserId, { defaultPetId: newPet.petId });
-      try {
-        await replyMessages(env, event.replyToken, [{
-          type: 'text',
-          text: `🐾 已幫「${intent.name}」建立檔案！\n\n順手補兩筆基本資料嗎？\n點下面的按鈕就能填，\n之後隨時可以改。`,
-          quickReply: { items: [
-            qrFill('記體重', '體重 '),
-            qrFill('記生日', '生日 '),
-            qrMsg('下一步：常吃的食物', '設定食物'),
-            qrMsg('先開始記錄', '紀錄')
-          ] }
-        }]);
-      } catch (error) {
-        await replyOrPush(env, event, `🐾 已建立貓咪「${intent.name}」！\n輸入「水 20」開始記錄。\n生日體重等資料，\n可到照護站補齊。`);
+      await replyOrPushFlex(env, event, stepMedCard(newPet.petName), `已幫「${intent.name}」建立檔案！每天需要餵藥嗎？（輸入：餵藥時段 早晚）`);
+      return;
+    }
+
+    case 'petNamePrompt': {
+      await updateUser(db, lineUserId, { pendingAction: 'petname' });
+      await replyOrPushFlex(env, event, namePromptCard(), '貓貓叫什麼名字？直接打名字送出就好');
+      return;
+    }
+
+    case 'petFieldPrompt': {
+      if (!pet) {
+        await updateUser(db, lineUserId, { pendingAction: 'petname' });
+        await replyOrPushFlex(env, event, namePromptCard(), '先幫貓貓建檔：直接打名字送出就好');
+        return;
       }
+      const isWeight = intent.field === 'weightKg';
+      await updateUser(db, lineUserId, { pendingAction: isWeight ? 'weight' : 'birthday' });
+      await replyOrPushFlex(env, event, onboardCard({
+        title: isWeight ? `${pet.petName}的體重是？` : `${pet.petName}的生日是哪天？`,
+        subtitle: isWeight ? '直接打數字就好，例如 4.2' : '直接打日期就好，例如 2020-01-01',
+        rows: [[menuCell('跳過這題', '之後可以再填', '跳過')]],
+        alt: isWeight ? '體重是？' : '生日是？'
+      }), isWeight ? '直接打體重數字就好，例如 4.2' : '直接打生日就好，例如 2020-01-01');
+      return;
+    }
+
+    case 'petExtraMenu': {
+      if (!pet) {
+        await updateUser(db, lineUserId, { pendingAction: 'petname' });
+        await replyOrPushFlex(env, event, namePromptCard(), '先幫貓貓建檔：直接打名字送出就好');
+        return;
+      }
+      await replyOrPushFlex(env, event, onboardCard({
+        title: '補充基本資料',
+        subtitle: '選填，之後在照護站也都能改',
+        rows: [[menuCell('記體重', '例如 4.2', '記體重'), menuCell('記生日', '例如 2020-01-01', '記生日')]],
+        alt: '補充基本資料'
+      }), '輸入「記體重」或「記生日」');
       return;
     }
 
     case 'petField': {
       if (!pet) {
-        try {
-          await replyMessages(env, event.replyToken, [{
-            type: 'text',
-            text: '先幫貓貓建立檔案，\n再記體重生日哦！',
-            quickReply: { items: [qrFill('🐱 幫貓貓建檔', '新增貓咪 ')] }
-          }]);
-        } catch (error) {
-          await replyOrPush(env, event, '先輸入「新增貓咪 名字」建立檔案哦！');
-        }
+        await updateUser(db, lineUserId, { pendingAction: 'petname' });
+        await replyOrPushFlex(env, event, namePromptCard(), '先幫貓貓建檔：直接打名字送出就好');
         return;
       }
       if (intent.field === 'birthday' && !intent.value) {
@@ -298,126 +484,72 @@ async function handleTextMessage(event, env, baseUrl) {
       }
       await updatePetFields(db, pet.petId, { [intent.field]: intent.value });
       const isWeight = intent.field === 'weightKg';
-      const doneText = isWeight
-        ? `已記下${pet.petName}的體重 ${intent.value} kg 🐾`
-        : `已記下${pet.petName}的生日 ${intent.value} 🐾`;
-      try {
-        await replyMessages(env, event.replyToken, [{
-          type: 'text',
-          text: doneText,
-          quickReply: { items: [
-            isWeight ? qrFill('記生日', '生日 ') : qrFill('記體重', '體重 '),
-            qrMsg('下一步：常吃的食物', '設定食物'),
-            qrMsg('開始記錄', '紀錄')
-          ] }
-        }]);
-      } catch (error) {
-        await replyOrPush(env, event, doneText);
-      }
+      await replyOrPushFlex(env, event, onboardCard({
+        title: isWeight ? `已記下${pet.petName}的體重 ${intent.value} kg 🐾` : `已記下${pet.petName}的生日 🐾`,
+        subtitle: isWeight ? '' : String(intent.value),
+        rows: [[
+          isWeight ? menuCell('記生日', '例如 2020-01-01', '記生日') : menuCell('記體重', '例如 4.2', '記體重'),
+          menuCell('完成', '開始使用', '完成設定')
+        ]],
+        alt: '已記下'
+      }), isWeight ? `已記下體重 ${intent.value} kg` : `已記下生日 ${intent.value}`);
       return;
     }
 
     case 'foodSetupMenu': {
-      try {
-        await replyMessages(env, event.replyToken, [{
-          type: 'text',
-          text: '先建常吃的食物，\n之後記錄會自動算熱量水分。\n\n點類型後打名字送出，\n想更準可以加每克熱量，\n例如：設定罐頭 主食罐 1.1',
-          quickReply: { items: [
-            qrFill('罐頭', '設定罐頭 '),
-            qrFill('乾糧', '設定乾糧 '),
-            qrFill('濕食', '設定濕食 '),
-            qrFill('零食', '設定零食 '),
-            qrMsg('跳過，下一步', '設定餵藥')
-          ] }
-        }]);
-      } catch (error) {
-        await replyOrPush(env, event, '建常吃的食物：\n設定罐頭 主食罐\n設定乾糧 品名 3.7');
-      }
+      await replyOrPushFlex(env, event, stepFoodCard('', '建好之後，記錄會自動算熱量和水分'), '建常吃的食物：輸入「設定罐頭」「設定乾糧」等');
+      return;
+    }
+
+    case 'foodSetupPrompt': {
+      await updateUser(db, lineUserId, { pendingAction: `food:${intent.foodType}` });
+      await replyOrPushFlex(env, event, onboardCard({
+        title: `這個${intent.foodType}叫什麼名字？`,
+        subtitle: '打名字就好；想更準可以加每克熱量，例如：主食罐 1.1',
+        rows: [[menuCell('跳過這題', '之後隨時可以建', '跳過')]],
+        alt: `這個${intent.foodType}叫什麼？`
+      }), `這個${intent.foodType}叫什麼名字？直接打名字送出`);
       return;
     }
 
     case 'foodSetup': {
       const foods = await listFoods(db, lineUserId);
       if (foods.some((food) => food.displayName === intent.name)) {
-        await replyOrPush(env, event, `「${intent.name}」已經建立過了，直接記錄就可以。`);
+        await replyOrPushFlex(env, event, doneCard(pet?.petName || '貓貓'), `「${intent.name}」已經建立過了，直接記錄就可以。`);
         return;
       }
-      // 預設值：罐頭/濕食 1.0 kcal/g、80% 水分；乾糧 3.7、8%；零食 3.0
-      const isWet = intent.foodType === '罐頭' || intent.foodType === '濕食';
-      const defaults = {
-        kcalPerGram: isWet ? 1.0 : (intent.foodType === '乾糧' ? 3.7 : 3.0),
-        waterRatio: isWet ? 0.8 : (intent.foodType === '乾糧' ? 0.08 : 0)
-      };
-      const kcalPerGram = intent.kcalPerGram > 0 ? intent.kcalPerGram : defaults.kcalPerGram;
-      await createFoodItem(db, lineUserId, {
-        displayName: intent.name,
-        foodType: intent.foodType,
-        kcalPerGram,
-        waterRatio: defaults.waterRatio,
-        note: intent.kcalPerGram > 0 ? '' : 'LINE 引導建立（預設值）'
-      });
-      const doneText = [
-        `已建立「${intent.name}」（${intent.foodType}）🐾`,
-        `每克 ${kcalPerGram} kcal・水分 ${Math.round(defaults.waterRatio * 100)}%`,
-        intent.kcalPerGram > 0 ? '' : '（預設值，照護站「設定→常吃的食物」可微調）'
-      ].filter(Boolean).join('\n');
-      try {
-        await replyMessages(env, event.replyToken, [{
-          type: 'text',
-          text: doneText,
-          quickReply: { items: [
-            qrMsg('再建一個', '設定食物'),
-            qrMsg('下一步：餵藥時段', '設定餵藥'),
-            qrMsg('開始記錄', '紀錄')
-          ] }
-        }]);
-      } catch (error) {
-        await replyOrPush(env, event, doneText);
-      }
+      const info = await createGuidedFood(db, lineUserId, intent.foodType, intent.name, intent.kcalPerGram);
+      await replyOrPushFlex(env, event, foodDoneCard(intent.name, intent.foodType, info), `已建立「${intent.name}」（${intent.foodType}）`);
       return;
     }
 
     case 'medSetupMenu': {
-      try {
-        await replyMessages(env, event.replyToken, [{
-          type: 'text',
-          text: `${pet ? pet.petName : '貓貓'}每天需要餵藥嗎？\n選了時段之後，\n今日確認和晚上提醒\n都會幫你看著。`,
-          quickReply: { items: [
-            qrMsg('早', '餵藥時段 早'),
-            qrMsg('早晚', '餵藥時段 早晚'),
-            qrMsg('早中晚', '餵藥時段 早中晚'),
-            qrMsg('只有晚上', '餵藥時段 晚'),
-            qrMsg('不用餵藥', '餵藥時段 不用')
-          ] }
-        }]);
-      } catch (error) {
-        await replyOrPush(env, event, '設定餵藥時段：\n餵藥時段 早晚\n（或「餵藥時段 不用」）');
-      }
+      await replyOrPushFlex(env, event, stepMedCard(pet ? pet.petName : '貓貓', ''), '設定餵藥時段：輸入「餵藥時段 早晚」或「餵藥時段 不用」');
       return;
     }
 
     case 'medSlots': {
       if (!pet) {
-        await replyOrPush(env, event, '先輸入「新增貓咪 名字」建立檔案哦！');
+        await updateUser(db, lineUserId, { pendingAction: 'petname' });
+        await replyOrPushFlex(env, event, namePromptCard(), '先幫貓貓建檔：直接打名字送出就好');
         return;
       }
       await updatePetFields(db, pet.petId, { goalMedSlots: JSON.stringify(intent.slots) });
-      const doneText = intent.slots.length
-        ? `好，每天會幫你確認\n${intent.slots.join('、')}的藥 🐾\n\n都準備好了！\n${pet.petName}的照護就交給我們一起。`
-        : `好，先不設定餵藥。\n\n都準備好了！\n${pet.petName}的照護就交給我們一起。`;
-      try {
-        await replyMessages(env, event.replyToken, [{
-          type: 'text',
-          text: doneText,
-          quickReply: { items: [
-            qrMsg('開始記錄', '紀錄'),
-            qrFill('再新增一隻貓', '新增貓咪 '),
-            qrMsg('開啟照護站', '照護站')
-          ] }
-        }]);
-      } catch (error) {
-        await replyOrPush(env, event, doneText);
-      }
+      const sub = intent.slots.length
+        ? `收到，每天會幫你確認${intent.slots.join('、')}的藥。最後一題——`
+        : '好，先不設定餵藥。最後一題——';
+      await replyOrPushFlex(env, event, stepFoodCard('第 3 步・共 3 步', `${sub}建好食物，記錄會自動算熱量水分`), '最後一題：最常吃哪種食物？輸入「設定罐頭」等');
+      return;
+    }
+
+    case 'skipStep': {
+      if (pet) await replyOrPushFlex(env, event, doneCard(pet.petName), '好，隨時打「水 60」開始記錄');
+      else await replyOrPushFlex(env, event, welcomeFlex(), welcomeText());
+      return;
+    }
+
+    case 'setupDone': {
+      await replyOrPushFlex(env, event, doneCard(pet?.petName || '貓貓'), '都準備好了！隨時打「水 60」開始記錄');
       return;
     }
 
@@ -446,30 +578,23 @@ async function handleTextMessage(event, env, baseUrl) {
     }
 
     case 'recordPrompt': {
-      // 記吃飯：列出自己建好的品項（快速回覆），點了自動填進輸入框，補克數送出即可
+      // 記吃飯：列出自己建好的品項（大按鈕卡），點了再打克數就記好
       if (intent.kind === 'food') {
         const foods = await listFoods(db, lineUserId);
-        if (foods.length && event.replyToken) {
-          const items = foods.slice(0, 13).map((food) => ({
-            type: 'action',
-            action: {
-              type: 'postback',
-              label: `${food.displayName}（${food.foodType}）`.slice(0, 20),
-              data: 'action=fillFood',
-              inputOption: 'openKeyboard',
-              fillInMessage: `${food.foodType} ${food.displayName} `
-            }
-          }));
-          try {
-            await replyMessages(env, event.replyToken, [{
-              type: 'text',
-              text: '想記哪一個品項？\n點了會自動填進輸入框，\n補上克數送出就記好。\n不在清單的直接打\n「罐頭 品名 30g」也可以。',
-              quickReply: { items }
-            }]);
-            return;
-          } catch (error) {
-            console.error('foodPick quickReply failed', error);
-          }
+        if (foods.length) {
+          const cells = foods.slice(0, 8).map((food) =>
+            menuCell(String(food.displayName).slice(0, 10), food.foodType, `${food.foodType} ${food.displayName}`));
+          const rows = [];
+          for (let i = 0; i < cells.length; i += 2) rows.push(cells.slice(i, i + 2));
+          rows.push([menuCell('建新的品項', '常吃的先建檔', '設定食物')]);
+          await replyOrPushFlex(env, event, onboardCard({
+            title: '想記哪一個品項？',
+            subtitle: '點了再告訴我幾克，就記好了',
+            rows,
+            hint: '不在清單的直接打「罐頭 品名 30g」也可以',
+            alt: '想記哪一個品項？'
+          }), recordPrompt('food'));
+          return;
         }
       }
       await replyOrPush(env, event, recordPrompt(intent.kind));
@@ -482,6 +607,11 @@ async function handleTextMessage(event, env, baseUrl) {
     }
 
     case 'invalid': {
+      if (intent.reason === 'missing_amount' && intent.category === 'food' && pet) {
+        await updateUser(db, lineUserId, { pendingAction: `amount|${text}` });
+        await replyOrPush(env, event, '幾克呢？直接打數字就好 🐾');
+        return;
+      }
       await replyOrPush(env, event, invalidReply(intent.reason, intent.category));
       return;
     }

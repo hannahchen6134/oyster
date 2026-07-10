@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS users (
   lineUserId TEXT PRIMARY KEY,
   displayName TEXT NOT NULL DEFAULT '',
   defaultPetId TEXT NOT NULL DEFAULT '',
+  pendingAction TEXT NOT NULL DEFAULT '',
   createdAt TEXT NOT NULL,
   updatedAt TEXT NOT NULL
 );
