@@ -134,24 +134,8 @@ function goalContents(pet, summary, date) {
   return contents;
 }
 
-function quickReply() {
-  const item = (label, textValue) => ({
-    type: 'action',
-    action: { type: 'message', label, text: textValue }
-  });
-  return {
-    items: [
-      item('📊 今天', '今天'),
-      item('📈 近7天', '近7天'),
-      item('🏥 回診', '回診'),
-      item('🔗 網站', '網站'),
-      item('📖 說明', '說明')
-    ]
-  };
-}
-
 function bubble(altText, contents) {
-  return { type: 'flex', altText: altText.slice(0, 390), contents, quickReply: quickReply() };
+  return { type: 'flex', altText: altText.slice(0, 390), contents };
 }
 
 // ---------- 記錄確認卡 ----------
