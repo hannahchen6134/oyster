@@ -176,9 +176,9 @@ function stepFoodCard(step = '第 3 步・共 3 步', subtitle = '建好之後�
     subtitle,
     rows: [
       [menuCell('罐頭', '主食罐/副食罐', '設定罐頭'), menuCell('乾糧', '飼料', '設定乾糧')],
-      [menuCell('濕食', '餐包/鮮食', '設定濕食'), menuCell('零食', '凍乾/肉泥', '設定零食')],
-      [menuCell('先跳過', '之後隨時可以建', '稍後再說')]
+      [menuCell('濕食', '餐包/鮮食', '設定濕食'), menuCell('零食', '凍乾/肉泥', '設定零食')]
     ],
+    skip: { label: '先跳過，之後再建', send: '稍後再說' },
     alt: '最常吃哪一種食物？'
   });
 }
@@ -201,7 +201,7 @@ function namePromptCard() {
     step: '第 1 步・共 3 步',
     title: '貓貓叫什麼名字？',
     subtitle: '直接打名字送出就好',
-    rows: [[menuCell('稍後再說', '先自己逛逛', '稍後再說')]],
+    skip: { label: '稍後再說', send: '稍後再說' },
     alt: '貓貓叫什麼名字？'
   });
 }
@@ -451,7 +451,7 @@ async function handleTextMessage(event, env, baseUrl) {
       await replyOrPushFlex(env, event, onboardCard({
         title: isWeight ? `${pet.petName}的體重是？` : `${pet.petName}的生日是哪天？`,
         subtitle: isWeight ? '直接打數字就好，例如 4.2' : '直接打日期就好，例如 2020-01-01',
-        rows: [[menuCell('跳過這題', '之後可以再填', '跳過')]],
+        skip: { label: '跳過這題', send: '跳過' },
         alt: isWeight ? '體重是？' : '生日是？'
       }), isWeight ? '直接打體重數字就好，例如 4.2' : '直接打生日就好，例如 2020-01-01');
       return;
@@ -506,7 +506,7 @@ async function handleTextMessage(event, env, baseUrl) {
       await replyOrPushFlex(env, event, onboardCard({
         title: `這個${intent.foodType}叫什麼名字？`,
         subtitle: '打名字就好；想更準可以加每克熱量，例如：主食罐 1.1',
-        rows: [[menuCell('跳過這題', '之後隨時可以建', '跳過')]],
+        skip: { label: '跳過這題', send: '跳過' },
         alt: `這個${intent.foodType}叫什麼？`
       }), `這個${intent.foodType}叫什麼名字？直接打名字送出`);
       return;

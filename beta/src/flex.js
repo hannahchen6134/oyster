@@ -256,7 +256,7 @@ export function websiteFlex(url) {
 }
 
 // ---------- 引導流程卡（喵爸媽安心上手：一張卡一件事、大按鈕） ----------
-export function onboardCard({ step = '', title, subtitle = '', rows = [], hint = '', alt = '' }) {
+export function onboardCard({ step = '', title, subtitle = '', rows = [], hint = '', alt = '', skip = null }) {
   const contents = [];
   if (step) contents.push(text(step, { size: 'xxs', color: C.brand, weight: 'bold', align: 'center' }));
   contents.push(text(title, { size: 'lg', weight: 'bold', color: C.ink, align: 'center', wrap: true, margin: step ? 'md' : 'none' }));
@@ -265,6 +265,13 @@ export function onboardCard({ step = '', title, subtitle = '', rows = [], hint =
     contents.push({ type: 'box', layout: 'horizontal', spacing: 'md', margin: 'md', contents: cells });
   }
   if (hint) contents.push(text(hint, { size: 'xxs', color: C.muted, align: 'center', wrap: true, margin: 'lg' }));
+  if (skip) {
+    contents.push({
+      type: 'box', layout: 'vertical', margin: 'lg', paddingAll: '6px',
+      action: { type: 'message', label: skip.label, text: skip.send },
+      contents: [text(`${skip.label} ›`, { size: 'xs', color: C.muted, align: 'center' })]
+    });
+  }
   return bubble(alt || title, {
     type: 'bubble', size: 'mega', header: header('喵爸媽安心上手'),
     body: { type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG, contents }
