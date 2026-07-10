@@ -21,10 +21,11 @@ const H = 1686;
 const colW = Math.round(W / 3); // 833
 const rowH = H / 2;             // 843
 
-const cell = (col, row, text) => ({
+const cell = (col, row, action) => ({
   bounds: { x: col * colW, y: row * rowH, width: col === 2 ? W - 2 * colW : colW, height: rowH },
-  action: { type: 'message', text }
+  action
 });
+const send = (text) => ({ type: 'message', text });
 
 const menu = {
   size: { width: W, height: H },
@@ -32,12 +33,13 @@ const menu = {
   name: MENU_NAME,
   chatBarText: '選單',
   areas: [
-    cell(0, 0, '今天'),
-    cell(1, 0, '月曆'),
-    cell(2, 0, '近7天'),
-    cell(0, 1, '回診'),
-    cell(1, 1, '網站'),
-    cell(2, 1, '說明')
+    cell(0, 0, send('今天')),
+    cell(1, 0, send('月曆')),
+    cell(2, 0, send('近7天')),
+    // 喵喵照護站：直接開網站（已登入的手機一點就進資料頁）
+    cell(0, 1, { type: 'uri', uri: 'https://cat-care-beta.hannahchen6134.workers.dev/' }),
+    cell(1, 1, send('網站')),
+    cell(2, 1, send('說明'))
   ]
 };
 
