@@ -189,9 +189,10 @@ function doneCard(petName) {
     subtitle: `現在試試看：直接打「水 60」，就幫${petName}記下第一筆`,
     rows: [
       [menuCell('快速紀錄', '點按鈕記錄', '紀錄'), menuCell('今日確認', '看今天狀況', '今天')],
-      [menuCell('補體重生日', '選填', '補體重生日'), menuCell('再新增一隻貓', '多貓家庭', '幫貓貓建檔')],
+      [menuCell('補體重年齡', '選填', '補體重年齡'), menuCell('再新增一隻貓', '多貓家庭', '幫貓貓建檔')],
       [menuCell('開啟照護站', '月曆・回診・設定', '照護站', true)]
     ],
+    hint: '疾病、疫苗、醫院醫生等詳細資料，之後可在照護站的「設定」頁慢慢記錄',
     alt: '都準備好了！'
   });
 }
@@ -204,6 +205,12 @@ function namePromptCard() {
     skip: { label: '稍後再說', send: '稍後再說' },
     alt: '貓貓叫什麼名字？'
   });
+}
+
+// 年齡（歲）→ 概略生日（以台北今天往回推 N 年）
+function birthdayFromAge(age) {
+  const today = taipeiToday();
+  return `${Number(today.slice(0, 4)) - age}${today.slice(4)}`;
 }
 
 // 引導建立食物：預設值（罐頭/濕食 1.0 kcal/g・80% 水分；乾糧 3.7・8%；零食 3.0）
@@ -275,26 +282,29 @@ async function handlePending(env, event, { db, user, pet, pets, lineUserId, text
     await clear();
     await replyOrPushFlex(env, event, onboardCard({
       title: `已記下${pet.petName}的體重 ${m[1]} kg 🐾`,
-      rows: [[menuCell('記生日', '例如 2020-01-01', '記生日'), menuCell('完成', '開始使用', '完成設定')]]
+      rows: [[menuCell('記年齡', '大約幾歲', '記年齡'), menuCell('完成', '開始使用', '完成設定')]]
     }), `已記下體重 ${m[1]} kg`);
     return true;
   }
 
   if (pending === 'birthday' && pet) {
+    const age = text.match(/^(\d{1,2})\s*歲?$/);
     const d = text.match(/^(\d{4})[年\/\-.](\d{1,2})[月\/\-.](\d{1,2})日?$/);
-    if (!d) {
+    if (!age && !d) {
       if (asIntent.type !== 'unknown') { await clear(); return false; }
-      await replyOrPush(env, event, '生日格式像這樣：2020-01-01\n（打「跳過」可以略過）');
+      await replyOrPush(env, event, '直接打大約幾歲就可以，例如 5\n（知道生日也可以打 2020-01-01；「跳過」可略過）');
       return true;
     }
-    const value = `${d[1]}-${String(d[2]).padStart(2, '0')}-${String(d[3]).padStart(2, '0')}`;
+    const value = age
+      ? birthdayFromAge(Number(age[1]))
+      : `${d[1]}-${String(d[2]).padStart(2, '0')}-${String(d[3]).padStart(2, '0')}`;
     await updatePetFields(db, pet.petId, { birthday: value });
     await clear();
     await replyOrPushFlex(env, event, onboardCard({
-      title: `已記下${pet.petName}的生日 🐾`,
-      subtitle: value,
+      title: age ? `已記下${pet.petName}約 ${age[1]} 歲 🐾` : `已記下${pet.petName}的生日 🐾`,
+      subtitle: age ? `生日先記為 ${value}，照護站可調整` : value,
       rows: [[menuCell('記體重', '例如 4.2', '記體重'), menuCell('完成', '開始使用', '完成設定')]]
-    }), `已記下生日 ${value}`);
+    }), age ? `已記下約 ${age[1]} 歲` : `已記下生日 ${value}`);
     return true;
   }
 
@@ -449,11 +459,11 @@ async function handleTextMessage(event, env, baseUrl) {
       const isWeight = intent.field === 'weightKg';
       await updateUser(db, lineUserId, { pendingAction: isWeight ? 'weight' : 'birthday' });
       await replyOrPushFlex(env, event, onboardCard({
-        title: isWeight ? `${pet.petName}的體重是？` : `${pet.petName}的生日是哪天？`,
-        subtitle: isWeight ? '直接打數字就好，例如 4.2' : '直接打日期就好，例如 2020-01-01',
+        title: isWeight ? `${pet.petName}的體重是？` : `${pet.petName}大約幾歲？`,
+        subtitle: isWeight ? '直接打數字就好，例如 4.2' : '直接打數字就好，例如 5（知道生日也可以打 2020-01-01）',
         skip: { label: '跳過這題', send: '跳過' },
-        alt: isWeight ? '體重是？' : '生日是？'
-      }), isWeight ? '直接打體重數字就好，例如 4.2' : '直接打生日就好，例如 2020-01-01');
+        alt: isWeight ? '體重是？' : '大約幾歲？'
+      }), isWeight ? '直接打體重數字就好，例如 4.2' : '直接打大約幾歲，例如 5');
       return;
     }
 
@@ -466,7 +476,7 @@ async function handleTextMessage(event, env, baseUrl) {
       await replyOrPushFlex(env, event, onboardCard({
         title: '補充基本資料',
         subtitle: '選填，之後在照護站也都能改',
-        rows: [[menuCell('記體重', '例如 4.2', '記體重'), menuCell('記生日', '例如 2020-01-01', '記生日')]],
+        rows: [[menuCell('記體重', '例如 4.2', '記體重'), menuCell('記年齡', '大約幾歲', '記年齡')]],
         alt: '補充基本資料'
       }), '輸入「記體重」或「記生日」');
       return;
@@ -479,20 +489,22 @@ async function handleTextMessage(event, env, baseUrl) {
         return;
       }
       if (intent.field === 'birthday' && !intent.value) {
-        await replyOrPush(env, event, '生日這樣記：\n生日 2020-01-01\n（年-月-日）');
+        await replyOrPush(env, event, '生日這樣記：\n生日 2020-01-01\n（或「年齡 5」記大約歲數）');
         return;
       }
-      await updatePetFields(db, pet.petId, { [intent.field]: intent.value });
-      const isWeight = intent.field === 'weightKg';
+      const field = intent.field === 'age' ? 'birthday' : intent.field;
+      const value = intent.field === 'age' ? birthdayFromAge(intent.value) : intent.value;
+      await updatePetFields(db, pet.petId, { [field]: value });
+      const isWeight = field === 'weightKg';
       await replyOrPushFlex(env, event, onboardCard({
-        title: isWeight ? `已記下${pet.petName}的體重 ${intent.value} kg 🐾` : `已記下${pet.petName}的生日 🐾`,
-        subtitle: isWeight ? '' : String(intent.value),
+        title: isWeight ? `已記下${pet.petName}的體重 ${value} kg 🐾` : `已記下${pet.petName}的生日 🐾`,
+        subtitle: isWeight ? '' : String(value),
         rows: [[
-          isWeight ? menuCell('記生日', '例如 2020-01-01', '記生日') : menuCell('記體重', '例如 4.2', '記體重'),
+          isWeight ? menuCell('記年齡', '大約幾歲', '記年齡') : menuCell('記體重', '例如 4.2', '記體重'),
           menuCell('完成', '開始使用', '完成設定')
         ]],
         alt: '已記下'
-      }), isWeight ? `已記下體重 ${intent.value} kg` : `已記下生日 ${intent.value}`);
+      }), isWeight ? `已記下體重 ${value} kg` : `已記下生日 ${value}`);
       return;
     }
 

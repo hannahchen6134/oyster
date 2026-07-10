@@ -139,8 +139,8 @@ export function parseMessage(rawText) {
   // 引導建檔：按鈕觸發的步驟
   if (['幫貓貓建檔', '開始建檔', '建立貓咪檔案'].includes(compact)) return { type: 'petNamePrompt' };
   if (['記體重', '補體重'].includes(compact)) return { type: 'petFieldPrompt', field: 'weightKg' };
-  if (['記生日', '補生日'].includes(compact)) return { type: 'petFieldPrompt', field: 'birthday' };
-  if (compact === '補體重生日') return { type: 'petExtraMenu' };
+  if (['記生日', '補生日', '記年齡', '補年齡'].includes(compact)) return { type: 'petFieldPrompt', field: 'birthday' };
+  if (['補體重生日', '補體重年齡'].includes(compact)) return { type: 'petExtraMenu' };
   const foodPromptMatch = compact.match(/^設定(罐頭|乾糧|濕食|零食)$/);
   if (foodPromptMatch) return { type: 'foodSetupPrompt', foodType: foodPromptMatch[1] };
   if (['稍後再說', '先跳過', '跳過'].includes(compact)) return { type: 'skipStep' };
@@ -178,6 +178,10 @@ export function parseMessage(rawText) {
   const weightMatch = text.match(/^體重\s*([0-9.]+)\s*(?:kg|公斤)?$/i);
   if (weightMatch) {
     return { type: 'petField', field: 'weightKg', value: Number(weightMatch[1]) };
+  }
+  const ageMatch = text.match(/^年齡\s*(\d{1,2})\s*歲?$/);
+  if (ageMatch) {
+    return { type: 'petField', field: 'age', value: Number(ageMatch[1]) };
   }
   const birthdayMatch = text.match(/^生日\s*(.*)$/);
   if (birthdayMatch) {
