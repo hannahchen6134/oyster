@@ -13,25 +13,25 @@
        光線是柔的：紙面浮在桌上、多層淡影、焦點與主按鈕帶光暈。
        朱紅只做印章：今天、異常，別處不出現。 */
     :root {
-      --paper-hi: #f3f1eb;       /* 桌面受光處 */
-      --paper: #e9e7df;          /* 桌面 */
+      --paper-hi: #f5efe3;       /* 桌面受光處 */
+      --paper: #eae3d3;          /* 桌面 */
       --sheet: #fdfdfb;          /* 紙面 */
-      --sheet-soft: #f8f7f2;
+      --sheet-soft: #f7f4ec;
       --ink: #1b1d1a;
       --ink-soft: #4c5049;
       --muted: #878b80;
       --line: #e2e0d6;           /* 規線 */
       --line-strong: #b8bbac;
-      --green: #23523f;          /* 松綠：結構與行動 */
-      --green-tint: #edf2ec;
+      --brand: #734921;          /* 松綠：結構與行動 */
+      --brand-tint: #f4ede0;
       --seal: #bf3b20;           /* 朱紅：印章，僅今天與異常 */
       --seal-tint: #f9ebe5;
       --serif: "Noto Serif TC", "Songti TC", "PMingLiU", serif;
       --radius: 10px;
       --radius-sm: 7px;
-      --shadow-soft: 0 1px 2px rgba(27, 29, 26, 0.04), 0 6px 18px rgba(27, 29, 26, 0.05);
-      --shadow-lift: 0 1px 3px rgba(27, 29, 26, 0.06), 0 14px 38px rgba(27, 29, 26, 0.09), 0 36px 90px rgba(27, 29, 26, 0.07);
-      --glow-green: 0 0 0 3px rgba(35, 82, 63, 0.13), 0 4px 14px rgba(35, 82, 63, 0.18);
+      --shadow-soft: 0 1px 2px rgba(58, 42, 24, 0.05), 0 7px 20px rgba(115, 73, 33, 0.07);
+      --shadow-lift: 0 1px 3px rgba(58, 42, 24, 0.06), 0 14px 38px rgba(58, 42, 24, 0.10), 0 36px 90px rgba(115, 73, 33, 0.08);
+      --glow-brand: 0 0 0 3px rgba(115, 73, 33, 0.13), 0 5px 16px rgba(115, 73, 33, 0.22);
     }
     * { box-sizing: border-box; }
     html { -webkit-text-size-adjust: 100%; background: var(--paper); }
@@ -43,7 +43,7 @@
       line-height: 1.7;
       color: var(--ink);
       background:
-        radial-gradient(1100px 480px at 50% -120px, rgba(255, 255, 255, 0.75), transparent 70%),
+        radial-gradient(1100px 480px at 50% -120px, rgba(255, 251, 242, 0.95), transparent 72%),
         linear-gradient(180deg, var(--paper-hi) 0%, var(--paper) 55%);
       background-attachment: fixed;
     }
@@ -75,6 +75,8 @@
       white-space: nowrap;
     }
     .colophon::before, .colophon::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+    .colophon .paw { width: 17px; height: 15px; flex: none; }
+    .login-cat { width: 132px; margin: 0 auto 10px; display: block; opacity: 0.92; }
 
     h1 {
       margin: 0; font-family: var(--serif); font-weight: 700;
@@ -93,7 +95,7 @@
     .topbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
     .topbar .spacer { flex: 1; }
     .eyebrow {
-      display: inline-block; color: var(--green); font-size: 11px; font-weight: 600;
+      display: inline-block; color: var(--brand); font-size: 11px; font-weight: 600;
       letter-spacing: 0.3em; text-transform: uppercase;
     }
     .page-head { padding-top: 4px; }
@@ -108,10 +110,10 @@
       transition: color 0.15s;
     }
     .tab:hover { color: var(--ink); }
-    .tab.active { color: var(--ink); font-weight: 600; border-bottom-color: var(--green); }
+    .tab.active { color: var(--ink); font-weight: 600; border-bottom-color: var(--brand); }
     .tab:focus-visible {
       outline: none; border-radius: var(--radius-sm);
-      box-shadow: 0 0 0 3px rgba(35, 82, 63, 0.22);
+      box-shadow: 0 0 0 3px rgba(115, 73, 33, 0.22);
     }
 
     input, select, textarea, button { font: inherit; }
@@ -122,8 +124,8 @@
     }
     textarea { min-height: 72px; resize: vertical; }
     input:focus, select:focus, textarea:focus {
-      outline: none; border-color: var(--green);
-      box-shadow: inset 0 1px 2px rgba(27, 29, 26, 0.03), 0 0 0 3px rgba(35, 82, 63, 0.12);
+      outline: none; border-color: var(--brand);
+      box-shadow: inset 0 1px 2px rgba(27, 29, 26, 0.03), 0 0 0 3px rgba(115, 73, 33, 0.12);
     }
     label {
       font-size: 11.5px; font-weight: 600; letter-spacing: 0.14em; color: var(--ink-soft);
@@ -135,10 +137,10 @@
       transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
     }
     .btn-primary {
-      background: linear-gradient(180deg, #2b604a, var(--green)); color: #fff;
-      box-shadow: 0 1px 2px rgba(27, 29, 26, 0.15), 0 6px 16px rgba(35, 82, 63, 0.28);
+      background: linear-gradient(180deg, #8a5a2c, var(--brand)); color: #fff;
+      box-shadow: 0 1px 2px rgba(27, 29, 26, 0.15), 0 6px 16px rgba(115, 73, 33, 0.28);
     }
-    .btn-primary:hover { background: linear-gradient(180deg, #24523f, #1a3f30); box-shadow: var(--glow-green); }
+    .btn-primary:hover { background: linear-gradient(180deg, #734921, #5a3617); box-shadow: var(--glow-brand); }
     .btn-secondary {
       background: var(--sheet); border-color: var(--line-strong); color: var(--ink-soft);
       box-shadow: 0 1px 2px rgba(27, 29, 26, 0.05);
@@ -147,7 +149,7 @@
     .btn-danger { background: transparent; color: var(--seal); }
     .btn-danger:hover { background: var(--seal-tint); }
     .btn-sm { padding: 5px 12px; font-size: 13px; }
-    .btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(35, 82, 63, 0.25); }
+    .btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(115, 73, 33, 0.25); }
     .grid { display: grid; gap: 10px; }
     .grid-2 { grid-template-columns: 1fr 1fr; }
     .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -156,7 +158,7 @@
     .stat-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
     .card {
       padding: 15px 17px 13px; border-radius: var(--radius);
-      background: linear-gradient(180deg, #ffffff, var(--sheet-soft));
+      background: linear-gradient(180deg, #ffffff 0%, var(--sheet-soft) 100%);
       border: 1px solid var(--line); box-shadow: var(--shadow-soft);
     }
     .stat-label { color: var(--muted); font-size: 11.5px; font-weight: 600; letter-spacing: 0.16em; }
@@ -193,7 +195,7 @@
     .entry-actions { display: flex; gap: 4px; }
     /* 區塊卡：每個段落用柔影優雅區隔 */
     .block {
-      background: linear-gradient(180deg, #ffffff, var(--sheet-soft));
+      background: linear-gradient(180deg, #ffffff 0%, var(--sheet-soft) 100%);
       border: 1px solid var(--line); border-radius: var(--radius);
       box-shadow: var(--shadow-soft);
       padding: 18px 20px; margin-top: 24px;
@@ -201,11 +203,11 @@
     .block .section-head { margin-top: 0; margin-bottom: 10px; }
     .block .empty { background: none; border: none; padding: 18px 8px; }
     /* 類別色：低飽和的莫蘭迪色分類 */
-    .chip-water { background: #edf3f6; color: #47708a; border-color: #cfdfe8; }
+    .chip-water { background: #eef1e1; color: #5d6c36; border-color: #dae0c3; }
     .chip-dry { background: #f5f1e3; color: #7a662f; border-color: #e3d9bd; }
     .chip-wet { background: #f7efe4; color: #8a5e35; border-color: #e8d7c0; }
     .chip-kcal { background: #f8f2e5; color: #91702f; border-color: #ecdfc0; }
-    .chip-med { background: var(--green-tint); color: var(--green); border-color: rgba(35, 82, 63, 0.3); }
+    .chip-med { background: var(--brand-tint); color: var(--brand); border-color: rgba(115, 73, 33, 0.35); }
     .chip-neutral { background: var(--sheet-soft); color: var(--ink-soft); border-color: var(--line-strong); }
     .empty {
       padding: 30px 20px; border: 1px dashed var(--line-strong); border-radius: var(--radius);
@@ -213,9 +215,9 @@
     }
     .doctor-note {
       margin-top: 20px; padding: 16px 20px;
-      border: 1px solid rgba(35, 82, 63, 0.14); border-left: 3px solid var(--green);
+      border: 1px solid rgba(115, 73, 33, 0.14); border-left: 3px solid var(--brand);
       border-radius: var(--radius-sm) var(--radius) var(--radius) var(--radius-sm);
-      background: linear-gradient(135deg, var(--green-tint), rgba(255, 255, 255, 0.7));
+      background: linear-gradient(135deg, var(--brand-tint), rgba(255, 255, 255, 0.7));
       box-shadow: var(--shadow-soft);
       line-height: 1.75; color: var(--ink-soft); font-size: 14px;
     }
@@ -224,9 +226,9 @@
     .section-head h2 { margin: 0; flex: 1; }
     .visit-item {
       display: flex; align-items: flex-start; gap: 12px; padding: 13px 16px;
-      border: 1px solid rgba(35, 82, 63, 0.14); border-left: 3px solid var(--green);
+      border: 1px solid rgba(115, 73, 33, 0.14); border-left: 3px solid var(--brand);
       border-radius: var(--radius-sm) var(--radius) var(--radius) var(--radius-sm);
-      background: linear-gradient(180deg, #ffffff, var(--green-tint));
+      background: linear-gradient(180deg, #ffffff, var(--brand-tint));
       box-shadow: var(--shadow-soft);
     }
     .visit-item .info { flex: 1; min-width: 0; }
@@ -243,17 +245,17 @@
     }
     /* 月誌慣例：週日朱、週六綠 */
     .cal-dow:nth-child(1) { color: rgba(191, 59, 32, 0.7); }
-    .cal-dow:nth-child(7) { color: rgba(35, 82, 63, 0.75); }
+    .cal-dow:nth-child(7) { color: rgba(106, 116, 64, 0.85); }
     .cal-cell:nth-child(7n+8):not(.today) .cal-daynum { color: rgba(191, 59, 32, 0.8); }
-    .cal-cell:nth-child(7n+14):not(.today) .cal-daynum { color: rgba(35, 82, 63, 0.85); }
+    .cal-cell:nth-child(7n+14):not(.today) .cal-daynum { color: rgba(106, 116, 64, 0.95); }
     .cal-cell {
       min-height: 84px; border-radius: var(--radius); border: 1px solid var(--line);
-      background: linear-gradient(180deg, #ffffff, var(--sheet-soft));
+      background: linear-gradient(180deg, #ffffff 0%, var(--sheet-soft) 100%);
       box-shadow: 0 1px 2px rgba(27, 29, 26, 0.03);
       padding: 7px 9px; font-size: 11px; cursor: pointer;
       overflow: hidden; transition: box-shadow 0.15s, border-color 0.15s;
     }
-    .cal-cell:hover { border-color: rgba(35, 82, 63, 0.55); box-shadow: var(--shadow-soft); }
+    .cal-cell:hover { border-color: rgba(115, 73, 33, 0.55); box-shadow: var(--shadow-soft); }
     .cal-cell.blank { visibility: hidden; }
     .cal-daynum {
       font-family: var(--serif); font-weight: 600; font-size: 16px; font-variant-numeric: tabular-nums;
@@ -343,7 +345,7 @@
     .login-steps { margin: 28px auto 0; max-width: 320px; text-align: left; }
     .login-step { display: flex; gap: 14px; align-items: baseline; padding: 11px 2px; border-bottom: 1px solid var(--line); }
     .login-step:last-child { border-bottom: none; }
-    .login-step .num { font-family: var(--serif); color: var(--green); font-weight: 600; font-size: 15px; }
+    .login-step .num { font-family: var(--serif); color: var(--brand); font-weight: 600; font-size: 15px; }
 
     @media (max-width: 760px) {
       .shell { padding-top: 14px; }
@@ -364,6 +366,15 @@
     <!-- 登入畫面 -->
     <section id="loginView" class="login-wrap hidden">
       <div class="panel login-card">
+        <svg class="login-cat" viewBox="0 0 140 90" fill="none" stroke="var(--brand)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M30 66 C16 52 24 28 52 24 C76 20 96 28 100 44 C103 56 95 64 82 66 C62 70 44 70 30 66 Z"/>
+          <circle cx="103" cy="38" r="15"/>
+          <path d="M92 28 L89 16 L100 24"/>
+          <path d="M108 25 L114 14 L117 27"/>
+          <path d="M97 39 q3 2.5 6 0"/>
+          <path d="M107 39 q3 2.5 6 0"/>
+          <path d="M30 66 C20 66 15 58 21 52 C25 48 31 50 30 56"/>
+        </svg>
         <div class="eyebrow">Cat Care · Beta</div>
         <h1 style="margin-top:14px">貓貓照護站</h1>
         <p class="muted" style="margin-top:10px">請先從 LINE 取得登入連結</p>
@@ -489,7 +500,7 @@
         <div class="grid" id="settingsList"></div>
       </section>
 
-      <footer class="colophon">輕鬆記錄守護毛孩</footer>
+      <footer class="colophon"><svg class="paw" viewBox="0 0 18 16" aria-hidden="true"><ellipse cx="9" cy="11" rx="4.2" ry="3.4" fill="var(--brand)" opacity="0.75"/><circle cx="3.4" cy="6.4" r="1.9" fill="var(--brand)" opacity="0.55"/><circle cx="9" cy="4.6" r="1.9" fill="var(--brand)" opacity="0.55"/><circle cx="14.6" cy="6.4" r="1.9" fill="var(--brand)" opacity="0.55"/></svg>輕鬆記錄守護毛孩</footer>
     </div>
   </div>
 
@@ -1058,7 +1069,7 @@
       if (refHigh > 0) {
         const top = Math.max(padT, y(Math.min(refHigh, yMax)));
         const bottom = Math.min(padT + innerH, y(Math.max(refLow, yMin)));
-        band = `<rect x="${padL}" y="${top.toFixed(1)}" width="${innerW}" height="${Math.max(0, bottom - top).toFixed(1)}" fill="var(--green-tint)" opacity="0.8"></rect>`;
+        band = `<rect x="${padL}" y="${top.toFixed(1)}" width="${innerW}" height="${Math.max(0, bottom - top).toFixed(1)}" fill="var(--brand-tint)" opacity="0.8"></rect>`;
       }
       let grid = `<line x1="${padL}" y1="${padT + innerH}" x2="${W - padR}" y2="${padT + innerH}" stroke="var(--line-strong)" stroke-width="1"></line>`;
       grid += `<text x="${padL - 6}" y="${y(yMax) + 9}" text-anchor="end" font-size="10" fill="var(--muted)">${fmt(yMax)}</text>`;
