@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS pets (
   birthday TEXT NOT NULL DEFAULT '',
   breed TEXT NOT NULL DEFAULT '',
   weightKg REAL NOT NULL DEFAULT 0,
+  chipNumber TEXT NOT NULL DEFAULT '',
   conditionNote TEXT NOT NULL DEFAULT '',
   vaccineNote TEXT NOT NULL DEFAULT '',
   defaultVetId TEXT NOT NULL DEFAULT '',

@@ -284,7 +284,7 @@
       min-height: 84px; border-radius: var(--radius); border: 1px solid var(--line);
       background: linear-gradient(180deg, #ffffff 0%, var(--sheet-soft) 100%);
       box-shadow: 0 1px 2px rgba(27, 29, 26, 0.03);
-      padding: 7px 9px; font-size: 11px; cursor: pointer;
+      padding: 7px 8px 8px; font-size: 11px; cursor: pointer;
       overflow: hidden; transition: box-shadow 0.15s, border-color 0.15s;
     }
     .cal-cell:hover { border-color: rgba(115, 73, 33, 0.55); box-shadow: var(--shadow-soft); }
@@ -298,8 +298,26 @@
     .cal-cell.today { border-color: rgba(191, 59, 32, 0.35); }
     .cal-cell.norec { background: transparent; box-shadow: none; color: var(--muted); }
     .cal-cell.warn { background: linear-gradient(180deg, #fdf3ef, var(--seal-tint)); border-color: rgba(191, 59, 32, 0.22); }
-    .cal-line { margin-top: 2px; white-space: nowrap; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
-    .cal-flags { margin-top: 2px; font-size: 11.5px; }
+    /* 數字為主：上排水分（橄欖綠）、下排熱量（琥珀棕），右對齊等寬字 */
+    .cal-num {
+      display: block; text-align: right; margin-top: 3px;
+      font-size: 11.5px; font-weight: 600; line-height: 1.3;
+      font-variant-numeric: tabular-nums; letter-spacing: 0.02em;
+    }
+    .cal-num.water { color: #55652f; }
+    .cal-num.kcal { color: #9c5f28; }
+    /* 事件標記：質感小色點取代 emoji */
+    .cal-dots { display: flex; gap: 4px; margin-top: 5px; align-items: center; min-height: 6px; }
+    .cdot { width: 6px; height: 6px; border-radius: 50%; flex: none; }
+    .cdot-med { background: var(--brand); }
+    .cdot-vomit { background: var(--seal); }
+    .cdot-stool { background: #A98657; }
+    .cdot-visit { width: 7px; height: 7px; background: transparent; border: 1.6px solid var(--brand); }
+    .cal-legend {
+      display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center;
+      margin-top: 14px; font-size: 12px; color: var(--muted);
+    }
+    .cal-legend .cdot { display: inline-block; margin-right: 5px; vertical-align: 1px; }
 
     /* 表格：表頭墨線、列規線 */
     .table-wrap { overflow-x: auto; }
@@ -497,7 +515,8 @@
       .section-head { margin-top: 34px; }
       .entry { grid-template-columns: 1fr; gap: 6px; padding: 15px 2px; }
       .entry-actions { flex-direction: row; }
-      .cal-cell { min-height: 64px; padding: 4px 5px; }
+      .cal-cell { min-height: 74px; padding: 5px 6px 7px; }
+      .cal-num { font-size: 11px; }
       .colophon { margin-top: 44px; }
     }
   </style>
@@ -611,7 +630,16 @@
           <button class="btn btn-secondary btn-sm" id="calNextBtn" type="button">下月 ›</button>
         </div>
         <div class="cal-grid" id="calGrid"></div>
-        <p class="muted" style="margin-top:14px;font-size:12.5px">💧 水分・🔥 熱量・💊 藥・⚠️ 留意・🤮 吐・💩 便・🏥 回診　點任一天可查看當日明細</p>
+        <div class="cal-legend">
+          <span><span class="cal-num water" style="display:inline">273</span>＝水分 ml</span>
+          <span><span class="cal-num kcal" style="display:inline">180</span>＝熱量 kcal</span>
+          <span><span class="cdot cdot-med"></span>藥</span>
+          <span><span class="cdot cdot-vomit"></span>吐</span>
+          <span><span class="cdot cdot-stool"></span>便</span>
+          <span><span class="cdot cdot-visit"></span>回診</span>
+          <span>淡紅底＝有需要留意的紀錄</span>
+        </div>
+        <p class="muted" style="margin-top:8px;font-size:12px">點任一天可查看當日明細</p>
       </section>
 
       <!-- 回診 -->
@@ -1166,19 +1194,18 @@
       for (let day = 1; day <= daysInMonth; day += 1) {
         const date = `${state.calMonth}-${String(day).padStart(2, '0')}`;
         const row = byDate[date];
-        const flags = [];
-        if (row?.medTakenCount) flags.push('💊');
-        if (row?.medIssueCount) flags.push('⚠️');
-        if (row?.vomitCount) flags.push('🤮');
-        if (row?.stoolCount) flags.push('💩');
-        if (visitDates.has(date)) flags.push('🏥');
+        const dots = [];
+        if (row?.medTakenCount || row?.medIssueCount) dots.push('<span class="cdot cdot-med"></span>');
+        if (row?.vomitCount) dots.push('<span class="cdot cdot-vomit"></span>');
+        if (row?.stoolCount) dots.push('<span class="cdot cdot-stool"></span>');
+        if (visitDates.has(date)) dots.push('<span class="cdot cdot-visit"></span>');
         const hasRecord = row && row.entryCount > 0;
         const isWarn = row && (row.vomitCount > 0 || row.medIssueCount > 0);
         html += `
           <div class="cal-cell ${date === today ? 'today' : ''} ${hasRecord ? '' : 'norec'} ${isWarn ? 'warn' : ''}" data-date="${date}">
             <div class="cal-daynum">${day}</div>
-            ${hasRecord ? `<div class="cal-line">💧${fmtInt(row.totalWaterMl)}</div><div class="cal-line">🔥${fmtInt(row.kcal)}</div>` : ''}
-            ${flags.length ? `<div class="cal-flags">${flags.join('')}</div>` : ''}
+            ${hasRecord ? `<span class="cal-num water">${fmtInt(row.totalWaterMl)}</span><span class="cal-num kcal">${fmtInt(row.kcal)}</span>` : ''}
+            ${dots.length ? `<div class="cal-dots">${dots.join('')}</div>` : ''}
           </div>`;
       }
       $('calGrid').innerHTML = html;
@@ -1536,12 +1563,13 @@
           { name: 'birthday', label: '生日', type: 'date' },
           { name: 'breed', label: '品種' },
           { name: 'weightKg', label: '體重（kg）', type: 'number' },
+          { name: 'chipNumber', label: '晶片號碼' },
           { name: 'conditionNote', label: '疾病備註', type: 'textarea' },
           { name: 'vaccineNote', label: '疫苗備註', type: 'textarea' }
         ],
         render: (row) => ({
           title: `${row.petName}（${row.species}）`,
-          sub: [row.breed, row.weightKg ? `${row.weightKg} kg` : '', row.conditionNote].filter(Boolean).join('｜') || '—'
+          sub: [row.breed, row.weightKg ? `${row.weightKg} kg` : '', row.chipNumber ? `晶片 ${row.chipNumber}` : '', row.conditionNote].filter(Boolean).join('｜') || '—'
         })
       },
       foods: {
