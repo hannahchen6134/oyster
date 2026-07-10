@@ -62,6 +62,40 @@ export async function pushText(env, to, text) {
   });
 }
 
+export async function replyMessages(env, replyToken, messages) {
+  await callLineApi(env, '/message/reply', { replyToken, messages });
+}
+
+export async function pushMessages(env, to, messages) {
+  await callLineApi(env, '/message/push', { to, messages });
+}
+
+// Flex 卡片備援鏈：reply 卡片 → reply 純文字 → push 卡片 → push 純文字
+export async function replyOrPushFlex(env, event, flexMessage, fallbackText) {
+  const targetId = String(event?.source?.userId || '').trim();
+  if (event?.replyToken) {
+    try {
+      await replyMessages(env, event.replyToken, [flexMessage]);
+      return;
+    } catch (error) {
+      console.warn('flex reply failed:', error.message);
+      try {
+        await replyText(env, event.replyToken, fallbackText);
+        return;
+      } catch (textError) {
+        console.warn('text reply failed too:', textError.message);
+      }
+    }
+  }
+  if (!targetId) return;
+  try {
+    await pushMessages(env, targetId, [flexMessage]);
+  } catch (error) {
+    console.warn('flex push failed, fallback to text:', error.message);
+    await pushText(env, targetId, fallbackText);
+  }
+}
+
 // reply 失敗（例如 token 過期）時改用 push 備援
 export async function replyOrPush(env, event, text) {
   const targetId = String(event?.source?.userId || '').trim();

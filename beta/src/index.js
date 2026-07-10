@@ -5,12 +5,13 @@
 
 import { parseMessage, matchFood, normalizeText } from './parser.js';
 import { handleApi } from './api.js';
-import { verifyLineSignature, replyOrPush, pushText, getProfile } from './line.js';
+import { verifyLineSignature, replyOrPush, replyOrPushFlex, pushText, getProfile } from './line.js';
 import { hasAnyReminder, parseReminderSettings, buildReminderLines, reminderMessage, visitReminderMessage } from './reminders.js';
 import { shortDate } from './replies.js';
+import { recordFlex, todayFlex, websiteFlex } from './flex.js';
 import {
   ensureUser, updateUser, listPets, createPet, resolveDefaultPet,
-  listFoods, insertLog, recomputeDay, getRecentSummaries,
+  listFoods, insertLog, getLog, softDeleteLog, recomputeDay, getRecentSummaries,
   upcomingVisits, listVetsByOwner, createSession
 } from './db.js';
 import {
@@ -122,6 +123,8 @@ async function handleWebhook(request, env, url) {
       } else if (event.type === 'message' && event.message?.type === 'text') {
         if (isDuplicateMessage(event.message.id)) continue;
         await handleTextMessage(event, env, baseUrl);
+      } else if (event.type === 'postback') {
+        await handlePostback(event, env);
       }
     } catch (error) {
       console.error('event handling failed:', error);
@@ -134,6 +137,28 @@ async function handleWebhook(request, env, url) {
   }
 
   return jsonResponse({ ok: true });
+}
+
+// Flex 卡片按鈕：目前只有「刪除這筆」
+async function handlePostback(event, env) {
+  const db = env.DB;
+  const lineUserId = event.source?.userId;
+  const data = new URLSearchParams(String(event.postback?.data || ''));
+
+  if (data.get('action') === 'delLog') {
+    const log = await getLog(db, data.get('logId') || '');
+    if (!log || log.lineUserId !== lineUserId) {
+      await replyOrPush(env, event, '找不到這筆紀錄');
+      return;
+    }
+    if (log.isDeleted) {
+      await replyOrPush(env, event, '這筆已經刪除過了');
+      return;
+    }
+    await softDeleteLog(db, log.logId, lineUserId);
+    const summary = await recomputeDay(db, log.petId, String(log.eventDateTime).slice(0, 10));
+    await replyOrPush(env, event, `🗑 已刪除，總結重算完成\n水分 ${summary.totalWaterMl} ml\n熱量 ${summary.kcal} kcal`);
+  }
 }
 
 async function handleFollow(event, env) {
@@ -286,17 +311,35 @@ async function handleRecord(env, event, pet, record, lineUserId) {
     description = `備註：${record.note}`;
   }
 
+  const mainText = description;
+  const subParts = [];
+  if (log.kcal) subParts.push(`${log.kcal} kcal`);
+  if (record.category === 'food' && log.waterMl) subParts.push(`水 ${log.waterMl} ml`);
   if (record.dayOffset || record.time) {
     const eventDay = eventDateTime.slice(0, 10);
-    description += `\n（記在 ${Number(eventDay.slice(5, 7))}月${Number(eventDay.slice(8, 10))}日 ${eventDateTime.slice(11)}）`;
+    const stamp = `記在 ${Number(eventDay.slice(5, 7))}月${Number(eventDay.slice(8, 10))}日 ${eventDateTime.slice(11)}`;
+    description += `\n（${stamp}）`;
+    subParts.push(stamp);
   }
 
-  await insertLog(db, log);
+  const savedLog = await insertLog(db, log);
   const eventDate = eventDateTime.slice(0, 10);
   const summary = await recomputeDay(db, pet.petId, eventDate);
 
+  const categoryKey = record.category === 'food'
+    ? (record.foodType === '乾糧' ? 'dry' : 'wet')
+    : record.category;
+
   // 補登到非今天時，回覆顯示的是「該日」的累積
-  await replyOrPush(env, event, recordReply(description, pet, summary, hints, eventDate));
+  const fallbackText = recordReply(description, pet, summary, hints, eventDate);
+  const card = recordFlex({
+    pet, categoryKey, mainText,
+    subText: subParts.join('・'),
+    summary, date: eventDate,
+    logId: savedLog?.logId || '',
+    hints
+  });
+  await replyOrPushFlex(env, event, card, fallbackText);
 }
 
 async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId) {
@@ -305,7 +348,8 @@ async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId) {
 
   if (query === 'website') {
     const token = await createSession(db, lineUserId);
-    await replyOrPush(env, event, websiteReply(`${baseUrl}/#token=${token}`));
+    const url = `${baseUrl}/#token=${token}`;
+    await replyOrPushFlex(env, event, websiteFlex(url), websiteReply(url));
     return;
   }
 
@@ -321,7 +365,12 @@ async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId) {
 
   if (query === 'today') {
     const summary = await recomputeDay(db, pet.petId, today);
-    await replyOrPush(env, event, todayReply(pet, today, summary));
+    if (!summary.entryCount) {
+      await replyOrPush(env, event, todayReply(pet, today, summary));
+      return;
+    }
+    const card = todayFlex({ pet, date: today, summary, dateLabel: shortDate(today) });
+    await replyOrPushFlex(env, event, card, todayReply(pet, today, summary));
     return;
   }
 
