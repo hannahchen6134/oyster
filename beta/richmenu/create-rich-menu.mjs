@@ -33,13 +33,13 @@ const menu = {
   name: MENU_NAME,
   chatBarText: '選單',
   areas: [
-    cell(0, 0, send('今天')),
-    cell(1, 0, send('月曆')),
-    cell(2, 0, send('近7天')),
+    cell(0, 0, send('紀錄')),
+    cell(1, 0, send('今天')),
+    cell(2, 0, send('回診摘要')),
     // 喵喵照護站：直接開網站（已登入的手機一點就進資料頁）
     cell(0, 1, { type: 'uri', uri: 'https://cat-care-beta.hannahchen6134.workers.dev/' }),
-    cell(1, 1, send('網站')),
-    cell(2, 1, send('說明'))
+    cell(1, 1, send('月曆')),
+    cell(2, 1, send('安心上手'))
   ]
 };
 

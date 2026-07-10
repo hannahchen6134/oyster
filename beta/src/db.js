@@ -111,9 +111,10 @@ export async function insertLog(db, log) {
   await db
     .prepare(
       `INSERT INTO logs (logId, lineUserId, petId, eventDateTime, category, itemName, foodType, foodId,
-        amount, unit, waterMl, kcal, medStatus, medSlot, note, sourceMessageId, isDeleted,
+        amount, unit, waterMl, kcal, medStatus, medSlot, note, sourceMessageId,
+        recordedBy, caregiverName, isBackfilled, source, isDeleted,
         createdAt, updatedAt, updatedBy)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`
     )
     .bind(
       logId,
@@ -132,6 +133,10 @@ export async function insertLog(db, log) {
       String(log.medSlot || ''),
       String(log.note || ''),
       String(log.sourceMessageId || ''),
+      String(log.recordedBy || log.lineUserId || ''),
+      String(log.caregiverName || ''),
+      log.isBackfilled ? 1 : 0,
+      String(log.source || ''),
       now,
       now,
       String(log.updatedBy || log.lineUserId || '')

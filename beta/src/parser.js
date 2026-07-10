@@ -32,7 +32,7 @@ const NOTE_WORDS = new Set(['備註', '筆記']);
 
 const MED_STATUS_WORDS = [
   { status: '已吃', words: ['已吃', '已餵', '有吃', '有餵', '吃了', '餵了', 'ok'] },
-  { status: '漏餵', words: ['漏餵', '漏', '忘記', '忘了', '沒餵'] },
+  { status: '漏餵', words: ['漏餵', '漏', '忘記', '忘了', '沒餵', '沒餵到', '沒吃到'] },
   { status: '吐掉', words: ['吐掉', '吐出', '吐了'] },
   { status: '拒吃', words: ['拒吃', '不吃', '沒吃', '拒絕'] }
 ];
@@ -44,13 +44,22 @@ const MED_SLOT_WORDS = [
 ];
 
 const QUERY_WORDS = [
-  { query: 'today', words: ['今天', '今日'] },
+  { query: 'today', words: ['今天', '今日', '今日確認', '今天狀況', '今日總結', '今天確認'] },
   { query: 'week', words: ['近7天', '近七天', '最近7天', '7天', '近7日', '近一週', '近一周'] },
-  { query: 'calendar', words: ['月曆', '月历', '本月'] },
-  { query: 'visit', words: ['回診', '回诊', '看診', '看诊'] },
-  { query: 'website', words: ['網站', '照護站', '照护站', '登入', '开网站', '開網站'] },
-  { query: 'help', words: ['說明', '说明', '幫助', '帮助', 'help', '指令', '教學', '教学', '怎麼用', '怎么用'] }
+  { query: 'calendar', words: ['月曆', '月历', '本月', '月曆紀錄', '看月曆'] },
+  { query: 'visit', words: ['回診', '回诊', '看診', '看诊', '回診摘要', '給醫生', '看醫生', '看診摘要'] },
+  { query: 'website', words: ['網站', '照護站', '照护站', '登入', '开网站', '開網站', '我的照護站', '開照護站'] },
+  { query: 'recordMenu', words: ['紀錄', '記錄', '快速紀錄', '快速記錄', '新增', '記一下', '我要紀錄', '我要記錄'] },
+  { query: 'backfill', words: ['補登', '補記', '昨天', '前天'] },
+  { query: 'onboarding', words: ['安心上手', '喵爸媽安心上手', '第一次使用', '怎麼開始', '新手'] },
+  { query: 'help', words: ['說明', '说明', '幫助', '帮助', 'help', '指令', '教學', '教学', '怎麼用', '怎么用', '使用說明'] }
 ];
+
+// 快速紀錄選單按鈕 → 對應提示
+const RECORD_PROMPT_WORDS = {
+  '記吃飯': 'food', '記喝水': 'water', '記用藥': 'med', '記嘔吐': 'vomit',
+  '記排便': 'stool', '記精神': 'mood', '記備註': 'note'
+};
 
 export function normalizeText(value) {
   let text = String(value || '');
@@ -111,6 +120,9 @@ export function parseMessage(rawText) {
 
   // 查詢詞同時比對「去空白」版本（normalizeText 會把「近7天」拆成「近 7 天」）
   const compact = text.replace(/ /g, '');
+  if (RECORD_PROMPT_WORDS[compact]) {
+    return { type: 'recordPrompt', kind: RECORD_PROMPT_WORDS[compact] };
+  }
   const candidates = [text, text.toLowerCase(), compact, compact.toLowerCase()];
   for (const entry of QUERY_WORDS) {
     if (candidates.some((candidate) => entry.words.includes(candidate))) {
@@ -136,7 +148,7 @@ export function parseMessage(rawText) {
   if (editFix) {
     return { type: 'fixLast', mode: 'set', amount: Number(editFix[1]) };
   }
-  if (['記錯', '記錯了', '打錯', '打錯了', '輸入錯誤'].includes(compact)) {
+  if (['記錯', '記錯了', '打錯', '打錯了', '輸入錯誤', '修改'].includes(compact)) {
     return { type: 'fixHint' };
   }
 

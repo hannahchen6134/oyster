@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>貓貓照護站 Beta</title>
+  <title>喵喵照護安心管家</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&family=Noto+Serif+TC:wght@500;600;700&display=swap" rel="stylesheet">
@@ -184,6 +184,7 @@
       font-size: 15px; font-weight: 600; color: var(--ink);
       font-variant-numeric: tabular-nums; padding-top: 2px;
     }
+    .entry-by { font-size: 11.5px; font-weight: 500; color: var(--muted); margin-top: 2px; }
     .chips { display: flex; flex-wrap: wrap; gap: 6px; }
     .chip {
       display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 999px;
@@ -364,7 +365,40 @@
     .login-step:last-child { border-bottom: none; }
     .login-step .num { font-family: var(--serif); color: var(--brand); font-weight: 600; font-size: 15px; }
 
+    /* 快速新增(手機大按鈕) */
+    .quick-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    .qbtn {
+      min-height: 48px; border: 1px solid var(--line); border-radius: var(--radius);
+      background: linear-gradient(180deg, #ffffff, var(--sheet-soft));
+      box-shadow: var(--shadow-soft); font-weight: 600; font-size: 14.5px; color: var(--ink);
+      cursor: pointer; transition: border-color .15s, box-shadow .15s;
+    }
+    .qbtn:hover { border-color: var(--brand); }
+    /* 今日照護確認卡 */
+    .confirm-row { display: flex; gap: 14px; padding: 10px 2px; border-bottom: 1px solid var(--line); font-size: 14.5px; }
+    .confirm-row:last-of-type { border-bottom: none; }
+    .confirm-label { flex: 0 0 64px; color: var(--muted); }
+    .confirm-value { flex: 1; color: var(--ink); }
+    .confirm-value.pending { color: var(--muted); }
+    .save-state { margin-top: 12px; font-size: 12.5px; color: var(--muted); text-align: right; letter-spacing: .04em; }
+    /* 可複製純文字 */
+    .copy-text {
+      margin: 0; font: 13px/1.8 "Noto Sans TC", sans-serif; white-space: pre-wrap; word-break: break-word;
+      background: var(--sheet-soft); border: 1px solid var(--line); border-radius: var(--radius-sm);
+      padding: 14px 16px; color: var(--ink-soft); user-select: all;
+    }
+    .login-notice {
+      margin: 18px auto 0; max-width: 340px; text-align: left; font-size: 13.5px; line-height: 1.7;
+      background: var(--brand-tint); border: 1px solid rgba(115,73,33,.2); border-radius: var(--radius-sm);
+      padding: 12px 14px; color: var(--ink-soft);
+    }
+    .disclaimer { margin: 18px auto 0; max-width: 560px; font-size: 11.5px; line-height: 1.7; color: var(--muted); text-align: center; }
+    .onboard-step { display: flex; gap: 12px; padding: 12px 2px; border-bottom: 1px solid var(--line); font-size: 14.5px; }
+    .onboard-step:last-child { border-bottom: none; }
+    .onboard-step .num { font-family: var(--serif); color: var(--brand); font-weight: 700; }
     @media (max-width: 760px) {
+      .quick-grid { grid-template-columns: repeat(3, 1fr); }
+
       /* 手機：留白加大、區塊間距拉開，讓每一段都能呼吸 */
       .shell { width: calc(100% - 22px); padding-top: 12px; }
       #appView { padding: 30px 22px 42px; }
@@ -405,15 +439,20 @@
           <path d="M107 39 q3 2.5 6 0"/>
           <path d="M30 66 C20 66 15 58 21 52 C25 48 31 50 30 56"/>
         </svg>
-        <div class="eyebrow">Cat Care · Beta</div>
-        <h1 style="margin-top:14px">貓貓照護站</h1>
-        <p class="muted" style="margin-top:10px">請先從 LINE 取得登入連結</p>
+        <div class="eyebrow">喵喵照護安心管家</div>
+        <h1 style="margin-top:14px">照護站</h1>
+        <p class="muted" style="margin-top:10px">讓每一次紀錄，都是對貓貓的守護。</p>
+        <div class="login-notice hidden" id="loginExpired">
+          這個照護站連結已過期。請回 LINE 輸入「照護站」取得新的專屬連結。<br>
+          <b>你的既有照護資料不會因連結過期而消失。</b>
+        </div>
         <div class="login-steps">
-          <div class="login-step"><span class="num">1</span><span>打開「貓貓照護管家 Beta」官方 LINE</span></div>
-          <div class="login-step"><span class="num">2</span><span>輸入 <b>網站</b> 兩個字</span></div>
+          <div class="login-step"><span class="num">1</span><span>打開「喵喵照護安心管家」官方 LINE</span></div>
+          <div class="login-step"><span class="num">2</span><span>輸入 <b>照護站</b></span></div>
           <div class="login-step"><span class="num">3</span><span>點機器人回覆的專屬連結</span></div>
         </div>
-        <p class="muted" style="margin-top:22px">連結會隨使用自動延長效期，超過 30 天未使用才會過期；<br>過期時再輸入一次「網站」即可。</p>
+        <p class="muted" style="margin-top:22px">連結會隨使用自動延長效期；就算過期，既有資料也不會消失。</p>
+        <p class="disclaimer">喵喵照護安心管家目前為 Beta 測試版，主要用途是協助飼主紀錄日常照護資料，方便回顧、交接與回診時參考。本工具不提供醫療診斷、治療建議或緊急判斷。如貓咪出現明顯不適，請直接聯繫獸醫。</p>
       </div>
     </section>
 
@@ -422,8 +461,8 @@
       <header class="page-head">
         <div class="topbar">
           <div>
-            <div class="eyebrow">Cat Care · Beta</div>
-            <h1 style="margin-top:10px"><span id="petTitle">貓貓</span>的照護紀錄</h1>
+            <div class="eyebrow">讓每一次紀錄，都是對貓貓的守護</div>
+            <h1 style="margin-top:10px"><span id="petTitle">貓貓</span><span id="pageMode">｜今天的照護確認</span></h1>
             <div class="date-line" id="dateLine"></div>
           </div>
           <div class="spacer"></div>
@@ -431,59 +470,61 @@
           <button class="btn btn-secondary btn-sm" id="logoutBtn" type="button">登出</button>
         </div>
         <div class="tabs">
-          <button class="tab active" data-tab="today" type="button">每日明細</button>
+          <button class="tab active" data-tab="today" type="button">今天</button>
           <button class="tab" data-tab="calendar" type="button">月曆</button>
-          <button class="tab" data-tab="trend" type="button">近 30 天</button>
+          <button class="tab" data-tab="trend" type="button">回診</button>
           <button class="tab" data-tab="settings" type="button">設定</button>
         </div>
       </header>
 
-      <!-- 今日明細 -->
+      <!-- 今天：照護確認板 -->
       <section class="panel" id="todayView">
-        <div class="toolbar">
-          <button class="btn btn-secondary btn-sm" id="dayPrevBtn" type="button" aria-label="前一天">‹</button>
+        <div class="quick-grid">
+          <button class="qbtn" data-quick="food" type="button">＋ 吃飯</button>
+          <button class="qbtn" data-quick="water" type="button">＋ 喝水</button>
+          <button class="qbtn" data-quick="med" type="button">＋ 用藥</button>
+          <button class="qbtn" data-quick="vomit" type="button">＋ 嘔吐</button>
+          <button class="qbtn" data-quick="stool" type="button">＋ 便便</button>
+          <button class="qbtn" data-quick="mood" type="button">＋ 精神</button>
+          <button class="qbtn" data-quick="note" type="button">＋ 備註</button>
+        </div>
+        <div class="toolbar" style="margin-top:16px">
+          <button class="link-btn" id="dayPrevBtn" type="button" aria-label="前一天">‹</button>
           <input type="date" id="dayPicker">
-          <button class="btn btn-secondary btn-sm" id="dayNextBtn" type="button" aria-label="後一天">›</button>
-          <button class="btn btn-secondary btn-sm" id="goTodayBtn" type="button">今天</button>
+          <button class="link-btn" id="dayNextBtn" type="button" aria-label="後一天">›</button>
+          <button class="link-btn" id="goTodayBtn" type="button">回到今天</button>
           <div class="spacer" style="flex:1"></div>
-          <button class="btn btn-primary btn-sm" id="addLogBtn" type="button">＋ 新增/補登紀錄</button>
+          <button class="btn btn-secondary btn-sm" id="addLogBtn" type="button">補登其他時間</button>
         </div>
-        <div class="grid stat-grid" style="margin-top:14px">
-          <div class="card"><div class="stat-label">總水分</div><div class="stat-value" id="statWater">0 ml</div></div>
-          <div class="card"><div class="stat-label">食物</div><div class="stat-value" id="statFood">0 g</div></div>
-          <div class="card"><div class="stat-label">熱量</div><div class="stat-value" id="statKcal">0 kcal</div></div>
-          <div class="card"><div class="stat-label">用藥</div><div class="stat-value" id="statMed">—</div></div>
-          <div class="card"><div class="stat-label">腸胃</div><div class="stat-value" id="statGut">穩定</div></div>
+        <div class="block">
+          <div class="section-head">
+            <h2 id="confirmTitle">今日照護確認</h2>
+          </div>
+          <div id="confirmList"></div>
+          <div class="save-state" id="saveState"></div>
         </div>
-        <details class="block fold">
-          <summary>
-            <span class="fold-title">給醫生的一句話</span>
-            <span class="fold-arrow">▾</span>
-          </summary>
-          <div class="fold-body">
-            <div id="doctorNote" class="doctor-text">今天還沒有紀錄。</div>
-            <div style="display:flex;justify-content:flex-end;margin-top:10px">
-              <button class="btn btn-secondary btn-sm" id="copyDoctorBtn" type="button">複製</button>
-            </div>
+        <div class="block">
+          <div class="section-head">
+            <h2>今日交接卡</h2>
+            <button class="btn btn-secondary btn-sm" id="copyHandoffBtn" type="button">複製交接卡</button>
           </div>
-        </details>
-        <details class="block fold">
-          <summary>
-            <span class="fold-title" id="visitFoldTitle">看診</span>
-            <span class="fold-arrow">▾</span>
-          </summary>
-          <div class="fold-body">
-            <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
-              <button class="btn btn-secondary btn-sm" id="addVisitBtn" type="button">＋ 記錄看診</button>
-            </div>
-            <div class="grid" id="dayVisitList"></div>
+          <p class="muted" style="margin:0;font-size:13px">一鍵複製今天的照護狀況，清楚交接給家人朋友。</p>
+        </div>
+        <div class="block visit-cta">
+          <b style="font-size:14.5px">回診時想給醫生看的整理</b>
+          <p class="muted" style="margin:6px 0 12px;font-size:13px">整理近 7 天的吃飯、喝水、用藥、腸胃、排便與精神狀態，讓你回診時更清楚。</p>
+          <div style="display:flex;gap:10px;justify-content:flex-end">
+            <button class="btn btn-primary btn-sm" data-tab="trend" type="button">查看回診頁</button>
           </div>
-        </details>
+        </div>
         <div class="block">
           <div class="section-head">
             <h2>當日紀錄</h2>
           </div>
-          <div class="grid" id="logList"></div>
+          <div class="grid" id="logList" style="gap:0"></div>
+          <div style="text-align:center;margin-top:8px">
+            <button class="link-btn hidden" id="showAllLogsBtn" type="button">查看全部</button>
+          </div>
         </div>
       </section>
 
@@ -495,25 +536,56 @@
           <button class="btn btn-secondary btn-sm" id="calNextBtn" type="button">下月 ›</button>
         </div>
         <div class="cal-grid" id="calGrid"></div>
-        <p class="muted" style="margin-top:14px;font-size:12.5px">💧 水分・🔥 熱量・💊 藥・⚠️ 異常・🤮 吐・💩 便・🏥 回診　點任一天可查看當日明細</p>
+        <p class="muted" style="margin-top:14px;font-size:12.5px">💧 水分・🔥 熱量・💊 藥・⚠️ 留意・🤮 吐・💩 便・🏥 回診　點任一天可查看當日明細</p>
       </section>
 
-      <!-- 近30天 -->
+      <!-- 回診 -->
       <section class="panel hidden" id="trendView">
-        <h2>近 30 天總覽</h2>
-        <div class="block" style="margin-top:14px"><div id="trendCharts"></div></div>
+        <div class="block" style="margin-top:14px">
+          <div class="section-head">
+            <h2>近 7 天摘要</h2>
+            <button class="btn btn-primary btn-sm" id="copyVisitSummaryBtn" type="button">複製給醫生</button>
+          </div>
+          <pre class="copy-text" id="visitSummaryText">整理中…</pre>
+        </div>
+        <details class="block fold">
+          <summary>
+            <span class="fold-title">給醫生的一句話（今天）</span>
+            <span class="fold-arrow">▾</span>
+          </summary>
+          <div class="fold-body">
+            <div id="doctorNote" class="doctor-text">今天還沒有紀錄。</div>
+            <div style="display:flex;justify-content:flex-end;margin-top:10px">
+              <button class="btn btn-secondary btn-sm" id="copyDoctorBtn" type="button">複製</button>
+            </div>
+          </div>
+        </details>
+        <details class="block fold">
+          <summary>
+            <span class="fold-title" id="visitFoldTitle">看診紀錄</span>
+            <span class="fold-arrow">▾</span>
+          </summary>
+          <div class="fold-body">
+            <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+              <button class="btn btn-secondary btn-sm" id="addVisitBtn" type="button">＋ 記錄看診</button>
+            </div>
+            <div class="grid" id="dayVisitList" style="gap:10px"></div>
+          </div>
+        </details>
         <div class="block hidden" id="labTrendBlock">
           <div class="section-head" style="margin-top:0">
-            <h2>血檢趨勢</h2>
+            <h2>血檢紀錄</h2>
             <select id="labItemSelect" style="width:auto" aria-label="選擇血檢項目"></select>
           </div>
+          <p class="muted" id="labLatestLine" style="margin:0 0 8px;font-size:13px"></p>
           <div id="labChartBox"></div>
-          <p class="muted" style="font-size:12px;margin:8px 0 0">綠色底＝參考範圍，紅點＝超出範圍。數值在照護站「設定 → 血檢」輸入。</p>
+          <p class="muted" style="font-size:12px;margin:8px 0 0">底色為你輸入的參考範圍，數值可提供醫生參考。輸入與編輯在「設定 → 血檢紀錄」。</p>
         </div>
+        <div class="block"><div class="section-head"><h2>近 30 天趨勢</h2></div><div id="trendCharts"></div></div>
         <div class="block table-wrap">
           <table>
             <thead>
-              <tr><th>日期</th><th>總水分</th><th>喝水</th><th>食物水</th><th>乾糧 g</th><th>濕/罐 g</th><th>熱量</th><th>藥✓</th><th>藥⚠️</th><th>吐</th><th>便</th><th>筆數</th></tr>
+              <tr><th>日期</th><th>總水分</th><th>喝水</th><th>食物水</th><th>乾糧 g</th><th>濕/罐 g</th><th>熱量</th><th>藥記錄</th><th>藥留意</th><th>吐</th><th>便</th><th>筆數</th></tr>
             </thead>
             <tbody id="trendBody"></tbody>
           </table>
@@ -523,6 +595,7 @@
       <!-- 設定 -->
       <section class="panel hidden" id="settingsView">
         <div class="settings-nav">
+          <button class="tab" data-settings="onboarding" type="button">安心上手</button>
           <button class="tab active" data-settings="pets" type="button">貓咪</button>
           <button class="tab" data-settings="foods" type="button">食物</button>
           <button class="tab" data-settings="meds" type="button">藥物</button>
@@ -540,7 +613,8 @@
         <div class="grid" id="settingsList"></div>
       </section>
 
-      <footer class="colophon"><svg class="paw" viewBox="0 0 18 16" aria-hidden="true"><ellipse cx="9" cy="11" rx="4.2" ry="3.4" fill="var(--brand)" opacity="0.75"/><circle cx="3.4" cy="6.4" r="1.9" fill="var(--brand)" opacity="0.55"/><circle cx="9" cy="4.6" r="1.9" fill="var(--brand)" opacity="0.55"/><circle cx="14.6" cy="6.4" r="1.9" fill="var(--brand)" opacity="0.55"/></svg>輕鬆記錄守護毛孩</footer>
+      <footer class="colophon"><svg class="paw" viewBox="0 0 18 16" aria-hidden="true"><ellipse cx="9" cy="11" rx="4.2" ry="3.4" fill="var(--brand)" opacity="0.75"/><circle cx="3.4" cy="6.4" r="1.9" fill="var(--brand)" opacity="0.55"/><circle cx="9" cy="4.6" r="1.9" fill="var(--brand)" opacity="0.55"/><circle cx="14.6" cy="6.4" r="1.9" fill="var(--brand)" opacity="0.55"/></svg>讓每一次紀錄，都是對貓貓的守護</footer>
+      <p class="disclaimer">喵喵照護安心管家目前為 Beta 測試版，主要用途是協助飼主紀錄日常照護資料，方便回顧、交接與回診時參考。本工具不提供醫療診斷、治療建議或緊急判斷。如貓咪出現明顯不適，請直接聯繫獸醫。<br>你的照護資料只用於本服務的紀錄與摘要功能，請勿將專屬照護站連結轉傳給不相關的人。</p>
     </div>
   </div>
 
@@ -610,22 +684,27 @@
     }
 
     async function api(path, options = {}) {
-      const response = await fetch('/api/' + path, {
-        ...options,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: 'Bearer ' + state.token,
-          ...(options.headers || {})
-        }
-      });
+      let response;
+      try {
+        response = await fetch('/api/' + path, {
+          ...options,
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer ' + state.token,
+            ...(options.headers || {})
+          }
+        });
+      } catch (networkError) {
+        throw new Error('這筆資料暫時沒有送出成功，請檢查網路後再試一次。');
+      }
       let data = {};
       try { data = await response.json(); } catch (error) { /* ignore */ }
       if (response.status === 401) {
         localStorage.removeItem(TOKEN_KEY);
-        showLogin();
-        throw new Error(data.message || '請重新登入');
+        showLogin(true);
+        throw new Error(data.message || '連結已過期，請回 LINE 輸入「照護站」取得新連結');
       }
-      if (!response.ok || data.ok === false) throw new Error(data.message || '發生錯誤');
+      if (!response.ok || data.ok === false) throw new Error(data.message || '這筆資料暫時沒有儲存成功，請稍後再試一次。');
       return data;
     }
 
@@ -634,9 +713,10 @@
     }
 
     // ---------- 畫面切換 ----------
-    function showLogin() {
+    function showLogin(expired = false) {
       $('loginView').classList.remove('hidden');
       $('appView').classList.add('hidden');
+      $('loginExpired').classList.toggle('hidden', !expired);
     }
 
     function switchTab(tab) {
@@ -645,6 +725,9 @@
       $('calendarView').classList.toggle('hidden', tab !== 'calendar');
       $('trendView').classList.toggle('hidden', tab !== 'trend');
       $('settingsView').classList.toggle('hidden', tab !== 'settings');
+      if (tab === 'calendar') $('pageMode').textContent = '｜照護月曆';
+      if (tab === 'trend') $('pageMode').textContent = '｜回診整理';
+      if (tab === 'settings') $('pageMode').textContent = '｜設定';
       if (tab === 'today') loadDay();
       if (tab === 'calendar') loadCalendar();
       if (tab === 'trend') loadTrend();
@@ -657,20 +740,116 @@
       vomit: '嘔吐', stool: '便便', mood: '精神', note: '備註'
     };
 
+    const MED_LABEL = (status) => status === '漏餵' ? '沒餵到' : status;
+
+    function tpeTime(iso) {
+      try {
+        return new Date(iso).toLocaleTimeString('en-GB', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit' });
+      } catch (error) { return ''; }
+    }
+
     async function loadDay() {
       if (!state.petId) return;
       $('dayPicker').value = state.date;
-      const [data, visitsData, vetsData] = await Promise.all([
-        api(`day?petId=${state.petId}&date=${state.date}`),
-        api(`visits?petId=${state.petId}`),
-        api('vets')
-      ]);
+      const isToday = state.date === todayStr();
+      $('pageMode').textContent = isToday ? '｜今天的照護確認' : `｜${Number(state.date.slice(5, 7))}月${Number(state.date.slice(8, 10))}日的照護紀錄`;
+      $('confirmTitle').textContent = isToday ? '今日照護確認' : '當日照護確認';
+      const data = await api(`day?petId=${state.petId}&date=${state.date}`);
       state.dayLogs = data.logs;
-      state.visits = visitsData.rows;
-      state.vets = vetsData.rows;
-      renderSummary(data.summary);
-      renderDayVisits();
+      state.daySummary = data.summary;
+      state.showAllLogs = false;
+      renderConfirm(data.logs, data.summary);
       renderLogs(data.logs);
+    }
+
+    // 每筆紀錄的主要內容(交接卡/最近一筆共用)
+    function describeLogFront(log) {
+      if (log.category === 'water') return `喝水 ${fmt(log.waterMl || log.amount)}ml`;
+      if (log.category === 'food') return `${log.foodType}${log.itemName ? ` ${log.itemName}` : ''} ${fmt(log.amount)}g`;
+      if (log.category === 'med') {
+        const label = [log.medSlot, log.itemName].filter(Boolean).join(' ');
+        return `用藥${label ? ` ${label}` : ''} ${MED_LABEL(log.medStatus)}`;
+      }
+      const names = { vomit: '嘔吐', stool: '便便', mood: '精神', note: '備註' };
+      return `${names[log.category] || log.category}${log.note ? ` ${log.note}` : ''}`;
+    }
+
+    // 今日照護確認卡:沒有資料時顯示「尚未看到紀錄」,不用 0 造成焦慮
+    function confirmData(logs, s) {
+      const foodLogs = logs.filter((l) => l.category === 'food');
+      const medLogs = logs.filter((l) => l.category === 'med');
+      const moodLogs = logs.filter((l) => l.category === 'mood');
+      const totalFood = (s.dryFoodG || 0) + (s.wetFoodG || 0) + (s.otherFoodG || 0);
+      const last = logs.length ? logs[logs.length - 1] : null;
+      const lastUpdated = logs.length
+        ? logs.reduce((max, l) => (l.updatedAt > max ? l.updatedAt : max), logs[0].updatedAt)
+        : '';
+      return {
+        rows: [
+          ['吃飯', foodLogs.length ? `已紀錄 ${foodLogs.length} 筆，共 ${fmt(totalFood)} g` : ''],
+          ['喝水', s.waterMl > 0 ? `已紀錄 ${fmt(s.waterMl)} ml${s.foodWaterMl ? `（含食物水分共 ${fmt(s.totalWaterMl)} ml）` : ''}` : ''],
+          ['用藥', medLogs.length ? `今天已紀錄 ${medLogs.length} 次` : ''],
+          ['腸胃', s.vomitCount > 0 ? `今天有紀錄嘔吐 ${s.vomitCount} 次` : ''],
+          ['便便', s.stoolCount > 0 ? `已紀錄 ${s.stoolCount} 次` : ''],
+          ['精神', moodLogs.length ? `最近一筆為「${moodLogs[moodLogs.length - 1].note || '有紀錄'}」` : '']
+        ],
+        last,
+        lastUpdated
+      };
+    }
+
+    function renderConfirm(logs, s) {
+      const info = confirmData(logs, s);
+      const rowsHtml = info.rows.map(([label, value]) => `
+        <div class="confirm-row">
+          <span class="confirm-label">${label}</span>
+          <span class="confirm-value ${value ? '' : 'pending'}">${value ? esc(value) : (label === '精神' ? '尚未紀錄' : '尚未看到紀錄')}</span>
+        </div>`).join('');
+      const lastHtml = info.last ? `
+        <div class="confirm-row">
+          <span class="confirm-label">最近一筆</span>
+          <span class="confirm-value">${esc(describeLogFront(info.last))}</span>
+        </div>` : '';
+      $('confirmList').innerHTML = rowsHtml + lastHtml;
+      $('saveState').textContent = info.lastUpdated
+        ? `資料已儲存｜最後更新 ${tpeTime(info.lastUpdated)}`
+        : '';
+    }
+
+    // 給醫生的一句話(回診頁使用,以今天為準)
+    function buildDoctorNote(s, dateStr) {
+      const pet = currentPet();
+      if (!s || !s.entryCount) return '今天還沒有看到紀錄。';
+      const totalFood = (s.dryFoodG || 0) + (s.wetFoodG || 0) + (s.otherFoodG || 0);
+      const medText = s.meds.length
+        ? s.meds.map((m) => `${[m.slot, m.name].filter(Boolean).join(' ')}${MED_LABEL(m.status)}`).join('、')
+        : '';
+      const parts = [
+        `${dateStr} ${pet ? pet.petName : ''} 總水分 ${fmt(s.totalWaterMl)} ml（喝水 ${fmt(s.waterMl)}＋食物 ${fmt(s.foodWaterMl)}）`,
+        `食物 ${fmt(totalFood)} g`,
+        `熱量 ${fmt(s.kcal)} kcal`,
+        medText ? `藥：${medText}` : '今天尚未看到用藥紀錄',
+        s.vomitNotes.length ? `嘔吐：${s.vomitNotes.join('；')}` : '沒有嘔吐紀錄',
+        s.stoolNotes.length ? `便便：${s.stoolNotes.join('；')}` : '沒有便便備註'
+      ];
+      return parts.join('。') + '。';
+    }
+
+    // 今日交接卡(純文字,複製給家人朋友)
+    function buildHandoffText() {
+      const pet = currentPet();
+      const s = state.daySummary || {};
+      const info = confirmData(state.dayLogs || [], s);
+      const day = `${Number(state.date.slice(5, 7))}/${Number(state.date.slice(8, 10))}`;
+      const lines = [`${pet ? pet.petName : '貓貓'}｜今日照護交接卡｜${day}`];
+      for (const [label, value] of info.rows) {
+        lines.push(`${label}：${value || (label === '精神' ? '尚未紀錄' : '尚未看到紀錄')}`);
+      }
+      const noteLogs = (state.dayLogs || []).filter((l) => l.category === 'note');
+      if (noteLogs.length) lines.push(`備註：${noteLogs.map((l) => l.note).join('；')}`);
+      if (info.last) lines.push(`最近一筆：${describeLogFront(info.last)}`);
+      if (info.lastUpdated) lines.push(`最後更新：${tpeTime(info.lastUpdated)}`);
+      return lines.join('\n');
     }
 
     function vetLabel(vet) {
@@ -680,18 +859,17 @@
 
     function renderDayVisits() {
       const vetsById = Object.fromEntries(state.vets.map((vet) => [vet.vetId, vet]));
-      const visits = state.visits.filter((visit) => visit.visitDate === state.date || visit.nextVisitDate === state.date);
-      $('visitFoldTitle').textContent = visits.length ? `看診（${visits.length}）` : '看診';
+      const visits = [...state.visits]
+        .sort((a, b) => String(b.visitDate || b.nextVisitDate).localeCompare(String(a.visitDate || a.nextVisitDate)))
+        .slice(0, 6);
+      $('visitFoldTitle').textContent = state.visits.length ? `看診紀錄（${state.visits.length}）` : '看診紀錄';
       const container = $('dayVisitList');
       if (!visits.length) {
-        container.innerHTML = '';
+        container.innerHTML = '<div class="empty">還沒有看診紀錄，回診後可以記下醫生說了什麼。</div>';
         return;
       }
       container.innerHTML = visits.map((visit) => {
-        const isNextOnly = visit.visitDate !== state.date && visit.nextVisitDate === state.date;
-        const title = isNextOnly
-          ? `預定回診${visit.visitTime ? `・${visit.visitTime}` : ''}`
-          : `看診${visit.visitTime ? `・${visit.visitTime}` : ''}`;
+        const title = `${visit.visitDate || '（未填日期）'}${visit.visitTime ? `・${visit.visitTime}` : ''}${visit.nextVisitDate ? `　→ 下次 ${visit.nextVisitDate}` : ''}`;
         const sub = [vetLabel(vetsById[visit.vetId]), visit.reason, visit.doctorInstruction].filter(Boolean).join('｜');
         return `
           <div class="visit-item">
@@ -707,7 +885,7 @@
 
     function openDayVisitModal(visit) {
       const spec = SETTINGS_SPEC.visits;
-      const prefill = visit || { visitDate: state.date };
+      const prefill = visit || { visitDate: todayStr() };
       const html = spec.fields.map((field) =>
         `<div class="field"><label>${esc(field.label)}</label>${settingsFieldHtml(field, prefill?.[field.name])}</div>`).join('');
       openModal(visit ? '編輯看診紀錄' : '記錄看診', html, async (form) => {
@@ -719,80 +897,33 @@
         if (!body.visitDate) throw new Error('請填看診日');
         if (visit) await api(`visits/${visit.visitId}`, { method: 'PUT', body: JSON.stringify(body) });
         else await api('visits', { method: 'POST', body: JSON.stringify(body) });
-        toast('已儲存看診紀錄');
-        await loadDay();
+        toast('已幫你記下來了，看診紀錄已更新。');
+        await loadTrend();
       });
-    }
-
-    // 統計數字微動畫：記錄後「記了有感」
-    const REDUCED_MOTION = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    function setStatValue(id, value, suffix) {
-      const el = $(id);
-      const from = Number(el.dataset.val || 0);
-      const target = Number(value) || 0;
-      el.dataset.val = target;
-      const render = (value) => {
-        el.innerHTML = `${fmt(value)}<span class="stat-unit">${suffix.trim()}</span>`;
-      };
-      if (REDUCED_MOTION || from === target) {
-        render(target);
-        return;
-      }
-      const start = performance.now();
-      const duration = 280;
-      const tick = (now) => {
-        const t = Math.min(1, (now - start) / duration);
-        const eased = 1 - Math.pow(1 - t, 3);
-        render(t === 1 ? target : from + (target - from) * eased);
-        if (t < 1) requestAnimationFrame(tick);
-      };
-      requestAnimationFrame(tick);
-    }
-
-    function renderSummary(s) {
-      setStatValue('statWater', s.totalWaterMl, ' ml');
-      const totalFood = (s.dryFoodG || 0) + (s.wetFoodG || 0) + (s.otherFoodG || 0);
-      setStatValue('statFood', totalFood, ' g');
-      setStatValue('statKcal', s.kcal, ' kcal');
-      const medText = s.meds.length
-        ? s.meds.map((m) => `${[m.slot, m.name].filter(Boolean).join(' ')}${m.status}`).join('、')
-        : '尚無用藥紀錄';
-      $('statMed').textContent = s.meds.length ? `${s.medTakenCount} 次` : '—';
-      $('statMed').classList.toggle('is-warn-value', s.medIssueCount > 0);
-      $('statGut').textContent = s.vomitCount > 0 ? '需留意' : '穩定';
-      $('statGut').classList.toggle('is-warn-value', s.vomitCount > 0);
-
-      const pet = currentPet();
-      if (!s.entryCount) {
-        $('doctorNote').textContent = '這一天還沒有紀錄。';
-      } else {
-        const parts = [
-          `${state.date} ${pet ? pet.petName : ''} 總水分 ${fmt(s.totalWaterMl)} ml（喝水 ${fmt(s.waterMl)}＋食物 ${fmt(s.foodWaterMl)}）`,
-          `食物 ${fmt(totalFood)} g`,
-          `熱量 ${fmt(s.kcal)} kcal`,
-          s.meds.length ? `藥：${medText}` : '無用藥紀錄',
-          s.vomitNotes.length ? `嘔吐：${s.vomitNotes.join('；')}` : '無嘔吐',
-          s.stoolNotes.length ? `便便：${s.stoolNotes.join('；')}` : '無便便備註'
-        ];
-        $('doctorNote').textContent = parts.join('。') + '。';
-      }
     }
 
     function renderLogs(logs) {
       const container = $('logList');
       if (!logs.length) {
+        $('showAllLogsBtn').classList.add('hidden');
         container.innerHTML = `
           <div class="empty">
-            這一天還沒有紀錄。直接在 LINE 輸入，或從這裡快速補登：
+            今天還沒有看到紀錄。可以先快速記一筆吃飯、喝水或用藥，讓照護細節有跡可循。
             <div class="quick-row">
-              <button class="btn btn-secondary btn-sm" data-quick="water" type="button">＋ 喝水</button>
-              <button class="btn btn-secondary btn-sm" data-quick="food" type="button">＋ 食物</button>
-              <button class="btn btn-secondary btn-sm" data-quick="med" type="button">＋ 藥物</button>
+              <button class="btn btn-secondary btn-sm" data-quick="food" type="button">記一筆吃飯</button>
+              <button class="btn btn-secondary btn-sm" data-quick="water" type="button">記一筆喝水</button>
+              <button class="btn btn-secondary btn-sm" data-quick="med" type="button">記一筆用藥</button>
+              <button class="btn btn-secondary btn-sm" id="bfYesterdayBtn" type="button">補登昨天</button>
+              <button class="btn btn-secondary btn-sm" id="goOnboardingBtn" type="button">喵爸媽安心上手</button>
             </div>
           </div>`;
         return;
       }
-      container.innerHTML = logs.map((log) => {
+      const total = logs.length;
+      const shown = state.showAllLogs ? logs : logs.slice(-5);
+      $('showAllLogsBtn').classList.toggle('hidden', state.showAllLogs || total <= 5);
+      $('showAllLogsBtn').textContent = `查看全部 ${total} 筆`;
+      container.innerHTML = shown.map((log) => {
         // 類別 → 低飽和色系：喝水藍、乾糧麥色、罐頭陶土、熱量琥珀、藥松綠、其他中性
         const foodChipClass = log.foodType === '乾糧' ? 'chip-dry' : 'chip-wet';
         const catChipClass = {
@@ -808,12 +939,12 @@
         }
         if (log.category === 'med') {
           const warn = log.medStatus !== '已吃';
-          chips.push(`<span class="chip ${warn ? 'warn' : 'chip-med'}">${esc([log.medSlot, log.itemName].filter(Boolean).join(' ') || '藥')} ${esc(log.medStatus)}</span>`);
+          chips.push(`<span class="chip ${warn ? 'warn' : 'chip-med'}">${esc([log.medSlot, log.itemName].filter(Boolean).join(' ') || '藥')} ${esc(MED_LABEL(log.medStatus))}</span>`);
         }
         if (log.category === 'vomit') chips.push('<span class="chip warn">需留意</span>');
         return `
           <div class="entry">
-            <div class="entry-time">${esc(String(log.eventDateTime).slice(11, 16) || '--:--')}</div>
+            <div class="entry-time">${esc(String(log.eventDateTime).slice(11, 16) || '--:--')}<div class="entry-by">${esc(log.caregiverName || '我')}${log.isBackfilled ? '・補登' : ''}</div></div>
             <div>
               <div class="chips">${chips.join('')}</div>
               ${log.note ? `<div class="entry-note">${esc(log.note)}</div>` : ''}
@@ -869,7 +1000,7 @@
             </div>
           </div>
           <div class="field"><label>狀態</label>
-            <select name="medStatus">${['已吃', '漏餵', '吐掉', '拒吃'].map((status) => `<option ${log?.medStatus === status ? 'selected' : ''}>${status}</option>`).join('')}</select>
+            <select name="medStatus">${['已吃', '漏餵', '吐掉', '拒吃'].map((status) => `<option value="${status}" ${log?.medStatus === status ? 'selected' : ''}>${MED_LABEL(status)}</option>`).join('')}</select>
           </div>
         </div>
         <div class="field"><label>備註 / 描述</label><textarea name="note">${esc(log?.note ?? '')}</textarea></div>`;
@@ -929,7 +1060,7 @@
         const body = collectLogForm(form);
         if (log) await api(`logs/${log.logId}`, { method: 'PUT', body: JSON.stringify(body) });
         else await api('logs', { method: 'POST', body: JSON.stringify(body) });
-        toast(log ? '已更新並重算總結' : '已新增紀錄');
+        toast(log ? '已更新這筆紀錄，今日照護摘要已重新整理。' : '已幫你記下來了，可在今日照護確認與回診摘要中查看。');
         await loadDay();
       });
       const form = $('modalForm');
@@ -1180,13 +1311,114 @@
       if (rows.length) boxContainer.appendChild(labChart(rows));
     }
 
+    // 近 7 天純文字摘要（回診時可整份複製給醫生）
+    function buildVisitSummaryText(rows, from, to, todaySummary) {
+      const pet = currentPet();
+      const byDate = Object.fromEntries(rows.map((row) => [row.date, row]));
+      const dates = [];
+      for (let d = from; d <= to; d = shiftDate(d, 1)) dates.push(d);
+      const label = (date) => `${Number(date.slice(5, 7))}月${Number(date.slice(8, 10))}日`;
+      const lines = [`${pet ? pet.petName : '貓貓'}｜近 7 天照護摘要（${label(from)}—${label(to)}）`];
+
+      lines.push('', '【飲食】');
+      let anyFood = false;
+      for (const date of dates) {
+        const r = byDate[date];
+        if (!r || !r.entryCount) continue;
+        const food = (r.dryFoodG || 0) + (r.wetFoodG || 0) + (r.otherFoodG || 0);
+        lines.push(`${label(date)}　食物 ${fmt(food)} g・熱量 ${fmt(r.kcal)} kcal`);
+        anyFood = true;
+      }
+      if (!anyFood) lines.push('這 7 天尚未看到飲食紀錄');
+
+      lines.push('', '【飲水】');
+      let anyWater = false;
+      for (const date of dates) {
+        const r = byDate[date];
+        if (!r || !r.entryCount) continue;
+        lines.push(`${label(date)}　總水分 ${fmt(r.totalWaterMl)} ml（喝水 ${fmt(r.waterMl)}＋食物 ${fmt(r.foodWaterMl)}）`);
+        anyWater = true;
+      }
+      if (!anyWater) lines.push('這 7 天尚未看到飲水紀錄');
+
+      lines.push('', '【用藥】');
+      const noMedDates = [];
+      let anyMed = false;
+      for (const date of dates) {
+        const r = byDate[date];
+        let meds = [];
+        try { meds = Array.isArray(r?.medJson) ? r.medJson : JSON.parse(r?.medJson || '[]'); } catch (error) { /* ignore */ }
+        if (!meds.length) { noMedDates.push(date); continue; }
+        for (const m of meds) {
+          lines.push(`${label(date)}　${[m.slot, m.name].filter(Boolean).join(' ') || '藥'} ${MED_LABEL(m.status) || '有紀錄'}`);
+        }
+        anyMed = true;
+      }
+      if (anyMed && noMedDates.length) lines.push(`尚未看到用藥紀錄的日期：${noMedDates.map(label).join('、')}`);
+      if (!anyMed) lines.push('這 7 天尚未看到用藥紀錄');
+
+      lines.push('', '【嘔吐】');
+      const vomitDays = dates.filter((date) => byDate[date]?.vomitCount > 0);
+      if (vomitDays.length) vomitDays.forEach((date) => lines.push(`${label(date)}　${byDate[date].vomitCount} 次`));
+      else lines.push('這 7 天沒有嘔吐紀錄');
+
+      lines.push('', '【排便】');
+      const stoolDays = dates.filter((date) => byDate[date]?.stoolCount > 0);
+      if (stoolDays.length) stoolDays.forEach((date) => lines.push(`${label(date)}　${byDate[date].stoolCount} 次`));
+      else lines.push('這 7 天尚未看到排便紀錄');
+
+      lines.push('', '【精神】');
+      const moods = todaySummary?.moodNotes || [];
+      lines.push(moods.length ? `今天：${moods.join('；')}` : '今天尚未紀錄精神狀態');
+
+      const latestLab = latestLabInfo();
+      if (latestLab) {
+        lines.push('', '【血檢】', `最近一次 ${label(latestLab.date)}：${latestLab.text}`);
+      }
+
+      const noRecDates = dates.filter((date) => !byDate[date] || !byDate[date].entryCount);
+      if (noRecDates.length && noRecDates.length < dates.length) {
+        lines.push('', `尚未看到紀錄的日期：${noRecDates.map(label).join('、')}`);
+      }
+      return lines.join('\n');
+    }
+
+    // 最近一次血檢（回診頁顯示 + 摘要引用）
+    function latestLabInfo() {
+      if (!state.labs.length) return null;
+      const date = state.labs.reduce((max, row) => (row.testDate > max ? row.testDate : max), state.labs[0].testDate);
+      const items = state.labs.filter((row) => row.testDate === date);
+      const text = items.map((row) => `${row.itemName} ${fmt(row.value)}${row.unit ? ` ${row.unit}` : ''}`).join('、');
+      return { date, text };
+    }
+
     async function loadTrend() {
       if (!state.petId) return;
       const to = todayStr();
       const fromDate = new Date(Date.now() - 29 * 86400000).toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
-      const data = await api(`summary?petId=${state.petId}&from=${fromDate}&to=${to}`);
+      const from7 = shiftDate(to, -6);
+      const [data, dayData, vetsData, visitsData, labsData] = await Promise.all([
+        api(`summary?petId=${state.petId}&from=${fromDate}&to=${to}`),
+        api(`day?petId=${state.petId}&date=${to}`),
+        api('vets'),
+        api(`visits?petId=${state.petId}`),
+        api(`labs?petId=${state.petId}`)
+      ]);
+      state.vets = vetsData.rows;
+      state.visits = visitsData.rows;
+      state.labs = labsData.rows;
+
+      const todayLabel = `${Number(to.slice(5, 7))}月${Number(to.slice(8, 10))}日`;
+      $('doctorNote').textContent = buildDoctorNote(dayData.summary, todayLabel);
+      renderDayVisits();
+      $('visitSummaryText').textContent = buildVisitSummaryText(
+        data.rows.filter((row) => row.date >= from7), from7, to, dayData.summary);
+      const latestLab = latestLabInfo();
+      $('labLatestLine').textContent = latestLab
+        ? `最近一次：${latestLab.date}｜${latestLab.text}`
+        : '';
+
       renderTrendCharts(data.rows, fromDate, to);
-      state.labs = (await api(`labs?petId=${state.petId}`)).rows;
       renderLabTrend();
       const rows = [...data.rows].reverse();
       if (!rows.length) {
@@ -1495,12 +1727,43 @@
       });
     }
 
+    // 喵爸媽安心上手：5 步驟 + 連結過期的安心說明
+    function renderOnboarding() {
+      const steps = [
+        ['在 LINE 直接打字就能記', '例如「水 60」「吃了罐頭 30」「藥 早 已吃」，我會幫你記下來，馬上回你一張確認卡。'],
+        ['想看今天的狀況', '在 LINE 輸入「今天」，或打開照護站的「今天」頁，就能看到今日照護確認。'],
+        ['回診前不用手忙腳亂', '打開「回診」頁，按「複製給醫生」，近 7 天的吃喝、用藥、腸胃狀況一次帶走。'],
+        ['要交接給家人朋友', '在「今天」頁按「複製交接卡」，貼到任何聊天視窗就完成交接。'],
+        ['忘了記、想補昨天的', '在 LINE 輸入「昨天 21:30 水 20」，或在網站按「補登其他時間」。']
+      ];
+      $('settingsList').innerHTML = `
+        <div class="block" style="margin-top:0">
+          ${steps.map(([title, body], i) => `
+            <div class="onboard-step">
+              <span class="num">${i + 1}</span>
+              <span><b style="font-size:14.5px">${title}</b><br><span class="muted" style="font-size:13px">${body}</span></span>
+            </div>`).join('')}
+          <div class="onboard-step">
+            <span class="num">＊</span>
+            <span><b style="font-size:14.5px">連結過期了怎麼辦？</b><br>
+            <span class="muted" style="font-size:13px">回 LINE 輸入「照護站」就能拿到新的專屬連結，<b>既有的照護資料都不會消失</b>。</span></span>
+          </div>
+        </div>`;
+    }
+
     async function loadSettings() {
       document.querySelectorAll('[data-settings]').forEach((el) =>
         el.classList.toggle('active', el.dataset.settings === state.settingsTab));
 
+      if (state.settingsTab === 'onboarding') {
+        $('settingsHint').textContent = '第一次使用？照著下面 5 步，安心開始。';
+        $('settingsAddBtn').classList.add('hidden');
+        renderOnboarding();
+        return;
+      }
+
       if (state.settingsTab === 'labs') {
-        $('settingsHint').textContent = '一次輸入一份報告，異常值會標 ⚠；趨勢圖在「近 30 天」分頁。';
+        $('settingsHint').textContent = '一次輸入一份報告，數值超出參考範圍會標 ⚠ 供留意；趨勢圖在「回診」頁。';
         $('settingsAddBtn').classList.remove('hidden');
         state.labs = (await api(`labs?petId=${state.petId}`)).rows;
         renderLabsList();
@@ -1508,7 +1771,7 @@
       }
 
       if (state.settingsTab === 'reminders') {
-        $('settingsHint').textContent = '挑選你想被提醒的狀況，異常時會主動傳 LINE 給你。';
+        $('settingsHint').textContent = '挑選你想被提醒的狀況，有需要留意時會輕輕傳 LINE 提醒你。';
         $('settingsAddBtn').classList.add('hidden');
         await refreshPets();
         renderRemindersForm();
@@ -1698,11 +1961,23 @@
         if (!confirm('確定要刪除這筆看診紀錄嗎？')) return;
         try {
           await api(`visits/${visitDelBtn.dataset.visitDel}`, { method: 'DELETE' });
-          toast('已刪除看診紀錄');
-          return loadDay();
+          toast('已刪除這筆看診紀錄。');
+          return loadTrend();
         } catch (error) {
           return toast(error.message, true);
         }
+      }
+
+      if (event.target.closest('#bfYesterdayBtn')) {
+        state.date = shiftDate(todayStr(), -1);
+        await loadDay();
+        state.foods = (await api('foods')).rows;
+        state.meds = (await api(`meds?petId=${state.petId}`)).rows;
+        return openLogModal(null);
+      }
+      if (event.target.closest('#goOnboardingBtn')) {
+        state.settingsTab = 'onboarding';
+        return switchTab('settings');
       }
 
       const quickBtn = event.target.closest('[data-quick]');
@@ -1729,15 +2004,19 @@
       const delBtn = event.target.closest('[data-del]');
       if (delBtn) {
         const id = delBtn.dataset.del;
-        if (!confirm('確定要刪除嗎？（會保留在資料庫並標記為已刪除，統計會立刻重算）')) return;
+        const isLog = Boolean(delBtn.closest('#logList'));
+        const question = isLog
+          ? '確定要刪除這筆紀錄嗎？刪除後今日摘要會重新整理。'
+          : '確定要刪除嗎？資料會標記為已刪除，統計會立刻重新整理。';
+        if (!confirm(question)) return;
         try {
-          if (delBtn.closest('#logList')) {
+          if (isLog) {
             await api(`logs/${id}`, { method: 'DELETE' });
-            toast('已刪除並重算總結');
+            toast('已刪除這筆紀錄，今日照護摘要已重新整理。');
             return loadDay();
           }
           await api(`${state.settingsTab}/${id}`, { method: 'DELETE' });
-          toast('已刪除');
+          toast('已刪除。');
           await loadSettings();
           if (state.settingsTab === 'pets') await refreshPets();
         } catch (error) {
@@ -1762,13 +2041,23 @@
     $('goTodayBtn').addEventListener('click', () => { state.date = todayStr(); loadDay(); });
     $('dayPrevBtn').addEventListener('click', () => { state.date = shiftDate(state.date, -1); loadDay(); });
     $('dayNextBtn').addEventListener('click', () => { state.date = shiftDate(state.date, 1); loadDay(); });
-    $('copyDoctorBtn').addEventListener('click', async () => {
+    async function copyText(text, doneMessage) {
       try {
-        await navigator.clipboard.writeText($('doctorNote').textContent);
-        toast('已複製，可直接貼給醫生');
+        await navigator.clipboard.writeText(text);
+        toast(doneMessage);
       } catch (error) {
-        toast('複製失敗，請手動選取文字', true);
+        toast('複製沒有成功，請長按文字手動複製。', true);
       }
+    }
+    $('copyDoctorBtn').addEventListener('click', () =>
+      copyText($('doctorNote').textContent, '已複製，可直接貼給醫生。'));
+    $('copyVisitSummaryBtn').addEventListener('click', () =>
+      copyText($('visitSummaryText').textContent, '已複製近 7 天摘要，回診時可直接貼給醫生。'));
+    $('copyHandoffBtn').addEventListener('click', () =>
+      copyText(buildHandoffText(), '已複製今日交接卡，可以直接貼給家人朋友。'));
+    $('showAllLogsBtn').addEventListener('click', () => {
+      state.showAllLogs = true;
+      renderLogs(state.dayLogs || []);
     });
     $('addLogBtn').addEventListener('click', async () => {
       state.foods = (await api('foods')).rows;

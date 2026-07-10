@@ -5,10 +5,10 @@
 
 import { parseMessage, matchFood, normalizeText } from './parser.js';
 import { handleApi } from './api.js';
-import { verifyLineSignature, replyOrPush, replyOrPushFlex, pushText, pushMessages, getProfile } from './line.js';
+import { verifyLineSignature, replyOrPush, replyOrPushFlex, replyMessages, pushText, pushMessages, getProfile } from './line.js';
 import { hasAnyReminder, parseReminderSettings, buildReminderLines, reminderMessage, visitReminderMessage } from './reminders.js';
 import { shortDate } from './replies.js';
-import { recordFlex, todayFlex, websiteFlex, menuFlex, weekFlex, reminderFlex, visitReminderFlex } from './flex.js';
+import { recordFlex, todayFlex, websiteFlex, menuFlex, recordMenuFlex, weekFlex, reminderFlex, visitReminderFlex } from './flex.js';
 import {
   ensureUser, updateUser, listPets, createPet, resolveDefaultPet, getPet,
   listFoods, getFood, insertLog, getLog, getLastLogByUser, softDeleteLog, updateLog,
@@ -18,7 +18,7 @@ import {
 import {
   recordReply, todayReply, weekReply, monthReply, visitReply,
   websiteReply, helpText, welcomeText, unknownReply, invalidReply,
-  recordTutorial, medTutorial
+  recordTutorial, medTutorial, onboardingText, recordPrompt, backfillGuide
 } from './replies.js';
 import { jsonResponse, taipeiToday, taipeiNowDateTime, addDays } from './util.js';
 
@@ -269,6 +269,11 @@ async function handleTextMessage(event, env, baseUrl) {
       return;
     }
 
+    case 'recordPrompt': {
+      await replyOrPush(env, event, recordPrompt(intent.kind));
+      return;
+    }
+
     case 'fixHint': {
       await replyOrPush(env, event, '修正上一筆：\n改 54（改數量）\n剩 20（沒吃完扣掉）\n刪除（整筆刪掉）');
       return;
@@ -393,6 +398,9 @@ async function handleRecord(env, event, pet, record, lineUserId) {
     medSlot: record.medSlot,
     note: record.note,
     sourceMessageId: String(event.message?.id || ''),
+    recordedBy: lineUserId,
+    isBackfilled: (record.dayOffset || record.time) ? 1 : 0,
+    source: 'line',
     updatedBy: lineUserId
   };
 
@@ -479,6 +487,21 @@ async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId) {
     return;
   }
 
+  if (query === 'recordMenu') {
+    await replyOrPushFlex(env, event, recordMenuFlex(), recordPrompt(''));
+    return;
+  }
+
+  if (query === 'backfill') {
+    await replyOrPush(env, event, backfillGuide());
+    return;
+  }
+
+  if (query === 'onboarding') {
+    await replyOrPush(env, event, onboardingText());
+    return;
+  }
+
   if (!pet) {
     await replyOrPush(env, event, '還沒有建立貓咪，先輸入「新增貓咪 名字」吧！');
     return;
@@ -514,7 +537,17 @@ async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId) {
     const visits = await upcomingVisits(db, pet.petId, today);
     const vets = await listVetsByOwner(db, lineUserId);
     const vetsById = Object.fromEntries(vets.map((vet) => [vet.vetId, vet]));
-    await replyOrPush(env, event, visitReply(pet.petName, visits, vetsById));
+    const rows = await getRecentSummaries(db, pet.petId, today, 7);
+    const infoText = `${visitReply(pet.petName, visits, vetsById)}\n\n完整摘要與複製功能\n請開照護站的「回診」頁`;
+    try {
+      await replyMessages(env, event.replyToken, [
+        weekFlex(pet.petName, rows),
+        { type: 'text', text: infoText }
+      ]);
+    } catch (error) {
+      console.warn('visit summary flex failed:', error.message);
+      await replyOrPush(env, event, `${weekReply(pet.petName, rows)}\n\n${infoText}`);
+    }
     return;
   }
 

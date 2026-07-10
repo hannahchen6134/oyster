@@ -1,4 +1,5 @@
-// LINE 回覆文字格式（貓貓照護管家 Beta）
+import { BRAND, displayMedStatus } from './brand.js';
+// LINE 回覆文字格式（喵喵照護安心管家）
 // 排版原則：每行盡量不超過 12 個全形字，大字體手機也不折行；
 // 日期用「7月10日」格式，避免被 LINE 自動轉成日期連結。
 
@@ -28,7 +29,7 @@ export function summaryBlock(summary) {
   } else {
     for (const med of meds) {
       const label = [med.slot, med.name].filter(Boolean).join(' ');
-      lines.push(`藥 ${label ? `${label} ` : ''}${med.status}`);
+      lines.push(`藥 ${label ? `${label} ` : ''}${displayMedStatus(med.status)}`);
     }
   }
 
@@ -140,7 +141,7 @@ export function weekReply(petName, rows) {
     }
     const parts = [`水${formatNumber(row.totalWaterMl)}`, `熱${formatNumber(row.kcal)}`, `藥${row.medTakenCount}`];
     if (row.vomitCount > 0) parts.push(`吐${row.vomitCount}`);
-    if (row.medIssueCount > 0) parts.push(`藥⚠${row.medIssueCount}`);
+    if (row.medIssueCount > 0) parts.push(`藥留意${row.medIssueCount}`);
     lines.push(`${day} ${parts.join('・')}`);
   }
   lines.push('', '※ 詳細請開照護站（輸入「網站」）');
@@ -166,8 +167,8 @@ export function monthReply(petName, monthLabel, rows) {
     lines.push(`日均熱量 ${formatNumber(avg((row) => row.kcal))} kcal`);
   }
   if (vomitDays.length) lines.push(`嘔吐日：${vomitDays.map(Number).join('、')} 號`);
-  if (medIssueDays.length) lines.push(`藥異常日：${medIssueDays.map(Number).join('、')} 號`);
-  if (!vomitDays.length && !medIssueDays.length) lines.push('沒有嘔吐或用藥異常');
+  if (medIssueDays.length) lines.push(`用藥留意日：${medIssueDays.map(Number).join('、')} 號`);
+  if (!vomitDays.length && !medIssueDays.length) lines.push('這個月的紀錄都很平穩');
   lines.push('', '※ 月曆圖請開照護站');
   return lines.join('\n');
 }
@@ -192,20 +193,22 @@ export function visitReply(petName, visits, vetsById) {
 
 export function websiteReply(url) {
   return [
-    '🔗 照護站登入連結：',
+    '🔗 你的專屬照護站連結：',
     url,
     '',
-    '有使用就會自動延長效期，',
-    '超過 30 天沒開才會過期，',
-    '過期再輸入「網站」即可。',
+    '這是你的專屬連結，',
+    '請不要轉傳給不相關的人。',
     '',
-    '連結請勿轉傳給別人。'
+    '若連結過期，輸入「照護站」',
+    '就能取得新連結，',
+    '既有資料不會消失。'
   ].join('\n');
 }
 
 export function helpText() {
   return [
     '📖 使用說明',
+    BRAND.tagline,
     '',
     '【記錄】直接打字',
     '水 20',
@@ -218,7 +221,7 @@ export function helpText() {
     '備註 今天有梳毛',
     '',
     '藥的狀態有四種：',
-    '已吃、漏餵、吐掉、拒吃',
+    '已吃、沒餵到、吐掉、拒吃',
     '',
     '【補登】加日期時間',
     '昨天 21:30 水 20',
@@ -244,7 +247,8 @@ export function helpText() {
 
 export function welcomeText() {
   return [
-    '歡迎使用貓貓照護管家 🐾',
+    `歡迎使用${BRAND.name} 🐾`,
+    BRAND.tagline,
     '',
     '第一步：',
     '新增貓咪 名字',
@@ -316,13 +320,70 @@ export function medTutorial() {
     '藥 心臟藥 晚 已吃',
     '',
     '狀態有四種：',
-    '已吃、漏餵、吐掉、拒吃',
+    '已吃、沒餵到、吐掉、拒吃',
     '',
     '有設「每日目標」的話，',
     '要寫時段才算完成，',
     '例如：藥 早 已吃',
     '',
-    '漏餵也記下來，',
+    '沒餵到也可以記下來，',
     '月曆會幫你標記 ⚠'
+  ].join('\n');
+}
+
+
+// ---------- 喵爸媽安心上手 ----------
+
+export function onboardingText() {
+  return [
+    `🐾 ${BRAND.onboarding}`,
+    '',
+    '第一次使用，可以先從',
+    '一筆簡單紀錄開始。',
+    '',
+    '1. 建立貓貓資料',
+    '　新增貓咪 蚵仔',
+    '2. 記一筆看看',
+    '　水 20 或 罐頭 30g',
+    '3. 輸入「今天」',
+    '　看今日照護確認',
+    '4. 輸入「回診摘要」',
+    '　整理給醫生看',
+    '',
+    '照護站連結過期',
+    '不代表資料消失，',
+    '輸入「照護站」就能',
+    '取得新的專屬連結。'
+  ].join('\n');
+}
+
+// 快速紀錄選單按下後的小提示
+export function recordPrompt(kind) {
+  const prompts = {
+    food: '記吃飯，直接輸入：\n罐頭 30g\n乾糧 希爾斯 4g',
+    water: '記喝水，直接輸入：\n水 20',
+    med: '記用藥，直接輸入：\n藥 早 已吃\n狀態：已吃、沒餵到、吐掉、拒吃',
+    vomit: '記嘔吐，直接輸入：\n吐 白色泡沫',
+    stool: '記排便，直接輸入：\n便 成形\n或：軟便',
+    mood: '記精神，直接輸入：\n精神 活動力好',
+    note: '記備註，直接輸入：\n備註 今天有梳毛'
+  };
+  return prompts[kind] || '直接打字就能記錄，例如：水 20';
+}
+
+export function backfillGuide() {
+  return [
+    '補登很簡單，',
+    '在指令前面加時間：',
+    '',
+    '昨天 21:30 水 20',
+    '前天 乾糧 4g',
+    '',
+    '要修改已記的紀錄，',
+    '可輸入：',
+    '改 54（改上一筆數量）',
+    '剩 20（沒吃完扣掉）',
+    '刪除（刪上一筆）',
+    '或開照護站直接編輯。'
   ].join('\n');
 }

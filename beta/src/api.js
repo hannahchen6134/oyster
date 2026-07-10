@@ -67,7 +67,7 @@ export async function handleApi(request, env, url) {
   const db = env.DB;
   const token = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
   const lineUserId = await getSessionUser(db, token);
-  if (!lineUserId) return jsonResponse({ ok: false, message: '登入已過期，請在 LINE 輸入「網站」重新取得連結。' }, 401);
+  if (!lineUserId) return jsonResponse({ ok: false, message: '這個照護站連結已過期。請回 LINE 輸入「照護站」取得新的專屬連結，你的既有照護資料不會因連結過期而消失。' }, 401);
 
   const segments = url.pathname.replace(/^\/api\/?/, '').split('/').filter(Boolean);
   const resource = segments[0] || '';
@@ -182,6 +182,9 @@ async function handleLogs(db, request, method, logId, lineUserId) {
       medStatus: String(body.medStatus || ''),
       medSlot: String(body.medSlot || ''),
       note: String(body.note || ''),
+      recordedBy: lineUserId,
+      isBackfilled: eventDateTime.slice(0, 10) === taipeiNowDateTime().slice(0, 10) ? 0 : 1,
+      source: 'web',
       updatedBy: lineUserId
     });
 

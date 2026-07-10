@@ -102,6 +102,6 @@ export function reminderMessage(pet, lines) {
     '',
     '做了但忘了記的話，',
     '補記一下就好；',
-    '真的有異常請諮詢獸醫師。'
+    '有不放心的狀況請諮詢獸醫師。'
   ].join('\n');
 }

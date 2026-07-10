@@ -1,8 +1,9 @@
-// LINE Flex Message 卡片（貓貓照護管家）
+// LINE Flex Message 卡片（喵喵照護安心管家）
 // 視覺沿用照護站：暖棕 #734921、紙白、朱紅只做警示。
 // 每張卡都附 altText（通知列預覽）與文字備援由呼叫端處理。
 
-import { goalSection } from './replies.js';
+import { goalSection, recordPrompt } from './replies.js';
+import { BRAND, displayMedStatus } from './brand.js';
 
 // 卡身：淺米色斜向漸層；標題：暖棕漸層
 const BODY_BG = '#FFFFFF';
@@ -175,7 +176,7 @@ export function recordFlex({ pet, categoryKey, mainText, subText, summary, date,
 export function todayFlex({ pet, date, summary, dateLabel }) {
   const meds = summary.meds || [];
   const medValue = meds.length
-    ? meds.map((m) => `${[m.slot, m.name].filter(Boolean).join(' ')}${m.status === '已吃' ? '✓' : m.status}`).join('、')
+    ? meds.map((m) => `${[m.slot, m.name].filter(Boolean).join(' ')}${m.status === '已吃' ? '✓' : displayMedStatus(m.status)}`).join('、')
     : '尚無紀錄';
   const gutParts = [];
   if (summary.vomitCount > 0) gutParts.push(`嘔吐 ${summary.vomitCount}`);
@@ -231,7 +232,7 @@ export function websiteFlex(url) {
 // ---------- 說明選單卡 ----------
 function menuRow(label, sendText, primary = false) {
   return {
-    type: 'box', layout: 'vertical',
+    type: 'box', layout: 'vertical', flex: 1,
     backgroundColor: primary ? C.brand : '#F6F3EA',
     cornerRadius: '10px', paddingAll: '12px', margin: 'sm',
     action: { type: 'message', label, text: sendText },
@@ -243,15 +244,38 @@ export function menuFlex() {
   const body = {
     type: 'box', layout: 'vertical', paddingAll: '16px', backgroundColor: BODY_BG,
     contents: [
-      text('選擇想了解的功能', { size: 'xs', color: C.muted, align: 'center' }),
+      text(BRAND.tagline, { size: 'xs', color: C.muted, align: 'center', wrap: true }),
+      menuRow(BRAND.onboarding, '安心上手'),
       menuRow('如何記錄', '如何記錄'),
       menuRow('如何記餵藥', '如何記餵藥'),
-      menuRow('看今日總結', '今天'),
-      menuRow('看近 7 天', '近7天'),
-      menuRow('開啟照護站', '網站', true)
+      menuRow('今日照護確認', '今天'),
+      menuRow('回診摘要', '回診摘要'),
+      menuRow('開啟照護站', '照護站', true)
     ]
   };
   return bubble('使用說明選單', { type: 'bubble', size: 'mega', header: header('📖 想做什麼？'), body });
+}
+
+// ---------- 快速紀錄選單卡 ----------
+export function recordMenuFlex() {
+  const body = {
+    type: 'box', layout: 'vertical', paddingAll: '16px', backgroundColor: BODY_BG,
+    contents: [
+      text('想記哪一種？點了會告訴你怎麼打', { size: 'xs', color: C.muted, align: 'center', wrap: true }),
+      { type: 'box', layout: 'horizontal', spacing: 'sm', margin: 'sm', contents: [
+        menuRow('吃飯', '記吃飯'), menuRow('喝水', '記喝水')
+      ] },
+      { type: 'box', layout: 'horizontal', spacing: 'sm', contents: [
+        menuRow('用藥', '記用藥'), menuRow('嘔吐', '記嘔吐')
+      ] },
+      { type: 'box', layout: 'horizontal', spacing: 'sm', contents: [
+        menuRow('排便', '記排便'), menuRow('精神', '記精神')
+      ] },
+      menuRow('其他備註', '記備註'),
+      text('補登昨天：昨天 21:30 水 20', { size: 'xxs', color: C.muted, align: 'center', margin: 'md' })
+    ]
+  };
+  return bubble('快速紀錄選單', { type: 'bubble', size: 'mega', header: header('✏️ 快速紀錄'), body });
 }
 
 // ---------- 近 7 天迷你圖卡（長條＝水分） ----------
@@ -327,7 +351,7 @@ export function reminderFlex(pet, lines) {
     contents: [
       ...items,
       { type: 'separator', margin: 'lg', color: '#EAE6DB' },
-      text('做了但忘了記的話，補記一下就好；真的有異常請諮詢獸醫師。',
+      text('做了但忘了記的話，補記一下就好；有不放心的狀況請諮詢獸醫師。',
         { size: 'xs', color: C.muted, wrap: true, margin: 'lg' })
     ]
   };
@@ -360,7 +384,7 @@ export function visitReminderFlex(pet, visits, vetsById, dateLabel) {
   }
   contents.push(
     { type: 'separator', margin: 'lg', color: '#EAE6DB' },
-    text('回診前可先看「近 7 天」摘要，或到照護站複製給醫生的一句話 🐾',
+    text('回診前可先看「回診摘要」，或到照護站的「回診」頁一鍵複製給醫生 🐾',
       { size: 'xs', color: C.muted, wrap: true, margin: 'lg' })
   );
   const body = { type: 'box', layout: 'vertical', paddingAll: '18px', backgroundColor: BODY_BG, contents };
@@ -368,7 +392,7 @@ export function visitReminderFlex(pet, visits, vetsById, dateLabel) {
     type: 'box', layout: 'horizontal', spacing: 'sm', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
     contents: [
       { type: 'button', height: 'sm', style: 'link', color: C.inkSoft,
-        action: { type: 'message', label: '近 7 天', text: '近7天' } },
+        action: { type: 'message', label: '回診摘要', text: '回診摘要' } },
       { type: 'button', height: 'sm', style: 'primary', color: C.brand,
         action: { type: 'message', label: '開啟照護站', text: '網站' } }
     ]
