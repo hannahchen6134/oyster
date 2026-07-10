@@ -4,6 +4,11 @@
 
 import { goalSection } from './replies.js';
 
+// 卡身：淺米色斜向漸層；標題：暖棕漸層
+const BODY_BG = { type: 'linearGradient', angle: '160deg', startColor: '#FCF8F0', endColor: '#F1EADA' };
+const HEADER_BG = { type: 'linearGradient', angle: '135deg', startColor: '#8A5A2C', endColor: '#6A4119' };
+const FOOTER_COLOR = '#F1EADA';
+
 const C = {
   brand: '#734921',
   brandDark: '#5A3617',
@@ -42,7 +47,7 @@ function text(content, options = {}) {
 
 function header(title) {
   return {
-    type: 'box', layout: 'vertical', backgroundColor: C.brand,
+    type: 'box', layout: 'vertical', background: HEADER_BG,
     paddingAll: '14px', paddingStart: '18px',
     contents: [text(title, { color: '#FFFFFF', weight: 'bold', size: 'sm' })]
   };
@@ -81,7 +86,7 @@ function progressBar(label, value, goal) {
         ]
       },
       {
-        type: 'box', layout: 'vertical', backgroundColor: '#EDE8DB',
+        type: 'box', layout: 'vertical', backgroundColor: '#E6DFCC',
         cornerRadius: '4px', height: '8px',
         contents: [{
           type: 'box', layout: 'vertical', backgroundColor: done ? C.olive : C.brand,
@@ -110,7 +115,7 @@ function goalContents(pet, summary, date) {
   if (!goalWater && !goalKcal && !slots.length) return [];
 
   const contents = [
-    { type: 'separator', margin: 'lg', color: C.line },
+    { type: 'separator', margin: 'lg', color: '#E3DCC9' },
     text('今日目標', { size: 'xs', color: C.muted, margin: 'lg', weight: 'bold' })
   ];
   if (goalWater > 0) contents.push(progressBar(`水分 ${fmt(summary.totalWaterMl)} / ${fmt(goalWater)} ml`, summary.totalWaterMl, goalWater));
@@ -153,12 +158,12 @@ function bubble(altText, contents) {
 export function recordFlex({ pet, categoryKey, mainText, subText, summary, date, logId, hints = [] }) {
   const style = CATEGORY_STYLE[categoryKey] || CATEGORY_STYLE.note;
   const body = {
-    type: 'box', layout: 'vertical', paddingAll: '18px', backgroundColor: C.sheet,
+    type: 'box', layout: 'vertical', paddingAll: '18px', background: BODY_BG,
     contents: [
       { type: 'box', layout: 'horizontal', contents: [tag(style.label, style)] },
       text(mainText, { size: 'xl', weight: 'bold', color: C.ink, margin: 'md', wrap: true }),
       ...(subText ? [text(subText, { size: 'xs', color: C.muted, wrap: true, margin: 'sm' })] : []),
-      { type: 'separator', margin: 'lg', color: C.line },
+      { type: 'separator', margin: 'lg', color: '#E3DCC9' },
       text('今日累積', { size: 'xs', color: C.muted, margin: 'lg', weight: 'bold' }),
       statRow('水分', `${fmt(summary.totalWaterMl)} ml`),
       statRow('食物', `${fmt((Number(summary.dryFoodG) || 0) + (Number(summary.wetFoodG) || 0) + (Number(summary.otherFoodG) || 0))} g`),
@@ -169,7 +174,7 @@ export function recordFlex({ pet, categoryKey, mainText, subText, summary, date,
     ]
   };
   const footer = {
-    type: 'box', layout: 'horizontal', spacing: 'sm', paddingAll: '10px',
+    type: 'box', layout: 'horizontal', spacing: 'sm', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
     contents: [
       { type: 'button', height: 'sm', style: 'link', color: C.muted,
         action: { type: 'postback', label: '刪除這筆', data: `action=delLog&logId=${logId}`, displayText: '刪除剛剛那筆' } },
@@ -191,7 +196,7 @@ export function todayFlex({ pet, date, summary, dateLabel }) {
   if (summary.stoolCount > 0) gutParts.push(`便便 ${summary.stoolCount}`);
 
   const body = {
-    type: 'box', layout: 'vertical', paddingAll: '18px', backgroundColor: C.sheet,
+    type: 'box', layout: 'vertical', paddingAll: '18px', background: BODY_BG,
     contents: [
       text(`共 ${summary.entryCount} 筆紀錄`, { size: 'xs', color: C.muted }),
       statRow('水分', `${fmt(summary.totalWaterMl)} ml`),
@@ -203,7 +208,7 @@ export function todayFlex({ pet, date, summary, dateLabel }) {
     ]
   };
   const footer = {
-    type: 'box', layout: 'horizontal', paddingAll: '10px',
+    type: 'box', layout: 'horizontal', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
     contents: [
       { type: 'button', height: 'sm', style: 'primary', color: C.brand,
         action: { type: 'message', label: '開啟照護站', text: '網站' } }
@@ -218,17 +223,17 @@ export function todayFlex({ pet, date, summary, dateLabel }) {
 // ---------- 網站連結卡 ----------
 export function websiteFlex(url) {
   const body = {
-    type: 'box', layout: 'vertical', paddingAll: '18px', backgroundColor: C.sheet, spacing: 'sm',
+    type: 'box', layout: 'vertical', paddingAll: '18px', background: BODY_BG, spacing: 'sm',
     contents: [
       text('點下方按鈕直接登入，', { size: 'sm', color: C.inkSoft, wrap: true }),
       text('可看月曆、趨勢、血檢，', { size: 'sm', color: C.inkSoft, wrap: true }),
       text('修改任何一筆紀錄。', { size: 'sm', color: C.inkSoft, wrap: true }),
-      { type: 'separator', margin: 'lg', color: C.line },
+      { type: 'separator', margin: 'lg', color: '#E3DCC9' },
       text('連結會隨使用自動延長效期，請勿轉傳給別人。', { size: 'xs', color: C.muted, wrap: true, margin: 'lg' })
     ]
   };
   const footer = {
-    type: 'box', layout: 'vertical', paddingAll: '10px',
+    type: 'box', layout: 'vertical', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
     contents: [
       { type: 'button', style: 'primary', color: C.brand,
         action: { type: 'uri', label: '開啟照護站', uri: url } }
