@@ -73,6 +73,25 @@ function statRow(label, value) {
   };
 }
 
+// 迷你數據卡：一排 2–3 格（同 menuCell 質感）
+function statCell(label, value, unit) {
+  return {
+    type: 'box', layout: 'vertical', flex: 1,
+    backgroundColor: '#FBF8F1', cornerRadius: '12px',
+    borderColor: '#E9E0CE', borderWidth: '1px',
+    paddingTop: '10px', paddingBottom: '10px', paddingStart: '4px', paddingEnd: '4px',
+    contents: [
+      text(label, { size: 'xxs', color: C.muted, align: 'center' }),
+      text(value, { size: 'lg', weight: 'bold', color: '#3F2B18', align: 'center', margin: 'xs' }),
+      text(unit, { size: 'xxs', color: C.muted, align: 'center' })
+    ]
+  };
+}
+
+function statCellRow(cells) {
+  return { type: 'box', layout: 'horizontal', spacing: 'md', margin: 'md', contents: cells };
+}
+
 function progressBar(label, value, goal) {
   const pct = Math.max(0, Math.min(100, Math.round((Number(value) / Number(goal)) * 100)));
   const done = pct >= 100;
@@ -116,7 +135,7 @@ function goalContents(pet, summary, date) {
   if (!goalWater && !goalKcal && !slots.length) return [];
 
   const contents = [
-    { type: 'separator', margin: 'lg', color: '#EAE6DB' },
+    { type: 'separator', margin: 'lg', color: '#F0EADF' },
     text('今日目標', { size: 'xs', color: C.muted, margin: 'lg', weight: 'bold' })
   ];
   if (goalWater > 0) contents.push(progressBar(`水分 ${fmt(summary.totalWaterMl)} / ${fmt(goalWater)} ml`, summary.totalWaterMl, goalWater));
@@ -143,16 +162,18 @@ function bubble(altText, contents) {
 export function recordFlex({ pet, categoryKey, mainText, subText, summary, date, logId, hints = [], title = '', tip = '' }) {
   const style = CATEGORY_STYLE[categoryKey] || CATEGORY_STYLE.note;
   const body = {
-    type: 'box', layout: 'vertical', paddingAll: '18px', backgroundColor: BODY_BG,
+    type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
     contents: [
       { type: 'box', layout: 'horizontal', contents: [tag(style.label, style)] },
       text(mainText, { size: 'xl', weight: 'bold', color: C.ink, margin: 'md', wrap: true }),
       ...(subText ? [text(subText, { size: 'xs', color: C.muted, wrap: true, margin: 'sm' })] : []),
-      { type: 'separator', margin: 'lg', color: '#EAE6DB' },
+      { type: 'separator', margin: 'lg', color: '#F0EADF' },
       text('今日累積', { size: 'xs', color: C.muted, margin: 'lg', weight: 'bold' }),
-      statRow('水分', `${fmt(summary.totalWaterMl)} ml`),
-      statRow('食物', `${fmt((Number(summary.dryFoodG) || 0) + (Number(summary.wetFoodG) || 0) + (Number(summary.otherFoodG) || 0))} g`),
-      statRow('熱量', `${fmt(summary.kcal)} kcal`),
+      statCellRow([
+        statCell('水分', fmt(summary.totalWaterMl), 'ml'),
+        statCell('食物', fmt((Number(summary.dryFoodG) || 0) + (Number(summary.wetFoodG) || 0) + (Number(summary.otherFoodG) || 0)), 'g'),
+        statCell('熱量', fmt(summary.kcal), 'kcal')
+      ]),
       ...goalContents(pet, summary, date),
       ...hints.filter(Boolean).map((hint) =>
         text(`※ ${hint.replace(/\n/g, '')}`, { size: 'xs', color: C.muted, wrap: true, margin: 'md' })),
@@ -182,13 +203,16 @@ export function todayFlex({ pet, date, summary, dateLabel }) {
   if (summary.vomitCount > 0) gutParts.push(`嘔吐 ${summary.vomitCount}`);
   if (summary.stoolCount > 0) gutParts.push(`便便 ${summary.stoolCount}`);
 
+  const totalFood = (Number(summary.dryFoodG) || 0) + (Number(summary.wetFoodG) || 0) + (Number(summary.otherFoodG) || 0);
   const body = {
-    type: 'box', layout: 'vertical', paddingAll: '18px', backgroundColor: BODY_BG,
+    type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
     contents: [
-      text(`共 ${summary.entryCount} 筆紀錄`, { size: 'xs', color: C.muted }),
-      statRow('水分', `${fmt(summary.totalWaterMl)} ml`),
-      statRow('食物', `${fmt((Number(summary.dryFoodG) || 0) + (Number(summary.wetFoodG) || 0) + (Number(summary.otherFoodG) || 0))} g`),
-      statRow('熱量', `${fmt(summary.kcal)} kcal`),
+      text(`共 ${summary.entryCount} 筆紀錄`, { size: 'xs', color: C.muted, align: 'center' }),
+      statCellRow([
+        statCell('水分', fmt(summary.totalWaterMl), 'ml'),
+        statCell('食物', fmt(totalFood), 'g'),
+        statCell('熱量', fmt(summary.kcal), 'kcal')
+      ]),
       statRow('藥', medValue),
       ...(gutParts.length ? [statRow('腸胃', gutParts.join('・'))] : []),
       ...goalContents(pet, summary, date)
@@ -210,13 +234,12 @@ export function todayFlex({ pet, date, summary, dateLabel }) {
 // ---------- 網站連結卡 ----------
 export function websiteFlex(url) {
   const body = {
-    type: 'box', layout: 'vertical', paddingAll: '18px', backgroundColor: BODY_BG, spacing: 'sm',
+    type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
     contents: [
-      text('點下方按鈕直接登入，', { size: 'sm', color: C.inkSoft, wrap: true }),
-      text('可看月曆、趨勢、血檢，', { size: 'sm', color: C.inkSoft, wrap: true }),
-      text('修改任何一筆紀錄。', { size: 'sm', color: C.inkSoft, wrap: true }),
-      { type: 'separator', margin: 'lg', color: '#EAE6DB' },
-      text('連結會隨使用自動延長效期，請勿轉傳給別人。', { size: 'xs', color: C.muted, wrap: true, margin: 'lg' })
+      text('點下方按鈕直接登入', { size: 'md', weight: 'bold', color: '#3F2B18', align: 'center' }),
+      text('月曆・回診摘要・血檢趨勢\n每一筆紀錄都能修改補登', { size: 'xs', color: C.muted, wrap: true, align: 'center', margin: 'md' }),
+      { type: 'separator', margin: 'xl', color: '#F0EADF' },
+      text('連結會隨使用自動延長效期；就算過期，輸入「照護站」拿新連結，資料都不會消失。請勿轉傳給別人。', { size: 'xxs', color: C.muted, wrap: true, margin: 'lg' })
     ]
   };
   const footer = {
@@ -319,13 +342,15 @@ export function weekFlex(petName, rows) {
   });
 
   const body = {
-    type: 'box', layout: 'vertical', paddingAll: '18px', backgroundColor: BODY_BG,
+    type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
     contents: [
-      text('長條＝總水分（ml）', { size: 'xs', color: C.muted }),
+      text('長條＝總水分（ml）', { size: 'xs', color: C.muted, align: 'center' }),
       ...dayRows,
-      { type: 'separator', margin: 'lg', color: '#EAE6DB' },
-      statRow('日均水分', `${fmt(avg((row) => row.totalWaterMl))} ml`),
-      statRow('日均熱量', `${fmt(avg((row) => row.kcal))} kcal`)
+      { type: 'separator', margin: 'xl', color: '#F0EADF' },
+      statCellRow([
+        statCell('日均水分', fmt(avg((row) => row.totalWaterMl)), 'ml'),
+        statCell('日均熱量', fmt(avg((row) => row.kcal)), 'kcal')
+      ])
     ]
   };
   const footer = {
@@ -358,10 +383,10 @@ export function reminderFlex(pet, lines) {
     }
   }
   const body = {
-    type: 'box', layout: 'vertical', paddingAll: '18px', backgroundColor: BODY_BG,
+    type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
     contents: [
       ...items,
-      { type: 'separator', margin: 'lg', color: '#EAE6DB' },
+      { type: 'separator', margin: 'lg', color: '#F0EADF' },
       text('做了但忘了記的話，補記一下就好；有不放心的狀況請諮詢獸醫師。',
         { size: 'xs', color: C.muted, wrap: true, margin: 'lg' })
     ]
@@ -394,11 +419,11 @@ export function visitReminderFlex(pet, visits, vetsById, dateLabel) {
     if (visit.reason) contents.push(statRow('原因', visit.reason));
   }
   contents.push(
-    { type: 'separator', margin: 'lg', color: '#EAE6DB' },
+    { type: 'separator', margin: 'lg', color: '#F0EADF' },
     text('回診前可先看「回診摘要」，或到照護站的「回診」頁一鍵複製給醫生 🐾',
       { size: 'xs', color: C.muted, wrap: true, margin: 'lg' })
   );
-  const body = { type: 'box', layout: 'vertical', paddingAll: '18px', backgroundColor: BODY_BG, contents };
+  const body = { type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG, contents };
   const footer = {
     type: 'box', layout: 'horizontal', spacing: 'sm', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
     contents: [
