@@ -189,7 +189,7 @@ export function recordFlex({ pet, categoryKey, mainText, subText, summary, date,
       { type: 'button', height: 'sm', style: 'link', color: C.brand,
         action: { type: 'postback', label: '刪除這筆', data: `action=delLog&logId=${logId}`, displayText: '刪除剛剛那筆' } },
       { type: 'button', height: 'sm', style: 'primary', color: C.brand,
-        action: { type: 'message', label: '開啟照護站', text: '網站' } }
+        action: { type: 'message', label: '開啟照護站', text: '照護站' } }
     ]
   };
   const headerTitle = title || `已記錄・${pet?.petName || '貓貓'}`;
@@ -225,7 +225,7 @@ export function todayFlex({ pet, date, summary, dateLabel }) {
     type: 'box', layout: 'horizontal', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
     contents: [
       { type: 'button', height: 'sm', style: 'primary', color: C.brand,
-        action: { type: 'message', label: '開啟照護站', text: '網站' } }
+        action: { type: 'message', label: '開啟照護站', text: '照護站' } }
     ]
   };
   return bubble(
@@ -399,7 +399,7 @@ export function weekFlex(petName, rows) {
     type: 'box', layout: 'vertical', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
     contents: [
       { type: 'button', height: 'sm', style: 'primary', color: C.brand,
-        action: { type: 'message', label: '開啟照護站看完整趨勢', text: '網站' } }
+        action: { type: 'message', label: '開啟照護站看完整趨勢', text: '照護站' } }
     ]
   };
   return bubble(
@@ -439,7 +439,7 @@ export function reminderFlex(pet, lines) {
       { type: 'button', height: 'sm', style: 'link', color: C.brand,
         action: { type: 'message', label: '看今天', text: '今天' } },
       { type: 'button', height: 'sm', style: 'primary', color: C.brand,
-        action: { type: 'message', label: '開啟照護站', text: '網站' } }
+        action: { type: 'message', label: '開啟照護站', text: '照護站' } }
     ]
   };
   return bubble(
@@ -472,7 +472,7 @@ export function visitReminderFlex(pet, visits, vetsById, dateLabel) {
       { type: 'button', height: 'sm', style: 'link', color: C.brand,
         action: { type: 'message', label: '回診摘要', text: '回診摘要' } },
       { type: 'button', height: 'sm', style: 'primary', color: C.brand,
-        action: { type: 'message', label: '開啟照護站', text: '網站' } }
+        action: { type: 'message', label: '開啟照護站', text: '照護站' } }
     ]
   };
   return bubble(
