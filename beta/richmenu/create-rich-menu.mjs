@@ -70,9 +70,10 @@ const { richMenuId } = await api('https://api.line.me/v2/bot/richmenu', {
 console.log('已建立選單', richMenuId);
 
 const image = await readFile(imagePath);
+const contentType = imagePath.endsWith('.jpg') || imagePath.endsWith('.jpeg') ? 'image/jpeg' : 'image/png';
 await api(`https://api-data.line.me/v2/bot/richmenu/${richMenuId}/content`, {
   method: 'POST',
-  headers: { 'Content-Type': 'image/png' },
+  headers: { 'Content-Type': contentType },
   body: image
 });
 console.log('已上傳圖片', imagePath);

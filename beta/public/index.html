@@ -142,10 +142,10 @@
     }
     .btn-primary:hover { background: linear-gradient(180deg, #734921, #5a3617); box-shadow: var(--glow-brand); }
     .btn-secondary {
-      background: var(--sheet); border-color: var(--line-strong); color: var(--ink-soft);
-      box-shadow: 0 1px 2px rgba(27, 29, 26, 0.05);
+      background: #fff; border-color: rgba(115, 73, 33, 0.34); color: #5a3617;
+      box-shadow: 0 1px 2px rgba(27, 29, 26, 0.06), 0 3px 8px rgba(115, 73, 33, 0.08);
     }
-    .btn-secondary:hover { border-color: var(--ink); color: var(--ink); box-shadow: var(--shadow-soft); }
+    .btn-secondary:hover { border-color: var(--brand); color: var(--brand); box-shadow: var(--glow-brand); }
     .btn-danger { background: transparent; color: var(--seal); }
     .btn-danger:hover { background: var(--seal-tint); }
     .btn-sm { padding: 5px 12px; font-size: 13px; }
@@ -197,9 +197,14 @@
     /* 區塊卡：每個段落用柔影優雅區隔 */
     .block {
       background: linear-gradient(180deg, #ffffff 0%, var(--sheet-soft) 100%);
-      border: 1px solid var(--line); border-radius: var(--radius);
-      box-shadow: var(--shadow-soft);
-      padding: 18px 20px; margin-top: 24px;
+      border: 1px solid rgba(115, 73, 33, 0.15); border-radius: var(--radius);
+      box-shadow: 0 1px 3px rgba(27, 29, 26, 0.05), 0 10px 26px rgba(90, 54, 23, 0.09);
+      padding: 20px 22px; margin-top: 28px;
+    }
+    /* 每張卡的標題前加品牌色小記號，一眼分區 */
+    .block .section-head h2::before {
+      content: ''; width: 4px; height: 17px; border-radius: 2px;
+      background: linear-gradient(180deg, #8a5a2c, var(--brand)); flex: none;
     }
     .block .section-head { margin-top: 0; margin-bottom: 10px; }
     .block .empty { background: none; border: none; padding: 18px 8px; }
@@ -365,15 +370,64 @@
     .login-step:last-child { border-bottom: none; }
     .login-step .num { font-family: var(--serif); color: var(--brand); font-weight: 600; font-size: 15px; }
 
-    /* 快速新增(手機大按鈕) */
+    /* 頁面模式：h1 底下的小標，避免和貓名擠成一行亂斷行 */
+    .page-mode {
+      margin-top: 8px; font-family: var(--serif); font-size: 16.5px; font-weight: 600;
+      color: var(--brand); letter-spacing: 0.08em;
+    }
+    /* 快速新增(手機大按鈕)：要一眼看得出是按鈕 */
     .quick-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
     .qbtn {
-      min-height: 48px; border: 1px solid var(--line); border-radius: var(--radius);
-      background: linear-gradient(180deg, #ffffff, var(--sheet-soft));
-      box-shadow: var(--shadow-soft); font-weight: 600; font-size: 14.5px; color: var(--ink);
-      cursor: pointer; transition: border-color .15s, box-shadow .15s;
+      display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+      min-height: 52px; border: 1px solid rgba(115, 73, 33, 0.32); border-radius: var(--radius);
+      background: #fff;
+      box-shadow: 0 1px 2px rgba(27, 29, 26, 0.06), 0 4px 12px rgba(115, 73, 33, 0.1);
+      font-weight: 600; font-size: 15px; color: var(--ink);
+      cursor: pointer; transition: border-color .15s, box-shadow .15s, transform .05s;
     }
-    .qbtn:hover { border-color: var(--brand); }
+    .qbtn .q-plus { color: var(--brand); font-weight: 700; }
+    .qbtn:hover { border-color: var(--brand); box-shadow: var(--glow-brand); }
+    .qbtn:active { transform: translateY(1px); box-shadow: 0 1px 2px rgba(27, 29, 26, 0.08); }
+    /* 日期列：前後天併成一組膠囊，不再散落 */
+    .day-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 16px; }
+    .date-nav {
+      display: inline-flex; align-items: stretch; border: 1px solid var(--line-strong);
+      border-radius: var(--radius-sm); background: var(--sheet); overflow: hidden;
+    }
+    .date-nav button {
+      border: none; background: none; cursor: pointer; padding: 0 14px;
+      font-size: 18px; color: var(--brand); font-weight: 700;
+    }
+    .date-nav button:hover { background: var(--brand-tint); }
+    .date-nav input[type="date"] {
+      width: auto; min-width: 122px; border: none; border-radius: 0; box-shadow: none; background: none;
+      border-left: 1px solid var(--line); border-right: 1px solid var(--line); text-align: center;
+    }
+    .date-nav input[type="date"]:focus { box-shadow: none; }
+    /* 動作卡：交接卡/回診整理，一列兩張小卡 */
+    .action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 24px; }
+    .action-card {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 16px; border: 1px solid rgba(115, 73, 33, 0.16); border-left: 3px solid var(--brand);
+      border-radius: var(--radius-sm) var(--radius) var(--radius) var(--radius-sm);
+      background: linear-gradient(180deg, #ffffff, var(--brand-tint));
+      box-shadow: var(--shadow-soft);
+    }
+    .action-card .action-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+    .action-card .action-info b { font-size: 14.5px; }
+    .action-card .action-info span { color: var(--ink-soft); font-size: 12.5px; line-height: 1.5; }
+    /* 近 7 天摘要：畫面用結構化排版，複製才給純文字 */
+    .vs-h {
+      display: flex; align-items: center; gap: 12px; margin: 18px 0 4px;
+      font-size: 12.5px; font-weight: 700; letter-spacing: 0.18em; color: var(--brand);
+    }
+    .vs-h:first-child { margin-top: 4px; }
+    .vs-h::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+    .vs-row { display: flex; gap: 12px; padding: 7px 2px; border-bottom: 1px dashed var(--line); font-size: 14px; }
+    .vs-row:last-child { border-bottom: none; }
+    .vs-date { flex: 0 0 60px; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 13px; padding-top: 1px; }
+    .vs-val { flex: 1; color: var(--ink); line-height: 1.55; }
+    .vs-empty { color: var(--muted); font-size: 13px; padding: 6px 2px; }
     /* 今日照護確認卡 */
     .confirm-row { display: flex; gap: 14px; padding: 10px 2px; border-bottom: 1px solid var(--line); font-size: 14.5px; }
     .confirm-row:last-of-type { border-bottom: none; }
@@ -397,11 +451,18 @@
     .onboard-step:last-child { border-bottom: none; }
     .onboard-step .num { font-family: var(--serif); color: var(--brand); font-weight: 700; }
     @media (max-width: 760px) {
-      .quick-grid { grid-template-columns: repeat(3, 1fr); }
+      .quick-grid { grid-template-columns: repeat(3, 1fr); gap: 9px; }
+      .qbtn { min-height: 50px; font-size: 14.5px; }
+      .page-mode { font-size: 15.5px; }
+      .action-row { grid-template-columns: 1fr; gap: 12px; }
+      .day-toolbar { row-gap: 12px; }
+      .day-toolbar .btn-secondary { flex: 1 0 100%; }
+      .date-nav { flex: 1; min-width: max-content; }
+      .date-nav input[type="date"] { flex: 1; }
 
       /* 手機：留白加大、區塊間距拉開，讓每一段都能呼吸 */
-      .shell { width: calc(100% - 22px); padding-top: 12px; }
-      #appView { padding: 30px 22px 42px; }
+      .shell { width: calc(100% - 26px); padding-top: 12px; }
+      #appView { padding: 32px 20px 44px; }
       h1 { font-size: 30px; }
       .date-line { margin-top: 6px; }
       .topbar { row-gap: 14px; }
@@ -415,7 +476,7 @@
       .stat-grid .card { padding: 16px 18px 14px; }
       .stat-grid .card:last-child:nth-child(odd) { grid-column: 1 / -1; }
       .doctor-note { margin-top: 28px; padding: 16px 18px; }
-      .block { margin-top: 30px; padding: 20px 18px; }
+      .block { margin-top: 26px; padding: 22px 18px; }
       .section-head { margin-top: 34px; }
       .entry { grid-template-columns: 1fr; gap: 6px; padding: 15px 2px; }
       .entry-actions { flex-direction: row; }
@@ -462,7 +523,8 @@
         <div class="topbar">
           <div>
             <div class="eyebrow">讓每一次紀錄，都是對貓貓的守護</div>
-            <h1 style="margin-top:10px"><span id="petTitle">貓貓</span><span id="pageMode">｜今天的照護確認</span></h1>
+            <h1 style="margin-top:10px" id="petTitle">貓貓</h1>
+            <div class="page-mode" id="pageMode">今天的照護確認</div>
             <div class="date-line" id="dateLine"></div>
           </div>
           <div class="spacer"></div>
@@ -479,22 +541,29 @@
 
       <!-- 今天：照護確認板 -->
       <section class="panel" id="todayView">
-        <div class="quick-grid">
-          <button class="qbtn" data-quick="food" type="button">＋ 吃飯</button>
-          <button class="qbtn" data-quick="water" type="button">＋ 喝水</button>
-          <button class="qbtn" data-quick="med" type="button">＋ 用藥</button>
-          <button class="qbtn" data-quick="vomit" type="button">＋ 嘔吐</button>
-          <button class="qbtn" data-quick="stool" type="button">＋ 便便</button>
-          <button class="qbtn" data-quick="mood" type="button">＋ 精神</button>
-          <button class="qbtn" data-quick="note" type="button">＋ 備註</button>
-        </div>
-        <div class="toolbar" style="margin-top:16px">
-          <button class="link-btn" id="dayPrevBtn" type="button" aria-label="前一天">‹</button>
-          <input type="date" id="dayPicker">
-          <button class="link-btn" id="dayNextBtn" type="button" aria-label="後一天">›</button>
-          <button class="link-btn" id="goTodayBtn" type="button">回到今天</button>
-          <div class="spacer" style="flex:1"></div>
-          <button class="btn btn-secondary btn-sm" id="addLogBtn" type="button">補登其他時間</button>
+        <div class="block" style="margin-top:0">
+          <div class="section-head">
+            <h2>快速記一筆</h2>
+          </div>
+          <div class="quick-grid">
+            <button class="qbtn" data-quick="food" type="button"><span class="q-plus">＋</span>吃飯</button>
+            <button class="qbtn" data-quick="water" type="button"><span class="q-plus">＋</span>喝水</button>
+            <button class="qbtn" data-quick="med" type="button"><span class="q-plus">＋</span>用藥</button>
+            <button class="qbtn" data-quick="vomit" type="button"><span class="q-plus">＋</span>嘔吐</button>
+            <button class="qbtn" data-quick="stool" type="button"><span class="q-plus">＋</span>便便</button>
+            <button class="qbtn" data-quick="mood" type="button"><span class="q-plus">＋</span>精神</button>
+            <button class="qbtn" data-quick="note" type="button"><span class="q-plus">＋</span>備註</button>
+          </div>
+          <div class="day-toolbar">
+            <div class="date-nav">
+              <button id="dayPrevBtn" type="button" aria-label="前一天">‹</button>
+              <input type="date" id="dayPicker">
+              <button id="dayNextBtn" type="button" aria-label="後一天">›</button>
+            </div>
+            <button class="link-btn" id="goTodayBtn" type="button">回到今天</button>
+            <div class="spacer" style="flex:1"></div>
+            <button class="btn btn-secondary btn-sm" id="addLogBtn" type="button">補登其他時間</button>
+          </div>
         </div>
         <div class="block">
           <div class="section-head">
@@ -503,18 +572,14 @@
           <div id="confirmList"></div>
           <div class="save-state" id="saveState"></div>
         </div>
-        <div class="block">
-          <div class="section-head">
-            <h2>今日交接卡</h2>
-            <button class="btn btn-secondary btn-sm" id="copyHandoffBtn" type="button">複製交接卡</button>
+        <div class="action-row">
+          <div class="action-card">
+            <div class="action-info"><b>今日交接卡</b><span>複製今天的照護狀況，交接給家人朋友</span></div>
+            <button class="btn btn-secondary btn-sm" id="copyHandoffBtn" type="button">複製</button>
           </div>
-          <p class="muted" style="margin:0;font-size:13px">一鍵複製今天的照護狀況，清楚交接給家人朋友。</p>
-        </div>
-        <div class="block visit-cta">
-          <b style="font-size:14.5px">回診時想給醫生看的整理</b>
-          <p class="muted" style="margin:6px 0 12px;font-size:13px">整理近 7 天的吃飯、喝水、用藥、腸胃、排便與精神狀態，讓你回診時更清楚。</p>
-          <div style="display:flex;gap:10px;justify-content:flex-end">
-            <button class="btn btn-primary btn-sm" data-tab="trend" type="button">查看回診頁</button>
+          <div class="action-card">
+            <div class="action-info"><b>回診整理</b><span>近 7 天摘要，回診時給醫生看</span></div>
+            <button class="btn btn-secondary btn-sm" data-tab="trend" type="button">查看</button>
           </div>
         </div>
         <div class="block">
@@ -546,7 +611,8 @@
             <h2>近 7 天摘要</h2>
             <button class="btn btn-primary btn-sm" id="copyVisitSummaryBtn" type="button">複製給醫生</button>
           </div>
-          <pre class="copy-text" id="visitSummaryText">整理中…</pre>
+          <p class="muted" style="margin:0 0 6px;font-size:12.5px" id="visitRangeLine"></p>
+          <div id="visitSummaryView"><div class="vs-empty">整理中…</div></div>
         </div>
         <details class="block fold">
           <summary>
@@ -725,9 +791,9 @@
       $('calendarView').classList.toggle('hidden', tab !== 'calendar');
       $('trendView').classList.toggle('hidden', tab !== 'trend');
       $('settingsView').classList.toggle('hidden', tab !== 'settings');
-      if (tab === 'calendar') $('pageMode').textContent = '｜照護月曆';
-      if (tab === 'trend') $('pageMode').textContent = '｜回診整理';
-      if (tab === 'settings') $('pageMode').textContent = '｜設定';
+      if (tab === 'calendar') $('pageMode').textContent = '照護月曆';
+      if (tab === 'trend') $('pageMode').textContent = '回診整理';
+      if (tab === 'settings') $('pageMode').textContent = '設定';
       if (tab === 'today') loadDay();
       if (tab === 'calendar') loadCalendar();
       if (tab === 'trend') loadTrend();
@@ -752,7 +818,7 @@
       if (!state.petId) return;
       $('dayPicker').value = state.date;
       const isToday = state.date === todayStr();
-      $('pageMode').textContent = isToday ? '｜今天的照護確認' : `｜${Number(state.date.slice(5, 7))}月${Number(state.date.slice(8, 10))}日的照護紀錄`;
+      $('pageMode').textContent = isToday ? '今天的照護確認' : `${Number(state.date.slice(5, 7))}月${Number(state.date.slice(8, 10))}日的照護紀錄`;
       $('confirmTitle').textContent = isToday ? '今日照護確認' : '當日照護確認';
       const data = await api(`day?petId=${state.petId}&date=${state.date}`);
       state.dayLogs = data.logs;
@@ -1311,74 +1377,90 @@
       if (rows.length) boxContainer.appendChild(labChart(rows));
     }
 
-    // 近 7 天純文字摘要（回診時可整份複製給醫生）
-    function buildVisitSummaryText(rows, from, to, todaySummary) {
+    // 近 7 天摘要：同一份資料產生畫面排版與複製用純文字；沒有的值不顯示 0
+    function buildVisitSummary(rows, from, to, todaySummary) {
       const pet = currentPet();
       const byDate = Object.fromEntries(rows.map((row) => [row.date, row]));
       const dates = [];
       for (let d = from; d <= to; d = shiftDate(d, 1)) dates.push(d);
-      const label = (date) => `${Number(date.slice(5, 7))}月${Number(date.slice(8, 10))}日`;
-      const lines = [`${pet ? pet.petName : '貓貓'}｜近 7 天照護摘要（${label(from)}—${label(to)}）`];
+      const label = (date) => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
+      const sections = [];
 
-      lines.push('', '【飲食】');
-      let anyFood = false;
+      const foodRows = [];
       for (const date of dates) {
         const r = byDate[date];
-        if (!r || !r.entryCount) continue;
+        if (!r) continue;
         const food = (r.dryFoodG || 0) + (r.wetFoodG || 0) + (r.otherFoodG || 0);
-        lines.push(`${label(date)}　食物 ${fmt(food)} g・熱量 ${fmt(r.kcal)} kcal`);
-        anyFood = true;
+        if (!(food > 0) && !(r.kcal > 0)) continue;
+        const parts = [];
+        if (food > 0) parts.push(`食物 ${fmt(food)} g`);
+        if (r.kcal > 0) parts.push(`熱量 ${fmt(r.kcal)} kcal`);
+        foodRows.push([label(date), parts.join('・')]);
       }
-      if (!anyFood) lines.push('這 7 天尚未看到飲食紀錄');
+      sections.push({ title: '飲食', rows: foodRows, emptyText: '這 7 天尚未看到飲食紀錄' });
 
-      lines.push('', '【飲水】');
-      let anyWater = false;
+      const waterRows = [];
       for (const date of dates) {
         const r = byDate[date];
-        if (!r || !r.entryCount) continue;
-        lines.push(`${label(date)}　總水分 ${fmt(r.totalWaterMl)} ml（喝水 ${fmt(r.waterMl)}＋食物 ${fmt(r.foodWaterMl)}）`);
-        anyWater = true;
+        if (!r || !(r.totalWaterMl > 0)) continue;
+        waterRows.push([label(date), r.foodWaterMl > 0
+          ? `總水分 ${fmt(r.totalWaterMl)} ml（喝 ${fmt(r.waterMl)}＋食物 ${fmt(r.foodWaterMl)}）`
+          : `喝水 ${fmt(r.totalWaterMl)} ml`]);
       }
-      if (!anyWater) lines.push('這 7 天尚未看到飲水紀錄');
+      sections.push({ title: '飲水', rows: waterRows, emptyText: '這 7 天尚未看到飲水紀錄' });
 
-      lines.push('', '【用藥】');
-      const noMedDates = [];
-      let anyMed = false;
+      const medRows = [];
+      let noMedCount = 0;
       for (const date of dates) {
         const r = byDate[date];
         let meds = [];
         try { meds = Array.isArray(r?.medJson) ? r.medJson : JSON.parse(r?.medJson || '[]'); } catch (error) { /* ignore */ }
-        if (!meds.length) { noMedDates.push(date); continue; }
-        for (const m of meds) {
-          lines.push(`${label(date)}　${[m.slot, m.name].filter(Boolean).join(' ') || '藥'} ${MED_LABEL(m.status) || '有紀錄'}`);
-        }
-        anyMed = true;
+        if (!meds.length) { noMedCount += 1; continue; }
+        medRows.push([label(date), meds.map((m) =>
+          `${[m.slot, m.name].filter(Boolean).join(' ') || '藥'} ${MED_LABEL(m.status) || '有紀錄'}`).join('、')]);
       }
-      if (anyMed && noMedDates.length) lines.push(`尚未看到用藥紀錄的日期：${noMedDates.map(label).join('、')}`);
-      if (!anyMed) lines.push('這 7 天尚未看到用藥紀錄');
+      if (medRows.length && noMedCount) medRows.push(['', `其他 ${noMedCount} 天尚未看到用藥紀錄`]);
+      sections.push({ title: '用藥', rows: medRows, emptyText: '這 7 天尚未看到用藥紀錄' });
 
-      lines.push('', '【嘔吐】');
-      const vomitDays = dates.filter((date) => byDate[date]?.vomitCount > 0);
-      if (vomitDays.length) vomitDays.forEach((date) => lines.push(`${label(date)}　${byDate[date].vomitCount} 次`));
-      else lines.push('這 7 天沒有嘔吐紀錄');
+      const vomitRows = dates.filter((date) => byDate[date]?.vomitCount > 0)
+        .map((date) => [label(date), `${byDate[date].vomitCount} 次`]);
+      sections.push({ title: '嘔吐', rows: vomitRows, emptyText: '這 7 天沒有嘔吐紀錄' });
 
-      lines.push('', '【排便】');
-      const stoolDays = dates.filter((date) => byDate[date]?.stoolCount > 0);
-      if (stoolDays.length) stoolDays.forEach((date) => lines.push(`${label(date)}　${byDate[date].stoolCount} 次`));
-      else lines.push('這 7 天尚未看到排便紀錄');
+      const stoolRows = dates.filter((date) => byDate[date]?.stoolCount > 0)
+        .map((date) => [label(date), `${byDate[date].stoolCount} 次`]);
+      sections.push({ title: '排便', rows: stoolRows, emptyText: '這 7 天尚未看到排便紀錄' });
 
-      lines.push('', '【精神】');
       const moods = todaySummary?.moodNotes || [];
-      lines.push(moods.length ? `今天：${moods.join('；')}` : '今天尚未紀錄精神狀態');
+      sections.push({ title: '精神', rows: moods.length ? [['今天', moods.join('；')]] : [], emptyText: '今天尚未紀錄精神狀態' });
 
       const latestLab = latestLabInfo();
       if (latestLab) {
-        lines.push('', '【血檢】', `最近一次 ${label(latestLab.date)}：${latestLab.text}`);
+        sections.push({ title: '血檢（最近一次）', rows: [[latestLab.date.slice(5).replace('-', '/'), latestLab.text]], emptyText: '' });
       }
 
-      const noRecDates = dates.filter((date) => !byDate[date] || !byDate[date].entryCount);
-      if (noRecDates.length && noRecDates.length < dates.length) {
-        lines.push('', `尚未看到紀錄的日期：${noRecDates.map(label).join('、')}`);
+      return {
+        petName: pet ? pet.petName : '貓貓',
+        rangeText: `${label(from)} — ${label(to)}`,
+        sections
+      };
+    }
+
+    function visitSummaryHtml(data) {
+      return data.sections.map((sec) => {
+        const body = sec.rows.length
+          ? sec.rows.map(([d, v]) =>
+              `<div class="vs-row"><span class="vs-date">${esc(d)}</span><span class="vs-val">${esc(v)}</span></div>`).join('')
+          : `<div class="vs-empty">${esc(sec.emptyText)}</div>`;
+        return `<div class="vs-h">${esc(sec.title)}</div>${body}`;
+      }).join('');
+    }
+
+    function visitSummaryCopyText(data) {
+      const lines = [`${data.petName}｜近 7 天照護摘要（${data.rangeText}）`];
+      for (const sec of data.sections) {
+        lines.push('', `【${sec.title}】`);
+        if (!sec.rows.length) { lines.push(sec.emptyText); continue; }
+        for (const [d, v] of sec.rows) lines.push(d ? `${d}　${v}` : v);
       }
       return lines.join('\n');
     }
@@ -1411,8 +1493,11 @@
       const todayLabel = `${Number(to.slice(5, 7))}月${Number(to.slice(8, 10))}日`;
       $('doctorNote').textContent = buildDoctorNote(dayData.summary, todayLabel);
       renderDayVisits();
-      $('visitSummaryText').textContent = buildVisitSummaryText(
+      const vsData = buildVisitSummary(
         data.rows.filter((row) => row.date >= from7), from7, to, dayData.summary);
+      $('visitRangeLine').textContent = `${vsData.petName}｜${vsData.rangeText}`;
+      $('visitSummaryView').innerHTML = visitSummaryHtml(vsData);
+      state.visitSummaryCopy = visitSummaryCopyText(vsData);
       const latestLab = latestLabInfo();
       $('labLatestLine').textContent = latestLab
         ? `最近一次：${latestLab.date}｜${latestLab.text}`
@@ -2052,7 +2137,7 @@
     $('copyDoctorBtn').addEventListener('click', () =>
       copyText($('doctorNote').textContent, '已複製，可直接貼給醫生。'));
     $('copyVisitSummaryBtn').addEventListener('click', () =>
-      copyText($('visitSummaryText').textContent, '已複製近 7 天摘要，回診時可直接貼給醫生。'));
+      copyText(state.visitSummaryCopy || '', '已複製近 7 天摘要，回診時可直接貼給醫生。'));
     $('copyHandoffBtn').addEventListener('click', () =>
       copyText(buildHandoffText(), '已複製今日交接卡，可以直接貼給家人朋友。'));
     $('showAllLogsBtn').addEventListener('click', () => {
