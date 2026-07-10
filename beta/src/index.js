@@ -804,7 +804,12 @@ async function handleRecord(env, event, pet, record, lineUserId) {
     description = `水 ${record.amount} ml`;
   } else if (record.category === 'food') {
     const foods = await listFoods(db, lineUserId);
-    const matched = matchFood(foods, record.itemName, record.foodType);
+    // 沒寫品名時，若該類型只建了一種品項就自動套用（例如乾糧只有一種 → 直接用它的公式）
+    let matched = matchFood(foods, record.itemName, record.foodType);
+    if (!matched && !record.itemName) {
+      const sameType = foods.filter((food) => food.foodType === record.foodType);
+      if (sameType.length === 1) matched = sameType[0];
+    }
     if (matched) {
       log.foodId = matched.foodId;
       log.itemName = matched.displayName;
