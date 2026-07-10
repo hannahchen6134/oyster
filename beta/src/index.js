@@ -5,10 +5,10 @@
 
 import { parseMessage, matchFood, normalizeText } from './parser.js';
 import { handleApi } from './api.js';
-import { verifyLineSignature, replyOrPush, replyOrPushFlex, pushText, getProfile } from './line.js';
+import { verifyLineSignature, replyOrPush, replyOrPushFlex, pushText, pushMessages, getProfile } from './line.js';
 import { hasAnyReminder, parseReminderSettings, buildReminderLines, reminderMessage, visitReminderMessage } from './reminders.js';
 import { shortDate } from './replies.js';
-import { recordFlex, todayFlex, websiteFlex } from './flex.js';
+import { recordFlex, todayFlex, websiteFlex, menuFlex, weekFlex, reminderFlex, visitReminderFlex } from './flex.js';
 import {
   ensureUser, updateUser, listPets, createPet, resolveDefaultPet,
   listFoods, insertLog, getLog, softDeleteLog, recomputeDay, getRecentSummaries,
@@ -16,7 +16,8 @@ import {
 } from './db.js';
 import {
   recordReply, todayReply, weekReply, monthReply, visitReply,
-  websiteReply, helpText, welcomeText, unknownReply, invalidReply
+  websiteReply, helpText, welcomeText, unknownReply, invalidReply,
+  recordTutorial, medTutorial
 } from './replies.js';
 import { jsonResponse, taipeiToday, taipeiNowDateTime, addDays } from './util.js';
 
@@ -72,7 +73,12 @@ async function runDailyReminders(env) {
       const rows = await getRecentSummaries(db, pet.petId, today, 8);
       const lines = buildReminderLines(pet, rows);
       if (lines.length) {
-        await pushText(env, pet.ownerLineUserId, reminderMessage(pet, lines));
+        try {
+          await pushMessages(env, pet.ownerLineUserId, [reminderFlex(pet, lines)]);
+        } catch (flexError) {
+          console.warn('reminder flex failed, fallback to text:', flexError.message);
+          await pushText(env, pet.ownerLineUserId, reminderMessage(pet, lines));
+        }
         console.log(JSON.stringify({ step: 'reminder_sent', petId: pet.petId, count: lines.length }));
       }
 
@@ -88,7 +94,12 @@ async function runDailyReminders(env) {
         if (visits?.length) {
           const vets = await listVetsByOwner(db, pet.ownerLineUserId);
           const vetsById = Object.fromEntries(vets.map((vet) => [vet.vetId, vet]));
-          await pushText(env, pet.ownerLineUserId, visitReminderMessage(pet, visits, vetsById, shortDate(tomorrow)));
+          try {
+            await pushMessages(env, pet.ownerLineUserId, [visitReminderFlex(pet, visits, vetsById, shortDate(tomorrow))]);
+          } catch (flexError) {
+            console.warn('visit flex failed, fallback to text:', flexError.message);
+            await pushText(env, pet.ownerLineUserId, visitReminderMessage(pet, visits, vetsById, shortDate(tomorrow)));
+          }
           console.log(JSON.stringify({ step: 'visit_reminder_sent', petId: pet.petId }));
         }
       }
@@ -206,6 +217,16 @@ async function handleTextMessage(event, env, baseUrl) {
         break;
       }
     }
+  }
+
+  // 說明選單卡的教學子頁
+  if (text === '如何記錄') {
+    await replyOrPush(env, event, recordTutorial());
+    return;
+  }
+  if (text === '如何記餵藥' || text === '如何記藥') {
+    await replyOrPush(env, event, medTutorial());
+    return;
   }
 
   const intent = parseMessage(text);
@@ -354,7 +375,7 @@ async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId) {
   }
 
   if (query === 'help') {
-    await replyOrPush(env, event, helpText());
+    await replyOrPushFlex(env, event, menuFlex(), helpText());
     return;
   }
 
@@ -376,7 +397,7 @@ async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId) {
 
   if (query === 'week') {
     const rows = await getRecentSummaries(db, pet.petId, today, 7);
-    await replyOrPush(env, event, weekReply(pet.petName, rows));
+    await replyOrPushFlex(env, event, weekFlex(pet.petName, rows), weekReply(pet.petName, rows));
     return;
   }
 

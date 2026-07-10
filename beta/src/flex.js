@@ -241,3 +241,154 @@ export function websiteFlex(url) {
   };
   return bubble('照護站登入連結', { type: 'bubble', size: 'mega', header: header('🔗 照護站'), body, footer });
 }
+
+// ---------- 說明選單卡 ----------
+function menuRow(label, sendText, primary = false) {
+  return {
+    type: 'box', layout: 'vertical',
+    backgroundColor: primary ? C.brand : '#F3EDDD',
+    cornerRadius: '10px', paddingAll: '12px', margin: 'sm',
+    action: { type: 'message', label, text: sendText },
+    contents: [text(label, { align: 'center', weight: 'bold', size: 'sm', color: primary ? '#FFFFFF' : C.ink })]
+  };
+}
+
+export function menuFlex() {
+  const body = {
+    type: 'box', layout: 'vertical', paddingAll: '16px', background: BODY_BG,
+    contents: [
+      text('選擇想了解的功能', { size: 'xs', color: C.muted, align: 'center' }),
+      menuRow('如何記錄', '如何記錄'),
+      menuRow('如何記餵藥', '如何記餵藥'),
+      menuRow('看今日總結', '今天'),
+      menuRow('看近 7 天', '近7天'),
+      menuRow('開啟照護站', '網站', true)
+    ]
+  };
+  return bubble('使用說明選單', { type: 'bubble', size: 'mega', header: header('📖 想做什麼？'), body });
+}
+
+// ---------- 近 7 天迷你圖卡（長條＝水分） ----------
+export function weekFlex(petName, rows) {
+  const maxWater = Math.max(1, ...rows.map((row) => Number(row.totalWaterMl) || 0));
+  const recorded = rows.filter((row) => row.entryCount > 0);
+  const avg = (selector) => (recorded.length
+    ? recorded.reduce((total, row) => total + (Number(selector(row)) || 0), 0) / recorded.length
+    : 0);
+
+  const dayRows = rows.map((row) => {
+    const day = `${Number(row.date.slice(5, 7))}/${Number(row.date.slice(8, 10))}`;
+    const warn = row.vomitCount > 0 || row.medIssueCount > 0;
+    const water = Number(row.totalWaterMl) || 0;
+    const pct = Math.max(row.entryCount ? 4 : 0, Math.round((water / maxWater) * 100));
+    return {
+      type: 'box', layout: 'horizontal', margin: 'md',
+      contents: [
+        text(`${day}${warn ? '⚠' : ''}`, { size: 'xs', color: warn ? C.seal : C.muted, flex: 2, gravity: 'center' }),
+        {
+          type: 'box', layout: 'vertical', flex: 6, backgroundColor: '#E6DFCC',
+          cornerRadius: '3px', height: '8px', margin: 'sm',
+          contents: pct > 0
+            ? [{ type: 'box', layout: 'vertical', backgroundColor: C.olive, cornerRadius: '3px', height: '8px', width: `${pct}%`, contents: [{ type: 'filler' }] }]
+            : [{ type: 'filler' }]
+        },
+        text(row.entryCount ? fmt(water) : '—', { size: 'xs', color: C.inkSoft, flex: 2, align: 'end', gravity: 'center' })
+      ]
+    };
+  });
+
+  const body = {
+    type: 'box', layout: 'vertical', paddingAll: '18px', background: BODY_BG,
+    contents: [
+      text('長條＝總水分（ml）', { size: 'xs', color: C.muted }),
+      ...dayRows,
+      { type: 'separator', margin: 'lg', color: '#E3DCC9' },
+      statRow('日均水分', `${fmt(avg((row) => row.totalWaterMl))} ml`),
+      statRow('日均熱量', `${fmt(avg((row) => row.kcal))} kcal`)
+    ]
+  };
+  const footer = {
+    type: 'box', layout: 'vertical', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
+    contents: [
+      { type: 'button', height: 'sm', style: 'primary', color: C.brand,
+        action: { type: 'message', label: '開啟照護站看完整趨勢', text: '網站' } }
+    ]
+  };
+  return bubble(
+    `近 7 天（${petName}）日均水分 ${fmt(avg((row) => row.totalWaterMl))} ml`,
+    { type: 'bubble', size: 'mega', header: header(`📈 近 7 天・${petName}`), body, footer }
+  );
+}
+
+// ---------- 照護提醒卡 ----------
+export function reminderFlex(pet, lines) {
+  const items = [];
+  for (const line of lines) {
+    const [main, ...subs] = String(line).split('\n');
+    items.push({
+      type: 'box', layout: 'horizontal', margin: 'md',
+      contents: [
+        text('・', { size: 'sm', color: C.seal, flex: 0 }),
+        text(main, { size: 'sm', color: C.ink, wrap: true, flex: 1 })
+      ]
+    });
+    for (const sub of subs) {
+      items.push(text(sub.trim(), { size: 'xs', color: C.muted, wrap: true, margin: 'xs' }));
+    }
+  }
+  const body = {
+    type: 'box', layout: 'vertical', paddingAll: '18px', background: BODY_BG,
+    contents: [
+      ...items,
+      { type: 'separator', margin: 'lg', color: '#E3DCC9' },
+      text('做了但忘了記的話，補記一下就好；真的有異常請諮詢獸醫師。',
+        { size: 'xs', color: C.muted, wrap: true, margin: 'lg' })
+    ]
+  };
+  const footer = {
+    type: 'box', layout: 'horizontal', spacing: 'sm', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
+    contents: [
+      { type: 'button', height: 'sm', style: 'link', color: C.inkSoft,
+        action: { type: 'message', label: '看今天', text: '今天' } },
+      { type: 'button', height: 'sm', style: 'primary', color: C.brand,
+        action: { type: 'message', label: '開啟照護站', text: '網站' } }
+    ]
+  };
+  return bubble(
+    `照護提醒（${pet.petName}）${lines.length} 項`,
+    { type: 'bubble', size: 'mega', header: header(`🔔 照護提醒・${pet.petName}`), body, footer }
+  );
+}
+
+// ---------- 回診提醒卡 ----------
+export function visitReminderFlex(pet, visits, vetsById, dateLabel) {
+  const contents = [
+    text(`明天 ${dateLabel}`, { size: 'xl', weight: 'bold', color: C.ink })
+  ];
+  for (const visit of visits) {
+    if (visit.visitTime) contents.push(statRow('時間', visit.visitTime));
+    const vet = vetsById[visit.vetId];
+    const where = vet ? [vet.hospitalName, vet.doctorName].filter(Boolean).join('・') : '';
+    if (where) contents.push(statRow('地點', where));
+    if (visit.reason) contents.push(statRow('原因', visit.reason));
+  }
+  contents.push(
+    { type: 'separator', margin: 'lg', color: '#E3DCC9' },
+    text('回診前可先看「近 7 天」摘要，或到照護站複製給醫生的一句話 🐾',
+      { size: 'xs', color: C.muted, wrap: true, margin: 'lg' })
+  );
+  const body = { type: 'box', layout: 'vertical', paddingAll: '18px', background: BODY_BG, contents };
+  const footer = {
+    type: 'box', layout: 'horizontal', spacing: 'sm', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
+    contents: [
+      { type: 'button', height: 'sm', style: 'link', color: C.inkSoft,
+        action: { type: 'message', label: '近 7 天', text: '近7天' } },
+      { type: 'button', height: 'sm', style: 'primary', color: C.brand,
+        action: { type: 'message', label: '開啟照護站', text: '網站' } }
+    ]
+  };
+  return bubble(
+    `回診提醒：明天 ${dateLabel}`,
+    { type: 'bubble', size: 'mega', header: header(`🏥 回診提醒・${pet.petName}`), body, footer }
+  );
+}
