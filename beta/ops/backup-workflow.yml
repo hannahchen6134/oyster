@@ -1,0 +1,36 @@
+# 每日自動備份：放到「私有」的 oyster-backups repo 的 .github/workflows/backup.yml
+# 需要在該 repo 的 Settings → Secrets and variables → Actions 新增兩個 secret：
+#   CLOUDFLARE_API_TOKEN   （Cloudflare API Token，需含 D1 讀取權限）
+#   CLOUDFLARE_ACCOUNT_ID  （6c81022b43adfbc4a417b4b551495d6a）
+name: 每日資料庫備份
+on:
+  schedule:
+    - cron: '0 18 * * *'   # 18:00 UTC = 台北 02:00
+  workflow_dispatch: {}     # 也可以手動按一下就備份
+permissions:
+  contents: write
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: 匯出 D1 資料庫
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          mkdir -p backups
+          npx wrangler@4 d1 export cat-care-beta --remote --output "backups/$(date +%F).sql"
+      - name: 清掉 60 天前的舊備份
+        run: |
+          find backups -name '*.sql' -mtime +60 -delete || true
+      - name: 提交備份
+        run: |
+          git config user.name "backup-bot"
+          git config user.email "backup-bot@users.noreply.github.com"
+          git add backups
+          git diff --cached --quiet || git commit -m "每日備份 $(date +%F)"
+          git push
