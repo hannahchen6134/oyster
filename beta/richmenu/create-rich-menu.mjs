@@ -36,8 +36,8 @@ const menu = {
     cell(0, 0, send('紀錄')),
     cell(1, 0, send('今天')),
     cell(2, 0, send('回診摘要')),
-    // 喵喵照護站：傳「照護站」→ 回專屬連結卡（新朋友也不會看到登入頁）
-    cell(0, 1, send('照護站')),
+    // 喵喵照護站：直接開網站（回訪者已登入一點就進；新朋友會看到登入引導頁）
+    cell(0, 1, { type: 'uri', uri: 'https://cat-care-beta.hannahchen6134.workers.dev/' }),
     cell(1, 1, send('月曆')),
     cell(2, 1, send('安心上手'))
   ]
