@@ -260,8 +260,8 @@
       line-height: 1.75; letter-spacing: 0.02em;
       border-left: 2px solid var(--brand); padding-left: 14px;
     }
-    .section-head { display: flex; align-items: center; gap: 14px; margin-top: 34px; margin-bottom: 12px; }
-    .section-head h2 { margin: 0; flex: 1; }
+    .section-head { display: flex; align-items: center; gap: 10px 14px; margin-top: 34px; margin-bottom: 12px; flex-wrap: wrap; }
+    .section-head h2 { margin: 0; flex: 1 1 auto; min-width: max-content; }
     .visit-item {
       display: flex; align-items: flex-start; gap: 12px; padding: 13px 16px;
       border: 1px solid rgba(115, 73, 33, 0.14); border-left: 3px solid var(--brand);
@@ -469,9 +469,15 @@
     .vs-h::after { content: ''; flex: 1; height: 1px; background: var(--line); }
     .vs-row { display: flex; gap: 12px; padding: 8px 2px; border-bottom: 1px dashed var(--line); font-size: 14px; font-variant-numeric: tabular-nums; }
     .vs-row:last-child { border-bottom: none; }
-    .vs-date { flex: 0 0 60px; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 13px; padding-top: 1px; }
+    .vs-date { flex: 0 0 auto; min-width: 60px; white-space: nowrap; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 13px; padding-top: 1px; }
     .vs-val { flex: 1; color: var(--ink); line-height: 1.55; }
     .vs-empty { color: var(--muted); font-size: 13px; padding: 6px 2px; }
+    .range-chips { display: flex; gap: 8px; margin: 2px 0 10px; }
+    .range-chips button {
+      border: 1px solid var(--line-strong); background: var(--sheet); color: var(--ink-soft);
+      border-radius: 999px; padding: 4px 14px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+    }
+    .range-chips button.active { background: var(--brand); border-color: var(--brand); color: #fff; }
     .fold-inline { margin-top: 10px; }
     .fold-inline summary {
       list-style: none; cursor: pointer; text-align: center;
@@ -676,9 +682,14 @@
       <section class="panel hidden" id="trendView">
         <div class="block" style="margin-top:14px">
           <div class="section-head">
-            <h2>近 7 天摘要</h2>
+            <h2>回診摘要</h2>
             <button class="btn btn-secondary btn-sm" id="pdfReportBtn" type="button">PDF 報告</button>
             <button class="btn btn-primary btn-sm" id="copyVisitSummaryBtn" type="button">複製給醫生</button>
+          </div>
+          <div class="range-chips">
+            <button data-range="7" type="button">7 天</button>
+            <button data-range="14" type="button" class="active">14 天</button>
+            <button data-range="30" type="button">30 天</button>
           </div>
           <p class="muted" style="margin:0 0 6px;font-size:12.5px" id="visitRangeLine"></p>
           <div id="visitHighlights"></div>
@@ -780,6 +791,7 @@
       date: todayStr(),
       calMonth: todayStr().slice(0, 7),
       settingsTab: '',
+      visitRange: 14,
       foods: [],
       meds: [],
       vets: [],
@@ -1458,7 +1470,7 @@
         if (r.kcal > 0) parts.push(`熱量 ${fmt(r.kcal)} kcal`);
         foodRows.push([label(date), parts.join('・')]);
       }
-      sections.push({ title: '飲食', rows: foodRows, emptyText: '這 7 天尚未看到飲食紀錄' });
+      sections.push({ title: '飲食', rows: foodRows, emptyText: `這 ${dates.length} 天尚未看到飲食紀錄` });
 
       const waterRows = [];
       for (const date of dates) {
@@ -1468,7 +1480,7 @@
           ? `總水分 ${fmt(r.totalWaterMl)} ml（喝 ${fmt(r.waterMl)}＋食物 ${fmt(r.foodWaterMl)}）`
           : `喝水 ${fmt(r.totalWaterMl)} ml`]);
       }
-      sections.push({ title: '飲水', rows: waterRows, emptyText: '這 7 天尚未看到飲水紀錄' });
+      sections.push({ title: '飲水', rows: waterRows, emptyText: `這 ${dates.length} 天尚未看到飲水紀錄` });
 
       const medRows = [];
       let noMedCount = 0;
@@ -1489,16 +1501,16 @@
         title: '用藥',
         rows: medAllOk ? [['', `${medRows.length} 天皆有用藥紀錄`]] : medRows,
         copyRows: medRows,
-        emptyText: '這 7 天尚未看到用藥紀錄'
+        emptyText: `這 ${dates.length} 天尚未看到用藥紀錄`
       });
 
       const vomitRows = dates.filter((date) => byDate[date]?.vomitCount > 0)
         .map((date) => [label(date), `${byDate[date].vomitCount} 次`]);
-      sections.push({ title: '嘔吐', rows: vomitRows, emptyText: '這 7 天沒有嘔吐紀錄' });
+      sections.push({ title: '嘔吐', rows: vomitRows, emptyText: `這 ${dates.length} 天沒有嘔吐紀錄` });
 
       const stoolRows = dates.filter((date) => byDate[date]?.stoolCount > 0)
         .map((date) => [label(date), `${byDate[date].stoolCount} 次`]);
-      sections.push({ title: '排便', rows: stoolRows, emptyText: '這 7 天尚未看到排便紀錄' });
+      sections.push({ title: '排便', rows: stoolRows, emptyText: `這 ${dates.length} 天尚未看到排便紀錄` });
 
       const moods = todaySummary?.moodNotes || [];
       sections.push({ title: '精神', rows: moods.length ? [['今天', moods.join('；')]] : [], emptyText: '今天尚未紀錄精神狀態' });
@@ -1511,6 +1523,7 @@
       return {
         petName: pet ? pet.petName : '貓貓',
         rangeText: `${label(from)} — ${label(to)}`,
+        dayCount: dates.length,
         sections
       };
     }
@@ -1526,7 +1539,7 @@
     }
 
     function visitSummaryCopyText(data) {
-      const lines = [`${data.petName}｜近 7 天照護摘要（${data.rangeText}）`];
+      const lines = [`${data.petName}｜近 ${data.dayCount} 天照護摘要（${data.rangeText}）`];
       for (const sec of data.sections) {
         const rows = sec.copyRows || sec.rows;
         lines.push('', `【${sec.title}】`);
@@ -1549,7 +1562,7 @@
       if (!state.petId) return;
       const to = todayStr();
       const fromDate = new Date(Date.now() - 29 * 86400000).toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
-      const from7 = shiftDate(to, -6);
+      const from7 = shiftDate(to, -(state.visitRange - 1));
       const [data, dayData, vetsData, visitsData, labsData] = await Promise.all([
         api(`summary?petId=${state.petId}&from=${fromDate}&to=${to}`),
         api(`day?petId=${state.petId}&date=${to}`),
@@ -1580,7 +1593,7 @@
       if (vomitDays) attention.push(`嘔吐 ${vomitDays} 天`);
       if (issueDays) attention.push(`用藥留意 ${issueDays} 天`);
       const highlightRows = [
-        ['紀錄', `${recorded7.length} 天有紀錄`],
+        ['紀錄', `${recorded7.length}／${state.visitRange} 天有紀錄`],
         ['日均水分', recorded7.length ? `${avg7((row) => row.totalWaterMl)} ml` : '—'],
         ['日均熱量', recorded7.length ? `${avg7((row) => row.kcal)} kcal` : '—'],
         ['留意', attention.length ? attention.join('・') : '這 7 天都很平穩']
@@ -2139,6 +2152,14 @@
         return loadSettings();
       }
 
+      const rangeBtn = event.target.closest('.range-chips [data-range]');
+      if (rangeBtn) {
+        state.visitRange = Number(rangeBtn.dataset.range) || 14;
+        document.querySelectorAll('.range-chips [data-range]').forEach((el) =>
+          el.classList.toggle('active', el === rangeBtn));
+        return loadTrend();
+      }
+
       const calCell = event.target.closest('.cal-cell[data-date]');
       if (calCell) {
         state.date = calCell.dataset.date;
@@ -2291,7 +2312,7 @@
         <h1>${esc(pet.petName || '貓貓')}｜照護報告</h1>
         <div class="pr-meta">${esc(meta || '')}</div>
         <div class="pr-meta">產生日期 ${esc(today)}・喵喵照護安心管家</div>
-        <h2>近 7 天摘要</h2>
+        <h2>近 ${state.visitRange} 天摘要</h2>
         <pre>${esc(state.visitSummaryCopy || '')}</pre>
         ${labHtml}
         <h2>近 30 天每日總覽</h2>
