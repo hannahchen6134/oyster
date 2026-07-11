@@ -26,7 +26,7 @@ export function visitReminderMessage(pet, visits, vetsById, dateLabel) {
     if (where) lines.push(where);
     if (visit.reason) lines.push(`原因：${visit.reason}`);
   }
-  lines.push('', '回診前輸入「回診摘要」', '可先看近況整理 🐾');
+  lines.push('', '回診前輸入「回診摘要」', '可先看近況整理');
   return lines.join('\n');
 }
 

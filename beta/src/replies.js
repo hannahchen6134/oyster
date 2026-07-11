@@ -57,17 +57,17 @@ function parseGoalSlots(pet) {
 }
 
 const ENCOURAGE_PROGRESS = [
-  '慢慢來，今天還有時間，{name}有你照顧很安心 🐾',
+  '慢慢來，今天還有時間，{name}有你照顧很安心',
   '記下來就不會漏，你做得很好',
   '一步一步來，{name}的健康有你把關',
-  '別擔心，照這個節奏就對了 🐾'
+  '別擔心，照這個節奏就對了'
 ];
 
 const ENCOURAGE_DONE = [
-  '今日目標全部達成！{name}有你真幸福 🐾',
+  '今日目標全部達成！{name}有你真幸福',
   '太棒了，今天的照顧滿分！',
-  '全部完成～給自己一個讚，也給{name}一個摸摸 🐾',
-  '目標達成！安心睡個好覺吧 🐾'
+  '全部完成～給自己一個讚，也給{name}一個摸摸',
+  '目標達成！安心睡個好覺吧'
 ];
 
 function pickLine(pool, seed, name) {
@@ -123,16 +123,16 @@ export function recordReply(description, pet, summary, hints = [], date = '') {
 export function todayReply(pet, date, summary) {
   const petName = pet?.petName || '貓貓';
   if (!summary.entryCount) {
-    return `📅 ${shortDate(date)}（${petName}）\n今天還沒有任何紀錄。\n輸入「水 20」開始記錄。`;
+    return `${shortDate(date)}（${petName}）\n今天還沒有任何紀錄。\n輸入「水 20」開始記錄。`;
   }
-  const lines = [`📅 ${shortDate(date)}（${petName}）${summary.entryCount} 筆`, summaryBlock(summary)];
+  const lines = [`${shortDate(date)}（${petName}）${summary.entryCount} 筆`, summaryBlock(summary)];
   const goals = goalSection(pet, summary, date);
   if (goals) lines.push('', goals);
   return lines.join('\n');
 }
 
 export function weekReply(petName, rows) {
-  const lines = [`📈 近 7 天（${petName}）`];
+  const lines = [`近 7 天（${petName}）`];
   for (const row of rows) {
     const day = `${Number(row.date.slice(5, 7))}/${Number(row.date.slice(8, 10))}`;
     if (!row.entryCount) {
@@ -159,7 +159,7 @@ export function monthReply(petName, monthLabel, rows) {
     return recorded.reduce((total, row) => total + (Number(selector(row)) || 0), 0) / recorded.length;
   };
 
-  const lines = [`🗓️ ${monthLabel}（${petName}）`];
+  const lines = [`️ ${monthLabel}（${petName}）`];
   lines.push(`有紀錄 ${recorded.length} 天`);
   if (noRecordDays > 0) lines.push(`無紀錄 ${noRecordDays} 天`);
   if (recorded.length) {
@@ -193,7 +193,7 @@ export function visitReply(petName, visits, vetsById) {
 
 export function websiteReply(url) {
   return [
-    '🔗 你的專屬照護站連結：',
+    '你的專屬照護站連結：',
     url,
     '',
     '這是你的專屬連結，',
@@ -207,7 +207,7 @@ export function websiteReply(url) {
 
 export function helpText() {
   return [
-    '📖 使用說明',
+    '使用說明',
     BRAND.tagline,
     '',
     '【記錄】直接打字',
@@ -247,7 +247,7 @@ export function helpText() {
 
 export function welcomeText() {
   return [
-    `歡迎使用${BRAND.name} 🐾`,
+    `歡迎使用${BRAND.name}`,
     BRAND.tagline,
     '',
     '第一步：',
@@ -286,7 +286,7 @@ export function invalidReply(reason, category) {
 
 export function recordTutorial() {
   return [
-    '📝 如何記錄',
+    '如何記錄',
     '',
     '直接打字就會記：',
     '水 20',
@@ -336,7 +336,7 @@ export function medTutorial() {
 
 export function onboardingText() {
   return [
-    `🐾 ${BRAND.onboarding}`,
+    `${BRAND.onboarding}`,
     '',
     '第一次使用，可以先從',
     '一筆簡單紀錄開始。',

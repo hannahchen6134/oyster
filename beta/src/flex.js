@@ -310,7 +310,7 @@ export function welcomeFlex() {
       text('之後隨時輸入「安心上手」都有小教學陪你', { size: 'xxs', color: C.muted, align: 'center', margin: 'lg' })
     ]
   };
-  return bubble(`歡迎加入${BRAND.name}！點「幫貓貓建檔」開始`, { type: 'bubble', size: 'mega', header: header('歡迎回家 🐾'), body });
+  return bubble(`歡迎加入${BRAND.name}！點「幫貓貓建檔」開始`, { type: 'bubble', size: 'mega', header: header('歡迎回家'), body });
 }
 
 // ---------- 說明選單卡 ----------
@@ -367,12 +367,12 @@ export function exampleCard() {
       line('藥 早 已吃', '記早上的藥已經餵了'),
       line('吐了', '記一次嘔吐'),
       { type: 'separator', margin: 'xl', color: '#F0EADF' },
-      text('平常怎麼說就怎麼打，「喝了60」「吃了罐頭30」也看得懂 🐾',
+      text('平常怎麼說就怎麼打，「喝了60」「吃了罐頭30」也看得懂',
         { size: 'xxs', color: C.muted, align: 'center', wrap: true, margin: 'lg' })
     ]
   };
   return bubble('照著打打看：水 60、罐頭 30、藥 早 已吃、吐了',
-    { type: 'bubble', size: 'mega', header: header('照著打打看 🐾'), body });
+    { type: 'bubble', size: 'mega', header: header('照著打打看'), body });
 }
 
 export function menuFlex() {
@@ -517,7 +517,7 @@ export function visitReminderFlex(pet, visits, vetsById, dateLabel) {
   }
   contents.push(
     { type: 'separator', margin: 'lg', color: '#F0EADF' },
-    text('回診前可先看「回診摘要」，或到照護站的「回診」頁一鍵複製給醫生 🐾',
+    text('回診前可先看「回診摘要」，或到照護站的「回診」頁一鍵複製給醫生',
       { size: 'xs', color: C.muted, wrap: true, margin: 'lg' })
   );
   const body = { type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG, contents };

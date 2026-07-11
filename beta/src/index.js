@@ -217,7 +217,7 @@ function medAskCard(petName, step = '第 3 步・共 3 步') {
 
 function doneCard(petName) {
   return onboardCard({
-    title: '都準備好了 🐾',
+    title: '都準備好了',
     subtitle: `現在試試看：直接打「水 60」，就幫${petName}記下第一筆`,
     rows: [
       [menuCell('照著打打看', '不會打？點這裡', '範例', true)],
@@ -265,7 +265,7 @@ async function createGuidedFood(db, lineUserId, foodType, name, kcalIn) {
 
 function foodDoneCard(name, foodType, info) {
   return onboardCard({
-    title: `已建立「${name}」🐾`,
+    title: `已建立「${name}」`,
     subtitle: `${foodType}・每克 ${info.kcalPerGram} kcal・水分 ${Math.round(info.waterRatio * 100)}%${info.usedDefault ? '（預設值，照護站可微調）' : ''}`,
     rows: [
       [menuCell('再建一種', '乾乾罐罐都建更好用', '設定食物'), menuCell('下一步：保健品/藥', '有在吃的話', '設定保健品')]
@@ -283,7 +283,7 @@ async function handlePending(env, event, { db, user, pet, pets, lineUserId, text
     await clear();
     if (pending === 'petname' && !pets.length) {
       await replyOrPushFlex(env, event, onboardCard({
-        title: '好，先自己逛逛 🐾',
+        title: '好，先自己逛逛',
         subtitle: '想開始時輸入「安心上手」，我都在',
         rows: [[menuCell('安心上手', '上手小教學', '安心上手'), menuCell('開啟照護站', '看看長什麼樣子', '照護站')]]
       }), '好，想開始時輸入「安心上手」');
@@ -313,7 +313,7 @@ async function handlePending(env, event, { db, user, pet, pets, lineUserId, text
     await updatePetFields(db, pet.petId, { weightKg: Number(m[1]) });
     await clear();
     await replyOrPushFlex(env, event, onboardCard({
-      title: `已記下${pet.petName}的體重 ${m[1]} kg 🐾`,
+      title: `已記下${pet.petName}的體重 ${m[1]} kg`,
       rows: [[menuCell('記年齡', '大約幾歲', '記年齡'), menuCell('完成', '開始使用', '完成設定')]]
     }), `已記下體重 ${m[1]} kg`);
     return true;
@@ -333,7 +333,7 @@ async function handlePending(env, event, { db, user, pet, pets, lineUserId, text
     await updatePetFields(db, pet.petId, { birthday: value });
     await clear();
     await replyOrPushFlex(env, event, onboardCard({
-      title: age ? `已記下${pet.petName}約 ${age[1]} 歲 🐾` : `已記下${pet.petName}的生日 🐾`,
+      title: age ? `已記下${pet.petName}約 ${age[1]} 歲` : `已記下${pet.petName}的生日`,
       subtitle: age ? `生日先記為 ${value}，照護站可調整` : value,
       rows: [[menuCell('記體重', '例如 4.2', '記體重'), menuCell('完成', '開始使用', '完成設定')]]
     }), age ? `已記下約 ${age[1]} 歲` : `已記下生日 ${value}`);
@@ -432,7 +432,7 @@ async function handleTextMessage(event, env, baseUrl) {
   const lineUserId = event.source?.userId;
 
   if (event.source?.type !== 'user' || !lineUserId) {
-    await replyOrPush(env, event, 'Beta 版目前僅支援一對一聊天，請直接私訊我唷 🐾');
+    await replyOrPush(env, event, 'Beta 版目前僅支援一對一聊天，請直接私訊我唷');
     return;
   }
 
@@ -558,7 +558,7 @@ async function handleTextMessage(event, env, baseUrl) {
       await updatePetFields(db, pet.petId, { [field]: value });
       const isWeight = field === 'weightKg';
       await replyOrPushFlex(env, event, onboardCard({
-        title: isWeight ? `已記下${pet.petName}的體重 ${value} kg 🐾` : `已記下${pet.petName}的生日 🐾`,
+        title: isWeight ? `已記下${pet.petName}的體重 ${value} kg` : `已記下${pet.petName}的生日`,
         subtitle: isWeight ? '' : String(value),
         rows: [[
           isWeight ? menuCell('記年齡', '大約幾歲', '記年齡') : menuCell('記體重', '例如 4.2', '記體重'),
@@ -702,7 +702,7 @@ async function handleTextMessage(event, env, baseUrl) {
     case 'invalid': {
       if (intent.reason === 'missing_amount' && intent.category === 'food' && pet) {
         await updateUser(db, lineUserId, { pendingAction: `amount|${text}` });
-        await replyOrPush(env, event, '幾克呢？直接打數字就好 🐾');
+        await replyOrPush(env, event, '幾克呢？直接打數字就好');
         return;
       }
       await replyOrPush(env, event, invalidReply(intent.reason, intent.category));
