@@ -517,12 +517,12 @@
       border-radius: var(--radius-sm); background: linear-gradient(180deg, #fefbf5, #f6efe2); overflow: hidden;
     }
     .date-nav button {
-      border: none; background: none; cursor: pointer; padding: 0 14px;
-      font-size: 18px; color: var(--brand); font-weight: 700;
+      border: none; background: none; cursor: pointer; padding: 0 12px;
+      font-size: 16px; color: var(--brand); font-weight: 700;
     }
     .date-nav button:hover { background: var(--brand-tint); }
     .date-nav input[type="date"] {
-      width: auto; min-width: 122px; border: none; border-radius: 0; box-shadow: none; background: none;
+      width: auto; min-width: 116px; border: none; border-radius: 0; box-shadow: none; background: none;
       border-left: 1px solid var(--line); border-right: 1px solid var(--line); text-align: center;
     }
     .date-nav input[type="date"]:focus { box-shadow: none; }
@@ -597,8 +597,9 @@
       .page-mode { font-size: 15.5px; }
       .day-toolbar { row-gap: 12px; }
       .day-toolbar .btn-secondary { flex: 1 0 100%; }
-      .date-nav { flex: 1; min-width: max-content; }
-      .date-nav input[type="date"] { flex: 1; }
+      .date-nav { min-width: 0; }
+      .day-toolbar { gap: 8px 10px; margin-top: 14px; }
+      .day-toolbar .link-btn { font-size: 12.5px; padding: 5px 12px; }
 
       /* 手機：留白加大、區塊間距拉開，讓每一段都能呼吸 */
       .shell { width: calc(100% - 30px); padding-top: 14px; }
