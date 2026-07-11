@@ -278,6 +278,25 @@ export function onboardCard({ step = '', title, subtitle = '', rows = [], hint =
   });
 }
 
+// ---------- 已刪除：安心卡＋照護站按鈕 ----------
+export function deletedCard(url) {
+  const body = {
+    type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
+    contents: [
+      text('已刪除剛剛的資料囉', { size: 'md', weight: 'bold', color: '#3F2B18', align: 'center' }),
+      text('若要刪除或調整其他紀錄，\n可以開啟照護站處理', { size: 'xs', color: C.muted, wrap: true, align: 'center', margin: 'md' })
+    ]
+  };
+  const footer = {
+    type: 'box', layout: 'vertical', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
+    contents: [
+      { type: 'button', style: 'primary', color: C.brand,
+        action: { type: 'uri', label: '開啟照護站', uri: url } }
+    ]
+  };
+  return bubble('已刪除剛剛的資料', { type: 'bubble', size: 'mega', header: header('已刪除'), body, footer });
+}
+
 // ---------- 補充貓咪資料：深連結到設定→貓咪資料 ----------
 export function petDataFlex(url) {
   const body = {

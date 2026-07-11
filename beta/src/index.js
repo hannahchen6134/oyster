@@ -9,7 +9,7 @@ import { handleApi } from './api.js';
 import { verifyLineSignature, replyOrPush, replyOrPushFlex, replyMessages, pushText, pushMessages, getProfile } from './line.js';
 import { hasAnyReminder, parseReminderSettings, buildReminderLines, reminderMessage, visitReminderMessage } from './reminders.js';
 import { shortDate } from './replies.js';
-import { recordFlex, todayFlex, websiteFlex, menuFlex, recordMenuFlex, weekFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, menuCell, exampleCard, petDataFlex } from './flex.js';
+import { recordFlex, todayFlex, websiteFlex, menuFlex, recordMenuFlex, weekFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, menuCell, exampleCard, petDataFlex, deletedCard } from './flex.js';
 import {
   ensureUser, updateUser, listPets, createPet, resolveDefaultPet, getPet, updatePetFields, createFoodItem, createMedItem,
   listFoods, getFood, insertLog, getLog, getLastLogByUser, softDeleteLog, updateLog,
@@ -156,7 +156,7 @@ async function handleWebhook(request, env, url) {
         if (isDuplicateMessage(event.message.id)) continue;
         await handleTextMessage(event, env, baseUrl);
       } else if (event.type === 'postback') {
-        await handlePostback(event, env);
+        await handlePostback(event, env, baseUrl);
       }
     } catch (error) {
       console.error('event handling failed:', error);
@@ -405,26 +405,29 @@ async function handlePending(env, event, { db, user, pet, pets, lineUserId, text
   return false;
 }
 
-async function handlePostback(event, env) {
+async function handlePostback(event, env, baseUrl) {
   const db = env.DB;
   const lineUserId = event.source?.userId;
   const data = new URLSearchParams(String(event.postback?.data || ''));
+  const action = data.get('action');
 
-  if (data.get('action') === 'fillFood' || data.get('action') === 'fill') return; // 只是把文字填進輸入框，不需回覆
+  if (action === 'fillFood' || action === 'fill') return; // 只是把文字填進輸入框，不需回覆
 
-  if (data.get('action') === 'delLog') {
-    const log = await getLog(db, data.get('logId') || '');
-    if (!log || log.lineUserId !== lineUserId) {
-      await replyOrPush(env, event, '找不到這筆紀錄');
-      return;
+  if (action === 'delLog') {
+    try {
+      const log = await getLog(db, data.get('logId') || '');
+      if (log && log.lineUserId === lineUserId && !log.isDeleted) {
+        await softDeleteLog(db, log.logId, lineUserId);
+        await recomputeDay(db, log.petId, String(log.eventDateTime).slice(0, 10));
+      }
+    } catch (error) {
+      console.error('delLog failed:', error);
     }
-    if (log.isDeleted) {
-      await replyOrPush(env, event, '這筆已經刪除過了');
-      return;
-    }
-    await softDeleteLog(db, log.logId, lineUserId);
-    const summary = await recomputeDay(db, log.petId, String(log.eventDateTime).slice(0, 10));
-    await replyOrPush(env, event, `🗑 已刪除，總結重算完成\n水分 ${summary.totalWaterMl} ml\n熱量 ${summary.kcal} kcal`);
+    // 不論結果都回一張安心卡（避免使用者卡住沒反應）
+    const token = await createSession(db, lineUserId);
+    const url = `${baseUrl}/#token=${token}`;
+    await replyOrPushFlex(env, event, deletedCard(url),
+      '已刪除剛剛的資料囉。若要再調整，請開啟照護站。');
   }
 }
 
