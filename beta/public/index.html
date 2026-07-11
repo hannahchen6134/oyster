@@ -352,13 +352,28 @@
     .cal-legend .cdot { display: inline-block; margin-right: 5px; vertical-align: 1px; }
 
     /* 表格：表頭墨線、列規線 */
-    .table-wrap { overflow-x: auto; }
+    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
     th, td { border-bottom: 1px solid var(--line); padding: 9px 10px; text-align: right; white-space: nowrap; }
     th:first-child, td:first-child { text-align: left; }
     th { color: var(--ink-soft); font-size: 11.5px; font-weight: 600; letter-spacing: 0.1em; border-bottom: 2px solid var(--brand); }
     tbody tr:nth-child(even) td { background: rgba(115, 73, 33, 0.035); }
     tr.warn td { background: var(--seal-tint); }
+
+    /* 每日數字表：日期凍結欄＋三大主欄強調 */
+    .scroll-hint { text-align: center; font-size: 11.5px; color: var(--muted); margin: 0 0 8px; letter-spacing: 0.08em; }
+    .trend-table td.col-date, .trend-table th.col-date {
+      position: sticky; left: 0; z-index: 1; text-align: left;
+      background: #fbf7ef; box-shadow: 1px 0 0 var(--line);
+    }
+    .trend-table th.col-date { z-index: 2; background: #f6efe2; }
+    .trend-table tbody tr:nth-child(even) td.col-date { background: #f4ecdd; }
+    .trend-table tr.warn td.col-date { background: var(--seal-tint); }
+    .trend-table th.col-primary { color: var(--brand); border-bottom-width: 2px; }
+    .trend-table td.col-primary { background: rgba(115, 73, 33, 0.05); }
+    .trend-table tbody tr:nth-child(even) td.col-primary { background: rgba(115, 73, 33, 0.08); }
+    .trend-table td.col-primary b { color: #4a3620; font-size: 14px; }
+    .trend-table tr.warn td.col-primary { background: var(--seal-tint); }
 
     /* 設定 */
     /* 設定：兩層式選單（先分組選單，點進去才是單一功能） */
@@ -780,10 +795,22 @@
             <span class="fold-toggle">＋</span>
           </summary>
           <div class="fold-body">
+            <div class="range-chips" id="tableRangeChips">
+              <button data-trange="30" type="button" class="active">30 天</button>
+              <button data-trange="60" type="button">60 天</button>
+              <button data-trange="90" type="button">90 天</button>
+            </div>
+            <p class="scroll-hint">← 左右滑動看更多欄位 →</p>
             <div class="table-wrap">
-              <table>
+              <table class="trend-table">
                 <thead>
-                  <tr><th>日期</th><th>總水分</th><th>喝水</th><th>食物水</th><th>乾糧 g</th><th>罐/濕固形 g</th><th>熱量</th><th>藥記錄</th><th>藥留意</th><th>吐</th><th>便</th><th>筆數</th></tr>
+                  <tr>
+                    <th class="col-date">日期</th>
+                    <th class="col-primary">總水分</th>
+                    <th class="col-primary">總熱量</th>
+                    <th>喝水</th><th>食物水</th><th>乾糧 g</th><th>罐/濕 g</th>
+                    <th>藥</th><th>留意</th><th>吐</th><th>便</th><th>筆數</th>
+                  </tr>
                 </thead>
                 <tbody id="trendBody"></tbody>
               </table>
@@ -842,6 +869,7 @@
       calMonth: todayStr().slice(0, 7),
       settingsTab: '',
       visitRange: 14,
+      tableDays: 30,
       foods: [],
       meds: [],
       vets: [],
@@ -1660,21 +1688,30 @@
 
       renderTrendCharts(data.rows, fromDate, to);
       renderLabTrend();
+      await loadTable();
+    }
+
+    // 每日數字表：獨立範圍（30/60/90 天），可左右滑動
+    async function loadTable() {
+      if (!state.petId) return;
+      const to = todayStr();
+      const from = shiftDate(to, -(state.tableDays - 1));
+      const data = await api(`summary?petId=${state.petId}&from=${from}&to=${to}`);
       const rows = [...data.rows].reverse();
+      const tc = $('tableCount'); if (tc) tc.textContent = `（${rows.length} 天）`;
       if (!rows.length) {
-        $('trendBody').innerHTML = '<tr><td colspan="12" style="text-align:center;color:var(--muted)">近 30 天還沒有紀錄</td></tr>';
+        $('trendBody').innerHTML = `<tr><td colspan="12" style="text-align:center;color:var(--muted)">近 ${state.tableDays} 天還沒有紀錄</td></tr>`;
         return;
       }
-      const tc = $('tableCount'); if (tc) tc.textContent = `（${rows.length} 天）`;
       $('trendBody').innerHTML = rows.map((row) => `
         <tr class="${row.vomitCount || row.medIssueCount ? 'warn' : ''}">
-          <td>${esc(row.date.slice(5).replace('-', '/'))}</td>
-          <td><b>${fmtInt(row.totalWaterMl)}</b></td>
+          <td class="col-date">${esc(row.date.slice(5).replace('-', '/'))}</td>
+          <td class="col-primary"><b>${fmtInt(row.totalWaterMl)}</b></td>
+          <td class="col-primary"><b>${fmtInt(row.kcal)}</b></td>
           <td>${fmtInt(row.waterMl)}</td>
           <td>${fmtInt(row.foodWaterMl)}</td>
           <td>${fmtInt(row.dryFoodG)}</td>
           <td>${fmtInt(row.wetFoodG)}</td>
-          <td><b>${fmtInt(row.kcal)}</b></td>
           <td>${row.medTakenCount || ''}</td>
           <td>${row.medIssueCount || ''}</td>
           <td>${row.vomitCount || ''}</td>
@@ -2225,6 +2262,13 @@
         document.querySelectorAll('.range-chips [data-range]').forEach((el) =>
           el.classList.toggle('active', el === rangeBtn));
         return loadTrend();
+      }
+      const trangeBtn = event.target.closest('#tableRangeChips [data-trange]');
+      if (trangeBtn) {
+        state.tableDays = Number(trangeBtn.dataset.trange) || 30;
+        document.querySelectorAll('#tableRangeChips [data-trange]').forEach((el) =>
+          el.classList.toggle('active', el === trangeBtn));
+        return loadTable();
       }
 
       const calCell = event.target.closest('.cal-cell[data-date]');
