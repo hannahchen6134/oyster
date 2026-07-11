@@ -9,7 +9,7 @@ import { handleApi } from './api.js';
 import { verifyLineSignature, replyOrPush, replyOrPushFlex, replyMessages, pushText, pushMessages, getProfile } from './line.js';
 import { hasAnyReminder, parseReminderSettings, buildReminderLines, reminderMessage, visitReminderMessage } from './reminders.js';
 import { shortDate } from './replies.js';
-import { recordFlex, todayFlex, websiteFlex, menuFlex, recordMenuFlex, weekFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, menuCell } from './flex.js';
+import { recordFlex, todayFlex, websiteFlex, menuFlex, recordMenuFlex, weekFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, menuCell, exampleCard } from './flex.js';
 import {
   ensureUser, updateUser, listPets, createPet, resolveDefaultPet, getPet, updatePetFields, createFoodItem, createMedItem,
   listFoods, getFood, insertLog, getLog, getLastLogByUser, softDeleteLog, updateLog,
@@ -220,9 +220,9 @@ function doneCard(petName) {
     title: '都準備好了 🐾',
     subtitle: `現在試試看：直接打「水 60」，就幫${petName}記下第一筆`,
     rows: [
+      [menuCell('照著打打看', '不會打？點這裡', '範例', true)],
       [menuCell('快速紀錄', '點按鈕記錄', '紀錄'), menuCell('今日確認', '看今天狀況', '今天')],
-      [menuCell('補體重年齡', '選填', '補體重年齡'), menuCell('再新增一隻貓', '多貓家庭', '幫貓貓建檔')],
-      [menuCell('開啟照護站', '月曆・回診・設定', '照護站', true)]
+      [menuCell('補體重年齡', '選填', '補體重年齡'), menuCell('開啟照護站', '月曆・回診・設定', '照護站')]
     ],
     hint: '疾病、疫苗、醫院醫生等詳細資料，之後可在照護站的「設定」頁慢慢記錄',
     alt: '都準備好了！'
@@ -490,6 +490,11 @@ async function handleTextMessage(event, env, baseUrl) {
       const newPet = await createPet(db, lineUserId, { petName: intent.name });
       if (!pets.length) await updateUser(db, lineUserId, { defaultPetId: newPet.petId });
       await replyOrPushFlex(env, event, stepFoodCard(), `已幫「${intent.name}」建立檔案！先建常吃的食物：輸入「設定罐頭」「設定乾糧」等`);
+      return;
+    }
+
+    case 'exampleMenu': {
+      await replyOrPushFlex(env, event, exampleCard(), '照著打打看：\n水 60（記喝水）\n罐頭 30（記食物）\n藥 早 已吃\n吐了');
       return;
     }
 

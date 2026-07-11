@@ -320,6 +320,42 @@ export function menuCell(label, sub, sendText, primary = false) {
   };
 }
 
+// 照著打打看：可直接點的範例指令（點一句就記一筆，教學於無形）
+export function exampleCard() {
+  const line = (cmd, desc) => ({
+    type: 'box', layout: 'horizontal', alignItems: 'center', spacing: 'md',
+    margin: 'md', paddingAll: '10px',
+    backgroundColor: '#FBF8F1', cornerRadius: '12px',
+    borderColor: '#E9E0CE', borderWidth: '1px',
+    action: { type: 'message', label: cmd, text: cmd },
+    contents: [
+      {
+        type: 'box', layout: 'vertical', flex: 0,
+        backgroundColor: C.tint, cornerRadius: '8px',
+        paddingAll: '7px', paddingStart: '12px', paddingEnd: '12px',
+        contents: [text(cmd, { size: 'sm', weight: 'bold', color: C.brand })]
+      },
+      text(desc, { size: 'xs', color: C.muted, flex: 1, gravity: 'center', wrap: true }),
+      text('›', { size: 'lg', color: '#D8CDBA', flex: 0, gravity: 'center' })
+    ]
+  });
+  const body = {
+    type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
+    contents: [
+      text('第一次記，照著點點看就懂了', { size: 'xs', color: C.muted, align: 'center', wrap: true }),
+      line('水 60', '記一筆喝水 60 ml'),
+      line('罐頭 30', '記一筆罐頭 30 克'),
+      line('藥 早 已吃', '記早上的藥已經餵了'),
+      line('吐了', '記一次嘔吐'),
+      { type: 'separator', margin: 'xl', color: '#F0EADF' },
+      text('平常怎麼說就怎麼打，「喝了60」「吃了罐頭30」也看得懂 🐾',
+        { size: 'xxs', color: C.muted, align: 'center', wrap: true, margin: 'lg' })
+    ]
+  };
+  return bubble('照著打打看：水 60、罐頭 30、藥 早 已吃、吐了',
+    { type: 'bubble', size: 'mega', header: header('照著打打看 🐾'), body });
+}
+
 export function menuFlex() {
   const row = (cells) => ({ type: 'box', layout: 'horizontal', spacing: 'md', margin: 'md', contents: cells });
   const body = {
@@ -327,7 +363,7 @@ export function menuFlex() {
     contents: [
       text(BRAND.tagline, { size: 'xs', color: C.muted, align: 'center', wrap: true }),
       row([menuCell(BRAND.onboarding, '第一次使用看這裡', '安心上手')]),
-      row([menuCell('如何記錄', '打字範例', '如何記錄'), menuCell('如何記餵藥', '藥的記法', '如何記餵藥')]),
+      row([menuCell('照著打打看', '點一句就記', '範例'), menuCell('如何記餵藥', '藥的記法', '如何記餵藥')]),
       row([menuCell('今日照護確認', '看今天狀況', '今天'), menuCell('回診摘要', '近 7 天整理', '回診摘要')]),
       row([menuCell('開啟照護站', '月曆・血檢・設定', '照護站', true)])
     ]
