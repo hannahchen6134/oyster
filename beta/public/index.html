@@ -52,12 +52,18 @@
     /* 紙面：一整張，頂端墨色規線，浮在柔光桌面上，帶紙張顆粒 */
     #appView {
       position: relative;
-      background: var(--sheet);
-      border: 1px solid rgba(27, 29, 26, 0.08);
-      border-top: 3px solid var(--ink);
+      background: linear-gradient(180deg, #fffdf8 0%, var(--sheet-soft) 100%);
+      border: 1px solid rgba(115, 73, 33, 0.12);
+      border-top: none;
       border-radius: 0 0 var(--radius) var(--radius);
       box-shadow: var(--shadow-lift);
-      padding: 36px 48px 44px;
+      padding: 34px 44px 44px;
+    }
+    /* 頂端暖咖啡漸層帶，讓網站和 LINE 卡片同一個世界 */
+    #appView::after {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 6px;
+      border-radius: 6px 6px 0 0;
+      background: linear-gradient(90deg, #8a5a2c 0%, var(--brand) 45%, #5a3617 100%);
     }
     #appView::before, .login-card::before {
       content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
@@ -203,10 +209,10 @@
     .entry-actions { display: flex; gap: 4px; }
     /* 區塊卡：每個段落用柔影優雅區隔 */
     .block {
-      background: linear-gradient(180deg, #ffffff 0%, var(--sheet-soft) 100%);
-      border: 1px solid rgba(115, 73, 33, 0.15); border-radius: var(--radius);
-      box-shadow: 0 1px 3px rgba(27, 29, 26, 0.05), 0 10px 26px rgba(90, 54, 23, 0.09);
-      padding: 20px 22px; margin-top: 28px;
+      background: linear-gradient(180deg, #fffefb 0%, #f8f2e6 100%);
+      border: 1px solid rgba(115, 73, 33, 0.14); border-radius: 14px;
+      box-shadow: 0 1px 3px rgba(90, 54, 23, 0.05), 0 10px 26px rgba(90, 54, 23, 0.08);
+      padding: 20px 22px; margin-top: 26px;
     }
     /* 每張卡的標題前加品牌色小記號，一眼分區 */
     .block .section-head h2::before {
@@ -435,20 +441,21 @@
     .quick-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
     .qbtn {
       display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-      min-height: 52px; border: 1px solid rgba(115, 73, 33, 0.32); border-radius: var(--radius);
-      background: #fff;
-      box-shadow: 0 1px 2px rgba(27, 29, 26, 0.06), 0 4px 12px rgba(115, 73, 33, 0.1);
-      font-weight: 600; font-size: 15px; color: var(--ink);
+      min-height: 54px; border: 1px solid rgba(115, 73, 33, 0.22); border-radius: 13px;
+      background: linear-gradient(180deg, #fefbf5 0%, #f6efe2 100%);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), 0 2px 8px rgba(115, 73, 33, 0.09);
+      font-weight: 600; font-size: 15px; color: #4a3620;
       cursor: pointer; transition: border-color .15s, box-shadow .15s, transform .05s;
     }
-    .qbtn .q-plus { color: var(--brand); font-weight: 700; }
+    .qbtn .q-plus { color: var(--brand); font-weight: 700; font-size: 16px; }
     .qbtn:hover { border-color: var(--brand); box-shadow: var(--glow-brand); }
+    .qbtn:active { transform: translateY(1px); }
     .qbtn:active { transform: translateY(1px); box-shadow: 0 1px 2px rgba(27, 29, 26, 0.08); }
     /* 日期列：前後天併成一組膠囊，不再散落 */
     .day-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 16px; }
     .date-nav {
-      display: inline-flex; align-items: stretch; border: 1px solid var(--line-strong);
-      border-radius: var(--radius-sm); background: var(--sheet); overflow: hidden;
+      display: inline-flex; align-items: stretch; border: 1px solid rgba(115, 73, 33, 0.2);
+      border-radius: var(--radius-sm); background: linear-gradient(180deg, #fefbf5, #f6efe2); overflow: hidden;
     }
     .date-nav button {
       border: none; background: none; cursor: pointer; padding: 0 14px;
@@ -535,8 +542,10 @@
       .date-nav input[type="date"] { flex: 1; }
 
       /* 手機：留白加大、區塊間距拉開，讓每一段都能呼吸 */
-      .shell { width: calc(100% - 26px); padding-top: 12px; }
-      #appView { padding: 32px 20px 44px; }
+      .shell { width: calc(100% - 30px); padding-top: 14px; }
+      #appView { padding: 30px 18px 44px; border-radius: 0 0 14px 14px; }
+      #appView::after { border-radius: 0; }
+      .block { padding: 20px 17px; }
       h1 { font-size: 30px; }
       .date-line { margin-top: 6px; }
       .topbar { row-gap: 14px; }
