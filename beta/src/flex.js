@@ -489,6 +489,122 @@ export function weekFlex(petName, rows) {
   );
 }
 
+// ---------- 月曆卡（純聊天泡泡，不需開網站；點日期看那天細節） ----------
+const WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日'];
+
+function monthShift(month, delta) {
+  const y = Number(month.slice(0, 4));
+  const m = Number(month.slice(5, 7));
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+// 空白格（月初補位）
+function calBlankCell() {
+  return { type: 'box', layout: 'vertical', flex: 1, height: '46px', contents: [{ type: 'filler' }] };
+}
+
+// 狀態圓點：置中的小圓（olive＝有紀錄，seal＝需留意，null＝留白對齊）
+function calDot(color) {
+  const dot = { type: 'box', layout: 'vertical', width: '6px', height: '6px', cornerRadius: '999px', backgroundColor: color, contents: [{ type: 'filler' }] };
+  return {
+    type: 'box', layout: 'horizontal', height: '7px', margin: 'xs',
+    contents: color ? [{ type: 'filler' }, dot, { type: 'filler' }] : [{ type: 'filler' }]
+  };
+}
+
+function calDayCell(month, day, row, { isToday, isFuture }) {
+  const recorded = row && Number(row.entryCount) > 0;
+  let flags = [];
+  try { flags = JSON.parse(row?.abnormalFlags || '[]'); } catch (error) { flags = []; }
+  const warn = Boolean(row) && (Number(row.vomitCount) > 0 || Number(row.medIssueCount) > 0 || (Array.isArray(flags) && flags.length > 0));
+  const dotColor = warn ? C.seal : recorded ? C.olive : null;
+  const numColor = isFuture ? '#D2C6B2' : isToday ? C.brand : recorded ? C.ink : C.muted;
+  const cell = {
+    type: 'box', layout: 'vertical', flex: 1, height: '46px',
+    cornerRadius: '8px', paddingTop: '6px', paddingBottom: '4px',
+    backgroundColor: isToday ? '#F1E7D6' : recorded ? '#FBF8F1' : undefined,
+    borderColor: isToday ? C.brand : undefined,
+    borderWidth: isToday ? '1px' : undefined,
+    contents: [
+      text(String(day), { size: 'sm', weight: isToday ? 'bold' : 'regular', color: numColor, align: 'center' }),
+      calDot(dotColor)
+    ]
+  };
+  if (recorded && !isFuture) {
+    const dateStr = `${month}-${String(day).padStart(2, '0')}`;
+    cell.action = { type: 'postback', data: `action=calDay&date=${dateStr}`, displayText: `看 ${Number(month.slice(5, 7))}/${day}` };
+  }
+  return cell;
+}
+
+// rows：該月 1 號到 lastDate 的 daily_summary（由 getRecentSummaries 補零）
+export function monthFlex(petName, month, rows, today) {
+  const year = Number(month.slice(0, 4));
+  const mon = Number(month.slice(5, 7));
+  const daysInMonth = new Date(year, mon, 0).getDate();
+  const firstWeekday = (new Date(year, mon - 1, 1).getDay() + 6) % 7; // 週一為 0
+  const byDay = new Map();
+  for (const row of rows) byDay.set(Number(row.date.slice(8, 10)), row);
+
+  const cells = [];
+  for (let i = 0; i < firstWeekday; i += 1) cells.push(calBlankCell());
+  for (let d = 1; d <= daysInMonth; d += 1) {
+    const dateStr = `${month}-${String(d).padStart(2, '0')}`;
+    cells.push(calDayCell(month, d, byDay.get(d), { isToday: dateStr === today, isFuture: dateStr > today }));
+  }
+  while (cells.length % 7 !== 0) cells.push(calBlankCell());
+
+  const weeks = [];
+  for (let i = 0; i < cells.length; i += 7) {
+    weeks.push({ type: 'box', layout: 'horizontal', spacing: 'xs', margin: 'sm', contents: cells.slice(i, i + 7) });
+  }
+
+  const recorded = rows.filter((row) => Number(row.entryCount) > 0);
+  const avgWater = recorded.length
+    ? recorded.reduce((total, row) => total + (Number(row.totalWaterMl) || 0), 0) / recorded.length
+    : 0;
+
+  const weekHeader = {
+    type: 'box', layout: 'horizontal', spacing: 'xs', margin: 'md',
+    contents: WEEKDAYS.map((w) => text(w, { size: 'xxs', color: C.muted, align: 'center', flex: 1 }))
+  };
+  const legend = {
+    type: 'box', layout: 'horizontal', spacing: 'md', margin: 'lg',
+    contents: [
+      text('● 有紀錄', { size: 'xxs', color: C.olive, align: 'center', flex: 1 }),
+      text('● 需留意', { size: 'xxs', color: C.seal, align: 'center', flex: 1 }),
+      text('點日期看細節', { size: 'xxs', color: C.muted, align: 'center', flex: 1 })
+    ]
+  };
+
+  const body = {
+    type: 'box', layout: 'vertical', paddingAll: '16px', backgroundColor: BODY_BG,
+    contents: [weekHeader, ...weeks, { type: 'separator', margin: 'lg', color: '#F0EADF' }, legend]
+  };
+
+  const thisMonth = today.slice(0, 7);
+  const prevMonth = monthShift(month, -1);
+  const nextMonth = monthShift(month, 1);
+  const navButtons = [{
+    type: 'button', height: 'sm', style: 'link', color: C.brand,
+    action: { type: 'postback', label: '‹ 上個月', data: `action=calMonth&month=${prevMonth}`, displayText: `${Number(prevMonth.slice(5, 7))} 月月曆` }
+  }];
+  if (nextMonth <= thisMonth) {
+    navButtons.push({
+      type: 'button', height: 'sm', style: 'link', color: C.brand,
+      action: { type: 'postback', label: '下個月 ›', data: `action=calMonth&month=${nextMonth}`, displayText: `${Number(nextMonth.slice(5, 7))} 月月曆` }
+    });
+  }
+  const footer = { type: 'box', layout: 'horizontal', paddingAll: '6px', backgroundColor: FOOTER_COLOR, contents: navButtons };
+
+  const summaryLine = recorded.length ? `有紀錄 ${recorded.length} 天・日均水分 ${fmt(avgWater)} ml` : '這個月還沒有紀錄';
+  return bubble(
+    `${year} 年 ${mon} 月（${petName}）${summaryLine}`,
+    { type: 'bubble', size: 'mega', header: header(`${year} 年 ${mon} 月・${petName}`), body, footer }
+  );
+}
+
 // ---------- 照護提醒卡 ----------
 export function reminderFlex(pet, lines) {
   const items = [];

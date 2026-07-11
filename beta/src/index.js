@@ -9,7 +9,7 @@ import { handleApi } from './api.js';
 import { verifyLineSignature, replyOrPush, replyOrPushFlex, replyMessages, pushText, pushMessages, getProfile } from './line.js';
 import { hasAnyReminder, parseReminderSettings, buildReminderLines, reminderMessage, visitReminderMessage } from './reminders.js';
 import { shortDate } from './replies.js';
-import { recordFlex, todayFlex, websiteFlex, menuFlex, recordMenuFlex, weekFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, menuCell, exampleCard, petDataFlex, deletedCard } from './flex.js';
+import { recordFlex, todayFlex, websiteFlex, menuFlex, recordMenuFlex, weekFlex, monthFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, menuCell, exampleCard, petDataFlex, deletedCard } from './flex.js';
 import { isBetaAllowed, normalizeCode, gateText } from './plan.js';
 import {
   ensureUser, updateUser, listPets, createPet, resolveDefaultPet, getPet, updatePetFields, createFoodItem, createMedItem,
@@ -414,6 +414,47 @@ async function handlePostback(event, env, baseUrl) {
   const action = data.get('action');
 
   if (action === 'fillFood' || action === 'fill') return; // 只是把文字填進輸入框，不需回覆
+
+  // 月曆點某一天 → 回那天的總結卡
+  if (action === 'calDay') {
+    const date = data.get('date') || '';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+    const { user } = await ensureUser(db, lineUserId);
+    const pets = await listPets(db, lineUserId);
+    const pet = await resolveDefaultPet(db, user, pets);
+    if (!pet) { await replyOrPush(env, event, '還沒有建立貓咪。'); return; }
+    const summary = await recomputeDay(db, pet.petId, date);
+    if (!summary.entryCount) {
+      await replyOrPush(env, event, `${shortDate(date)}（${pet.petName}）\n這天沒有紀錄。`);
+      return;
+    }
+    await replyOrPushFlex(env, event, todayFlex({ pet, date, summary, dateLabel: shortDate(date) }), todayReply(pet, date, summary));
+    return;
+  }
+
+  // 月曆切換月份（不超過本月，最多回溯 24 個月）
+  if (action === 'calMonth') {
+    const month = data.get('month') || '';
+    if (!/^\d{4}-\d{2}$/.test(month)) return;
+    const { user } = await ensureUser(db, lineUserId);
+    const pets = await listPets(db, lineUserId);
+    const pet = await resolveDefaultPet(db, user, pets);
+    if (!pet) { await replyOrPush(env, event, '還沒有建立貓咪。'); return; }
+    const today = taipeiToday();
+    const thisMonth = today.slice(0, 7);
+    const floor = `${Number(thisMonth.slice(0, 4)) - 2}-${thisMonth.slice(5, 7)}`;
+    let target = month;
+    if (target > thisMonth) target = thisMonth;
+    if (target < floor) target = floor;
+    const year = Number(target.slice(0, 4));
+    const mon = Number(target.slice(5, 7));
+    const daysInMonth = new Date(year, mon, 0).getDate();
+    const lastDate = target === thisMonth ? today : `${target}-${String(daysInMonth).padStart(2, '0')}`;
+    const rows = await getRecentSummaries(db, pet.petId, lastDate, Number(lastDate.slice(8, 10)));
+    const monthLabel = `${year} 年 ${mon} 月`;
+    await replyOrPushFlex(env, event, monthFlex(pet.petName, target, rows, today), monthReply(pet.petName, monthLabel, rows));
+    return;
+  }
 
   if (action === 'delLog') {
     try {
@@ -1046,10 +1087,10 @@ async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId) {
 
   if (query === 'calendar') {
     const month = today.slice(0, 7);
-    const daysInMonth = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate();
-    const lastDay = Math.min(daysInMonth, Number(today.slice(8, 10)));
+    const lastDay = Number(today.slice(8, 10));
     const rows = await getRecentSummaries(db, pet.petId, today, lastDay);
-    await replyOrPush(env, event, monthReply(pet.petName, `${month.slice(0, 4)} 年 ${Number(month.slice(5, 7))} 月`, rows));
+    const monthLabel = `${month.slice(0, 4)} 年 ${Number(month.slice(5, 7))} 月`;
+    await replyOrPushFlex(env, event, monthFlex(pet.petName, month, rows, today), monthReply(pet.petName, monthLabel, rows));
     return;
   }
 

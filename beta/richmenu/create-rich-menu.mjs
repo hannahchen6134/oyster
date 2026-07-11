@@ -38,8 +38,8 @@ const menu = {
     cell(2, 0, send('回診摘要')),
     // 喵喵照護站：直接開網站（回訪者已登入一點就進；新朋友會看到登入引導頁）
     cell(0, 1, { type: 'uri', uri: 'https://cat-care-beta.hannahchen6134.workers.dev/' }),
-    // 照護月曆：直接開網站的月曆頁
-    cell(1, 1, { type: 'uri', uri: 'https://cat-care-beta.hannahchen6134.workers.dev/#go=calendar' }),
+    // 照護月曆：直接在對話裡回月曆卡（不用開網站，點日期看那天細節）
+    cell(1, 1, send('月曆')),
     cell(2, 1, send('安心上手'))
   ]
 };
