@@ -10,6 +10,7 @@ import { verifyLineSignature, replyOrPush, replyOrPushFlex, replyMessages, pushT
 import { hasAnyReminder, parseReminderSettings, buildReminderLines, reminderMessage, visitReminderMessage } from './reminders.js';
 import { shortDate } from './replies.js';
 import { recordFlex, todayFlex, websiteFlex, menuFlex, recordMenuFlex, weekFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, menuCell, exampleCard, petDataFlex, deletedCard } from './flex.js';
+import { isBetaAllowed, normalizeCode, gateText } from './plan.js';
 import {
   ensureUser, updateUser, listPets, createPet, resolveDefaultPet, getPet, updatePetFields, createFoodItem, createMedItem,
   listFoods, getFood, insertLog, getLog, getLastLogByUser, softDeleteLog, updateLog,
@@ -440,6 +441,10 @@ async function handleFollow(event, env) {
   if (profile?.displayName && user.displayName !== profile.displayName) {
     await updateUser(env.DB, lineUserId, { displayName: profile.displayName });
   }
+  if (!isBetaAllowed(user)) {
+    await replyOrPush(env, event, gateText());
+    return;
+  }
   await replyOrPushFlex(env, event, welcomeFlex(), welcomeText());
 }
 
@@ -459,9 +464,21 @@ async function handleTextMessage(event, env, baseUrl) {
   }
 
   const pets = await listPets(db, lineUserId);
+  let text = normalizeText(event.message?.text || '');
+
+  // 封閉測試門檻：未解鎖者只能輸入邀請碼，看不到任何產品內容
+  if (!isBetaAllowed(user)) {
+    const code = String(env.INVITE_CODE || '__closed_beta__').trim();
+    if (normalizeCode(text) === normalizeCode(code)) {
+      await updateUser(db, lineUserId, { betaAccess: 1 });
+      await replyOrPushFlex(env, event, welcomeFlex(), welcomeText());
+      return;
+    }
+    await replyOrPush(env, event, gateText());
+    return;
+  }
 
   // 多貓咪：訊息開頭是貓咪名（或 @貓咪名）時指定該貓咪
-  let text = normalizeText(event.message?.text || '');
   let pet = await resolveDefaultPet(db, user, pets);
   for (const candidate of pets) {
     for (const prefix of [candidate.petName, `@${candidate.petName}`]) {

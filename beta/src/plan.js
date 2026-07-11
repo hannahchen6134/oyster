@@ -30,6 +30,29 @@ export function planStatus(user) {
   return { plus, admin: Boolean(admin), betaFree: BETA_ALL_FREE, expiresAt, trialActive };
 }
 
+// 封閉測試門檻：betaAccess=1 或管理員才可使用；其餘需邀請碼解鎖
+export function isBetaAllowed(user) {
+  if (!user) return false;
+  if (ADMIN_LINE_IDS.includes(user.lineUserId)) return true;
+  return Number(user.betaAccess) === 1;
+}
+
+export function normalizeCode(text) {
+  return String(text || '').replace(/\s+/g, '').toLowerCase();
+}
+
+export function gateText() {
+  return [
+    '感謝你對喵喵照護安心管家的興趣 🐱',
+    '',
+    '目前是封閉測試中，',
+    '需要邀請碼才能開始使用。',
+    '',
+    '請向分享給你的朋友索取邀請碼，',
+    '直接輸入邀請碼就能解鎖囉。'
+  ].join('\n');
+}
+
 export function trialExpiryFromNow(days = TRIAL_DAYS) {
   return new Date(Date.now() + days * 86400000).toISOString();
 }
