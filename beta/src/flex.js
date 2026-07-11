@@ -278,6 +278,25 @@ export function onboardCard({ step = '', title, subtitle = '', rows = [], hint =
   });
 }
 
+// ---------- 補充貓咪資料：深連結到設定→貓咪資料 ----------
+export function petDataFlex(url) {
+  const body = {
+    type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
+    contents: [
+      text('補充貓咪資料', { size: 'md', weight: 'bold', color: '#3F2B18', align: 'center' }),
+      text('晶片號碼・疾病・疫苗・品種\n點下方按鈕直接到填寫頁', { size: 'xs', color: C.muted, wrap: true, align: 'center', margin: 'md' })
+    ]
+  };
+  const footer = {
+    type: 'box', layout: 'vertical', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
+    contents: [
+      { type: 'button', style: 'primary', color: C.brand,
+        action: { type: 'uri', label: '前往填寫', uri: url } }
+    ]
+  };
+  return bubble('補充貓咪資料', { type: 'bubble', size: 'mega', header: header('補充貓咪資料'), body, footer });
+}
+
 // ---------- 歡迎卡（加好友時） ----------
 export function welcomeFlex() {
   const body = {
@@ -306,13 +325,13 @@ function menuRow(label, sendText, primary = false) {
 }
 
 // 質感小卡格（選單卡共用）：淺米底、細邊框、主標＋一行小字
-export function menuCell(label, sub, sendText, primary = false) {
+export function menuCell(label, sub, sendText, primary = false, uri = '') {
   return {
     type: 'box', layout: 'vertical', flex: 1,
     backgroundColor: primary ? C.brand : '#FBF8F1', cornerRadius: '14px',
     borderColor: primary ? C.brandDark : '#E9E0CE', borderWidth: '1px',
     paddingTop: '14px', paddingBottom: '13px', paddingStart: '8px', paddingEnd: '8px',
-    action: { type: 'message', label, text: sendText },
+    action: uri ? { type: 'uri', label, uri } : { type: 'message', label, text: sendText },
     contents: [
       text(label, { align: 'center', weight: 'bold', size: 'md', color: primary ? '#FFFFFF' : '#3F2B18' }),
       text(sub, { align: 'center', size: 'xxs', color: primary ? '#EFE3D2' : C.muted, margin: 'sm' })

@@ -2108,8 +2108,10 @@
     }
 
     async function bootstrap() {
-      // 從網址 hash 取 token（LINE 登入連結）
+      // 從網址 hash 取 token（LINE 登入連結）與深連結目標 go=
       const hashMatch = location.hash.match(/token=([a-zA-Z0-9]+)/);
+      const goMatch = location.hash.match(/[#&]go=([a-z]+)/);
+      const goTarget = goMatch ? goMatch[1] : '';
       if (hashMatch) {
         localStorage.setItem(TOKEN_KEY, hashMatch[1]);
         history.replaceState(null, '', location.pathname);
@@ -2130,6 +2132,17 @@
       const tpe = todayStr();
       const dow = '日一二三四五六'[new Date(`${tpe}T00:00:00`).getDay()];
       $('dateLine').textContent = `・${Number(tpe.slice(5, 7))}月${Number(tpe.slice(8, 10))}日（${dow}）`;
+      // 深連結：go=pet → 直接開「設定 → 貓咪資料」；go=settings → 設定選單
+      if (goTarget === 'pet') {
+        state.settingsTab = 'pets';
+        switchTab('settings');
+        return;
+      }
+      if (goTarget === 'settings') {
+        state.settingsTab = '';
+        switchTab('settings');
+        return;
+      }
       await loadDay();
     }
 

@@ -9,7 +9,7 @@ import { handleApi } from './api.js';
 import { verifyLineSignature, replyOrPush, replyOrPushFlex, replyMessages, pushText, pushMessages, getProfile } from './line.js';
 import { hasAnyReminder, parseReminderSettings, buildReminderLines, reminderMessage, visitReminderMessage } from './reminders.js';
 import { shortDate } from './replies.js';
-import { recordFlex, todayFlex, websiteFlex, menuFlex, recordMenuFlex, weekFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, menuCell, exampleCard } from './flex.js';
+import { recordFlex, todayFlex, websiteFlex, menuFlex, recordMenuFlex, weekFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, menuCell, exampleCard, petDataFlex } from './flex.js';
 import {
   ensureUser, updateUser, listPets, createPet, resolveDefaultPet, getPet, updatePetFields, createFoodItem, createMedItem,
   listFoods, getFood, insertLog, getLog, getLastLogByUser, softDeleteLog, updateLog,
@@ -222,9 +222,9 @@ function doneCard(petName) {
     rows: [
       [menuCell('照著打打看', '不會打？點這裡', '範例', true)],
       [menuCell('快速紀錄', '點按鈕記錄', '紀錄'), menuCell('今日確認', '看今天狀況', '今天')],
-      [menuCell('補體重年齡', '選填', '補體重年齡'), menuCell('開啟照護站', '月曆・回診・設定', '照護站')]
+      [menuCell('補充貓咪資料', '晶片・疾病・疫苗', '補資料'), menuCell('開啟照護站', '月曆・回診・設定', '照護站')]
     ],
-    hint: '疾病、疫苗、醫院醫生等詳細資料，之後可在照護站的「設定」頁慢慢記錄',
+    hint: '晶片、疾病、疫苗、醫院醫生等詳細資料，點「補充貓咪資料」直接到設定頁填',
     alt: '都準備好了！'
   });
 }
@@ -495,6 +495,13 @@ async function handleTextMessage(event, env, baseUrl) {
 
     case 'exampleMenu': {
       await replyOrPushFlex(env, event, exampleCard(), '照著打打看：\n水 60（記喝水）\n罐頭 30（記食物）\n藥 早 已吃\n吐了');
+      return;
+    }
+
+    case 'petDataLink': {
+      const token = await createSession(db, lineUserId);
+      const url = `${baseUrl}/#token=${token}&go=pet`;
+      await replyOrPushFlex(env, event, petDataFlex(url), `補充貓咪資料（晶片/疾病/疫苗）：\n${url}`);
       return;
     }
 

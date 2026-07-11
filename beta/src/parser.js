@@ -138,6 +138,7 @@ export function parseMessage(rawText) {
 
   // 引導建檔：按鈕觸發的步驟
   if (['範例', '照著打打看', '怎麼記', '怎麼打', '範例指令', '打打看'].includes(compact)) return { type: 'exampleMenu' };
+  if (['補資料', '補充資料', '補充貓咪資料', '貓咪資料', '完善資料'].includes(compact)) return { type: 'petDataLink' };
   if (['幫貓貓建檔', '開始建檔', '建立貓咪檔案'].includes(compact)) return { type: 'petNamePrompt' };
   if (['記體重', '補體重'].includes(compact)) return { type: 'petFieldPrompt', field: 'weightKg' };
   if (['記生日', '補生日', '記年齡', '補年齡'].includes(compact)) return { type: 'petFieldPrompt', field: 'birthday' };
