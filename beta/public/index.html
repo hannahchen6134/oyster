@@ -250,17 +250,37 @@
     }
     .doctor-note #doctorNote { font-family: var(--serif); font-size: 14.5px; letter-spacing: 0.02em; }
     /* 收合區塊：預設收起，首頁保持乾淨 */
-    details.fold { padding: 0; }
+    /* 優雅收合：品牌小記號＋明體標題＋圓形＋鈕（展開轉 45° 成 ×） */
+    details.fold { padding: 0; overflow: hidden; }
     .fold summary {
-      list-style: none; cursor: pointer; display: flex; align-items: center; gap: 12px;
-      padding: 15px 20px; font-weight: 600; font-size: 14.5px; color: var(--ink-soft);
+      list-style: none; cursor: pointer; display: flex; align-items: center; gap: 13px;
+      padding: 17px 22px; transition: background 0.18s;
     }
     .fold summary::-webkit-details-marker { display: none; }
-    .fold .fold-title { flex: 1; }
-    .fold .fold-arrow { color: var(--muted); font-size: 13px; transition: transform 0.15s; }
-    .fold[open] .fold-arrow { transform: rotate(180deg); }
-    .fold[open] summary { color: var(--ink); }
-    .fold .fold-body { padding: 2px 20px 18px; }
+    .fold summary::before {
+      content: ''; width: 4px; height: 17px; border-radius: 2px; flex: none;
+      background: linear-gradient(180deg, #8a5a2c, var(--brand));
+    }
+    .fold summary:hover { background: rgba(115, 73, 33, 0.03); }
+    .fold .fold-title {
+      flex: 1; font-family: var(--serif); font-weight: 600; font-size: 16.5px;
+      letter-spacing: 0.05em; color: var(--ink);
+    }
+    .fold .fold-count { margin-left: 9px; color: var(--muted); font-size: 12.5px; font-weight: 500; font-family: "Noto Sans TC", sans-serif; letter-spacing: 0; }
+    .fold .fold-toggle {
+      width: 27px; height: 27px; border-radius: 50%; flex: none;
+      border: 1px solid rgba(115, 73, 33, 0.3); color: var(--brand);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 19px; font-weight: 400; line-height: 1;
+      transition: transform 0.22s ease, background 0.22s ease, border-color 0.22s ease;
+    }
+    .fold summary:hover .fold-toggle { background: var(--brand-tint); border-color: var(--brand); }
+    .fold[open] .fold-toggle { transform: rotate(45deg); background: var(--brand); color: #fff; border-color: var(--brand); }
+    /* 相容舊的箭頭寫法 */
+    .fold .fold-arrow { display: none; }
+    .fold .fold-body { padding: 0 22px 20px; }
+    .fold[open] .fold-body { animation: foldReveal 0.24s ease; }
+    @keyframes foldReveal { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: none; } }
     .fold .doctor-text {
       font-family: var(--serif); font-size: 14.5px; color: var(--ink-soft);
       line-height: 1.75; letter-spacing: 0.02em;
@@ -655,16 +675,18 @@
           <div class="save-state" id="saveState"></div>
           <p class="muted" style="margin:10px 0 0;font-size:12px">「複製交接卡」會把上面的內容變成一段文字，可直接貼給家人朋友。</p>
         </div>
-        <div class="block">
-          <div class="section-head">
-            <h2>當日紀錄</h2>
-            <svg class="head-paw" viewBox="0 0 24 21" fill="none" stroke="var(--brand)" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><ellipse cx="12" cy="14.5" rx="5" ry="4"/><circle cx="5.2" cy="8.6" r="2.1"/><circle cx="12" cy="6.4" r="2.1"/><circle cx="18.8" cy="8.6" r="2.1"/></svg>
+        <details class="block fold">
+          <summary>
+            <span class="fold-title">每一筆紀錄<span class="fold-count" id="logCount"></span></span>
+            <span class="fold-toggle">＋</span>
+          </summary>
+          <div class="fold-body">
+            <div class="grid" id="logList" style="gap:0"></div>
+            <div style="text-align:center;margin-top:8px">
+              <button class="link-btn hidden" id="showAllLogsBtn" type="button">查看全部</button>
+            </div>
           </div>
-          <div class="grid" id="logList" style="gap:0"></div>
-          <div style="text-align:center;margin-top:8px">
-            <button class="link-btn hidden" id="showAllLogsBtn" type="button">查看全部</button>
-          </div>
-        </div>
+        </details>
       </section>
 
       <!-- 月曆 -->
@@ -710,7 +732,7 @@
         <details class="block fold">
           <summary>
             <span class="fold-title">給醫生的一句話（今天）</span>
-            <span class="fold-arrow">▾</span>
+            <span class="fold-toggle">＋</span>
           </summary>
           <div class="fold-body">
             <div id="doctorNote" class="doctor-text">今天還沒有紀錄。</div>
@@ -722,7 +744,7 @@
         <details class="block fold">
           <summary>
             <span class="fold-title" id="visitFoldTitle">看診紀錄</span>
-            <span class="fold-arrow">▾</span>
+            <span class="fold-toggle">＋</span>
           </summary>
           <div class="fold-body">
             <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
@@ -731,24 +753,43 @@
             <div class="grid" id="dayVisitList" style="gap:10px"></div>
           </div>
         </details>
-        <div class="block hidden" id="labTrendBlock">
-          <div class="section-head" style="margin-top:0">
-            <h2>血檢紀錄</h2>
-            <select id="labItemSelect" style="width:auto" aria-label="選擇血檢項目"></select>
+        <details class="block fold hidden" id="labTrendBlock">
+          <summary>
+            <span class="fold-title">血檢紀錄<span class="fold-count" id="labCount"></span></span>
+            <span class="fold-toggle">＋</span>
+          </summary>
+          <div class="fold-body">
+            <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+              <select id="labItemSelect" style="width:auto" aria-label="選擇血檢項目"></select>
+            </div>
+            <p class="muted" id="labLatestLine" style="margin:0 0 8px;font-size:13px"></p>
+            <div id="labChartBox"></div>
+            <p class="muted" style="font-size:12px;margin:8px 0 0">數值可提供醫生參考，高低請以你的醫生判讀為準。輸入與編輯在「設定 → 血檢紀錄」。</p>
           </div>
-          <p class="muted" id="labLatestLine" style="margin:0 0 8px;font-size:13px"></p>
-          <div id="labChartBox"></div>
-          <p class="muted" style="font-size:12px;margin:8px 0 0">數值可提供醫生參考，高低請以你的醫生判讀為準。輸入與編輯在「設定 → 血檢紀錄」。</p>
-        </div>
-        <div class="block"><div class="section-head"><h2>近 30 天趨勢</h2></div><div id="trendCharts"></div></div>
-        <div class="block table-wrap">
-          <table>
-            <thead>
-              <tr><th>日期</th><th>總水分</th><th>喝水</th><th>食物水</th><th>乾糧 g</th><th>罐/濕固形 g</th><th>熱量</th><th>藥記錄</th><th>藥留意</th><th>吐</th><th>便</th><th>筆數</th></tr>
-            </thead>
-            <tbody id="trendBody"></tbody>
-          </table>
-        </div>
+        </details>
+        <details class="block fold">
+          <summary>
+            <span class="fold-title">近 30 天趨勢<span class="fold-count">水分・熱量</span></span>
+            <span class="fold-toggle">＋</span>
+          </summary>
+          <div class="fold-body"><div id="trendCharts"></div></div>
+        </details>
+        <details class="block fold">
+          <summary>
+            <span class="fold-title">每日數字表<span class="fold-count" id="tableCount"></span></span>
+            <span class="fold-toggle">＋</span>
+          </summary>
+          <div class="fold-body">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>日期</th><th>總水分</th><th>喝水</th><th>食物水</th><th>乾糧 g</th><th>罐/濕固形 g</th><th>熱量</th><th>藥記錄</th><th>藥留意</th><th>吐</th><th>便</th><th>筆數</th></tr>
+                </thead>
+                <tbody id="trendBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </details>
       </section>
 
       <!-- 設定 -->
@@ -1065,6 +1106,7 @@
 
     function renderLogs(logs) {
       const container = $('logList');
+      const lc = $('logCount'); if (lc) lc.textContent = logs.length ? `（${logs.length}）` : '';
       if (!logs.length) {
         $('showAllLogsBtn').classList.add('hidden');
         container.innerHTML = `
@@ -1447,6 +1489,8 @@
         return;
       }
       block.classList.remove('hidden');
+      const dates = new Set(state.labs.map((row) => row.testDate));
+      const labc = $('labCount'); if (labc) labc.textContent = `（${dates.size} 份）`;
       const select = $('labItemSelect');
       if (!itemNames.includes(state.labItem)) state.labItem = itemNames[0];
       select.innerHTML = itemNames.map((name) =>
@@ -1621,6 +1665,7 @@
         $('trendBody').innerHTML = '<tr><td colspan="12" style="text-align:center;color:var(--muted)">近 30 天還沒有紀錄</td></tr>';
         return;
       }
+      const tc = $('tableCount'); if (tc) tc.textContent = `（${rows.length} 天）`;
       $('trendBody').innerHTML = rows.map((row) => `
         <tr class="${row.vomitCount || row.medIssueCount ? 'warn' : ''}">
           <td>${esc(row.date.slice(5).replace('-', '/'))}</td>
