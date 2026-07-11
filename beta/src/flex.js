@@ -322,11 +322,16 @@ export function welcomeFlex() {
     type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
     contents: [
       text(BRAND.tagline, { size: 'xs', color: C.muted, align: 'center', wrap: true }),
-      text('我會陪你記下貓貓的每一天——', { size: 'sm', color: C.inkSoft, wrap: true, margin: 'lg', align: 'center' }),
-      text('吃飯、喝水、用藥、回診，像聊天一樣打字就能記，不用學。', { size: 'sm', color: C.inkSoft, wrap: true, margin: 'sm', align: 'center' }),
-      { type: 'box', layout: 'horizontal', margin: 'xl', contents: [menuCell('🐱 開始建檔', '3 個小問題・30 秒', '幫貓貓建檔', true)] },
-      { type: 'box', layout: 'horizontal', margin: 'md', contents: [menuCell('先看看怎麼用', '安心上手小教學', '安心上手')] },
-      text('之後隨時輸入「安心上手」都有小教學陪你', { size: 'xxs', color: C.muted, align: 'center', margin: 'lg' })
+      text('每天忙碌又放不下貓貓？\n交給我陪你一起記。', { size: 'sm', weight: 'bold', color: '#3F2B18', wrap: true, margin: 'lg', align: 'center' }),
+      text('吃飯、喝水、用藥、嘔吐——像聊天一樣打字就記好，回診時一鍵整理給醫生看。', { size: 'sm', color: C.inkSoft, wrap: true, margin: 'sm', align: 'center' }),
+      {
+        type: 'box', layout: 'vertical', margin: 'lg', backgroundColor: '#FBF8F1',
+        cornerRadius: '12px', borderColor: '#E9E0CE', borderWidth: '1px', paddingAll: '12px',
+        contents: [text('記錯了能改、想刪能刪，資料都在不會不見，安心記就好。',
+          { size: 'xs', color: C.inkSoft, wrap: true, align: 'center' })]
+      },
+      { type: 'box', layout: 'horizontal', margin: 'lg', contents: [menuCell('幫貓貓建檔', '3 個小問題・30 秒', '幫貓貓建檔', true)] },
+      { type: 'box', layout: 'horizontal', margin: 'md', contents: [menuCell('先看看怎麼用', '安心上手小教學', '安心上手')] }
     ]
   };
   return bubble(`歡迎加入${BRAND.name}！點「幫貓貓建檔」開始`, { type: 'bubble', size: 'mega', header: header('歡迎回家'), body });
