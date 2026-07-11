@@ -23,7 +23,7 @@ export async function ensureUser(db, lineUserId, displayName = '') {
 }
 
 export async function updateUser(db, lineUserId, fields) {
-  const allowed = ['displayName', 'defaultPetId', 'pendingAction'];
+  const allowed = ['displayName', 'defaultPetId', 'pendingAction', 'plan', 'planExpiresAt'];
   const sets = [];
   const values = [];
   for (const key of allowed) {

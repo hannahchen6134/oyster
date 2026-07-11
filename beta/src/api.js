@@ -1,6 +1,7 @@
 // 照護站 REST API（Bearer session token 授權）
 // 所有資源都檢查擁有權：pet.ownerLineUserId 必須等於 session 使用者。
 
+import { planStatus } from './plan.js';
 import {
   getUser, updateUser, listPets, getPet, createPet,
   listFoods, getFood,
@@ -79,7 +80,7 @@ export async function handleApi(request, env, url) {
       if (method === 'GET') {
         const user = await getUser(db, lineUserId);
         const pets = await listPets(db, lineUserId);
-        return jsonResponse({ ok: true, user, pets });
+        return jsonResponse({ ok: true, user, pets, plan: planStatus(user) });
       }
       if (method === 'PUT') {
         const body = await request.json();

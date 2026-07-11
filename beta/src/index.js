@@ -388,6 +388,19 @@ async function handlePending(env, event, { db, user, pet, pets, lineUserId, text
     return false;
   }
 
+  // 點嘔吐/排便/精神/備註 → 直接打描述就記好
+  if (pending.startsWith('note|') && pet) {
+    const cat = pending.slice(5);
+    // 若使用者直接打了可解析的紀錄（例如「吐了」），交回正常流程
+    if (asIntent.type === 'record') { await clear(); return false; }
+    await clear();
+    await handleRecord(env, event, pet, {
+      category: cat, note: text, amount: 0, unit: '',
+      itemName: '', foodType: '', medStatus: '', medSlot: ''
+    }, lineUserId);
+    return true;
+  }
+
   await clear();
   return false;
 }
@@ -671,8 +684,15 @@ async function handleTextMessage(event, env, baseUrl) {
     }
 
     case 'recordPrompt': {
-      // 記吃飯：列出自己建好的品項（大按鈕卡），點了再打克數就記好
-      if (intent.kind === 'food') {
+      const k = intent.kind;
+      // 喝水：點了直接打數字就好
+      if (k === 'water') {
+        await updateUser(db, lineUserId, { pendingAction: 'amount|水' });
+        await replyOrPush(env, event, '喝了多少 ml？\n直接打數字就好，例如 20');
+        return;
+      }
+      // 吃飯：列出自己建好的品項，點了再打克數
+      if (k === 'food') {
         const foods = await listFoods(db, lineUserId);
         if (foods.length) {
           const cells = foods.slice(0, 8).map((food) =>
@@ -682,15 +702,43 @@ async function handleTextMessage(event, env, baseUrl) {
           rows.push([menuCell('建新的品項', '常吃的先建檔', '設定食物')]);
           await replyOrPushFlex(env, event, onboardCard({
             title: '想記哪一個品項？',
-            subtitle: '點了再告訴我幾克，就記好了',
+            subtitle: '點了再打幾克，就記好了',
             rows,
             hint: '不在清單的直接打「罐頭 品名 30g」也可以',
             alt: '想記哪一個品項？'
           }), recordPrompt('food'));
           return;
         }
+        await updateUser(db, lineUserId, { pendingAction: 'amount|罐頭' });
+        await replyOrPush(env, event, '吃了幾克？\n直接打數字就好，例如 30\n（先當罐頭記，之後可在照護站改）');
+        return;
       }
-      await replyOrPush(env, event, recordPrompt(intent.kind));
+      // 用藥：給快捷鈕，免打字
+      if (k === 'med') {
+        await replyOrPushFlex(env, event, onboardCard({
+          title: '這次的藥？',
+          subtitle: '點一下就記好',
+          rows: [
+            [menuCell('早・已吃', '', '藥 早 已吃'), menuCell('晚・已吃', '', '藥 晚 已吃')],
+            [menuCell('中午・已吃', '', '藥 中午 已吃'), menuCell('沒餵到', '', '藥 沒餵到')]
+          ],
+          alt: '這次的藥？'
+        }), '記餵藥：藥 早 已吃 / 藥 晚 已吃 / 藥 沒餵到');
+        return;
+      }
+      // 嘔吐/排便/精神/備註：點了直接打描述
+      const notePrompts = {
+        vomit: '怎麼了？簡單描述就好\n（例如：黃色液體）\n不想寫直接打「吐了」也行',
+        stool: '描述一下便便\n（例如：軟便、正常）\n或直接打「便便」',
+        mood: '今天精神如何？\n（例如：活力好、懶懶的）',
+        note: '想記什麼？直接打字就好'
+      };
+      if (notePrompts[k]) {
+        await updateUser(db, lineUserId, { pendingAction: `note|${k}` });
+        await replyOrPush(env, event, notePrompts[k]);
+        return;
+      }
+      await replyOrPush(env, event, recordPrompt(k));
       return;
     }
 
