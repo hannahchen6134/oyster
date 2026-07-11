@@ -427,7 +427,8 @@ export function recordMenuFlex() {
       row([cell('排便', '次數與形狀', '記排便'), cell('精神', '活動力如何', '記精神')]),
       row([cell('其他備註', '想補充的小事', '記備註')]),
       { type: 'separator', margin: 'xl', color: '#F0EADF' },
-      text('補登昨天：昨天 21:30 水 20', { size: 'xxs', color: C.muted, align: 'center', margin: 'lg' })
+      text('熟了就直接打字更快：水 60・罐頭 30・藥 早 已吃', { size: 'xxs', color: C.brand, align: 'center', wrap: true, margin: 'lg' }),
+      text('補登昨天：昨天 21:30 水 20', { size: 'xxs', color: C.muted, align: 'center', margin: 'sm' })
     ]
   };
   return bubble('快速紀錄選單', { type: 'bubble', size: 'mega', header: header('快速紀錄'), body });

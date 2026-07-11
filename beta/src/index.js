@@ -383,7 +383,7 @@ async function handlePending(env, event, { db, user, pet, pets, lineUserId, text
     await clear();
     const intent2 = parseMessage(`${base} ${m[1]}`);
     if (intent2.type === 'record' && pet) {
-      await handleRecord(env, event, pet, intent2.record, lineUserId);
+      await handleRecord(env, event, pet, intent2.record, lineUserId, { fromButton: true });
       return true;
     }
     return false;
@@ -398,7 +398,7 @@ async function handlePending(env, event, { db, user, pet, pets, lineUserId, text
     await handleRecord(env, event, pet, {
       category: cat, note: text, amount: 0, unit: '',
       itemName: '', foodType: '', medStatus: '', medSlot: ''
-    }, lineUserId);
+    }, lineUserId, { fromButton: true });
     return true;
   }
 
@@ -861,7 +861,7 @@ async function handleDeleteLast(env, event, lineUserId) {
   await replyOrPush(env, event, `🗑 已刪除上一筆\n${describeLog(last)}\n\n今日水分 ${summary.totalWaterMl} ml\n熱量 ${summary.kcal} kcal`);
 }
 
-async function handleRecord(env, event, pet, record, lineUserId) {
+async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
   const db = env.DB;
   const hints = [];
 
@@ -956,11 +956,22 @@ async function handleRecord(env, event, pet, record, lineUserId) {
 
   // 補登到非今天時，回覆顯示的是「該日」的累積
   const fallbackText = recordReply(description, pet, summary, hints, eventDate);
-  const tip = record.category === 'water'
+  let tip = record.category === 'water'
     ? '記錯了？直接輸入「改 25」'
     : record.category === 'food'
       ? '記錯輸入「改 54」・沒吃完輸入「剩 20」'
       : '';
+  if (opts.fromButton) {
+    const amt = record.amount;
+    const shortcut = record.category === 'water' ? `水 ${amt}`
+      : record.category === 'food' ? `${record.foodType} ${log.itemName || ''} ${amt}`.replace(/\s+/g, ' ').trim()
+      : record.category === 'med' ? `藥 ${[record.medSlot, record.medStatus].filter(Boolean).join(' ')}`.trim()
+      : record.category === 'vomit' ? '吐了'
+      : record.category === 'stool' ? '便便'
+      : record.category === 'mood' ? (record.note ? `精神 ${record.note}` : '精神')
+      : (record.note ? `備註 ${record.note}` : '');
+    if (shortcut) tip = `💡 下次更快：直接打「${shortcut}」`;
+  }
   const card = recordFlex({
     pet, categoryKey, mainText,
     subText: subParts.join('・'),
