@@ -396,8 +396,9 @@ async function handlePending(env, event, { db, user, pet, pets, lineUserId, text
     if (asIntent.type === 'record') { await clear(); return false; }
     await clear();
     await handleRecord(env, event, pet, {
-      category: cat, note: text, amount: 0, unit: '',
-      itemName: '', foodType: '', medStatus: '', medSlot: ''
+      category: cat, amount: 0, unit: '', foodType: '', medStatus: '', medSlot: '',
+      itemName: cat === 'supplement' ? text : '',
+      note: cat === 'supplement' ? '' : text
     }, lineUserId, { fromButton: true });
     return true;
   }
@@ -749,7 +750,9 @@ async function handleTextMessage(event, env, baseUrl) {
       // 嘔吐/排便/精神/備註：點了直接打描述
       const notePrompts = {
         vomit: '怎麼了？簡單描述就好\n（例如：黃色液體）\n不想寫直接打「吐了」也行',
-        stool: '描述一下便便\n（例如：軟便、正常）\n或直接打「便便」',
+        stool: '大便情況？簡單描述\n（例如：軟便、正常）\n或直接打「大便」',
+        urine: '尿尿正常嗎？可補描述\n（例如：量少、顏色深）\n或直接打「尿尿」',
+        supplement: '補充了什麼？\n（例如：益生菌、化毛膏）',
         mood: '今天精神如何？\n（例如：活力好、懶懶的）',
         note: '想記什麼？直接打字就好'
       };
@@ -929,6 +932,10 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
     description = `嘔吐${record.note ? `：${record.note}` : ''}`;
   } else if (record.category === 'stool') {
     description = `便便${record.note ? `：${record.note}` : ''}`;
+  } else if (record.category === 'urine') {
+    description = `尿尿${record.note ? `：${record.note}` : ''}`;
+  } else if (record.category === 'supplement') {
+    description = `營養補充${record.itemName ? `：${record.itemName}` : ''}`;
   } else if (record.category === 'mood') {
     description = `精神${record.note ? `：${record.note}` : ''}`;
   } else {
@@ -968,6 +975,8 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
       : record.category === 'med' ? `藥 ${[record.medSlot, record.medStatus].filter(Boolean).join(' ')}`.trim()
       : record.category === 'vomit' ? '吐了'
       : record.category === 'stool' ? '便便'
+      : record.category === 'urine' ? '尿尿'
+      : record.category === 'supplement' ? (record.itemName ? `營養補充 ${record.itemName}` : '營養補充')
       : record.category === 'mood' ? (record.note ? `精神 ${record.note}` : '精神')
       : (record.note ? `備註 ${record.note}` : '');
     if (shortcut) tip = `💡 下次更快：直接打「${shortcut}」`;

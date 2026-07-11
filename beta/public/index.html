@@ -489,26 +489,18 @@
     .quick-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
     .qbtn {
       display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-      min-height: 54px; border: 1px solid rgba(74, 45, 20, 0.55); border-radius: 13px;
-      background: linear-gradient(165deg, #8a5a2c 0%, #734921 52%, #5f3b1c 100%);
-      color: #f6ead4; font-weight: 600; font-size: 15px; letter-spacing: 0.06em;
-      box-shadow:
-        inset 0 1px 0 rgba(255, 240, 214, 0.28),
-        inset 0 -2px 6px rgba(58, 30, 10, 0.35),
-        0 2px 4px rgba(58, 42, 24, 0.22),
-        0 8px 20px rgba(115, 73, 33, 0.30);
-      cursor: pointer; transition: box-shadow .18s, transform .06s, filter .18s;
+      min-height: 54px; border: 1px solid rgba(58, 36, 16, 0.45); border-radius: 13px;
+      background: #6f4824;
+      color: #f2e6d1; font-weight: 600; font-size: 15px; letter-spacing: 0.08em;
+      box-shadow: 0 1px 2px rgba(58, 42, 24, 0.14), 0 3px 10px rgba(90, 54, 23, 0.16);
+      cursor: pointer; transition: background .16s, box-shadow .16s, transform .06s;
     }
-    .qbtn .q-plus { color: #f0d7ac; font-weight: 700; font-size: 17px; }
+    .qbtn .q-plus { color: #d9b483; font-weight: 600; font-size: 16px; }
     .qbtn:hover {
-      filter: brightness(1.06);
-      box-shadow:
-        inset 0 1px 0 rgba(255, 240, 214, 0.3),
-        0 3px 6px rgba(58, 42, 24, 0.25),
-        0 0 0 3px rgba(191, 138, 74, 0.28),
-        0 10px 26px rgba(115, 73, 33, 0.4);
+      background: #7d5228;
+      box-shadow: 0 1px 2px rgba(58, 42, 24, 0.16), 0 6px 16px rgba(90, 54, 23, 0.22);
     }
-    .qbtn:active { transform: translateY(1px); filter: brightness(0.97); }
+    .qbtn:active { transform: translateY(1px); background: #634020; }
     .qbtn:active { transform: translateY(1px); box-shadow: 0 1px 2px rgba(27, 29, 26, 0.08); }
     /* 日期列：前後天併成一組膠囊，不再散落 */
     .day-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 16px; }
@@ -691,8 +683,9 @@
             <button class="qbtn" data-quick="water" type="button"><span class="q-plus">＋</span>喝水</button>
             <button class="qbtn" data-quick="med" type="button"><span class="q-plus">＋</span>用藥</button>
             <button class="qbtn" data-quick="vomit" type="button"><span class="q-plus">＋</span>嘔吐</button>
-            <button class="qbtn" data-quick="stool" type="button"><span class="q-plus">＋</span>便便</button>
+            <button class="qbtn" data-quick="stool" type="button"><span class="q-plus">＋</span>大小便</button>
             <button class="qbtn" data-quick="mood" type="button"><span class="q-plus">＋</span>精神</button>
+            <button class="qbtn" data-quick="supplement" type="button"><span class="q-plus">＋</span>營養補充</button>
             <button class="qbtn" data-quick="note" type="button"><span class="q-plus">＋</span>備註</button>
           </div>
           <div class="day-toolbar">
@@ -993,7 +986,7 @@
     // ---------- 今日明細 ----------
     const CATEGORY_LABEL = {
       water: '喝水', food: '食物', med: '藥物',
-      vomit: '嘔吐', stool: '便便', mood: '精神', note: '備註'
+      vomit: '嘔吐', stool: '大便', urine: '尿尿', supplement: '營養補充', mood: '精神', note: '備註'
     };
 
     const MED_LABEL = (status) => status === '漏餵' ? '沒餵到' : status;
@@ -1026,7 +1019,7 @@
         const label = [log.medSlot, log.itemName].filter(Boolean).join(' ');
         return `用藥${label ? ` ${label}` : ''} ${MED_LABEL(log.medStatus)}`;
       }
-      const names = { vomit: '嘔吐', stool: '便便', mood: '精神', note: '備註' };
+      const names = { vomit: '嘔吐', stool: '大便', urine: '尿尿', supplement: '營養補充', mood: '精神', note: '備註' };
       return `${names[log.category] || log.category}${log.note ? ` ${log.note}` : ''}`;
     }
 
@@ -1044,13 +1037,18 @@
       const foodText = foodLogs.length
         ? `已紀錄 ${foodLogs.length} 筆，共 ${fmt(totalFood)} g${s.wetFoodG > 0 ? '（罐頭以固形量計）' : ''}${noFormula ? `・${noFormula} 筆未設定公式，熱量未計入` : ''}`
         : '';
+      const suppLogs = logs.filter((l) => l.category === 'supplement');
+      const excreteParts = [];
+      if (s.stoolCount > 0) excreteParts.push(`大便 ${s.stoolCount} 次`);
+      if (s.urineCount > 0) excreteParts.push(`尿尿 ${s.urineCount} 次`);
       return {
         rows: [
           ['吃飯', foodText],
           ['喝水', s.waterMl > 0 ? `已紀錄 ${fmt(s.waterMl)} ml${s.foodWaterMl ? `（含食物水分共 ${fmt(s.totalWaterMl)} ml）` : ''}` : ''],
           ['用藥', medLogs.length ? `今天已紀錄 ${medLogs.length} 次` : ''],
+          ['營養補充', suppLogs.length ? `已紀錄 ${suppLogs.length} 次` : ''],
           ['腸胃', s.vomitCount > 0 ? `今天有紀錄嘔吐 ${s.vomitCount} 次` : ''],
-          ['便便', s.stoolCount > 0 ? `已紀錄 ${s.stoolCount} 次` : ''],
+          ['大小便', excreteParts.length ? excreteParts.join('・') : ''],
           ['精神', moodLogs.length ? `最近一筆為「${moodLogs[moodLogs.length - 1].note || '有紀錄'}」` : '']
         ],
         last,

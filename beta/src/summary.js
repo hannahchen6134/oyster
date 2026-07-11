@@ -50,10 +50,14 @@ export function computeDailySummary(logs) {
     medIssueCount: 0,
     vomitCount: 0,
     stoolCount: 0,
+    urineCount: 0,
+    supplementCount: 0,
     entryCount: 0,
     abnormalFlags: [],
     vomitNotes: [],
     stoolNotes: [],
+    urineNotes: [],
+    supplementNotes: [],
     moodNotes: [],
     otherNotes: []
   };
@@ -98,6 +102,16 @@ export function computeDailySummary(logs) {
       case 'stool': {
         summary.stoolCount += 1;
         summary.stoolNotes.push(noteWithTime(log));
+        break;
+      }
+      case 'urine': {
+        summary.urineCount += 1;
+        summary.urineNotes.push(noteWithTime(log));
+        break;
+      }
+      case 'supplement': {
+        summary.supplementCount += 1;
+        summary.supplementNotes.push(log.note ? `${log.itemName ? log.itemName + ' ' : ''}${log.note}` : (log.itemName || '有紀錄'));
         break;
       }
       case 'mood': {

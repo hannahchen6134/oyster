@@ -24,6 +24,8 @@ const MED_WORDS = new Set(['藥', '用藥', '餵藥', '吃藥', '吃藥了', '�
 const VOMIT_WORDS = new Set(['吐', '嘔吐', '吐了', '嘔吐了']);
 const STOOL_PLAIN_WORDS = new Set(['便', '大便', '便便', '大便了', '便了', '便便了', '排便', '拉了']);
 const STOOL_DETAIL_WORDS = new Set(['軟便', '血便', '拉肚子', '腹瀉', '便秘', '拉稀']);
+const URINE_WORDS = new Set(['尿', '尿尿', '小便', '噓噓', '尿了', '排尿']);
+const SUPPLEMENT_WORDS = new Set(['營養補充', '保健品', '保健', '補充', '益生菌']);
 const MOOD_WORDS = new Set(['精神']);
 const MOOD_DETAIL_WORDS = new Set(['沒精神', '精神差', '活力差', '懶懶的', '沒活力']);
 // 句首的動詞雜訊：吃了罐頭30g、餵了乾糧4g
@@ -58,7 +60,8 @@ const QUERY_WORDS = [
 // 快速紀錄選單按鈕 → 對應提示
 const RECORD_PROMPT_WORDS = {
   '記吃飯': 'food', '記喝水': 'water', '記用藥': 'med', '記嘔吐': 'vomit',
-  '記排便': 'stool', '記精神': 'mood', '記備註': 'note'
+  '記排便': 'stool', '記大便': 'stool', '記尿尿': 'urine', '記營養補充': 'supplement',
+  '記精神': 'mood', '記備註': 'note'
 };
 
 export function normalizeText(value) {
@@ -309,6 +312,21 @@ export function parseMessage(rawText) {
     record.category = 'stool';
     const detail = STOOL_DETAIL_WORDS.has(head) ? [head, ...rest] : rest;
     record.note = detail.join(' ');
+    return { type: 'record', record };
+  }
+
+  // 尿尿
+  if (URINE_WORDS.has(head)) {
+    record.category = 'urine';
+    record.note = rest.join(' ');
+    return { type: 'record', record };
+  }
+
+  // 營養補充（保健品）：可帶名稱，例如「營養補充 益生菌」
+  if (SUPPLEMENT_WORDS.has(head)) {
+    record.category = 'supplement';
+    record.itemName = rest.join(' ');
+    record.note = '';
     return { type: 'record', record };
   }
 

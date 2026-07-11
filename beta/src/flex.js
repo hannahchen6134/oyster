@@ -423,8 +423,9 @@ export function recordMenuFlex() {
     contents: [
       text('想記哪一種？點一下就開始', { size: 'xs', color: C.muted, align: 'center' }),
       row([cell('吃飯', '罐頭・乾糧・零食', '記吃飯'), cell('喝水', '今天喝了多少', '記喝水')]),
-      row([cell('用藥', '已吃・沒餵到', '記用藥'), cell('嘔吐', '顏色與內容', '記嘔吐')]),
-      row([cell('排便', '次數與形狀', '記排便'), cell('精神', '活動力如何', '記精神')]),
+      row([cell('用藥', '已吃・沒餵到', '記用藥'), cell('營養補充', '益生菌・化毛膏', '記營養補充')]),
+      row([cell('大便', '次數與形狀', '記大便'), cell('尿尿', '量與顏色', '記尿尿')]),
+      row([cell('嘔吐', '顏色與內容', '記嘔吐'), cell('精神', '活動力如何', '記精神')]),
       row([cell('其他備註', '想補充的小事', '記備註')]),
       { type: 'separator', margin: 'xl', color: '#F0EADF' },
       text('熟了就直接打字更快：水 60・罐頭 30・藥 早 已吃', { size: 'xxs', color: C.brand, align: 'center', wrap: true, margin: 'lg' }),
