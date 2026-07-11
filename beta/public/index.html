@@ -27,8 +27,8 @@
       --seal: #bf3b20;           /* 朱紅：印章，僅今天與異常 */
       --seal-tint: #f9ebe5;
       --serif: "Noto Serif TC", "Songti TC", "PMingLiU", serif;
-      --radius: 10px;
-      --radius-sm: 7px;
+      --radius: 12px;
+      --radius-sm: 9px;
       --shadow-soft: 0 1px 2px rgba(58, 42, 24, 0.05), 0 7px 20px rgba(115, 73, 33, 0.07);
       --shadow-lift: 0 1px 3px rgba(58, 42, 24, 0.06), 0 14px 38px rgba(58, 42, 24, 0.10), 0 36px 90px rgba(115, 73, 33, 0.08);
       --glow-brand: 0 0 0 3px rgba(115, 73, 33, 0.13), 0 5px 16px rgba(115, 73, 33, 0.22);
@@ -156,6 +156,13 @@
     .btn-danger { background: transparent; color: var(--seal); }
     .btn-danger:hover { background: var(--seal-tint); }
     .btn-sm { padding: 5px 12px; font-size: 13px; }
+    .link-btn {
+      border: 1px solid rgba(115, 73, 33, 0.3); background: #fff; color: #5a3617;
+      border-radius: 999px; padding: 6px 15px; font: inherit; font-size: 13px; font-weight: 600;
+      letter-spacing: 0.04em; cursor: pointer; transition: border-color .15s, color .15s, box-shadow .15s;
+    }
+    .link-btn:hover { border-color: var(--brand); color: var(--brand); box-shadow: var(--shadow-soft); }
+    .link-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(115, 73, 33, 0.22); }
     .btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(115, 73, 33, 0.25); }
     .grid { display: grid; gap: 10px; }
     .grid-2 { grid-template-columns: 1fr 1fr; }
@@ -476,15 +483,26 @@
     .quick-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
     .qbtn {
       display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-      min-height: 54px; border: 1px solid rgba(115, 73, 33, 0.22); border-radius: 13px;
-      background: linear-gradient(180deg, #fefbf5 0%, #f6efe2 100%);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), 0 2px 8px rgba(115, 73, 33, 0.09);
-      font-weight: 600; font-size: 15px; color: #4a3620;
-      cursor: pointer; transition: border-color .15s, box-shadow .15s, transform .05s;
+      min-height: 54px; border: 1px solid rgba(74, 45, 20, 0.55); border-radius: 13px;
+      background: linear-gradient(165deg, #8a5a2c 0%, #734921 52%, #5f3b1c 100%);
+      color: #f6ead4; font-weight: 600; font-size: 15px; letter-spacing: 0.06em;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 240, 214, 0.28),
+        inset 0 -2px 6px rgba(58, 30, 10, 0.35),
+        0 2px 4px rgba(58, 42, 24, 0.22),
+        0 8px 20px rgba(115, 73, 33, 0.30);
+      cursor: pointer; transition: box-shadow .18s, transform .06s, filter .18s;
     }
-    .qbtn .q-plus { color: var(--brand); font-weight: 700; font-size: 16px; }
-    .qbtn:hover { border-color: var(--brand); box-shadow: var(--glow-brand); }
-    .qbtn:active { transform: translateY(1px); }
+    .qbtn .q-plus { color: #f0d7ac; font-weight: 700; font-size: 17px; }
+    .qbtn:hover {
+      filter: brightness(1.06);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 240, 214, 0.3),
+        0 3px 6px rgba(58, 42, 24, 0.25),
+        0 0 0 3px rgba(191, 138, 74, 0.28),
+        0 10px 26px rgba(115, 73, 33, 0.4);
+    }
+    .qbtn:active { transform: translateY(1px); filter: brightness(0.97); }
     .qbtn:active { transform: translateY(1px); box-shadow: 0 1px 2px rgba(27, 29, 26, 0.08); }
     /* 日期列：前後天併成一組膠囊，不再散落 */
     .day-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 16px; }
@@ -681,15 +699,20 @@
             <button class="btn btn-secondary btn-sm" id="addLogBtn" type="button">補登其他時間</button>
           </div>
         </div>
-        <div class="block">
-          <div class="section-head">
-            <h2 id="confirmTitle">今日照護確認</h2>
-            <button class="btn btn-secondary btn-sm" id="copyHandoffBtn" type="button">複製交接卡</button>
+        <details class="block fold">
+          <summary>
+            <span class="fold-title" id="confirmTitle">今日照護確認</span>
+            <span class="fold-toggle">＋</span>
+          </summary>
+          <div class="fold-body">
+            <div id="confirmList"></div>
+            <div class="save-state" id="saveState"></div>
+            <div style="display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-top:14px">
+              <span class="muted" style="flex:1;font-size:11.5px">複製交接卡＝把上面內容變成一段文字，可貼給家人朋友</span>
+              <button class="btn btn-secondary btn-sm" id="copyHandoffBtn" type="button">複製交接卡</button>
+            </div>
           </div>
-          <div id="confirmList"></div>
-          <div class="save-state" id="saveState"></div>
-          <p class="muted" style="margin:10px 0 0;font-size:12px">「複製交接卡」會把上面的內容變成一段文字，可直接貼給家人朋友。</p>
-        </div>
+        </details>
         <details class="block fold">
           <summary>
             <span class="fold-title">每一筆紀錄<span class="fold-count" id="logCount"></span></span>
