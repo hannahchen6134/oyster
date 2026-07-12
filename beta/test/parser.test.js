@@ -53,20 +53,41 @@ test('罐罐同義詞', () => {
   assert.equal(intent.record.foodType, '罐頭');
 });
 
-test('多個數字＋雜訊「水」：取有單位的克數、品名可比對、雜訊保留備註', () => {
+test('罐頭加水：先抽加水量、再抓克數，品名可比對', () => {
   const intent = parseMessage('罐頭 皇家 13g 水 10');
   assert.equal(intent.record.foodType, '罐頭');
-  assert.equal(intent.record.amount, 13);        // 取 13g（有單位）而非 10
-  assert.equal(intent.record.itemName, '皇家');    // 品名乾淨 → 能比對到「皇家罐頭」
-  assert.equal(intent.record.note, '水 10');       // 多打的原樣保留，不臆測成水量
-  // 品名清洗後仍能對到已建的食物並套用其 kcalPerGram
+  assert.equal(intent.record.amount, 13);            // 食物克數 = 13（不是加的水 10）
+  assert.equal(intent.record.addedWaterMl, 10);      // 加的水 = 10ml
+  assert.equal(intent.record.itemName, '皇家');        // 品名乾淨 → 能比對到「皇家罐頭」
   const foods = [{ foodId: 'x', displayName: '皇家罐頭', brand: '', productName: '', foodType: '罐頭', isDeleted: 0 }];
   assert.equal(matchFood(foods, intent.record.itemName, intent.record.foodType).foodId, 'x');
 });
 
-test('純數字（無單位）仍取最後一個數字', () => {
+test('罐頭加水：克數沒帶單位也不會被加水覆蓋（嚴格）', () => {
+  const intent = parseMessage('罐頭 皇家 13 水 10');
+  assert.equal(intent.record.amount, 13);            // 先移除「水 10」→ 剩下唯一數字 13
+  assert.equal(intent.record.addedWaterMl, 10);
+  assert.equal(intent.record.itemName, '皇家');
+});
+
+test('罐頭加水：小數克數＋較大加水量', () => {
+  const intent = parseMessage('罐頭 皇家 14.8g 水 28');
+  assert.equal(intent.record.amount, 14.8);
+  assert.equal(intent.record.addedWaterMl, 28);
+  assert.equal(intent.record.itemName, '皇家');
+});
+
+test('沒加水時 addedWaterMl 為 0', () => {
+  const intent = parseMessage('罐頭 皇家 30g');
+  assert.equal(intent.record.amount, 30);
+  assert.equal(intent.record.addedWaterMl, 0);
+  assert.equal(intent.record.itemName, '皇家');
+});
+
+test('純數字（無單位、無加水）仍取最後一個數字', () => {
   const intent = parseMessage('罐頭 皇家 30');
   assert.equal(intent.record.amount, 30);
+  assert.equal(intent.record.addedWaterMl, 0);
   assert.equal(intent.record.itemName, '皇家');
 });
 

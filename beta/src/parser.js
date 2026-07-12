@@ -111,17 +111,24 @@ function extractAmount(tokens, defaultUnit) {
   return { amount: 0, unit: defaultUnit, rest: tokens };
 }
 
-// 食物品名清洗：把多餘的數字（含單位）與「水」等雜訊字拿掉，避免品名比對失敗；
-// 拿掉的內容原樣保留下來，一律不臆測、不丟失（回傳給呼叫端塞進備註）。
-const FOOD_NAME_NOISE = new Set(['水', '加水', '清水', '泡水']);
-function cleanFoodName(tokens) {
-  const nameTokens = [];
-  const dropped = [];
-  for (const token of tokens) {
-    if (parseAmountToken(token) || FOOD_NAME_NOISE.has(token)) dropped.push(token);
-    else nameTokens.push(token);
+// 罐頭常見「另外加水」：把「水/加水/泡水/清水 + 緊接的數字」抽出來當加水量（ml），
+// 並從 token 移除，避免加的水被誤當成食物克數。嚴格：先抽水量、再抓克數。
+const FOOD_WATER_WORDS = new Set(['水', '加水', '清水', '泡水', '兌水']);
+function parseFoodExtras(tokens) {
+  const toks = [...tokens];
+  let addedWaterMl = 0;
+  for (let i = 0; i < toks.length; i += 1) {
+    if (!FOOD_WATER_WORDS.has(toks[i])) continue;
+    const next = parseAmountToken(toks[i + 1]);
+    if (next && next.value > 0) {
+      addedWaterMl += next.value;
+      toks.splice(i, 2); // 移除「水」與其後的數字
+    } else {
+      toks.splice(i, 1); // 只有「水」沒接數字 → 當雜訊移除
+    }
+    i -= 1;
   }
-  return { itemName: nameTokens.join(' '), dropped: dropped.join(' ') };
+  return { tokens: toks, addedWaterMl };
 }
 
 function emptyRecord() {
@@ -131,6 +138,7 @@ function emptyRecord() {
     itemName: '',
     amount: 0,
     unit: '',
+    addedWaterMl: 0,
     medStatus: '',
     medSlot: '',
     note: '',
@@ -296,15 +304,21 @@ export function parseMessage(rawText) {
   // 食物
   const foodEntry = matchWordList(head, FOOD_TYPE_WORDS);
   if (foodEntry) {
-    const { amount, rest: leftover } = extractAmount(rest, 'g');
+    // 先抽「另外加水」量，再從剩下的 token 抓食物克數（嚴格：加的水不會被當成克數）
+    const { tokens: afterWater, addedWaterMl } = parseFoodExtras(rest);
+    const { amount, rest: leftover } = extractAmount(afterWater, 'g');
     if (!amount) return { type: 'invalid', reason: 'missing_amount', category: 'food' };
     record.category = 'food';
     record.foodType = foodEntry.type;
     record.amount = amount;
     record.unit = 'g';
-    const { itemName, dropped } = cleanFoodName(leftover);
-    record.itemName = itemName;
-    if (dropped) record.note = dropped; // 多打的數字/「水」等原樣保留，不臆測成水量
+    record.addedWaterMl = addedWaterMl;
+    // 品名 = 剩下的非數字 token；殘留數字原樣保留備註，不臆測
+    const nameTokens = [];
+    const strayNums = [];
+    for (const token of leftover) (parseAmountToken(token) ? strayNums : nameTokens).push(token);
+    record.itemName = nameTokens.join(' ');
+    if (strayNums.length) record.note = strayNums.join(' ');
     return { type: 'record', record };
   }
 
