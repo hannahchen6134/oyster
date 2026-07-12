@@ -202,6 +202,15 @@ export async function getLog(db, logId) {
   return db.prepare('SELECT * FROM logs WHERE logId = ?').bind(logId).first();
 }
 
+// 最近 n 筆紀錄（新到舊），供 LINE「回顧」清單使用
+export async function getRecentLogsByPet(db, petId, limit = 10) {
+  const { results } = await db
+    .prepare('SELECT * FROM logs WHERE petId = ? AND isDeleted = 0 ORDER BY eventDateTime DESC, createdAt DESC LIMIT ?')
+    .bind(petId, limit)
+    .all();
+  return results || [];
+}
+
 export async function getLogsForDay(db, petId, date) {
   const { results } = await db
     .prepare(

@@ -725,6 +725,16 @@
             </div>
           </div>
         </details>
+        <details class="block fold" id="recentFold">
+          <summary>
+            <span class="fold-title">紀錄回顧（最近·跨日）<span class="fold-count" id="recentCount"></span></span>
+            <span class="fold-toggle">＋</span>
+          </summary>
+          <div class="fold-body">
+            <p class="muted" style="font-size:12px;margin:0 0 10px">最近的紀錄依時間由新到舊，方便睡前掃一眼、抓出記錯的數字。每筆都能「編輯」或「刪除」。</p>
+            <div class="grid" id="recentList" style="gap:0"></div>
+          </div>
+        </details>
       </section>
 
       <!-- 月曆 -->
@@ -898,6 +908,7 @@
       vets: [],
       visits: [],
       dayLogs: [],
+      recentLogs: [],
       labs: [],
       labItem: ''
     };
@@ -1216,6 +1227,52 @@
       }).join('');
     }
 
+    // ---------- 紀錄回顧（最近·跨日） ----------
+    async function loadRecent() {
+      if (!state.petId) return;
+      try {
+        const data = await api(`recent?petId=${state.petId}&limit=20`);
+        state.recentLogs = data.logs || [];
+        renderRecent(state.recentLogs);
+      } catch (error) { /* 靜默：回顧非關鍵路徑 */ }
+    }
+
+    function renderRecent(logs) {
+      const container = $('recentList');
+      const rc = $('recentCount'); if (rc) rc.textContent = logs.length ? `（${logs.length}）` : '';
+      if (!logs.length) { container.innerHTML = '<div class="empty">還沒有紀錄。</div>'; return; }
+      container.innerHTML = logs.map((log) => {
+        const foodChipClass = log.foodType === '乾糧' ? 'chip-dry' : 'chip-wet';
+        const catChipClass = { water: 'chip-water', food: foodChipClass, med: 'chip-med' }[log.category] || 'chip-neutral';
+        const chips = [`<span class="chip ${catChipClass}">${CATEGORY_LABEL[log.category] || log.category}</span>`];
+        if (log.category === 'water') chips.push(`<span class="chip chip-water">${fmt(log.waterMl || log.amount)} ml</span>`);
+        if (log.category === 'food') {
+          chips.push(`<span class="chip ${foodChipClass}">${esc(log.foodType)}${log.itemName ? ` ・ ${esc(log.itemName)}` : ''} ${fmt(log.amount)} g</span>`);
+          if (log.kcal) chips.push(`<span class="chip chip-kcal">${fmt(log.kcal)} kcal</span>`);
+          if (log.waterMl) chips.push(`<span class="chip chip-water">水 ${fmt(log.waterMl)} ml</span>`);
+        }
+        if (log.category === 'med') {
+          const warn = log.medStatus !== '已吃';
+          chips.push(`<span class="chip ${warn ? 'warn' : 'chip-med'}">${esc([log.medSlot, log.itemName].filter(Boolean).join(' ') || '藥')} ${esc(MED_LABEL(log.medStatus))}</span>`);
+        }
+        if (log.category === 'vomit') chips.push('<span class="chip warn">需留意</span>');
+        const dt = String(log.eventDateTime);
+        const dayLabel = `${Number(dt.slice(5, 7))}/${Number(dt.slice(8, 10))}`;
+        return `
+          <div class="entry" data-entry="${esc(log.logId)}">
+            <div class="entry-time">${dayLabel}<div class="entry-by">${esc(dt.slice(11, 16) || '--:--')}</div></div>
+            <div>
+              <div class="chips">${chips.join('')}</div>
+              ${log.note ? `<div class="entry-note">${esc(log.note)}</div>` : ''}
+            </div>
+            <div class="entry-actions">
+              <button class="btn btn-secondary btn-sm" data-edit="${esc(log.logId)}" data-recent="1" type="button">編輯</button>
+              <button class="btn btn-danger btn-sm" data-del="${esc(log.logId)}" data-recent="1" type="button">刪除</button>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
     // ---------- 紀錄表單（新增 / 編輯） ----------
     function logFormFields(log, presetCategory) {
       const isEdit = Boolean(log);
@@ -1321,6 +1378,7 @@
         else await api('logs', { method: 'POST', body: JSON.stringify(body) });
         toast(log ? '已更新這筆紀錄，今日照護摘要已重新整理。' : '已幫你記下來了，可在今日照護確認與回診摘要中查看。');
         await loadDay();
+        if ($('recentFold') && $('recentFold').open) await loadRecent();
       });
       const form = $('modalForm');
       syncLogFormVisibility(form);
@@ -2366,6 +2424,12 @@
       const editBtn = event.target.closest('[data-edit]');
       if (editBtn) {
         const id = editBtn.dataset.edit;
+        if (editBtn.dataset.recent) {
+          const log = state.recentLogs.find((entry) => entry.logId === id);
+          state.meds = (await api(`meds?petId=${state.petId}`)).rows;
+          state.foods = (await api('foods')).rows;
+          return openLogModal(log);
+        }
         if (!$('todayView').classList.contains('hidden') && editBtn.closest('#logList')) {
           const log = state.dayLogs.find((entry) => entry.logId === id);
           state.meds = (await api(`meds?petId=${state.petId}`)).rows;
@@ -2388,15 +2452,17 @@
       const delBtn = event.target.closest('[data-del]');
       if (delBtn) {
         const id = delBtn.dataset.del;
-        const isLog = Boolean(delBtn.closest('#logList'));
+        const isRecent = Boolean(delBtn.dataset.recent);
+        const isLog = isRecent || Boolean(delBtn.closest('#logList'));
         const question = isLog
-          ? '確定要刪除這筆紀錄嗎？刪除後今日摘要會重新整理。'
+          ? '確定要刪除這筆紀錄嗎？刪除後統計會重新整理。'
           : '確定要刪除嗎？資料會標記為已刪除，統計會立刻重新整理。';
         if (!confirm(question)) return;
         try {
           if (isLog) {
             await api(`logs/${id}`, { method: 'DELETE' });
-            toast('已刪除這筆紀錄，今日照護摘要已重新整理。');
+            toast('已刪除這筆紀錄，統計已重新整理。');
+            if (isRecent) await loadRecent();
             return loadDay();
           }
           await api(`${state.settingsTab}/${id}`, { method: 'DELETE' });
@@ -2478,6 +2544,9 @@
     $('showAllLogsBtn').addEventListener('click', () => {
       state.showAllLogs = true;
       renderLogs(state.dayLogs || []);
+    });
+    $('recentFold').addEventListener('toggle', (event) => {
+      if (event.target.open) loadRecent();
     });
     $('addLogBtn').addEventListener('click', async () => {
       state.foods = (await api('foods')).rows;

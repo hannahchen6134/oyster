@@ -9,7 +9,7 @@ import { handleApi } from './api.js';
 import { verifyLineSignature, replyOrPush, replyOrPushFlex, replyMessages, pushText, pushMessages, getProfile } from './line.js';
 import { hasAnyReminder, parseReminderSettings, buildReminderLines, reminderMessage, visitReminderMessage } from './reminders.js';
 import { shortDate } from './replies.js';
-import { recordFlex, todayFlex, websiteFlex, menuFlex, recordMenuFlex, weekFlex, monthFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, menuCell, exampleCard, petDataFlex, deletedCard } from './flex.js';
+import { recordFlex, todayFlex, websiteFlex, menuFlex, recordMenuFlex, weekFlex, monthFlex, recentFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, menuCell, exampleCard, petDataFlex, deletedCard } from './flex.js';
 import { isBetaAllowed, normalizeCode, gateText } from './plan.js';
 import {
   ensureUser, updateUser, listPets, createPet, resolveDefaultPet, getPet, updatePetFields, createFoodItem, createMedItem,
@@ -22,6 +22,16 @@ import {
   websiteReply, helpText, welcomeText, unknownReply, invalidReply,
   recordTutorial, medTutorial, onboardingText, recordPrompt, backfillGuide
 } from './replies.js';
+import { getRecentLogsByPet } from './db.js';
+
+// 回顧清單用：一筆紀錄的簡短描述（含罐頭另外加的水）
+function describeLogLine(log) {
+  const line = describeLog(log);
+  const parts = [];
+  if (log.category === 'food' && Number(log.kcal) > 0) parts.push(`${log.kcal} kcal`);
+  if (log.category === 'food' && String(log.note || '').includes('加水')) parts.push(log.note);
+  return parts.length ? `${line}（${parts.join('・')}）` : line;
+}
 import { jsonResponse, taipeiToday, taipeiNowDateTime, addDays } from './util.js';
 
 // LINE 重送去重（單一 isolate 內有效，Beta 足夠）
@@ -376,6 +386,42 @@ async function handlePending(env, event, { db, user, pet, pets, lineUserId, text
     return true;
   }
 
+  // 回顧清單「改數字」：更新指定那一筆的數量（食物連帶重算熱量/含水）
+  if (pending.startsWith('editLog|')) {
+    const logId = pending.slice(8);
+    const m = text.match(/^([0-9]+(?:\.[0-9]+)?)\s*(?:g|克|公克|ml|毫升)?$/i);
+    if (!m) { await clear(); return false; }
+    await clear();
+    const log = await getLog(db, logId);
+    if (!log || log.lineUserId !== lineUserId || log.isDeleted) {
+      await replyOrPush(env, event, '找不到那筆紀錄了');
+      return true;
+    }
+    const newAmount = Number(m[1]);
+    const fields = { amount: newAmount };
+    if (log.category === 'water') {
+      fields.waterMl = newAmount;
+    } else if (log.category === 'food') {
+      const food = log.foodId ? await getFood(db, log.foodId) : null;
+      const derived = deriveFoodFields(newAmount, log.foodType, food);
+      fields.kcal = derived.kcal;
+      fields.waterMl = derived.waterMl;
+    }
+    const updated = await updateLog(db, logId, fields, lineUserId);
+    const eventDate = String(updated.eventDateTime).slice(0, 10);
+    const summary = await recomputeDay(db, updated.petId, eventDate);
+    const cardPet = await getPet(db, updated.petId);
+    const subParts = [];
+    if (updated.kcal) subParts.push(`${updated.kcal} kcal`);
+    if (updated.category === 'food' && updated.waterMl) subParts.push(`含水 ${updated.waterMl} ml`);
+    const categoryKey = updated.category === 'food' ? (updated.foodType === '乾糧' ? 'dry' : 'wet') : updated.category;
+    await replyOrPushFlex(env, event, recordFlex({
+      pet: cardPet, categoryKey, mainText: describeLog(updated), subText: subParts.join('・'),
+      summary, date: eventDate, logId: updated.logId, title: `✓ 已更新・${cardPet?.petName || '貓貓'}`
+    }), recordReply(describeLog(updated), cardPet, summary, [], eventDate));
+    return true;
+  }
+
   if (pending.startsWith('amount|')) {
     const base = pending.slice(7);
     const m = text.match(/^([0-9]+(?:\.[0-9]+)?)\s*(?:g|克|公克|ml|毫升)?$/i);
@@ -453,6 +499,24 @@ async function handlePostback(event, env, baseUrl) {
     const rows = await getRecentSummaries(db, pet.petId, lastDate, Number(lastDate.slice(8, 10)));
     const monthLabel = `${year} 年 ${mon} 月`;
     await replyOrPushFlex(env, event, monthFlex(pet.petName, target, rows, today), monthReply(pet.petName, monthLabel, rows));
+    return;
+  }
+
+  // 回顧清單「改數字」：進入等待輸入新數量的狀態
+  if (action === 'editAmount') {
+    const logId = data.get('logId') || '';
+    const log = await getLog(db, logId);
+    if (!log || log.lineUserId !== lineUserId || log.isDeleted) {
+      await replyOrPush(env, event, '找不到那筆紀錄了');
+      return;
+    }
+    if (!['water', 'food'].includes(log.category)) {
+      await replyOrPush(env, event, `「${describeLog(log)}」沒有數量可以改，\n可以改按「刪除」。`);
+      return;
+    }
+    await updateUser(db, lineUserId, { pendingAction: `editLog|${logId}` });
+    const unit = log.category === 'water' ? 'ml' : 'g';
+    await replyOrPush(env, event, `「${describeLog(log)}」\n要改成多少 ${unit}？\n直接打數字就好（例如 ${unit === 'ml' ? '60' : '13'}）`);
     return;
   }
 
@@ -1120,6 +1184,26 @@ async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId) {
     const rows = await getRecentSummaries(db, pet.petId, today, lastDay);
     const monthLabel = `${month.slice(0, 4)} 年 ${Number(month.slice(5, 7))} 月`;
     await replyOrPushFlex(env, event, monthFlex(pet.petName, month, rows, today), monthReply(pet.petName, monthLabel, rows));
+    return;
+  }
+
+  if (query === 'recent') {
+    const logs = await getRecentLogsByPet(db, pet.petId, 10);
+    if (!logs.length) {
+      await replyOrPush(env, event, `${pet.petName} 還沒有任何紀錄。\n打「水 60」或「罐頭 皇家 30g」開始記錄吧！`);
+      return;
+    }
+    const items = logs.map((log) => {
+      const day = String(log.eventDateTime).slice(5, 16).replace('T', ' ');
+      return {
+        logId: log.logId,
+        timeLabel: day,
+        desc: describeLogLine(log),
+        editable: log.category === 'water' || log.category === 'food'
+      };
+    });
+    await replyOrPushFlex(env, event, recentFlex(pet.petName, items),
+      `最近 ${items.length} 筆：\n${items.map((i) => `${i.timeLabel} ${i.desc}`).join('\n')}\n\n要改哪筆到照護站更方便`);
     return;
   }
 

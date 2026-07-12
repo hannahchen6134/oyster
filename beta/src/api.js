@@ -6,7 +6,7 @@ import {
   getUser, updateUser, listPets, getPet, createPet,
   listFoods, getFood,
   insertLog, getLog, getLogsForDay, updateLog, softDeleteLog,
-  recomputeDay, getSummaries, getSessionUser
+  recomputeDay, getSummaries, getSessionUser, getRecentLogsByPet
 } from './db.js';
 import { computeDailySummary, deriveFoodFields } from './summary.js';
 import { jsonResponse, newId, nowIso, isValidDate, isValidDateTime, taipeiNowDateTime } from './util.js';
@@ -122,6 +122,14 @@ export async function handleApi(request, env, url) {
         .bind(petId, month, month)
         .all();
       return jsonResponse({ ok: true, rows, visits: visits || [] });
+    }
+
+    if (resource === 'recent' && method === 'GET') {
+      const petId = url.searchParams.get('petId') || '';
+      const limit = Math.min(50, Math.max(1, Number(url.searchParams.get('limit')) || 20));
+      if (!(await assertPetOwner(db, petId, lineUserId))) return forbidden();
+      const logs = await getRecentLogsByPet(db, petId, limit);
+      return jsonResponse({ ok: true, logs });
     }
 
     if (resource === 'logs') {

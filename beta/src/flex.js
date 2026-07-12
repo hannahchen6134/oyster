@@ -605,6 +605,54 @@ export function monthFlex(petName, month, rows, today) {
   );
 }
 
+// ---------- 紀錄回顧清單（最近幾筆，可直接改數字或刪除） ----------
+// items：[{ logId, timeLabel, desc, editable }]（由呼叫端整理好文字）
+export function recentFlex(petName, items) {
+  const rows = [];
+  items.forEach((item, index) => {
+    if (index > 0) rows.push({ type: 'separator', margin: 'md', color: '#F2ECE0' });
+    const buttons = [];
+    if (item.editable) {
+      buttons.push({
+        type: 'button', height: 'sm', style: 'link', color: C.brand, gravity: 'center',
+        action: { type: 'postback', label: '改數字', data: `action=editAmount&logId=${item.logId}`, displayText: `改「${item.desc}」` }
+      });
+    }
+    buttons.push({
+      type: 'button', height: 'sm', style: 'link', color: C.muted, gravity: 'center',
+      action: { type: 'postback', label: '刪除', data: `action=delLog&logId=${item.logId}`, displayText: `刪除「${item.desc}」` }
+    });
+    rows.push({
+      type: 'box', layout: 'vertical', margin: 'md', spacing: 'xs',
+      contents: [
+        text(item.timeLabel, { size: 'xxs', color: C.muted }),
+        text(item.desc, { size: 'sm', color: C.ink, wrap: true }),
+        { type: 'box', layout: 'horizontal', spacing: 'md', justifyContent: 'flex-end', contents: buttons }
+      ]
+    });
+  });
+
+  const body = {
+    type: 'box', layout: 'vertical', paddingAll: '18px', backgroundColor: BODY_BG,
+    contents: [
+      text('點「改數字」修正克數/ml，或「刪除」整筆移除', { size: 'xxs', color: C.muted, wrap: true, align: 'center' }),
+      { type: 'separator', margin: 'md', color: '#F0EADF' },
+      ...rows
+    ]
+  };
+  const footer = {
+    type: 'box', layout: 'vertical', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
+    contents: [
+      { type: 'button', height: 'sm', style: 'primary', color: C.brand,
+        action: { type: 'message', label: '開啟照護站看全部', text: '照護站' } }
+    ]
+  };
+  return bubble(
+    `紀錄回顧（${petName}）最近 ${items.length} 筆`,
+    { type: 'bubble', size: 'mega', header: header(`紀錄回顧・${petName}`), body, footer }
+  );
+}
+
 // ---------- 照護提醒卡 ----------
 export function reminderFlex(pet, lines) {
   const items = [];
