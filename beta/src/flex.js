@@ -650,8 +650,9 @@ export function recentFlex(petName, items) {
 
   const body = { type: 'box', layout: 'vertical', paddingAll: '18px', backgroundColor: BODY_BG, contents };
   const footer = {
-    type: 'box', layout: 'vertical', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
+    type: 'box', layout: 'vertical', paddingAll: '10px', spacing: 'sm', backgroundColor: FOOTER_COLOR,
     contents: [
+      text('重要數字請核對後再參考', { size: 'xxs', color: C.muted, align: 'center' }),
       { type: 'button', height: 'sm', style: 'primary', color: C.brand,
         action: { type: 'message', label: '開啟照護站看全部', text: '照護站' } }
     ]
