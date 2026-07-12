@@ -8,7 +8,7 @@ export const BRAND = {
   dataNote: '你的照護資料只用於本服務的紀錄與摘要功能。請勿將專屬照護站連結轉傳給不相關的人。'
 };
 
-// 資料值 → 顯示文字：資料層保留「漏餵」，所有輸出改為不責備的說法
+// 資料值 → 顯示文字：資料層保留「漏餵」，所有輸出改為不責備的中性說法（未餵）
 export function displayMedStatus(status) {
-  return status === '漏餵' ? '沒餵到' : String(status || '');
+  return status === '漏餵' ? '未餵' : String(status || '');
 }

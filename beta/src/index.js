@@ -53,6 +53,7 @@ export default {
     if (url.pathname === '/healthz') {
       return jsonResponse({ ok: true, service: 'cat-care-beta', now: new Date().toISOString() });
     }
+    // 照護站不進搜尋引擎：靠 index.html 的 <meta name="robots"> 與 /robots.txt（靜態資源由平台直接回應，Worker 不介入）
     return env.ASSETS.fetch(request);
   },
 
@@ -842,10 +843,10 @@ async function handleTextMessage(event, env, baseUrl) {
           subtitle: '點一下就記好',
           rows: [
             [menuCell('早・已吃', '', '藥 早 已吃'), menuCell('晚・已吃', '', '藥 晚 已吃')],
-            [menuCell('中午・已吃', '', '藥 中午 已吃'), menuCell('沒餵到', '', '藥 沒餵到')]
+            [menuCell('中午・已吃', '', '藥 中午 已吃'), menuCell('未餵', '', '藥 未餵')]
           ],
           alt: '這次的藥？'
-        }), '記餵藥：藥 早 已吃 / 藥 晚 已吃 / 藥 沒餵到');
+        }), '記餵藥：藥 早 已吃 / 藥 晚 已吃 / 藥 未餵');
         return;
       }
       // 嘔吐/排便/精神/備註：點了直接打描述

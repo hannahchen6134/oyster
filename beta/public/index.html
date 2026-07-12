@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
   <title>喵喵照護安心管家</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -522,6 +523,8 @@
     .pg-foot .remain.done { color: var(--brand); }
     .pg-hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
     .pg-hint a { color: var(--brand); text-decoration: none; border-bottom: 1px solid rgba(115,73,33,.3); }
+    .hero-empty { font-size: 15px; font-weight: 600; color: var(--ink-soft); }
+    .hero-empty span { display: block; margin-top: 6px; font-size: 12.5px; font-weight: 400; color: var(--muted); line-height: 1.6; }
     /* 日期列：前後天併成一組膠囊，不再散落 */
     .day-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 16px; }
     .date-nav {
@@ -1023,7 +1026,7 @@
       vomit: '嘔吐', stool: '大便', urine: '尿尿', supplement: '營養補充', mood: '精神', note: '備註'
     };
 
-    const MED_LABEL = (status) => status === '漏餵' ? '沒餵到' : status;
+    const MED_LABEL = (status) => status === '漏餵' ? '未餵' : status;
 
     function tpeTime(iso) {
       try {
@@ -1055,6 +1058,17 @@
       const isToday = state.date === todayStr();
       const dow = '日一二三四五六'[new Date(`${state.date}T00:00:00`).getDay()];
       const dateLabel = `${Number(state.date.slice(5, 7))}月${Number(state.date.slice(8, 10))}日（${dow}）`;
+
+      // 沒有紀錄時：不以 0ml／0kcal 當主要狀態，改顯示溫柔的空狀態
+      if (!Number(s.entryCount)) {
+        el.innerHTML = `
+          <div class="hero-head">
+            <span class="hero-title">${isToday ? '今日累計' : '當日累計'}</span>
+            <span class="hero-date">${dateLabel}</span>
+          </div>
+          <div class="hero-empty">${isToday ? '今天還沒有紀錄' : '這天沒有紀錄'}<span>記一筆吃飯、喝水或用藥，就會開始統計今日水分與熱量。</span></div>`;
+        return;
+      }
 
       const bar = (name, unit, rawVal, rawGoal) => {
         const val = Math.round((Number(rawVal) || 0) * 10) / 10;
