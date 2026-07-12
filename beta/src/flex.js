@@ -539,7 +539,8 @@ function calDayCell(month, day, row, { isToday, isFuture }) {
 }
 
 // rows：該月 1 號到 lastDate 的 daily_summary（由 getRecentSummaries 補零）
-export function monthFlex(petName, month, rows, today) {
+// calendarUrl：帶登入 token 的網站月曆連結（有帶才顯示「看完整月曆」按鈕）
+export function monthFlex(petName, month, rows, today, calendarUrl = '') {
   const year = Number(month.slice(0, 4));
   const mon = Number(month.slice(5, 7));
   const daysInMonth = new Date(year, mon, 0).getDate();
@@ -596,7 +597,14 @@ export function monthFlex(petName, month, rows, today) {
       action: { type: 'postback', label: '下個月 ›', data: `action=calMonth&month=${nextMonth}`, displayText: `${Number(nextMonth.slice(5, 7))} 月月曆` }
     });
   }
-  const footer = { type: 'box', layout: 'horizontal', paddingAll: '6px', backgroundColor: FOOTER_COLOR, contents: navButtons };
+  const footerRows = [{ type: 'box', layout: 'horizontal', contents: navButtons }];
+  if (calendarUrl) {
+    footerRows.push({
+      type: 'button', height: 'sm', style: 'primary', color: C.brand,
+      action: { type: 'uri', label: '看完整月曆（開網站）', uri: calendarUrl }
+    });
+  }
+  const footer = { type: 'box', layout: 'vertical', paddingAll: '8px', spacing: 'sm', backgroundColor: FOOTER_COLOR, contents: footerRows };
 
   const summaryLine = recorded.length ? `有紀錄 ${recorded.length} 天・日均水分 ${fmt(avgWater)} ml` : '這個月還沒有紀錄';
   return bubble(

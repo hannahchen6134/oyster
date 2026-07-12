@@ -489,7 +489,9 @@ async function handlePostback(event, env, baseUrl) {
     const lastDate = target === thisMonth ? today : `${target}-${String(daysInMonth).padStart(2, '0')}`;
     const rows = await getRecentSummaries(db, pet.petId, lastDate, Number(lastDate.slice(8, 10)));
     const monthLabel = `${year} 年 ${mon} 月`;
-    await replyOrPushFlex(env, event, monthFlex(pet.petName, target, rows, today), monthReply(pet.petName, monthLabel, rows));
+    const token = await createSession(db, lineUserId);
+    const calendarUrl = `${baseUrl}/#token=${token}&go=calendar`;
+    await replyOrPushFlex(env, event, monthFlex(pet.petName, target, rows, today, calendarUrl), monthReply(pet.petName, monthLabel, rows));
     return;
   }
 
@@ -1174,7 +1176,9 @@ async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId) {
     const lastDay = Number(today.slice(8, 10));
     const rows = await getRecentSummaries(db, pet.petId, today, lastDay);
     const monthLabel = `${month.slice(0, 4)} 年 ${Number(month.slice(5, 7))} 月`;
-    await replyOrPushFlex(env, event, monthFlex(pet.petName, month, rows, today), monthReply(pet.petName, monthLabel, rows));
+    const token = await createSession(db, lineUserId);
+    const calendarUrl = `${baseUrl}/#token=${token}&go=calendar`;
+    await replyOrPushFlex(env, event, monthFlex(pet.petName, month, rows, today, calendarUrl), monthReply(pet.petName, monthLabel, rows));
     return;
   }
 
