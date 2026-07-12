@@ -601,7 +601,7 @@ export function monthFlex(petName, month, rows, today, calendarUrl = '') {
   if (calendarUrl) {
     footerRows.push({
       type: 'button', height: 'sm', style: 'primary', color: C.brand,
-      action: { type: 'uri', label: '看完整月曆（開網站）', uri: calendarUrl }
+      action: { type: 'uri', label: '看完整月曆（去照護站）', uri: calendarUrl }
     });
   }
   const footer = { type: 'box', layout: 'vertical', paddingAll: '8px', spacing: 'sm', backgroundColor: FOOTER_COLOR, contents: footerRows };
