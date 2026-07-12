@@ -371,10 +371,11 @@
     .scroll-hint { text-align: center; font-size: 11.5px; color: var(--muted); margin: 0 0 8px; letter-spacing: 0.08em; }
     .trend-table td.col-date, .trend-table th.col-date {
       position: sticky; left: 0; z-index: 1; text-align: left;
-      background: #fbf7ef; box-shadow: 1px 0 0 var(--line);
+      background: #F3E9D6; box-shadow: 7px 0 9px -6px rgba(90, 54, 23, 0.30);
+      font-weight: 700; color: #4A3620; font-size: 13.5px; padding-right: 14px;
     }
-    .trend-table th.col-date { z-index: 2; background: #f6efe2; }
-    .trend-table tbody tr:nth-child(even) td.col-date { background: #f4ecdd; }
+    .trend-table th.col-date { z-index: 2; background: #EADDC4; color: var(--brand); }
+    .trend-table tbody tr:nth-child(even) td.col-date { background: #EFE3CC; }
     .trend-table tr.warn td.col-date { background: var(--seal-tint); }
     .trend-table th.col-primary { color: var(--brand); border-bottom-width: 2px; }
     .trend-table td.col-primary { background: rgba(115, 73, 33, 0.05); }
@@ -488,20 +489,20 @@
     /* 快速新增(手機大按鈕)：要一眼看得出是按鈕 */
     .quick-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
     .qbtn {
-      display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-      min-height: 54px; border: 1px solid rgba(58, 36, 16, 0.45); border-radius: 13px;
-      background: #6f4824;
-      color: #f2e6d1; font-weight: 600; font-size: 15px; letter-spacing: 0.08em;
-      box-shadow: 0 1px 2px rgba(58, 42, 24, 0.14), 0 3px 10px rgba(90, 54, 23, 0.16);
-      cursor: pointer; transition: background .16s, box-shadow .16s, transform .06s;
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      min-height: 54px; padding: 0 8px; border: 1px solid rgba(74, 48, 22, 0.28); border-radius: 15px;
+      background: linear-gradient(180deg, #855A34 0%, #6E4A28 100%);
+      color: #F6EDDF; font-weight: 600; font-size: 15px; letter-spacing: 0.02em;
+      white-space: nowrap;
+      box-shadow: 0 1px 1px rgba(60, 40, 20, 0.10), 0 6px 18px rgba(122, 76, 34, 0.13);
+      cursor: pointer; transition: filter .16s, box-shadow .16s, transform .06s;
     }
-    .qbtn .q-plus { color: #d9b483; font-weight: 600; font-size: 16px; }
+    .qbtn .q-plus { color: #E7C79A; font-weight: 500; font-size: 16px; }
     .qbtn:hover {
-      background: #7d5228;
-      box-shadow: 0 1px 2px rgba(58, 42, 24, 0.16), 0 6px 16px rgba(90, 54, 23, 0.22);
+      filter: brightness(1.06);
+      box-shadow: 0 1px 1px rgba(60, 40, 20, 0.10), 0 8px 22px rgba(122, 76, 34, 0.20);
     }
-    .qbtn:active { transform: translateY(1px); background: #634020; }
-    .qbtn:active { transform: translateY(1px); box-shadow: 0 1px 2px rgba(27, 29, 26, 0.08); }
+    .qbtn:active { transform: translateY(1px); filter: brightness(0.96); box-shadow: 0 1px 2px rgba(27, 29, 26, 0.10); }
     /* 日期列：前後天併成一組膠囊，不再散落 */
     .day-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 16px; }
     .date-nav {
@@ -727,11 +728,11 @@
         </details>
         <details class="block fold" id="recentFold">
           <summary>
-            <span class="fold-title">紀錄回顧（最近·跨日）<span class="fold-count" id="recentCount"></span></span>
+            <span class="fold-title">最近的紀錄<span class="fold-count" id="recentCount"></span></span>
             <span class="fold-toggle">＋</span>
           </summary>
           <div class="fold-body">
-            <p class="muted" style="font-size:12px;margin:0 0 10px">最近的紀錄依時間由新到舊，方便睡前掃一眼、抓出記錯的數字。每筆都能「編輯」或「刪除」。</p>
+            <p class="muted" style="font-size:12px;margin:0 0 10px">不分哪一天，把最近記的每一筆依時間由新到舊列出來，方便睡前掃一眼、抓出記錯的數字。每筆都能「編輯」或「刪除」。</p>
             <div class="grid" id="recentList" style="gap:0"></div>
           </div>
         </details>
@@ -1232,7 +1233,8 @@
       if (!state.petId) return;
       try {
         const data = await api(`recent?petId=${state.petId}&limit=20`);
-        state.recentLogs = data.logs || [];
+        // 濾掉「罐頭加水」那種伴隨紀錄（該餐本身已標示加水），避免重複、看了眼花
+        state.recentLogs = (data.logs || []).filter((log) => !(log.category === 'water' && log.note === '罐頭加水')).slice(0, 12);
         renderRecent(state.recentLogs);
       } catch (error) { /* 靜默：回顧非關鍵路徑 */ }
     }
@@ -1279,20 +1281,36 @@
       const dateValue = isEdit ? String(log.eventDateTime).slice(0, 10) : state.date;
       const timeValue = isEdit ? String(log.eventDateTime).slice(11, 16) : new Date().toLocaleTimeString('en-GB', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit' });
       const category = log?.category || presetCategory || 'water';
+      const isQuick = !isEdit && Boolean(presetCategory);
       const foodOptions = state.foods.map((food) =>
         `<option value="${esc(food.foodId)}" ${log?.foodId === food.foodId ? 'selected' : ''}>${esc(food.displayName)}（${esc(food.foodType)}）</option>`).join('');
       const medOptions = state.meds.map((med) =>
         `<option value="${esc(med.medName)}" ${log?.itemName === med.medName ? 'selected' : ''}>${esc(med.medName)}</option>`).join('');
+      // 類別控制項：
+      //  - 快速按鈕「大小便」→ 只給大便/尿尿兩個選項
+      //  - 其他快速按鈕 → 類別已確定，不再重複顯示下拉（用隱藏值）
+      //  - 一般新增/編輯 → 完整下拉
+      let categoryControl;
+      if (isQuick && (category === 'stool' || category === 'urine')) {
+        categoryControl = `<div class="field"><label>大便還是尿尿？</label>
+          <select name="category" id="logCategory">
+            <option value="stool" ${category !== 'urine' ? 'selected' : ''}>大便</option>
+            <option value="urine" ${category === 'urine' ? 'selected' : ''}>尿尿</option>
+          </select></div>`;
+      } else if (isQuick) {
+        categoryControl = `<input type="hidden" name="category" id="logCategory" value="${esc(category)}">`;
+      } else {
+        categoryControl = `<div class="field"><label>類別</label>
+          <select name="category" id="logCategory">
+            ${Object.entries(CATEGORY_LABEL).map(([key, label]) => `<option value="${key}" ${category === key ? 'selected' : ''}>${label}</option>`).join('')}
+          </select></div>`;
+      }
       return `
         <div class="grid grid-2">
           <div class="field"><label>日期</label><input type="date" name="eventDate" value="${esc(dateValue)}" required></div>
           <div class="field"><label>時間</label><input type="time" name="eventTime" value="${esc(timeValue)}" required></div>
         </div>
-        <div class="field"><label>類別</label>
-          <select name="category" id="logCategory">
-            ${Object.entries(CATEGORY_LABEL).map(([key, label]) => `<option value="${key}" ${category === key ? 'selected' : ''}>${label}</option>`).join('')}
-          </select>
-        </div>
+        ${categoryControl}
         <div class="field log-water"><label>喝水量（ml）</label><input type="number" name="waterAmount" min="0" step="0.5" value="${category === 'water' ? esc(log?.amount ?? '') : ''}"></div>
         <div class="log-food">
           <div class="grid grid-2">
@@ -1372,7 +1390,10 @@
     }
 
     function openLogModal(log, presetCategory) {
-      openModal(log ? '編輯紀錄' : '新增/補登紀錄', logFormFields(log, presetCategory), async (form) => {
+      const quickTitle = presetCategory
+        ? `記一筆・${presetCategory === 'stool' ? '大小便' : (CATEGORY_LABEL[presetCategory] || '')}`
+        : '新增/補登紀錄';
+      openModal(log ? '編輯紀錄' : quickTitle, logFormFields(log, presetCategory), async (form) => {
         const body = collectLogForm(form);
         if (log) await api(`logs/${log.logId}`, { method: 'PUT', body: JSON.stringify(body) });
         else await api('logs', { method: 'POST', body: JSON.stringify(body) });

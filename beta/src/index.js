@@ -23,15 +23,6 @@ import {
   recordTutorial, medTutorial, onboardingText, recordPrompt, backfillGuide
 } from './replies.js';
 import { getRecentLogsByPet } from './db.js';
-
-// 回顧清單用：一筆紀錄的簡短描述（含罐頭另外加的水）
-function describeLogLine(log) {
-  const line = describeLog(log);
-  const parts = [];
-  if (log.category === 'food' && Number(log.kcal) > 0) parts.push(`${log.kcal} kcal`);
-  if (log.category === 'food' && String(log.note || '').includes('加水')) parts.push(log.note);
-  return parts.length ? `${line}（${parts.join('・')}）` : line;
-}
 import { jsonResponse, taipeiToday, taipeiNowDateTime, addDays } from './util.js';
 
 // LINE 重送去重（單一 isolate 內有效，Beta 足夠）
@@ -1188,22 +1179,33 @@ async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId) {
   }
 
   if (query === 'recent') {
-    const logs = await getRecentLogsByPet(db, pet.petId, 10);
+    // 多撈一些，濾掉「罐頭加水」那種伴隨紀錄後，仍能湊滿約 10 筆
+    const raw = await getRecentLogsByPet(db, pet.petId, 20);
+    const logs = raw.filter((log) => !(log.category === 'water' && String(log.note || '') === '罐頭加水')).slice(0, 10);
     if (!logs.length) {
       await replyOrPush(env, event, `${pet.petName} 還沒有任何紀錄。\n打「水 60」或「罐頭 皇家 30g」開始記錄吧！`);
       return;
     }
+    const WD = ['日', '一', '二', '三', '四', '五', '六'];
     const items = logs.map((log) => {
-      const day = String(log.eventDateTime).slice(5, 16).replace('T', ' ');
-      return {
-        logId: log.logId,
-        timeLabel: day,
-        desc: describeLogLine(log),
-        editable: log.category === 'water' || log.category === 'food'
-      };
+      const dt = String(log.eventDateTime);
+      const wd = WD[new Date(`${dt.slice(0, 10)}T00:00:00`).getDay()] || '';
+      const dateLabel = `${Number(dt.slice(5, 7))}/${Number(dt.slice(8, 10))}（${wd}）`;
+      let title = describeLog(log);
+      let sub = '';
+      if (log.category === 'food') {
+        title = `${log.foodType}${log.itemName ? ` ${log.itemName}` : ''} ${log.amount}g`;
+        const parts = [];
+        if (Number(log.kcal) > 0) parts.push(`${log.kcal} kcal`);
+        if (String(log.note || '').includes('加水')) parts.push(String(log.note).replace('另', ''));
+        sub = parts.join('・');
+      } else if (log.category === 'water') {
+        title = `喝水 ${log.amount} ml`;
+      }
+      return { logId: log.logId, dateLabel, time: dt.slice(11, 16), title, sub, editable: log.category === 'water' || log.category === 'food' };
     });
-    await replyOrPushFlex(env, event, recentFlex(pet.petName, items),
-      `最近 ${items.length} 筆：\n${items.map((i) => `${i.timeLabel} ${i.desc}`).join('\n')}\n\n要改哪筆到照護站更方便`);
+    const fallback = items.map((i) => `${i.dateLabel} ${i.time} ${i.title}${i.sub ? `（${i.sub}）` : ''}`).join('\n');
+    await replyOrPushFlex(env, event, recentFlex(pet.petName, items), `最近紀錄：\n${fallback}`);
     return;
   }
 

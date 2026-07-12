@@ -605,41 +605,50 @@ export function monthFlex(petName, month, rows, today) {
   );
 }
 
-// ---------- 紀錄回顧清單（最近幾筆，可直接改數字或刪除） ----------
-// items：[{ logId, timeLabel, desc, editable }]（由呼叫端整理好文字）
+// ---------- 紀錄回顧清單（最近幾筆，依日期分段，可直接改數字或刪除） ----------
+// items：[{ logId, dateLabel, time, title, sub, editable }]（由呼叫端整理好）
 export function recentFlex(petName, items) {
-  const rows = [];
-  items.forEach((item, index) => {
-    if (index > 0) rows.push({ type: 'separator', margin: 'md', color: '#F2ECE0' });
-    const buttons = [];
+  const contents = [
+    text('主資訊在上、細節在下；點「改」修正數字、「刪」移除整筆', { size: 'xxs', color: C.muted, wrap: true, align: 'center' })
+  ];
+
+  let lastDate = null;
+  items.forEach((item) => {
+    if (item.dateLabel !== lastDate) {
+      contents.push(text(item.dateLabel, { size: 'sm', weight: 'bold', color: C.brand, margin: lastDate ? 'xl' : 'lg' }));
+      contents.push({ type: 'separator', margin: 'sm', color: '#F0EADF' });
+      lastDate = item.dateLabel;
+    }
+
+    const actions = [];
     if (item.editable) {
-      buttons.push({
+      actions.push({
         type: 'button', height: 'sm', style: 'link', color: C.brand, gravity: 'center',
-        action: { type: 'postback', label: '改數字', data: `action=editAmount&logId=${item.logId}`, displayText: `改「${item.desc}」` }
+        action: { type: 'postback', label: '改', data: `action=editAmount&logId=${item.logId}`, displayText: `改「${item.title}」` }
       });
     }
-    buttons.push({
+    actions.push({
       type: 'button', height: 'sm', style: 'link', color: C.muted, gravity: 'center',
-      action: { type: 'postback', label: '刪除', data: `action=delLog&logId=${item.logId}`, displayText: `刪除「${item.desc}」` }
+      action: { type: 'postback', label: '刪', data: `action=delLog&logId=${item.logId}`, displayText: `刪除「${item.title}」` }
     });
-    rows.push({
-      type: 'box', layout: 'vertical', margin: 'md', spacing: 'xs',
+
+    contents.push({
+      type: 'box', layout: 'horizontal', margin: 'lg', spacing: 'sm',
       contents: [
-        text(item.timeLabel, { size: 'xxs', color: C.muted }),
-        text(item.desc, { size: 'sm', color: C.ink, wrap: true }),
-        { type: 'box', layout: 'horizontal', spacing: 'md', justifyContent: 'flex-end', contents: buttons }
+        text(item.time, { size: 'xs', color: C.muted, flex: 0, gravity: 'top' }),
+        {
+          type: 'box', layout: 'vertical', flex: 1, spacing: 'xs',
+          contents: [
+            text(item.title, { size: 'md', weight: 'bold', color: C.ink, wrap: true }),
+            ...(item.sub ? [text(item.sub, { size: 'xs', color: C.muted, wrap: true })] : [])
+          ]
+        },
+        { type: 'box', layout: 'horizontal', flex: 0, spacing: 'xs', contents: actions }
       ]
     });
   });
 
-  const body = {
-    type: 'box', layout: 'vertical', paddingAll: '18px', backgroundColor: BODY_BG,
-    contents: [
-      text('點「改數字」修正克數/ml，或「刪除」整筆移除', { size: 'xxs', color: C.muted, wrap: true, align: 'center' }),
-      { type: 'separator', margin: 'md', color: '#F0EADF' },
-      ...rows
-    ]
-  };
+  const body = { type: 'box', layout: 'vertical', paddingAll: '18px', backgroundColor: BODY_BG, contents };
   const footer = {
     type: 'box', layout: 'vertical', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
     contents: [
@@ -648,8 +657,8 @@ export function recentFlex(petName, items) {
     ]
   };
   return bubble(
-    `紀錄回顧（${petName}）最近 ${items.length} 筆`,
-    { type: 'bubble', size: 'mega', header: header(`紀錄回顧・${petName}`), body, footer }
+    `最近紀錄（${petName}）${items.length} 筆`,
+    { type: 'bubble', size: 'mega', header: header(`最近紀錄・${petName}`), body, footer }
   );
 }
 
