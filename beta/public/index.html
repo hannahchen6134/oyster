@@ -503,6 +503,25 @@
       box-shadow: 0 1px 1px rgba(60, 40, 20, 0.10), 0 8px 22px rgba(122, 76, 34, 0.20);
     }
     .qbtn:active { transform: translateY(1px); filter: brightness(0.96); box-shadow: 0 1px 2px rgba(27, 29, 26, 0.10); }
+    /* 今日累計 hero：一打開先看到的重點（水分/熱量對照目標） */
+    .today-hero { padding-top: 22px; padding-bottom: 22px; }
+    .hero-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 18px; }
+    .hero-title { font-family: var(--serif); font-size: 19px; font-weight: 700; color: var(--ink); letter-spacing: .02em; }
+    .hero-date { font-size: 12.5px; color: var(--muted); }
+    .pg + .pg { margin-top: 20px; }
+    .pg-top { display: flex; align-items: baseline; justify-content: space-between; }
+    .pg-name { font-size: 14.5px; font-weight: 700; color: var(--ink-soft); letter-spacing: .04em; }
+    .pg-num { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .pg-num b { font-family: var(--serif); font-size: 24px; font-weight: 700; color: var(--brand); margin-right: 3px; }
+    .pg-track { height: 12px; background: #ECE3D2; border-radius: 999px; margin: 9px 0 6px; overflow: hidden; }
+    .pg-track i { display: block; height: 100%; border-radius: 999px;
+      background: linear-gradient(90deg, #8A5A2C, #6F4824); transition: width .5s cubic-bezier(.4,0,.2,1); }
+    .pg-track i.done { background: linear-gradient(90deg, #7A5230, #5A3617); }
+    .pg-foot { display: flex; align-items: baseline; justify-content: space-between; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .pg-foot .remain { font-weight: 700; color: var(--ink-soft); }
+    .pg-foot .remain.done { color: var(--brand); }
+    .pg-hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+    .pg-hint a { color: var(--brand); text-decoration: none; border-bottom: 1px solid rgba(115,73,33,.3); }
     /* 日期列：前後天併成一組膠囊，不再散落 */
     .day-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 16px; }
     .date-nav {
@@ -674,7 +693,10 @@
 
       <!-- 今天：照護確認板 -->
       <section class="panel" id="todayView">
-        <div class="block" style="margin-top:0">
+        <div class="block today-hero" id="todayHero" style="margin-top:0">
+          <div id="todayProgress"></div>
+        </div>
+        <div class="block">
           <div class="section-head">
             <h2>快速記一筆</h2>
             <svg class="head-paw" viewBox="0 0 24 21" fill="none" stroke="var(--brand)" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><ellipse cx="12" cy="14.5" rx="5" ry="4"/><circle cx="5.2" cy="8.6" r="2.1"/><circle cx="12" cy="6.4" r="2.1"/><circle cx="18.8" cy="8.6" r="2.1"/></svg>
@@ -1019,8 +1041,49 @@
       state.dayLogs = data.logs;
       state.daySummary = data.summary;
       state.showAllLogs = false;
+      renderTodayProgress();
       renderConfirm(data.logs, data.summary);
       renderLogs(data.logs);
+    }
+
+    // 今日累計：總水分/總熱量對照每日目標，長條圖顯示還差多少
+    function renderTodayProgress() {
+      const el = $('todayProgress');
+      if (!el) return;
+      const pet = currentPet();
+      const s = state.daySummary || {};
+      const isToday = state.date === todayStr();
+      const dow = '日一二三四五六'[new Date(`${state.date}T00:00:00`).getDay()];
+      const dateLabel = `${Number(state.date.slice(5, 7))}月${Number(state.date.slice(8, 10))}日（${dow}）`;
+
+      const bar = (name, unit, rawVal, rawGoal) => {
+        const val = Math.round((Number(rawVal) || 0) * 10) / 10;
+        const goal = Number(rawGoal) || 0;
+        if (!goal) {
+          return `<div class="pg">
+            <div class="pg-top"><span class="pg-name">${name}</span><span class="pg-num"><b>${val}</b>${unit}</span></div>
+            <div class="pg-hint">尚未設定每日目標 · <a data-goto-goal="1">去設定</a></div>
+          </div>`;
+        }
+        const pct = Math.max(0, Math.min(100, Math.round((val / goal) * 100)));
+        const reached = val >= goal;
+        const remain = Math.round((goal - val) * 10) / 10;
+        return `<div class="pg">
+          <div class="pg-top"><span class="pg-name">${name}</span>
+            <span class="pg-num"><b>${val}</b>/ ${goal} ${unit}</span></div>
+          <div class="pg-track"><i class="${reached ? 'done' : ''}" style="width:${Math.max(pct, 2)}%"></i></div>
+          <div class="pg-foot"><span>${pct}%</span>
+            <span class="remain ${reached ? 'done' : ''}">${reached ? '已達標 ✓' : `還差 ${remain} ${unit}`}</span></div>
+        </div>`;
+      };
+
+      el.innerHTML = `
+        <div class="hero-head">
+          <span class="hero-title">${isToday ? '今日累計' : '當日累計'}</span>
+          <span class="hero-date">${dateLabel}</span>
+        </div>
+        ${bar('總水分', 'ml', s.totalWaterMl, pet?.goalWaterMl)}
+        ${bar('總熱量', 'kcal', s.kcal, pet?.goalKcal)}`;
     }
 
     // 每筆紀錄的主要內容(交接卡/最近一筆共用)
@@ -2371,6 +2434,11 @@
       if (tab) {
         if (tab.dataset.tab === 'settings') state.settingsTab = '';
         return switchTab(tab.dataset.tab);
+      }
+
+      if (event.target.closest('[data-goto-goal]')) {
+        state.settingsTab = '';
+        return switchTab('settings');
       }
 
       if (event.target.closest('#logoutBtn')) {
