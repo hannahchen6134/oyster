@@ -164,10 +164,10 @@ export async function insertLog(db, log) {
   await db
     .prepare(
       `INSERT INTO logs (logId, lineUserId, petId, eventDateTime, category, itemName, foodType, foodId,
-        amount, unit, waterMl, kcal, medStatus, medSlot, note, sourceMessageId,
+        amount, unit, waterMl, kcal, medStatus, medSlot, doseText, medForm, beforeMeal, note, sourceMessageId,
         recordedBy, caregiverName, isBackfilled, source, isDeleted,
         createdAt, updatedAt, updatedBy)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`
     )
     .bind(
       logId,
@@ -184,6 +184,9 @@ export async function insertLog(db, log) {
       Number(log.kcal || 0),
       String(log.medStatus || ''),
       String(log.medSlot || ''),
+      String(log.doseText || ''),
+      String(log.medForm || ''),
+      String(log.beforeMeal || ''),
       String(log.note || ''),
       String(log.sourceMessageId || ''),
       String(log.recordedBy || log.lineUserId || ''),
@@ -224,7 +227,7 @@ export async function getLogsForDay(db, petId, date) {
 }
 
 export async function updateLog(db, logId, fields, updatedBy) {
-  const allowedText = ['eventDateTime', 'category', 'itemName', 'foodType', 'foodId', 'unit', 'medStatus', 'medSlot', 'note'];
+  const allowedText = ['eventDateTime', 'category', 'itemName', 'foodType', 'foodId', 'unit', 'medStatus', 'medSlot', 'doseText', 'medForm', 'beforeMeal', 'note'];
   const allowedNumber = ['amount', 'waterMl', 'kcal'];
   const sets = [];
   const values = [];

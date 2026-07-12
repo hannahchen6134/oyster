@@ -1112,12 +1112,17 @@
     }
 
     // 每筆紀錄的主要內容(交接卡/最近一筆共用)
+    // 用藥細節：劑量・形式・飯前後（有才顯示）
+    function medExtra(log) {
+      return [log.doseText, log.medForm, log.beforeMeal].filter(Boolean).join('・');
+    }
     function describeLogFront(log) {
       if (log.category === 'water') return `喝水 ${fmt(log.waterMl || log.amount)}ml`;
       if (log.category === 'food') return `${log.foodType}${log.itemName ? ` ${log.itemName}` : ''} ${fmt(log.amount)}g`;
       if (log.category === 'med') {
         const label = [log.medSlot, log.itemName].filter(Boolean).join(' ');
-        return `用藥${label ? ` ${label}` : ''} ${MED_LABEL(log.medStatus)}`;
+        const extra = medExtra(log);
+        return `用藥${label ? ` ${label}` : ''}${extra ? ` ${extra}` : ''} ${MED_LABEL(log.medStatus)}`;
       }
       const names = { vomit: '嘔吐', stool: '大便', urine: '尿尿', supplement: '營養補充', mood: '精神', note: '備註' };
       return `${names[log.category] || log.category}${log.note ? ` ${log.note}` : ''}`;
@@ -1298,7 +1303,7 @@
         }
         if (log.category === 'med') {
           const warn = log.medStatus !== '已吃';
-          chips.push(`<span class="chip ${warn ? 'warn' : 'chip-med'}">${esc([log.medSlot, log.itemName].filter(Boolean).join(' ') || '藥')} ${esc(MED_LABEL(log.medStatus))}</span>`);
+          chips.push(`<span class="chip ${warn ? 'warn' : 'chip-med'}">${esc([log.medSlot, log.itemName].filter(Boolean).join(' ') || '藥')}${medExtra(log) ? ` ${esc(medExtra(log))}` : ''} ${esc(MED_LABEL(log.medStatus))}</span>`);
         }
         if (log.category === 'vomit') chips.push('<span class="chip warn">需留意</span>');
         return `
@@ -1343,7 +1348,7 @@
         }
         if (log.category === 'med') {
           const warn = log.medStatus !== '已吃';
-          chips.push(`<span class="chip ${warn ? 'warn' : 'chip-med'}">${esc([log.medSlot, log.itemName].filter(Boolean).join(' ') || '藥')} ${esc(MED_LABEL(log.medStatus))}</span>`);
+          chips.push(`<span class="chip ${warn ? 'warn' : 'chip-med'}">${esc([log.medSlot, log.itemName].filter(Boolean).join(' ') || '藥')}${medExtra(log) ? ` ${esc(medExtra(log))}` : ''} ${esc(MED_LABEL(log.medStatus))}</span>`);
         }
         if (log.category === 'vomit') chips.push('<span class="chip warn">需留意</span>');
         const dt = String(log.eventDateTime);
@@ -1421,8 +1426,19 @@
               <select name="medSlot">${['', '早', '中午', '晚'].map((slot) => `<option value="${slot}" ${log?.medSlot === slot ? 'selected' : ''}>${slot || '—'}</option>`).join('')}</select>
             </div>
           </div>
-          <div class="field"><label>狀態</label>
-            <select name="medStatus">${['已吃', '漏餵', '吐掉', '拒吃'].map((status) => `<option value="${status}" ${log?.medStatus === status ? 'selected' : ''}>${MED_LABEL(status)}</option>`).join('')}</select>
+          <div class="grid grid-2">
+            <div class="field"><label>劑量（選填）</label><input name="doseText" value="${category === 'med' ? esc(log?.doseText ?? '') : ''}" placeholder="例如 1/4 顆、0.5 ml"></div>
+            <div class="field"><label>狀態</label>
+              <select name="medStatus">${['已吃', '漏餵', '吐掉', '拒吃'].map((status) => `<option value="${status}" ${log?.medStatus === status ? 'selected' : ''}>${MED_LABEL(status)}</option>`).join('')}</select>
+            </div>
+          </div>
+          <div class="grid grid-2">
+            <div class="field"><label>藥物形式（選填）</label>
+              <select name="medForm">${['', '藥水', '膠囊', '粉藥', '錠劑', '保健品', '其他'].map((f) => `<option value="${f}" ${log?.medForm === f ? 'selected' : ''}>${f || '—'}</option>`).join('')}</select>
+            </div>
+            <div class="field"><label>飯前／飯後（選填）</label>
+              <select name="beforeMeal">${['', '飯前', '飯後'].map((f) => `<option value="${f}" ${log?.beforeMeal === f ? 'selected' : ''}>${f || '—'}</option>`).join('')}</select>
+            </div>
           </div>
         </div>
         <div class="field"><label>備註 / 描述</label><textarea name="note">${esc(log?.note ?? '')}</textarea></div>`;
@@ -1473,6 +1489,9 @@
         body.itemName = get('medName').trim();
         body.medSlot = get('medSlot');
         body.medStatus = get('medStatus');
+        body.doseText = get('doseText').trim();
+        body.medForm = get('medForm');
+        body.beforeMeal = get('beforeMeal');
       }
       return body;
     }
@@ -1492,6 +1511,17 @@
       const form = $('modalForm');
       syncLogFormVisibility(form);
       form.querySelector('[name="category"]').addEventListener('change', () => syncLogFormVisibility(form));
+      // 選了常用藥物 → 自動帶入該藥的預設劑量（若劑量欄還是空的）
+      const medNameEl = form.querySelector('[name="medName"]');
+      if (medNameEl && medNameEl.tagName === 'SELECT') {
+        medNameEl.addEventListener('change', () => {
+          const med = (state.meds || []).find((m) => m.medName === medNameEl.value);
+          const doseEl = form.querySelector('[name="doseText"]');
+          if (med && doseEl && !doseEl.value.trim() && (med.doseAmount || med.doseUnit)) {
+            doseEl.value = `${med.doseAmount ? fmt(med.doseAmount) : ''}${med.doseUnit || ''}`.trim();
+          }
+        });
+      }
     }
 
     // ---------- 月曆 ----------
@@ -1767,8 +1797,10 @@
         try { meds = Array.isArray(r?.medJson) ? r.medJson : JSON.parse(r?.medJson || '[]'); } catch (error) { /* ignore */ }
         if (!meds.length) { noMedCount += 1; continue; }
         if (meds.some((m) => m.status && m.status !== '已吃')) medHasIssue = true;
-        medRows.push([label(date), meds.map((m) =>
-          `${[m.slot, m.name].filter(Boolean).join(' ') || '藥'} ${MED_LABEL(m.status) || '有紀錄'}`).join('、')]);
+        medRows.push([label(date), meds.map((m) => {
+          const extra = [m.dose, m.form, m.beforeMeal].filter(Boolean).join('・');
+          return `${[m.slot, m.name].filter(Boolean).join(' ') || '藥'}${extra ? ` ${extra}` : ''} ${MED_LABEL(m.status) || '有紀錄'}`;
+        }).join('、')]);
       }
       if (medRows.length && noMedCount) medRows.push(['', `其他 ${noMedCount} 天尚未看到用藥紀錄`]);
       // 畫面版：天天都有記錄且沒有留意事項時，縮成一行（複製給醫生仍保留逐日）

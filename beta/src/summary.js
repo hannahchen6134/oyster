@@ -88,6 +88,9 @@ export function computeDailySummary(logs) {
           name: String(log.itemName || ''),
           slot: String(log.medSlot || ''),
           status: String(log.medStatus || ''),
+          dose: String(log.doseText || ''),
+          form: String(log.medForm || ''),
+          beforeMeal: String(log.beforeMeal || ''),
           time: timeOf(log)
         });
         if (log.medStatus === '已吃') summary.medTakenCount += 1;
