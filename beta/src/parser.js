@@ -92,6 +92,15 @@ function matchWordList(token, list) {
 }
 
 function extractAmount(tokens, defaultUnit) {
+  // 有多個數字時，優先挑「有明確單位」的（例如 13g、20ml），避免挑錯（皇家 13g 水 10 → 取 13 而非 10）
+  for (let i = tokens.length - 1; i >= 0; i -= 1) {
+    const parsed = parseAmountToken(tokens[i]);
+    if (parsed && parsed.value > 0 && parsed.hasUnit) {
+      const rest = tokens.slice(0, i).concat(tokens.slice(i + 1));
+      return { amount: parsed.value, unit: parsed.unit || defaultUnit, rest };
+    }
+  }
+  // 沒有帶單位的數字時，退回最後一個純數字
   for (let i = tokens.length - 1; i >= 0; i -= 1) {
     const parsed = parseAmountToken(tokens[i]);
     if (parsed && parsed.value > 0) {
@@ -100,6 +109,19 @@ function extractAmount(tokens, defaultUnit) {
     }
   }
   return { amount: 0, unit: defaultUnit, rest: tokens };
+}
+
+// 食物品名清洗：把多餘的數字（含單位）與「水」等雜訊字拿掉，避免品名比對失敗；
+// 拿掉的內容原樣保留下來，一律不臆測、不丟失（回傳給呼叫端塞進備註）。
+const FOOD_NAME_NOISE = new Set(['水', '加水', '清水', '泡水']);
+function cleanFoodName(tokens) {
+  const nameTokens = [];
+  const dropped = [];
+  for (const token of tokens) {
+    if (parseAmountToken(token) || FOOD_NAME_NOISE.has(token)) dropped.push(token);
+    else nameTokens.push(token);
+  }
+  return { itemName: nameTokens.join(' '), dropped: dropped.join(' ') };
 }
 
 function emptyRecord() {
@@ -280,7 +302,9 @@ export function parseMessage(rawText) {
     record.foodType = foodEntry.type;
     record.amount = amount;
     record.unit = 'g';
-    record.itemName = leftover.join(' ');
+    const { itemName, dropped } = cleanFoodName(leftover);
+    record.itemName = itemName;
+    if (dropped) record.note = dropped; // 多打的數字/「水」等原樣保留，不臆測成水量
     return { type: 'record', record };
   }
 

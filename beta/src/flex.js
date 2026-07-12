@@ -504,11 +504,11 @@ function calBlankCell() {
   return { type: 'box', layout: 'vertical', flex: 1, height: '46px', contents: [{ type: 'filler' }] };
 }
 
-// 狀態圓點：置中的小圓（olive＝有紀錄，seal＝需留意，null＝留白對齊）
+// 狀態圓點：置中的小圓（咖啡＝有紀錄，seal＝需留意，null＝留白對齊）；放大方便長輩辨識
 function calDot(color) {
-  const dot = { type: 'box', layout: 'vertical', width: '6px', height: '6px', cornerRadius: '999px', backgroundColor: color, contents: [{ type: 'filler' }] };
+  const dot = { type: 'box', layout: 'vertical', width: '8px', height: '8px', cornerRadius: '999px', backgroundColor: color, contents: [{ type: 'filler' }] };
   return {
-    type: 'box', layout: 'horizontal', height: '7px', margin: 'xs',
+    type: 'box', layout: 'horizontal', height: '9px', margin: 'sm',
     contents: color ? [{ type: 'filler' }, dot, { type: 'filler' }] : [{ type: 'filler' }]
   };
 }
@@ -518,16 +518,16 @@ function calDayCell(month, day, row, { isToday, isFuture }) {
   let flags = [];
   try { flags = JSON.parse(row?.abnormalFlags || '[]'); } catch (error) { flags = []; }
   const warn = Boolean(row) && (Number(row.vomitCount) > 0 || Number(row.medIssueCount) > 0 || (Array.isArray(flags) && flags.length > 0));
-  const dotColor = warn ? C.seal : recorded ? C.olive : null;
+  const dotColor = warn ? C.seal : recorded ? C.brand : null;
   const numColor = isFuture ? '#D2C6B2' : isToday ? C.brand : recorded ? C.ink : C.muted;
   const cell = {
-    type: 'box', layout: 'vertical', flex: 1, height: '46px',
-    cornerRadius: '8px', paddingTop: '6px', paddingBottom: '4px',
+    type: 'box', layout: 'vertical', flex: 1, height: '60px',
+    cornerRadius: '10px', paddingTop: '9px', paddingBottom: '6px',
     backgroundColor: isToday ? '#F1E7D6' : recorded ? '#FBF8F1' : undefined,
     borderColor: isToday ? C.brand : undefined,
-    borderWidth: isToday ? '1px' : undefined,
+    borderWidth: isToday ? '2px' : undefined,
     contents: [
-      text(String(day), { size: 'sm', weight: isToday ? 'bold' : 'regular', color: numColor, align: 'center' }),
+      text(String(day), { size: 'lg', weight: isToday ? 'bold' : 'regular', color: numColor, align: 'center' }),
       calDot(dotColor)
     ]
   };
@@ -567,14 +567,14 @@ export function monthFlex(petName, month, rows, today) {
 
   const weekHeader = {
     type: 'box', layout: 'horizontal', spacing: 'xs', margin: 'md',
-    contents: WEEKDAYS.map((w) => text(w, { size: 'xxs', color: C.muted, align: 'center', flex: 1 }))
+    contents: WEEKDAYS.map((w) => text(w, { size: 'sm', color: C.inkSoft, align: 'center', flex: 1 }))
   };
   const legend = {
     type: 'box', layout: 'horizontal', spacing: 'md', margin: 'lg',
     contents: [
-      text('● 有紀錄', { size: 'xxs', color: C.olive, align: 'center', flex: 1 }),
-      text('● 需留意', { size: 'xxs', color: C.seal, align: 'center', flex: 1 }),
-      text('點日期看細節', { size: 'xxs', color: C.muted, align: 'center', flex: 1 })
+      text('● 有紀錄', { size: 'xs', color: C.brand, align: 'center', flex: 1 }),
+      text('● 需留意', { size: 'xs', color: C.seal, align: 'center', flex: 1 }),
+      text('點日期看細節', { size: 'xs', color: C.muted, align: 'center', flex: 1 })
     ]
   };
 

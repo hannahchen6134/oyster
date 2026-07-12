@@ -53,6 +53,23 @@ test('罐罐同義詞', () => {
   assert.equal(intent.record.foodType, '罐頭');
 });
 
+test('多個數字＋雜訊「水」：取有單位的克數、品名可比對、雜訊保留備註', () => {
+  const intent = parseMessage('罐頭 皇家 13g 水 10');
+  assert.equal(intent.record.foodType, '罐頭');
+  assert.equal(intent.record.amount, 13);        // 取 13g（有單位）而非 10
+  assert.equal(intent.record.itemName, '皇家');    // 品名乾淨 → 能比對到「皇家罐頭」
+  assert.equal(intent.record.note, '水 10');       // 多打的原樣保留，不臆測成水量
+  // 品名清洗後仍能對到已建的食物並套用其 kcalPerGram
+  const foods = [{ foodId: 'x', displayName: '皇家罐頭', brand: '', productName: '', foodType: '罐頭', isDeleted: 0 }];
+  assert.equal(matchFood(foods, intent.record.itemName, intent.record.foodType).foodId, 'x');
+});
+
+test('純數字（無單位）仍取最後一個數字', () => {
+  const intent = parseMessage('罐頭 皇家 30');
+  assert.equal(intent.record.amount, 30);
+  assert.equal(intent.record.itemName, '皇家');
+});
+
 test('驗收：藥 已吃 → 用藥紀錄', () => {
   const intent = parseMessage('藥 已吃');
   assert.equal(intent.type, 'record');
