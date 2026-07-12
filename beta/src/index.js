@@ -417,6 +417,25 @@ async function handlePending(env, event, { db, user, pet, pets, lineUserId, text
     return true;
   }
 
+  // 從食物快捷卡選了某品項後：只需打幾克（可帶「水 N」加水），直接用該食物的公式記錄
+  if (pending.startsWith('amountFood|')) {
+    const foodId = pending.slice(11);
+    const m = text.match(/^([0-9]+(?:\.[0-9]+)?)\s*(?:g|克|公克)?(?:\s*(?:水|加水|泡水)\s*([0-9]+(?:\.[0-9]+)?))?$/i);
+    if (!m) { await clear(); return false; }
+    await clear();
+    const food = await getFood(db, foodId);
+    if (!food || food.ownerLineUserId !== lineUserId || food.isDeleted || !pet) {
+      await replyOrPush(env, event, '找不到這個品項，請再選一次。');
+      return true;
+    }
+    await handleRecord(env, event, pet, {
+      category: 'food', foodType: food.foodType, itemName: food.displayName,
+      amount: Number(m[1]), unit: 'g', addedWaterMl: m[2] ? Number(m[2]) : 0,
+      medStatus: '', medSlot: '', note: ''
+    }, lineUserId, { fromButton: true });
+    return true;
+  }
+
   if (pending.startsWith('amount|')) {
     const base = pending.slice(7);
     const m = text.match(/^([0-9]+(?:\.[0-9]+)?)\s*(?:g|克|公克|ml|毫升)?$/i);
@@ -455,6 +474,19 @@ async function handlePostback(event, env, baseUrl) {
   const action = data.get('action');
 
   if (action === 'fillFood' || action === 'fill') return; // 只是把文字填進輸入框，不需回覆
+
+  // 快速紀錄點選食物品項 → 直接鎖定那個食物，只問幾克（免再打類型/品名）
+  if (action === 'pickFood') {
+    const foodId = data.get('foodId') || '';
+    const food = foodId ? await getFood(db, foodId) : null;
+    if (!food || food.ownerLineUserId !== lineUserId || food.isDeleted) {
+      await replyOrPush(env, event, '找不到這個品項，請再選一次。');
+      return;
+    }
+    await updateUser(db, lineUserId, { pendingAction: `amountFood|${foodId}` });
+    await replyOrPush(env, event, `「${food.displayName}」吃了幾克？直接打數字，例如 30\n（要加水就打「30 水 20」）`);
+    return;
+  }
 
   // 月曆點某一天 → 回那天的總結卡
   if (action === 'calDay') {
@@ -811,29 +843,31 @@ async function handleTextMessage(event, env, baseUrl) {
       // 喝水：點了直接打數字就好
       if (k === 'water') {
         await updateUser(db, lineUserId, { pendingAction: 'amount|水' });
-        await replyOrPush(env, event, '喝了多少 ml？\n直接打數字就好，例如 20');
+        await replyOrPush(env, event, '喝了多少 ml？直接打數字，例如 20\n\n💡 熟了更快：下次直接打「水 20」就記好，不用先點。');
         return;
       }
-      // 吃飯：列出自己建好的品項，點了再打克數
+      // 吃飯：列出自己建好的品項，點一下就直接記那個食物（免再打類型）
       if (k === 'food') {
         const foods = await listFoods(db, lineUserId);
         if (foods.length) {
-          const cells = foods.slice(0, 8).map((food) =>
-            menuCell(String(food.displayName).slice(0, 10), food.foodType, `${food.foodType} ${food.displayName}`));
+          const cells = foods.slice(0, 8).map((food) => {
+            const sub = Number(food.kcalPerGram) > 0 ? `每克 ${food.kcalPerGram} kcal` : '點一下記錄';
+            return menuCell(String(food.displayName).slice(0, 12), sub, `記 ${food.displayName}`, false, '', `action=pickFood&foodId=${food.foodId}`);
+          });
           const rows = [];
           for (let i = 0; i < cells.length; i += 2) rows.push(cells.slice(i, i + 2));
           rows.push([menuCell('建新的品項', '常吃的先建檔', '設定食物')]);
           await replyOrPushFlex(env, event, onboardCard({
             title: '想記哪一個品項？',
-            subtitle: '點了再打幾克，就記好了',
+            subtitle: '點品項，再打幾克就好',
             rows,
-            hint: '不在清單的直接打「罐頭 品名 30g」也可以',
+            hint: '💡 熟了更快：直接打「罐頭 皇家 30」不用先點',
             alt: '想記哪一個品項？'
           }), recordPrompt('food'));
           return;
         }
         await updateUser(db, lineUserId, { pendingAction: 'amount|罐頭' });
-        await replyOrPush(env, event, '吃了幾克？\n直接打數字就好，例如 30\n（先當罐頭記，之後可在照護站改）');
+        await replyOrPush(env, event, '吃了幾克？直接打數字，例如 30\n（先當罐頭記，之後可在照護站改）\n\n💡 熟了更快：直接打「罐頭 品名 30」。');
         return;
       }
       // 用藥：給快捷鈕，免打字
@@ -845,6 +879,7 @@ async function handleTextMessage(event, env, baseUrl) {
             [menuCell('早・已吃', '', '藥 早 已吃'), menuCell('晚・已吃', '', '藥 晚 已吃')],
             [menuCell('中午・已吃', '', '藥 中午 已吃'), menuCell('未餵', '', '藥 未餵')]
           ],
+          hint: '💡 熟了更快：直接打「藥 早 已吃」',
           alt: '這次的藥？'
         }), '記餵藥：藥 早 已吃 / 藥 晚 已吃 / 藥 未餵');
         return;

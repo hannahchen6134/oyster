@@ -264,7 +264,11 @@ export function onboardCard({ step = '', title, subtitle = '', rows = [], hint =
   for (const cells of rows) {
     contents.push({ type: 'box', layout: 'horizontal', spacing: 'md', margin: 'md', contents: cells });
   }
-  if (hint) contents.push(text(hint, { size: 'xxs', color: C.muted, align: 'center', wrap: true, margin: 'lg' }));
+  if (hint) contents.push({
+    type: 'box', layout: 'vertical', margin: 'lg',
+    backgroundColor: C.tint, cornerRadius: '10px', paddingAll: '10px', paddingStart: '13px', paddingEnd: '13px',
+    contents: [text(hint, { size: 'xs', color: C.brand, align: 'center', wrap: true })]
+  });
   if (skip) {
     contents.push({
       type: 'box', layout: 'vertical', margin: 'lg', paddingAll: '6px',
@@ -349,13 +353,16 @@ function menuRow(label, sendText, primary = false) {
 }
 
 // 質感小卡格（選單卡共用）：淺米底、細邊框、主標＋一行小字
-export function menuCell(label, sub, sendText, primary = false, uri = '') {
+export function menuCell(label, sub, sendText, primary = false, uri = '', postback = '') {
+  const action = postback
+    ? { type: 'postback', label, data: postback, displayText: sendText || label }
+    : uri ? { type: 'uri', label, uri } : { type: 'message', label, text: sendText };
   return {
     type: 'box', layout: 'vertical', flex: 1,
     backgroundColor: primary ? C.brand : '#FBF8F1', cornerRadius: '14px',
     borderColor: primary ? C.brandDark : '#E9E0CE', borderWidth: '1px',
     paddingTop: '14px', paddingBottom: '13px', paddingStart: '8px', paddingEnd: '8px',
-    action: uri ? { type: 'uri', label, uri } : { type: 'message', label, text: sendText },
+    action,
     contents: [
       text(label, { align: 'center', weight: 'bold', size: 'md', color: primary ? '#FFFFFF' : '#3F2B18' }),
       text(sub, { align: 'center', size: 'xxs', color: primary ? '#EFE3D2' : C.muted, margin: 'sm' })
