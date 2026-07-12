@@ -247,28 +247,31 @@ function birthdayFromAge(age) {
   return `${Number(today.slice(0, 4)) - age}${today.slice(4)}`;
 }
 
-// 引導建立食物：預設值（罐頭/濕食 1.0 kcal/g・80% 水分；乾糧 3.7・8%；零食 3.0）
+// 引導建立食物：
+//  - 熱量（每克 kcal）各產品差異大，絕不自動帶預設值；沒填就留 0，記錄時先不算熱量、之後在照護站補正確值。
+//  - 含水比例：罐頭/濕食用 80%（濕食含水的物理常數，可在照護站微調）；乾糧/其他不預設（0）。
 async function createGuidedFood(db, lineUserId, foodType, name, kcalIn) {
   const isWet = foodType === '罐頭' || foodType === '濕食';
-  const defaults = {
-    kcalPerGram: isWet ? 1.0 : (foodType === '乾糧' ? 3.7 : 3.0),
-    waterRatio: isWet ? 0.8 : (foodType === '乾糧' ? 0.08 : 0)
-  };
-  const kcalPerGram = kcalIn > 0 ? kcalIn : defaults.kcalPerGram;
+  const kcalPerGram = kcalIn > 0 ? kcalIn : 0;
+  const waterRatio = isWet ? 0.8 : 0;
   await createFoodItem(db, lineUserId, {
     displayName: name,
     foodType,
     kcalPerGram,
-    waterRatio: defaults.waterRatio,
-    note: kcalIn > 0 ? '' : 'LINE 引導建立（預設值）'
+    waterRatio,
+    note: kcalIn > 0 ? '' : 'LINE 引導建立（熱量待補）'
   });
-  return { kcalPerGram, waterRatio: defaults.waterRatio, usedDefault: !(kcalIn > 0) };
+  return { kcalPerGram, waterRatio, needsKcal: !(kcalIn > 0) };
 }
 
 function foodDoneCard(name, foodType, info) {
+  const waterPct = Math.round(info.waterRatio * 100);
+  const subtitle = info.needsKcal
+    ? `${foodType}・含水 ${waterPct}%\n熱量還沒設定，記錄時先不算熱量。到照護站「設定→常吃的食物」填每克熱量後才會計算（不會自動亂帶數字）。`
+    : `${foodType}・每克 ${info.kcalPerGram} kcal・含水 ${waterPct}%`;
   return onboardCard({
     title: `已建立「${name}」`,
-    subtitle: `${foodType}・每克 ${info.kcalPerGram} kcal・水分 ${Math.round(info.waterRatio * 100)}%${info.usedDefault ? '（預設值，照護站可微調）' : ''}`,
+    subtitle,
     rows: [
       [menuCell('再建一種', '乾乾罐罐都建更好用', '設定食物'), menuCell('下一步：保健品/藥', '有在吃的話', '設定保健品')]
     ],
