@@ -525,6 +525,13 @@
     .pg-hint a { color: var(--brand); text-decoration: none; border-bottom: 1px solid rgba(115,73,33,.3); }
     .hero-empty { font-size: 15px; font-weight: 600; color: var(--ink-soft); }
     .hero-empty span { display: block; margin-top: 6px; font-size: 12.5px; font-weight: 400; color: var(--muted); line-height: 1.6; }
+    /* 今日守護燈 */
+    .guardian { display: flex; gap: 13px; align-items: center; }
+    .guard-cat { width: 54px; height: 54px; border-radius: 16px; background: var(--gbg); display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+    .guard-title { font-size: 14px; color: var(--ink-soft); letter-spacing: .01em; }
+    .guard-title b { color: var(--gc); font-weight: 700; }
+    .guard-why { font-size: 12.5px; color: var(--muted); margin-top: 4px; line-height: 1.55; }
+    .hero-sep { height: 1px; background: var(--line); margin: 16px 0; }
     .vs-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
     .vs-actions .btn { flex: 1 1 auto; }
     /* 日期列：前後天併成一組膠囊，不再散落 */
@@ -1060,7 +1067,64 @@
       renderLogs(data.logs);
     }
 
-    // 今日累計：總水分/總熱量對照每日目標，長條圖顯示還差多少
+    // 今日守護燈：照護提醒燈（非健康警報），提醒今天照護是否完整、有無值得留意的紀錄
+    const GUARD_COLORS = {
+      green: { c: '#6F8A5A', bg: '#EDF1E6' },
+      yellow: { c: '#C0973A', bg: '#F6EEDA' },
+      orange: { c: '#BE6A38', bg: '#F6E6D8' }
+    };
+    function guardianState(s, pet) {
+      const entry = Number(s?.entryCount) || 0;
+      let slots = [];
+      try { slots = JSON.parse(pet?.goalMedSlots || '[]'); } catch (error) { slots = []; }
+      slots = Array.isArray(slots) ? slots.filter(Boolean) : [];
+      const meds = s?.meds || [];
+      const doneSlots = new Set(meds.filter((m) => m.status === '已吃').map((m) => m.slot).filter(Boolean));
+      const missingSlots = slots.filter((sl) => !doneSlots.has(sl));
+      const water = Number(s?.totalWaterMl) || 0;
+      const food = (Number(s?.dryFoodG) || 0) + (Number(s?.wetFoodG) || 0) + (Number(s?.otherFoodG) || 0);
+      const kcal = Number(s?.kcal) || 0;
+      const vomit = Number(s?.vomitCount) || 0;
+
+      if (!entry) return { level: 'yellow', title: '可以再留意一下', why: '今天還沒有紀錄，記一筆吃飯、喝水或用藥就開始守護。' };
+
+      const medMissing = slots.length > 0 && missingSlots.length > 0;
+      const noWater = !(water > 0);
+      const noFood = !(food > 0 || kcal > 0);
+      let level = 'green';
+      if (vomit >= 2 || medMissing) level = 'orange';
+      else if (vomit === 1 || noWater || noFood) level = 'yellow';
+
+      const reasons = [];
+      if (medMissing) reasons.push(`固定用藥（${missingSlots.join('、')}）尚未看到紀錄`);
+      if (vomit > 0) reasons.push(`今天有 ${vomit} 筆嘔吐紀錄`);
+      if (noWater) reasons.push('今天尚未看到喝水紀錄');
+      if (noFood) reasons.push('今天尚未看到飲食紀錄');
+      const title = level === 'green' ? '今日有在守護中' : level === 'yellow' ? '可以再留意一下' : '今天有值得優先查看的紀錄';
+      const why = reasons.length ? `${reasons.join('，')}。` : '今天的照護都有記到，很穩。';
+      return { level, title, why };
+    }
+    function guardianCatSvg(color) {
+      return `<svg viewBox="0 0 46 42" width="40" height="40" fill="none" stroke="${color}" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M11 16 L8 4 L19 11.5"/><path d="M35 16 L38 4 L27 11.5"/>
+        <path d="M9 17 C9 28 15 36 23 36 C31 36 37 28 37 17"/>
+        <circle cx="17.6" cy="21.5" r="1.5" fill="${color}" stroke="none"/>
+        <circle cx="28.4" cy="21.5" r="1.5" fill="${color}" stroke="none"/>
+        <path d="M23 25.5 v2.2"/></svg>`;
+    }
+    function guardianHtml(s, pet) {
+      const g = guardianState(s, pet);
+      const col = GUARD_COLORS[g.level];
+      return `<div class="guardian" style="--gc:${col.c};--gbg:${col.bg}">
+        <div class="guard-cat">${guardianCatSvg(col.c)}</div>
+        <div class="guard-text">
+          <div class="guard-title">今日守護燈 · <b>${esc(g.title)}</b></div>
+          <div class="guard-why">${esc(g.why)}</div>
+        </div>
+      </div>`;
+    }
+
+    // 今日照護確認板：守護燈 ＋ 總水分/總熱量對照每日目標長條圖
     function renderTodayProgress() {
       const el = $('todayProgress');
       if (!el) return;
@@ -1069,10 +1133,11 @@
       const isToday = state.date === todayStr();
       const dow = '日一二三四五六'[new Date(`${state.date}T00:00:00`).getDay()];
       const dateLabel = `${Number(state.date.slice(5, 7))}月${Number(state.date.slice(8, 10))}日（${dow}）`;
+      const guard = guardianHtml(s, pet);
 
       // 沒有紀錄時：不以 0ml／0kcal 當主要狀態，改顯示溫柔的空狀態
       if (!Number(s.entryCount)) {
-        el.innerHTML = `
+        el.innerHTML = `${guard}<div class="hero-sep"></div>
           <div class="hero-head">
             <span class="hero-title">${isToday ? '今日累計' : '當日累計'}</span>
             <span class="hero-date">${dateLabel}</span>
@@ -1102,7 +1167,7 @@
         </div>`;
       };
 
-      el.innerHTML = `
+      el.innerHTML = `${guard}<div class="hero-sep"></div>
         <div class="hero-head">
           <span class="hero-title">${isToday ? '今日累計' : '當日累計'}</span>
           <span class="hero-date">${dateLabel}</span>
