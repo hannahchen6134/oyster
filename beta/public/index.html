@@ -387,6 +387,47 @@
     .trend-table td.col-primary b { color: #4a3620; font-size: 14px; }
     .trend-table tr.warn td.col-primary { background: var(--seal-tint); }
 
+    /* 近 N 天給醫生看：每天一列（卡片式，比表格好讀） */
+    .daycards { display: flex; flex-direction: column; gap: 10px; }
+    .daycard {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 14px; border: 1px solid var(--line); border-radius: 16px;
+      background: linear-gradient(180deg, #fffef9, var(--sheet));
+      box-shadow: 0 1px 0 rgba(90,54,23,.04);
+    }
+    .daycard.warn { border-color: var(--seal); background: linear-gradient(180deg, #fffdf7, var(--seal-tint)); }
+    .dc-date { flex: 0 0 auto; min-width: 46px; text-align: center; line-height: 1.15; }
+    .dc-date b { display: block; font-size: 17px; color: var(--brand); letter-spacing: .01em; }
+    .dc-date span { font-size: 11px; color: var(--muted); }
+    .dc-main { flex: 1 1 auto; min-width: 0; }
+    .dc-pills { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .dc-pills .pill {
+      display: inline-flex; align-items: baseline; gap: 3px; justify-content: center;
+      padding: 5px 9px; border-radius: 999px; font-size: 12px; color: var(--ink);
+      background: var(--soft); border: 1px solid var(--line); white-space: nowrap;
+    }
+    .dc-pills .pill b { font-size: 13px; font-weight: 800; }
+    .dc-pills .pill.p-water { background: #eaf3f0; border-color: #d3e6df; color: #2f5f52; }
+    .dc-pills .pill.p-wet   { background: #f3ede2; border-color: #e6d9c1; color: #6b4b25; }
+    .dc-pills .pill.p-dry   { background: #f5efe6; border-color: #e8ddc9; color: #7a5a28; }
+    .dc-pills .pill.p-kcal  { background: #efeaf5; border-color: #ddd2ea; color: #574a72; }
+    .dc-sub { margin-top: 7px; font-size: 12px; color: var(--muted); }
+    .dc-sub .warn-txt { color: var(--seal); font-weight: 700; }
+    .dc-btn {
+      flex: 0 0 auto; align-self: center; padding: 9px 14px; border-radius: 12px;
+      border: 1px solid var(--line); background: #fff; color: var(--brand);
+      font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap;
+    }
+    .dc-btn:hover { background: var(--soft); }
+    /* 手機：日期在上、加總在中、查看當天橫跨底部（大按鈕好點，長輩友善） */
+    @media (max-width: 520px) {
+      .daycard { flex-wrap: wrap; align-items: center; }
+      .dc-date { flex: 1 1 auto; display: flex; align-items: baseline; gap: 6px; min-width: 0; text-align: left; }
+      .dc-date b { font-size: 16px; }
+      .dc-main { flex: 1 1 100%; order: 3; }
+      .dc-btn { order: 2; padding: 7px 12px; }
+    }
+
     /* 設定 */
     /* 設定：兩層式選單（先分組選單，點進去才是單一功能） */
     .set-group-title {
@@ -862,32 +903,19 @@
           </summary>
           <div class="fold-body"><div id="trendCharts"></div></div>
         </details>
-        <details class="block fold">
+        <details class="block fold" open>
           <summary>
-            <span class="fold-title">每日數字表<span class="fold-count" id="tableCount"></span></span>
+            <span class="fold-title">近 30 天給醫生看<span class="fold-count" id="tableCount"></span></span>
             <span class="fold-toggle">＋</span>
           </summary>
           <div class="fold-body">
+            <p class="scroll-hint" style="text-align:left;margin:0 2px 10px">每一天一列，先看加總，再點「查看當天」切回當天細節。</p>
             <div class="range-chips" id="tableRangeChips">
               <button data-trange="30" type="button" class="active">30 天</button>
               <button data-trange="60" type="button">60 天</button>
               <button data-trange="90" type="button">90 天</button>
             </div>
-            <p class="scroll-hint">← 左右滑動看更多欄位 →</p>
-            <div class="table-wrap">
-              <table class="trend-table">
-                <thead>
-                  <tr>
-                    <th class="col-date">日期</th>
-                    <th class="col-primary">總水分</th>
-                    <th class="col-primary">總熱量</th>
-                    <th>喝水</th><th>食物水</th><th>乾糧 g</th><th>罐/濕 g</th>
-                    <th>藥</th><th>留意</th><th>吐</th><th>便</th><th>筆數</th>
-                  </tr>
-                </thead>
-                <tbody id="trendBody"></tbody>
-              </table>
-            </div>
+            <div class="daycards" id="dayCardList"></div>
           </div>
         </details>
       </section>
@@ -1959,27 +1987,42 @@
       const to = todayStr();
       const from = shiftDate(to, -(state.tableDays - 1));
       const data = await api(`summary?petId=${state.petId}&from=${from}&to=${to}`);
-      const rows = [...data.rows].reverse();
-      const tc = $('tableCount'); if (tc) tc.textContent = `（${rows.length} 天）`;
+      // 只列有紀錄的日子（沒紀錄的空日不佔版面），新到舊
+      const rows = [...data.rows].reverse().filter((row) => Number(row.entryCount) > 0);
+      const tc = $('tableCount'); if (tc) tc.textContent = `（${rows.length} 天有紀錄）`;
+      const list = $('dayCardList');
       if (!rows.length) {
-        $('trendBody').innerHTML = `<tr><td colspan="12" style="text-align:center;color:var(--muted)">近 ${state.tableDays} 天還沒有紀錄</td></tr>`;
+        list.innerHTML = `<div class="hero-empty" style="border-radius:16px">近 ${state.tableDays} 天還沒有紀錄<span>記一筆吃飯、喝水或用藥就會開始統計。</span></div>`;
         return;
       }
-      $('trendBody').innerHTML = rows.map((row) => `
-        <tr class="${row.vomitCount || row.medIssueCount ? 'warn' : ''}">
-          <td class="col-date">${esc(row.date.slice(5).replace('-', '/'))}</td>
-          <td class="col-primary"><b>${fmtInt(row.totalWaterMl)}</b></td>
-          <td class="col-primary"><b>${fmtInt(row.kcal)}</b></td>
-          <td>${fmtInt(row.waterMl)}</td>
-          <td>${fmtInt(row.foodWaterMl)}</td>
-          <td>${fmtInt(row.dryFoodG)}</td>
-          <td>${fmtInt(row.wetFoodG)}</td>
-          <td>${row.medTakenCount || ''}</td>
-          <td>${row.medIssueCount || ''}</td>
-          <td>${row.vomitCount || ''}</td>
-          <td>${row.stoolCount || ''}</td>
-          <td>${row.entryCount}</td>
-        </tr>`).join('');
+      const WEEK = '日一二三四五六';
+      list.innerHTML = rows.map((row) => {
+        const warn = row.vomitCount || row.medIssueCount;
+        const dow = WEEK[new Date(`${row.date}T00:00:00`).getDay()];
+        const attn = [];
+        if (row.vomitCount) attn.push(`嘔吐 ${row.vomitCount} 次`);
+        if (row.medIssueCount) attn.push(`用藥留意 ${row.medIssueCount}`);
+        const status = warn
+          ? `<span class="warn-txt">需留意（${attn.join('・')}）</span>`
+          : '穩定';
+        const otherPill = Number(row.otherFoodG) > 0
+          ? `<span class="pill p-dry">其他 <b>${fmtInt(row.otherFoodG)}</b> g</span>` : '';
+        return `
+        <div class="daycard ${warn ? 'warn' : ''}">
+          <div class="dc-date"><b>${esc(row.date.slice(5).replace('-', '/'))}</b><span>週${dow}</span></div>
+          <div class="dc-main">
+            <div class="dc-pills">
+              <span class="pill p-water">總水分 <b>${fmtInt(row.totalWaterMl)}</b> ml</span>
+              <span class="pill p-wet">罐頭 <b>${fmtInt(row.wetFoodG)}</b> g</span>
+              <span class="pill p-dry">乾糧 <b>${fmtInt(row.dryFoodG)}</b> g</span>
+              ${otherPill}
+              <span class="pill p-kcal">熱量約 <b>${fmtInt(row.kcal)}</b> kcal</span>
+            </div>
+            <div class="dc-sub">${row.entryCount} 筆紀錄 · 腸胃狀態：${status}</div>
+          </div>
+          <button class="dc-btn" data-day="${esc(row.date)}" type="button">查看當天</button>
+        </div>`;
+      }).join('');
     }
 
     // ---------- 設定 ----------
@@ -2562,6 +2605,12 @@
       const calCell = event.target.closest('.cal-cell[data-date]');
       if (calCell) {
         state.date = calCell.dataset.date;
+        return switchTab('today');
+      }
+
+      const dayCardBtn = event.target.closest('.dc-btn[data-day]');
+      if (dayCardBtn) {
+        state.date = dayCardBtn.dataset.day;
         return switchTab('today');
       }
 
