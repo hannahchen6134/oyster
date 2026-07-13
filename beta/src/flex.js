@@ -196,6 +196,34 @@ export function recordFlex({ pet, categoryKey, mainText, subText, summary, date,
   return bubble(`${title ? '已更新' : '已記錄'} ${mainText}`, { type: 'bubble', size: 'mega', header: header(headerTitle), body, footer });
 }
 
+// 一則訊息記多筆時的合併確認卡：條列這次記了哪幾筆 ＋ 當天累積
+export function multiRecordFlex(pet, lines, summary, date) {
+  const foodG = (Number(summary.dryFoodG) || 0) + (Number(summary.wetFoodG) || 0) + (Number(summary.otherFoodG) || 0);
+  const body = {
+    type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
+    contents: [
+      { type: 'box', layout: 'horizontal', contents: [tag(`一次記了 ${lines.length} 筆`, CATEGORY_STYLE.note)] },
+      ...lines.map((line) => text(`· ${line}`, { size: 'md', weight: 'bold', color: C.ink, wrap: true, margin: 'sm' })),
+      { type: 'separator', margin: 'lg', color: '#F0EADF' },
+      text('今日累積', { size: 'xs', color: C.muted, margin: 'lg', weight: 'bold' }),
+      statCellRow([
+        statCell('水分', fmt(summary.totalWaterMl), 'ml'),
+        statCell('食物', fmt(foodG), 'g'),
+        statCell('熱量', fmt(summary.kcal), 'kcal')
+      ]),
+      ...goalContents(pet, summary, date)
+    ]
+  };
+  const footer = {
+    type: 'box', layout: 'horizontal', spacing: 'sm', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
+    contents: [
+      { type: 'button', height: 'sm', style: 'primary', color: C.brand,
+        action: { type: 'message', label: '開啟照護站', text: '照護站' } }
+    ]
+  };
+  return bubble(`已記錄 ${lines.length} 筆`, { type: 'bubble', size: 'mega', header: header(`已記錄・${pet?.petName || '貓貓'}`), body, footer });
+}
+
 // ---------- 今日總結卡 ----------
 export function todayFlex({ pet, date, summary, dateLabel }) {
   const meds = summary.meds || [];

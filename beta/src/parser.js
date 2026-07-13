@@ -26,6 +26,8 @@ const STOOL_PLAIN_WORDS = new Set(['便', '大便', '便便', '大便了', '便�
 const STOOL_DETAIL_WORDS = new Set(['軟便', '血便', '拉肚子', '腹瀉', '便秘', '拉稀']);
 const URINE_WORDS = new Set(['尿', '尿尿', '小便', '噓噓', '尿了', '排尿']);
 const SUPPLEMENT_WORDS = new Set(['營養補充', '保健品', '保健', '補充', '益生菌']);
+// 只有「通用類別詞」才用來切段；像「益生菌」是品名，不該把它從前面的營養補充切開
+const SUPPLEMENT_HEAD_WORDS = new Set(['營養補充', '保健品', '保健', '補充']);
 const MOOD_WORDS = new Set(['精神']);
 const MOOD_DETAIL_WORDS = new Set(['沒精神', '精神差', '活力差', '懶懶的', '沒活力']);
 // 句首的動詞雜訊：吃了罐頭30g、餵了乾糧4g
@@ -285,6 +287,58 @@ export function parseMessage(rawText) {
     }
   }
 
+  // 一則訊息可含多筆：以「類別詞」為界切段，各段獨立解析後一起記錄
+  // （例如「水20 乾糧4 藥早已吃」＝三筆）。只有單一段落時走原本單筆流程、沿用原訊息。
+  const segments = splitSegments(tokens);
+  if (segments.length > 1) {
+    const records = [];
+    const invalids = [];
+    for (const seg of segments) {
+      const intent = parseSegment(seg, dayOffset, time);
+      if (intent.type === 'record') records.push(intent.record);
+      else if (intent.type === 'invalid') invalids.push(intent);
+    }
+    if (records.length) return { type: 'multiRecord', records, invalids };
+    // 全部都不成立 → 落回單段解析，沿用原本的錯誤訊息
+  }
+
+  return parseSegment(tokens, dayOffset, time);
+}
+
+// 判斷 token 是否為「類別起始詞」（用來把一則訊息切成多筆）
+function isSegmentHead(token) {
+  if (
+    WATER_WORDS.has(token) || MED_WORDS.has(token) || VOMIT_WORDS.has(token)
+    || STOOL_PLAIN_WORDS.has(token) || STOOL_DETAIL_WORDS.has(token) || URINE_WORDS.has(token)
+    || SUPPLEMENT_HEAD_WORDS.has(token) || MOOD_WORDS.has(token) || MOOD_DETAIL_WORDS.has(token)
+    || NOTE_WORDS.has(token)
+  ) return true;
+  return Boolean(matchWordList(token, FOOD_TYPE_WORDS));
+}
+
+// 以「類別起始詞」為界，把 token 切成多段（每段一筆紀錄）。
+// 例外：用藥段落裡的「吐了/漏餵」等是用藥狀態，不另起新段。
+function splitSegments(tokens) {
+  const segments = [];
+  let current = [];
+  let currentIsMed = false;
+  for (const token of tokens) {
+    const medStatusInMed = currentIsMed && Boolean(matchWordList(token.toLowerCase(), MED_STATUS_WORDS));
+    if (isSegmentHead(token) && current.length && !medStatusInMed) {
+      segments.push(current);
+      current = [token];
+      currentIsMed = MED_WORDS.has(token);
+    } else {
+      if (!current.length) currentIsMed = MED_WORDS.has(token);
+      current.push(token);
+    }
+  }
+  if (current.length) segments.push(current);
+  return segments;
+}
+
+// 單段（單筆）解析：token 已去除時間前綴與開頭動詞
+function parseSegment(tokens, dayOffset, time) {
   const head = tokens[0];
   const rest = tokens.slice(1);
   const record = emptyRecord();
@@ -361,10 +415,10 @@ export function parseMessage(rawText) {
     return { type: 'record', record };
   }
 
-  // 營養補充（保健品）：可帶名稱，例如「營養補充 益生菌」
+  // 營養補充（保健品）：可帶名稱，例如「營養補充 益生菌」；若直接打品名（益生菌）則品名＝該詞
   if (SUPPLEMENT_WORDS.has(head)) {
     record.category = 'supplement';
-    record.itemName = rest.join(' ');
+    record.itemName = SUPPLEMENT_HEAD_WORDS.has(head) ? rest.join(' ') : [head, ...rest].join(' ');
     record.note = '';
     return { type: 'record', record };
   }
