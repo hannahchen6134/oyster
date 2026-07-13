@@ -420,18 +420,25 @@ export function exampleCard() {
   const body = {
     type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
     contents: [
-      text('第一次記，照著點點看就懂了', { size: 'xs', color: C.muted, align: 'center', wrap: true }),
+      text('直接打字最快，照著點點看就懂了', { size: 'xs', color: C.muted, align: 'center', wrap: true }),
       line('水 60', '記一筆喝水 60 ml'),
       line('罐頭 30', '記一筆罐頭 30 克'),
       line('藥 早 已吃', '記早上的藥已經餵了'),
-      line('吐了', '記一次嘔吐'),
+      line('水20 乾糧4 藥早已吃', '一句話一次記三筆'),
       { type: 'separator', margin: 'xl', color: '#F0EADF' },
       text('平常怎麼說就怎麼打，「喝了60」「吃了罐頭30」也看得懂',
         { size: 'xxs', color: C.muted, align: 'center', wrap: true, margin: 'lg' })
     ]
   };
-  return bubble('照著打打看：水 60、罐頭 30、藥 早 已吃、吐了',
-    { type: 'bubble', size: 'mega', header: header('照著打打看'), body });
+  const footer = {
+    type: 'box', layout: 'horizontal', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
+    contents: [
+      { type: 'button', height: 'sm', style: 'secondary', color: C.brand,
+        action: { type: 'message', label: '改用按鈕點選', text: '按鈕記錄' } }
+    ]
+  };
+  return bubble('照著打打看：水 60、罐頭 30、藥 早 已吃、水20 乾糧4 藥早已吃',
+    { type: 'bubble', size: 'mega', header: header('怎麼記？打字最快'), body, footer });
 }
 
 export function menuFlex() {
