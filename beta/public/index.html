@@ -405,12 +405,13 @@
     .dc-date { flex: 0 0 auto; text-align: center; line-height: 1.05; }
     .dc-date b { display: block; font-size: 14px; color: var(--brand); letter-spacing: .01em; }
     .dc-date span { font-size: 10px; color: var(--muted); }
-    .dc-pills { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: nowrap; gap: 3px; }
+    .dc-pills { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: nowrap; gap: 3px; overflow-x: auto; scrollbar-width: none; }
+    .dc-pills::-webkit-scrollbar { display: none; }
     .dc-pills .pill {
-      flex: 1 1 0; min-width: 0; display: inline-flex; align-items: baseline; justify-content: center; gap: 2px;
-      padding: 6px 2px; border-radius: 8px; font-size: 9px; white-space: nowrap; border: 1px solid;
+      flex: 0 0 auto; display: inline-flex; align-items: baseline; gap: 2px;
+      padding: 5px 5px; border-radius: 8px; font-size: 7.5px; white-space: nowrap; border: 1px solid;
     }
-    .dc-pills .pill b { font-size: 11px; font-weight: 800; }
+    .dc-pills .pill b { font-size: 9px; font-weight: 800; }
     .dc-pills .pill.p-water { background: #eaf3f0; border-color: #d3e6df; color: #3a6f61; }
     .dc-pills .pill.p-water b { color: #2f7d6a; }
     .dc-pills .pill.p-wet   { background: #f5ede0; border-color: #e8d9bf; color: #7a5a2e; }
@@ -421,10 +422,13 @@
     .dc-pills .pill.p-kcal b { color: #5b4a86; }
     .dc-sub { font-size: 11.5px; color: var(--muted); padding-left: 2px; }
     .dc-sub .warn-txt { color: var(--seal); font-weight: 700; }
+    .dc-sub .dc-open { color: var(--brand); font-weight: 700; }
+    /* 精簡圓形按鈕（「查看當天」改用小箭頭，把寬度留給四項數字） */
     .dc-btn {
-      flex: 0 0 auto; padding: 7px 9px; border-radius: 9px;
+      flex: 0 0 auto; width: 30px; height: 30px; padding: 0; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
       border: 1px solid var(--line); background: #fff; color: var(--brand);
-      font-size: 12px; font-weight: 700; white-space: nowrap;
+      font-size: 18px; font-weight: 700; line-height: 1;
     }
     .dc-btn:active { background: var(--soft); }
 
@@ -2032,14 +2036,14 @@
             <div class="dc-date"><b>${esc(row.date.slice(5).replace('-', '/'))}</b><span>週${dow}</span></div>
             <div class="dc-pills">
               <span class="pill p-water">總水分 <b>${f1(row.totalWaterMl)}</b> ml</span>
+              <span class="pill p-kcal">熱量約 <b>${f1(row.kcal)}</b> kcal</span>
               <span class="pill p-wet">總罐頭 <b>${f1(row.wetFoodG)}</b> g</span>
               <span class="pill p-dry">乾糧 <b>${f1(row.dryFoodG)}</b> g</span>
               ${otherPill}
-              <span class="pill p-kcal">熱量約 <b>${f1(row.kcal)}</b> kcal</span>
             </div>
-            <button class="dc-btn" data-day="${esc(row.date)}" type="button">查看當天</button>
+            <button class="dc-btn" data-day="${esc(row.date)}" type="button" aria-label="查看當天">›</button>
           </div>
-          <div class="dc-sub">${row.entryCount} 筆紀錄 · 腸胃：${status}</div>
+          <div class="dc-sub">${row.entryCount} 筆紀錄 · 腸胃：${status}<span class="dc-open" data-day="${esc(row.date)}"> · 查看當天</span></div>
         </div>`;
       }).join('');
     }
