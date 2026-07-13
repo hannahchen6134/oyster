@@ -156,6 +156,22 @@ export async function getFood(db, foodId) {
   return db.prepare('SELECT * FROM food_items WHERE foodId = ? AND isDeleted = 0').bind(foodId).first();
 }
 
+// ---------- app_kv（一般鍵值：目前存 LINE 自動換發權杖）----------
+export async function appKvGet(db, key) {
+  const row = await db.prepare('SELECT v FROM app_kv WHERE k = ?').bind(String(key)).first();
+  return row ? row.v : null;
+}
+
+export async function appKvSet(db, key, value) {
+  await db
+    .prepare(
+      `INSERT INTO app_kv (k, v, updatedAt) VALUES (?, ?, ?)
+       ON CONFLICT(k) DO UPDATE SET v = excluded.v, updatedAt = excluded.updatedAt`
+    )
+    .bind(String(key), String(value ?? ''), nowIso())
+    .run();
+}
+
 // ---------- logs ----------
 
 export async function insertLog(db, log) {

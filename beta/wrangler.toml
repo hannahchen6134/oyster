@@ -27,5 +27,6 @@ crons = ["0 13 * * *"]
 APP_BASE_URL = ""
 
 # 機密請用 wrangler secret 設定，不要寫進這個檔案：
-#   wrangler secret put LINE_CHANNEL_ACCESS_TOKEN
-#   wrangler secret put LINE_CHANNEL_SECRET
+#   wrangler secret put LINE_CHANNEL_ACCESS_TOKEN   # 固定權杖（備援用）
+#   wrangler secret put LINE_CHANNEL_SECRET         # 驗簽 + 自動換發用
+#   wrangler secret put LINE_CHANNEL_ID             # 設了就啟用「權杖自動換發」，永不因過期斷線

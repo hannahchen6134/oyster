@@ -1,8 +1,82 @@
 // LINE Messaging API：驗簽、回覆、推播、取得使用者名稱
 // Beta 設計原則：後端夠快，一律優先用免費的 reply，push 僅作為備援。
 
+import { appKvGet, appKvSet } from './db.js';
+
 const LINE_API_BASE = 'https://api.line.me/v2/bot';
+const LINE_OAUTH_URL = 'https://api.line.me/v2/oauth/accessToken';
 const MAX_TEXT_LENGTH = 4900;
+
+// ── 存取權杖自動換發（永不因權杖過期而停止回覆）──────────────────────────
+// 設計原則：只要設定了 LINE_CHANNEL_ID + LINE_CHANNEL_SECRET，Worker 會自己向
+// LINE 換發 30 天效期的權杖、快取在 D1、到期前 3 天自動換新。任何一步失敗，
+// 一律退回原本的固定權杖 env.LINE_CHANNEL_ACCESS_TOKEN——確保行為不會比現在更差。
+// 未設定 Channel ID 時，完全沿用固定權杖（與過去行為相同）。
+const TOKEN_KV_KEY = 'line_access_token';
+const REFRESH_BEFORE_MS = 3 * 24 * 60 * 60 * 1000; // 到期前 3 天就換新
+let cachedToken = null; // 單一 isolate 內記憶：{ token, expiresAt(ms) }
+
+async function mintToken(env) {
+  const body = new URLSearchParams({
+    grant_type: 'client_credentials',
+    client_id: String(env.LINE_CHANNEL_ID || ''),
+    client_secret: String(env.LINE_CHANNEL_SECRET || '')
+  });
+  const res = await fetch(LINE_OAUTH_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString()
+  });
+  if (!res.ok) throw new Error(`mint token failed ${res.status}: ${await res.text()}`);
+  const data = await res.json();
+  const token = String(data.access_token || '');
+  if (!token) throw new Error('mint token: empty access_token');
+  return { token, expiresAt: Date.now() + Number(data.expires_in || 0) * 1000 };
+}
+
+// 是否啟用自動換發（有 Channel ID + Secret + DB 才啟用）
+function selfRenewEnabled(env) {
+  return Boolean(env.LINE_CHANNEL_ID && env.LINE_CHANNEL_SECRET && env.DB);
+}
+
+export async function getAccessToken(env) {
+  if (!selfRenewEnabled(env)) return env.LINE_CHANNEL_ACCESS_TOKEN || '';
+  try {
+    const now = Date.now();
+    if (cachedToken?.token && cachedToken.expiresAt - now > REFRESH_BEFORE_MS) {
+      return cachedToken.token;
+    }
+    const stored = await appKvGet(env.DB, TOKEN_KV_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (parsed?.token && parsed.expiresAt - now > REFRESH_BEFORE_MS) {
+        cachedToken = parsed;
+        return parsed.token;
+      }
+    }
+    const minted = await mintToken(env);
+    cachedToken = minted;
+    await appKvSet(env.DB, TOKEN_KV_KEY, JSON.stringify(minted));
+    return minted.token;
+  } catch (error) {
+    console.error('getAccessToken self-renew failed, fallback to static token:', error.message);
+    return env.LINE_CHANNEL_ACCESS_TOKEN || '';
+  }
+}
+
+// 供每日 cron 呼叫：主動確認/換新權杖，回報狀態（不外洩權杖本身）
+export async function checkAccessToken(env) {
+  const staticToken = env.LINE_CHANNEL_ACCESS_TOKEN || '';
+  if (!selfRenewEnabled(env)) {
+    return { mode: 'static', hasStatic: Boolean(staticToken) };
+  }
+  const token = await getAccessToken(env);
+  const usingStatic = token === staticToken;
+  const expiresInDays = cachedToken?.expiresAt
+    ? Math.round((cachedToken.expiresAt - Date.now()) / 86400000)
+    : null;
+  return { mode: usingStatic ? 'static-fallback' : 'self-renew', hasStatic: Boolean(staticToken), expiresInDays };
+}
 
 export async function verifyLineSignature(rawBody, signature, channelSecret) {
   if (!signature || !channelSecret) return false;
@@ -33,11 +107,12 @@ function truncate(text) {
 }
 
 async function callLineApi(env, path, body) {
+  const token = await getAccessToken(env);
   const response = await fetch(`${LINE_API_BASE}${path}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${env.LINE_CHANNEL_ACCESS_TOKEN || ''}`
+      Authorization: `Bearer ${token}`
     },
     body: JSON.stringify(body)
   });
@@ -112,8 +187,9 @@ export async function replyOrPush(env, event, text) {
 
 export async function getProfile(env, userId) {
   try {
+    const token = await getAccessToken(env);
     const response = await fetch(`${LINE_API_BASE}/profile/${userId}`, {
-      headers: { Authorization: `Bearer ${env.LINE_CHANNEL_ACCESS_TOKEN || ''}` }
+      headers: { Authorization: `Bearer ${token}` }
     });
     if (!response.ok) return null;
     return await response.json();
