@@ -387,37 +387,43 @@
     .trend-table td.col-primary b { color: #4a3620; font-size: 14px; }
     .trend-table tr.warn td.col-primary { background: var(--seal-tint); }
 
-    /* 近 N 天給醫生看：每天一列（卡片式，比表格好讀） */
-    .daycards { display: flex; flex-direction: column; gap: 10px; margin: 0 -14px; }
-    /* 每天一列：日期（左）＋四顆加總膠囊（中，一行排開）＋查看當天（右），
-       醫生一眼看完。螢幕夠寬時全部在同一行；手機放不下時只有中間膠囊區
-       可左右滑，日期與按鈕固定不動、整頁不會橫向捲動。 */
+    /* 近 N 天給醫生看：每天一列。完整標籤＋有底色膠囊＋「查看當天」按鈕，好讀好點。 */
+    .daycards { display: flex; flex-direction: column; gap: 12px; margin: 0 -8px; }
     .daycard {
-      display: flex; align-items: center; gap: 10px; cursor: pointer;
-      padding: 12px 12px; border: 1px solid var(--line); border-radius: 16px;
+      display: flex; flex-direction: column; gap: 9px; cursor: pointer;
+      padding: 13px 14px; border: 1px solid var(--line); border-radius: 16px;
       background: linear-gradient(180deg, #fffef9, var(--sheet));
       box-shadow: 0 1px 0 rgba(90,54,23,.04);
     }
     .daycard:active { background: var(--soft); }
     .daycard.warn { border-color: var(--seal); background: linear-gradient(180deg, #fffdf7, var(--seal-tint)); }
-    .dc-date { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-start; line-height: 1.1; }
-    .dc-date b { font-size: 15px; color: var(--brand); letter-spacing: .01em; }
-    .dc-date span { font-size: 10.5px; color: var(--muted); }
-    .dc-main { flex: 1 1 auto; min-width: 0; }
-    .dc-pills { display: flex; flex-wrap: nowrap; gap: 10px; overflow-x: auto; scrollbar-width: none; }
-    .dc-pills::-webkit-scrollbar { display: none; }
+    /* 上排：日期（左）＋查看當天（右）；下排：四顆完整標籤膠囊整行排開 */
+    .dc-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .dc-date { display: flex; align-items: baseline; gap: 6px; }
+    .dc-date b { font-size: 16px; color: var(--brand); letter-spacing: .01em; }
+    .dc-date span { font-size: 11.5px; color: var(--muted); }
+    .dc-pills { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
     .dc-pills .pill {
-      flex: 0 0 auto; display: inline-flex; align-items: baseline; gap: 2px;
-      font-size: 11px; color: var(--muted); white-space: nowrap;
+      display: inline-flex; align-items: baseline; justify-content: center; gap: 3px;
+      padding: 7px 6px; border-radius: 10px; font-size: 11.5px; white-space: nowrap; border: 1px solid;
     }
-    .dc-pills .pill b { font-size: 14px; font-weight: 800; color: var(--ink); }
+    .dc-pills .pill b { font-size: 13px; font-weight: 800; }
+    .dc-pills .pill.p-water { background: #eaf3f0; border-color: #d3e6df; color: #3a6f61; }
     .dc-pills .pill.p-water b { color: #2f7d6a; }
-    .dc-pills .pill.p-wet   b { color: #8a5a24; }
-    .dc-pills .pill.p-dry   b { color: #9a6a1e; }
-    .dc-pills .pill.p-kcal  b { color: #5b4a86; }
-    .dc-sub { margin-top: 5px; font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dc-pills .pill.p-wet   { background: #f5ede0; border-color: #e8d9bf; color: #7a5a2e; }
+    .dc-pills .pill.p-wet b  { color: #8a5a24; }
+    .dc-pills .pill.p-dry   { background: #f6efe3; border-color: #e9ddc7; color: #846326; }
+    .dc-pills .pill.p-dry b  { color: #9a6a1e; }
+    .dc-pills .pill.p-kcal  { background: #efeaf6; border-color: #ddd4ea; color: #5c5080; }
+    .dc-pills .pill.p-kcal b { color: #5b4a86; }
+    .dc-sub { font-size: 12px; color: var(--muted); }
     .dc-sub .warn-txt { color: var(--seal); font-weight: 700; }
-    .dc-go { flex: 0 0 auto; align-self: center; color: var(--brand); font-size: 20px; font-weight: 700; opacity: .55; }
+    .dc-btn {
+      flex: 0 0 auto; padding: 8px 14px; border-radius: 12px;
+      border: 1px solid var(--line); background: #fff; color: var(--brand);
+      font-size: 13px; font-weight: 700; white-space: nowrap;
+    }
+    .dc-btn:active { background: var(--soft); }
 
     /* 記錄表單「更多選項」：平常收起，需要時才展開（時間、劑量、藥物形式…） */
     .more-fold { margin-top: 4px; border-top: 1px dashed var(--line); padding-top: 6px; }
@@ -2014,22 +2020,23 @@
         const status = warn
           ? `<span class="warn-txt">需留意（${attn.join('・')}）</span>`
           : '穩定';
+        const f1 = (v) => (Math.round((Number(v) || 0) * 10) / 10).toFixed(1);
         const otherPill = Number(row.otherFoodG) > 0
-          ? `<span class="pill p-dry">其他 <b>${fmtInt(row.otherFoodG)}</b>g</span>` : '';
+          ? `<span class="pill p-dry">其他 <b>${f1(row.otherFoodG)}</b> g</span>` : '';
         return `
         <div class="daycard ${warn ? 'warn' : ''}" data-day="${esc(row.date)}" role="button" tabindex="0">
-          <div class="dc-date"><b>${esc(row.date.slice(5).replace('-', '/'))}</b><span>週${dow}</span></div>
-          <div class="dc-main">
-            <div class="dc-pills">
-              <span class="pill p-water">水 <b>${fmtInt(row.totalWaterMl)}</b>ml</span>
-              <span class="pill p-wet">罐 <b>${fmtInt(row.wetFoodG)}</b>g</span>
-              <span class="pill p-dry">乾 <b>${fmtInt(row.dryFoodG)}</b>g</span>
-              ${otherPill}
-              <span class="pill p-kcal">熱 <b>${fmtInt(row.kcal)}</b>kcal</span>
-            </div>
-            <div class="dc-sub">${row.entryCount} 筆 · 腸胃：${status}</div>
+          <div class="dc-head">
+            <div class="dc-date"><b>${esc(row.date.slice(5).replace('-', '/'))}</b><span>週${dow}</span></div>
+            <button class="dc-btn" data-day="${esc(row.date)}" type="button">查看當天</button>
           </div>
-          <span class="dc-go" aria-hidden="true">›</span>
+          <div class="dc-pills">
+            <span class="pill p-water">總水分 <b>${f1(row.totalWaterMl)}</b> ml</span>
+            <span class="pill p-wet">總罐頭 <b>${f1(row.wetFoodG)}</b> g</span>
+            <span class="pill p-dry">乾糧 <b>${f1(row.dryFoodG)}</b> g</span>
+            ${otherPill}
+            <span class="pill p-kcal">熱量約 <b>${f1(row.kcal)}</b> kcal</span>
+          </div>
+          <div class="dc-sub">${row.entryCount} 筆紀錄 · 腸胃：${status}</div>
         </div>`;
       }).join('');
     }
