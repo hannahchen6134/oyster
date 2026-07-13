@@ -419,6 +419,14 @@
     .dc-sub .warn-txt { color: var(--seal); font-weight: 700; }
     .dc-go { flex: 0 0 auto; align-self: center; color: var(--brand); font-size: 20px; font-weight: 700; opacity: .55; }
 
+    /* 記錄表單「更多選項」：平常收起，需要時才展開（時間、劑量、藥物形式…） */
+    .more-fold { margin-top: 4px; border-top: 1px dashed var(--line); padding-top: 6px; }
+    .more-summary { list-style: none; cursor: pointer; padding: 8px 2px; font-size: 13px; color: var(--brand); font-weight: 600; }
+    .more-summary::-webkit-details-marker { display: none; }
+    .more-summary::before { content: '＋ '; font-weight: 700; }
+    .more-fold[open] .more-summary::before { content: '－ '; }
+    .more-body { padding-top: 4px; }
+
     /* 設定 */
     /* 設定：兩層式選單（先分組選單，點進去才是單一功能） */
     .set-group-title {
@@ -1420,11 +1428,8 @@
             ${Object.entries(CATEGORY_LABEL).map(([key, label]) => `<option value="${key}" ${category === key ? 'selected' : ''}>${label}</option>`).join('')}
           </select></div>`;
       }
+      // 平常只記重點：必要欄位直接顯示；時間與進階（劑量、藥物形式、飯前後、自訂品名）收進「更多選項」。
       return `
-        <div class="grid grid-2">
-          <div class="field"><label>日期</label><input type="date" name="eventDate" value="${esc(dateValue)}" required></div>
-          <div class="field"><label>時間</label><input type="time" name="eventTime" value="${esc(timeValue)}" required></div>
-        </div>
         ${categoryControl}
         <div class="field log-water"><label>喝水量（ml）</label><input type="number" name="waterAmount" min="0" step="0.5" value="${category === 'water' ? esc(log?.amount ?? '') : ''}"></div>
         <div class="log-food">
@@ -1434,43 +1439,56 @@
             </div>
             <div class="field"><label>克數（g）</label><input type="number" name="foodAmount" min="0" step="0.5" value="${category === 'food' ? esc(log?.amount ?? '') : ''}"></div>
           </div>
-          <div class="field"><label>食物品項（選了會自動算熱量與水分）</label>
+          ${state.foods.length ? `<div class="field"><label>食物品項（選了會自動算熱量與水分）</label>
             <select name="foodId"><option value="">— 不指定 —</option>${foodOptions}</select>
-          </div>
-          <div class="field"><label>或自訂品項名稱</label><input name="itemNameFood" value="${category === 'food' && !log?.foodId ? esc(log?.itemName ?? '') : ''}" placeholder="例如 腎臟處方罐"></div>
+          </div>` : '<input type="hidden" name="foodId" value="">'}
         </div>
         <div class="log-med">
           <div class="grid grid-2">
-            <div class="field"><label>藥名（可選）</label>
-              ${state.meds.length ? `<select name="medName"><option value="">— 未指定 —</option>${medOptions}</select>` : `<input name="medName" value="${category === 'med' ? esc(log?.itemName ?? '') : ''}" placeholder="例如 心臟藥">`}
-            </div>
             <div class="field"><label>時段</label>
               <select name="medSlot">${['', '早', '中午', '晚'].map((slot) => `<option value="${slot}" ${log?.medSlot === slot ? 'selected' : ''}>${slot || '—'}</option>`).join('')}</select>
             </div>
-          </div>
-          <div class="grid grid-2">
-            <div class="field"><label>劑量（選填）</label><input name="doseText" value="${category === 'med' ? esc(log?.doseText ?? '') : ''}" placeholder="例如 1/4 顆、0.5 ml"></div>
             <div class="field"><label>狀態</label>
               <select name="medStatus">${['已吃', '漏餵', '吐掉', '拒吃'].map((status) => `<option value="${status}" ${log?.medStatus === status ? 'selected' : ''}>${MED_LABEL(status)}</option>`).join('')}</select>
             </div>
           </div>
-          <div class="grid grid-2">
-            <div class="field"><label>藥物形式（選填）</label>
-              <select name="medForm">${['', '藥水', '膠囊', '粉藥', '錠劑', '保健品', '其他'].map((f) => `<option value="${f}" ${log?.medForm === f ? 'selected' : ''}>${f || '—'}</option>`).join('')}</select>
+        </div>
+        <div class="field"><label>備註 / 描述</label><textarea name="note">${esc(log?.note ?? '')}</textarea></div>
+        <details class="more-fold" ${isQuick ? '' : 'open'}>
+          <summary class="more-summary">更多選項（時間${category === 'med' ? '、藥名、劑量' : category === 'food' ? '、自訂品名' : ''}…）</summary>
+          <div class="more-body">
+            <div class="grid grid-2">
+              <div class="field"><label>日期</label><input type="date" name="eventDate" value="${esc(dateValue)}" required></div>
+              <div class="field"><label>時間</label><input type="time" name="eventTime" value="${esc(timeValue)}" required></div>
             </div>
-            <div class="field"><label>飯前／飯後（選填）</label>
-              <select name="beforeMeal">${['', '飯前', '飯後'].map((f) => `<option value="${f}" ${log?.beforeMeal === f ? 'selected' : ''}>${f || '—'}</option>`).join('')}</select>
+            <div class="log-food">
+              <div class="field"><label>自訂品項名稱（沒在清單裡時）</label><input name="itemNameFood" value="${category === 'food' && !log?.foodId ? esc(log?.itemName ?? '') : ''}" placeholder="例如 腎臟處方罐"></div>
+            </div>
+            <div class="log-med">
+              <div class="grid grid-2">
+                <div class="field"><label>藥名（可選）</label>
+                  ${state.meds.length ? `<select name="medName"><option value="">— 未指定 —</option>${medOptions}</select>` : `<input name="medName" value="${category === 'med' ? esc(log?.itemName ?? '') : ''}" placeholder="例如 心臟藥">`}
+                </div>
+                <div class="field"><label>劑量（選填）</label><input name="doseText" value="${category === 'med' ? esc(log?.doseText ?? '') : ''}" placeholder="例如 1/4 顆、0.5 ml"></div>
+              </div>
+              <div class="grid grid-2">
+                <div class="field"><label>藥物形式（選填）</label>
+                  <select name="medForm">${['', '藥水', '膠囊', '粉藥', '錠劑', '保健品', '其他'].map((f) => `<option value="${f}" ${log?.medForm === f ? 'selected' : ''}>${f || '—'}</option>`).join('')}</select>
+                </div>
+                <div class="field"><label>飯前／飯後（選填）</label>
+                  <select name="beforeMeal">${['', '飯前', '飯後'].map((f) => `<option value="${f}" ${log?.beforeMeal === f ? 'selected' : ''}>${f || '—'}</option>`).join('')}</select>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-        <div class="field"><label>備註 / 描述</label><textarea name="note">${esc(log?.note ?? '')}</textarea></div>`;
+        </details>`;
     }
 
     function syncLogFormVisibility(form) {
       const category = form.querySelector('[name="category"]').value;
-      form.querySelector('.log-water').classList.toggle('hidden', category !== 'water');
-      form.querySelector('.log-food').classList.toggle('hidden', category !== 'food');
-      form.querySelector('.log-med').classList.toggle('hidden', category !== 'med');
+      form.querySelectorAll('.log-water').forEach((el) => el.classList.toggle('hidden', category !== 'water'));
+      form.querySelectorAll('.log-food').forEach((el) => el.classList.toggle('hidden', category !== 'food'));
+      form.querySelectorAll('.log-med').forEach((el) => el.classList.toggle('hidden', category !== 'med'));
     }
 
     function collectLogForm(form) {
