@@ -450,13 +450,13 @@ export function menuFlex() {
 }
 
 // ---------- 快速紀錄選單卡 ----------
-export function recordMenuFlex() {
+export function recordMenuFlex(introText = '想記哪一種？點一下就開始', headerTitle = '快速紀錄') {
   const cell = menuCell;
   const row = (cells) => ({ type: 'box', layout: 'horizontal', spacing: 'md', margin: 'md', contents: cells });
   const body = {
     type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
     contents: [
-      text('想記哪一種？點一下就開始', { size: 'xs', color: C.muted, align: 'center' }),
+      text(introText, { size: 'xs', color: C.muted, align: 'center', wrap: true }),
       row([cell('吃飯', '罐頭・乾糧・零食', '記吃飯'), cell('喝水', '今天喝了多少', '記喝水')]),
       row([cell('用藥', '已吃・未餵', '記用藥'), cell('營養補充', '益生菌・化毛膏', '記營養補充')]),
       row([cell('大便', '次數與形狀', '記大便'), cell('尿尿', '量與顏色', '記尿尿')]),
@@ -467,7 +467,7 @@ export function recordMenuFlex() {
       text('補登昨天：昨天 21:30 水 20', { size: 'xxs', color: C.muted, align: 'center', margin: 'sm' })
     ]
   };
-  return bubble('快速紀錄選單', { type: 'bubble', size: 'mega', header: header('快速紀錄'), body });
+  return bubble(headerTitle, { type: 'bubble', size: 'mega', header: header(headerTitle), body });
 }
 
 // ---------- 近 7 天迷你圖卡（長條＝水分） ----------
