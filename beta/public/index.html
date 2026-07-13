@@ -387,27 +387,30 @@
     .trend-table td.col-primary b { color: #4a3620; font-size: 14px; }
     .trend-table tr.warn td.col-primary { background: var(--seal-tint); }
 
-    /* 近 N 天給醫生看：每天一列。完整標籤＋有底色膠囊＋「查看當天」按鈕，好讀好點。 */
-    .daycards { display: flex; flex-direction: column; gap: 12px; margin: 0 -8px; }
+    /* 近 N 天給醫生看：每天一列，全部同一行（日期＋四項＋查看當天），像 CODEX。
+       用滿整個螢幕寬度（跳出窄欄）＋精簡小膠囊，手機也塞得下一行。 */
+    /* 這個摺疊區要讓整行卡片跳出窄欄用滿螢幕，需允許溢出（其他 fold 仍維持裁切） */
+    .block.fold.daycards-fold { overflow: visible; }
+    .daycards { display: flex; flex-direction: column; gap: 9px; width: 100vw; margin-left: 50%; transform: translateX(-50%); padding: 0 10px; box-sizing: border-box; }
     .daycard {
-      display: flex; flex-direction: column; gap: 9px; cursor: pointer;
-      padding: 13px 14px; border: 1px solid var(--line); border-radius: 16px;
+      display: flex; flex-direction: column; gap: 6px; cursor: pointer;
+      padding: 11px 10px; border: 1px solid var(--line); border-radius: 14px;
       background: linear-gradient(180deg, #fffef9, var(--sheet));
       box-shadow: 0 1px 0 rgba(90,54,23,.04);
     }
     .daycard:active { background: var(--soft); }
     .daycard.warn { border-color: var(--seal); background: linear-gradient(180deg, #fffdf7, var(--seal-tint)); }
-    /* 上排：日期（左）＋查看當天（右）；下排：四顆完整標籤膠囊整行排開 */
-    .dc-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-    .dc-date { display: flex; align-items: baseline; gap: 6px; }
-    .dc-date b { font-size: 16px; color: var(--brand); letter-spacing: .01em; }
-    .dc-date span { font-size: 11.5px; color: var(--muted); }
-    .dc-pills { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+    /* 同一行：日期（左）＋四顆膠囊（中，平均撐滿）＋查看當天（右）；腸胃狀態在下方 */
+    .dc-top { display: flex; align-items: center; gap: 7px; }
+    .dc-date { flex: 0 0 auto; text-align: center; line-height: 1.05; }
+    .dc-date b { display: block; font-size: 14px; color: var(--brand); letter-spacing: .01em; }
+    .dc-date span { font-size: 10px; color: var(--muted); }
+    .dc-pills { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: nowrap; gap: 3px; }
     .dc-pills .pill {
-      display: inline-flex; align-items: baseline; justify-content: center; gap: 3px;
-      padding: 7px 6px; border-radius: 10px; font-size: 11.5px; white-space: nowrap; border: 1px solid;
+      flex: 1 1 0; min-width: 0; display: inline-flex; align-items: baseline; justify-content: center; gap: 2px;
+      padding: 6px 2px; border-radius: 8px; font-size: 9px; white-space: nowrap; border: 1px solid;
     }
-    .dc-pills .pill b { font-size: 13px; font-weight: 800; }
+    .dc-pills .pill b { font-size: 11px; font-weight: 800; }
     .dc-pills .pill.p-water { background: #eaf3f0; border-color: #d3e6df; color: #3a6f61; }
     .dc-pills .pill.p-water b { color: #2f7d6a; }
     .dc-pills .pill.p-wet   { background: #f5ede0; border-color: #e8d9bf; color: #7a5a2e; }
@@ -416,12 +419,12 @@
     .dc-pills .pill.p-dry b  { color: #9a6a1e; }
     .dc-pills .pill.p-kcal  { background: #efeaf6; border-color: #ddd4ea; color: #5c5080; }
     .dc-pills .pill.p-kcal b { color: #5b4a86; }
-    .dc-sub { font-size: 12px; color: var(--muted); }
+    .dc-sub { font-size: 11.5px; color: var(--muted); padding-left: 2px; }
     .dc-sub .warn-txt { color: var(--seal); font-weight: 700; }
     .dc-btn {
-      flex: 0 0 auto; padding: 8px 14px; border-radius: 12px;
+      flex: 0 0 auto; padding: 7px 9px; border-radius: 9px;
       border: 1px solid var(--line); background: #fff; color: var(--brand);
-      font-size: 13px; font-weight: 700; white-space: nowrap;
+      font-size: 12px; font-weight: 700; white-space: nowrap;
     }
     .dc-btn:active { background: var(--soft); }
 
@@ -908,7 +911,7 @@
           </summary>
           <div class="fold-body"><div id="trendCharts"></div></div>
         </details>
-        <details class="block fold" open>
+        <details class="block fold daycards-fold" open>
           <summary>
             <span class="fold-title">近 30 天給醫生看<span class="fold-count" id="tableCount"></span></span>
             <span class="fold-toggle">＋</span>
@@ -2025,16 +2028,16 @@
           ? `<span class="pill p-dry">其他 <b>${f1(row.otherFoodG)}</b> g</span>` : '';
         return `
         <div class="daycard ${warn ? 'warn' : ''}" data-day="${esc(row.date)}" role="button" tabindex="0">
-          <div class="dc-head">
+          <div class="dc-top">
             <div class="dc-date"><b>${esc(row.date.slice(5).replace('-', '/'))}</b><span>週${dow}</span></div>
+            <div class="dc-pills">
+              <span class="pill p-water">總水分 <b>${f1(row.totalWaterMl)}</b> ml</span>
+              <span class="pill p-wet">總罐頭 <b>${f1(row.wetFoodG)}</b> g</span>
+              <span class="pill p-dry">乾糧 <b>${f1(row.dryFoodG)}</b> g</span>
+              ${otherPill}
+              <span class="pill p-kcal">熱量約 <b>${f1(row.kcal)}</b> kcal</span>
+            </div>
             <button class="dc-btn" data-day="${esc(row.date)}" type="button">查看當天</button>
-          </div>
-          <div class="dc-pills">
-            <span class="pill p-water">總水分 <b>${f1(row.totalWaterMl)}</b> ml</span>
-            <span class="pill p-wet">總罐頭 <b>${f1(row.wetFoodG)}</b> g</span>
-            <span class="pill p-dry">乾糧 <b>${f1(row.dryFoodG)}</b> g</span>
-            ${otherPill}
-            <span class="pill p-kcal">熱量約 <b>${f1(row.kcal)}</b> kcal</span>
           </div>
           <div class="dc-sub">${row.entryCount} 筆紀錄 · 腸胃：${status}</div>
         </div>`;
