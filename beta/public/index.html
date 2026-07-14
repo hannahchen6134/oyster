@@ -409,21 +409,23 @@
     .dc-date { flex: 0 0 auto; text-align: center; line-height: 1.05; }
     .dc-date b { display: block; font-size: 14px; color: var(--brand); letter-spacing: .01em; }
     .dc-date span { font-size: 10px; color: var(--muted); }
-    .dc-pills { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: nowrap; gap: 2px; overflow-x: auto; scrollbar-width: none; }
-    .dc-pills::-webkit-scrollbar { display: none; }
+    /* 四等分欄位（各佔 1/4），標籤在上、數字在下 → 結構上絕不會溢出，字放大也一樣 */
+    .dc-pills { flex: 1 1 auto; min-width: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
     .dc-pills .pill {
-      flex: 0 0 auto; display: inline-flex; align-items: baseline; gap: 2px;
-      padding: 5px 4px; border-radius: 7px; font-size: 7px; white-space: nowrap; border: 1px solid;
+      min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      text-align: center; line-height: 1.12; padding: 5px 3px; border-radius: 8px; border: 1px solid; overflow: hidden;
     }
-    .dc-pills .pill b { font-size: 8.5px; font-weight: 800; }
+    .dc-pills .pill .lbl { font-size: 8.5px; }
+    .dc-pills .pill .val { font-size: 12px; font-weight: 800; white-space: nowrap; }
+    .dc-pills .pill .val .u { font-size: 8.5px; font-weight: 600; }
     .dc-pills .pill.p-water { background: #eaf3f0; border-color: #d3e6df; color: #3a6f61; }
-    .dc-pills .pill.p-water b { color: #2f7d6a; }
+    .dc-pills .pill.p-water .val { color: #2f7d6a; }
     .dc-pills .pill.p-wet   { background: #f5ede0; border-color: #e8d9bf; color: #7a5a2e; }
-    .dc-pills .pill.p-wet b  { color: #8a5a24; }
+    .dc-pills .pill.p-wet .val  { color: #8a5a24; }
     .dc-pills .pill.p-dry   { background: #f6efe3; border-color: #e9ddc7; color: #846326; }
-    .dc-pills .pill.p-dry b  { color: #9a6a1e; }
+    .dc-pills .pill.p-dry .val  { color: #9a6a1e; }
     .dc-pills .pill.p-kcal  { background: #efeaf6; border-color: #ddd4ea; color: #5c5080; }
-    .dc-pills .pill.p-kcal b { color: #5b4a86; }
+    .dc-pills .pill.p-kcal .val { color: #5b4a86; }
     .dc-sub { font-size: 11.5px; color: var(--muted); padding-left: 2px; }
     .dc-sub .warn-txt { color: var(--seal); font-weight: 700; }
     .dc-sub .dc-open { color: var(--brand); font-weight: 700; }
@@ -2038,10 +2040,10 @@
           <div class="dc-top">
             <div class="dc-date"><b>${esc(row.date.slice(5).replace('-', '/'))}</b><span>週${dow}</span></div>
             <div class="dc-pills">
-              <span class="pill p-water">總水分 <b>${f1(row.totalWaterMl)}</b> ml</span>
-              <span class="pill p-kcal">熱量約 <b>${f1(row.kcal)}</b> kcal</span>
-              <span class="pill p-wet">總罐頭 <b>${f1(row.wetFoodG)}</b> g</span>
-              <span class="pill p-dry">乾糧 <b>${f1(row.dryFoodG)}</b> g</span>
+              <span class="pill p-water"><span class="lbl">總水分</span><span class="val">${f1(row.totalWaterMl)}<span class="u"> ml</span></span></span>
+              <span class="pill p-kcal"><span class="lbl">熱量約</span><span class="val">${f1(row.kcal)}<span class="u"> kcal</span></span></span>
+              <span class="pill p-wet"><span class="lbl">總罐頭</span><span class="val">${f1(row.wetFoodG)}<span class="u"> g</span></span></span>
+              <span class="pill p-dry"><span class="lbl">乾糧</span><span class="val">${f1(row.dryFoodG)}<span class="u"> g</span></span></span>
             </div>
           </div>
           <div class="dc-sub">${row.entryCount} 筆紀錄 · 腸胃：${status}${otherTxt}<span class="dc-open" data-day="${esc(row.date)}"> · 查看當天 ›</span></div>
