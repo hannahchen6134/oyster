@@ -434,7 +434,7 @@ export function exampleCard() {
     type: 'box', layout: 'horizontal', spacing: 'sm', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
     contents: [
       { type: 'button', height: 'sm', style: 'secondary', color: C.brand,
-        action: { type: 'message', label: '完整記法', text: '如何記錄' } },
+        action: { type: 'message', label: '完整記法', text: '完整記法' } },
       { type: 'button', height: 'sm', style: 'secondary', color: C.brand,
         action: { type: 'message', label: '改用按鈕', text: '按鈕記錄' } }
     ]
@@ -517,71 +517,81 @@ export function recordTutorialFlex() {
     { type: 'bubble', size: 'mega', header: header('完整記法・照著打就會'), body, footer });
 }
 
-// 快速記錄：左右滑動的分類卡（常用打字／進階記法／進階功能）
+// 如何記錄：左右滑動的分類卡，三類用不同色系明確區隔（常用／進階記法／進階功能）
 export function quickRecordCarousel() {
-  // 可直接點的範例列（點一句就記／或觸發功能）
-  const line = (cmd, desc, sendText) => ({
-    type: 'box', layout: 'horizontal', alignItems: 'center', spacing: 'md',
-    margin: 'md', paddingAll: '10px',
-    backgroundColor: '#FBF8F1', cornerRadius: '12px', borderColor: '#E9E0CE', borderWidth: '1px',
+  // 三種色系主題：綠（常用）→ 琥珀（進階記法）→ 深棕（進階功能）
+  const THEME = {
+    common: { grad: { type: 'linearGradient', angle: '135deg', startColor: '#6E7A3A', endColor: '#4F5A28' }, pillBg: '#EEF1E1', pillFg: '#4F5A28', body: '#FBFCF6', chipBg: '#EEF1E1', chipFg: '#5D6C36', border: '#DDE3C8' },
+    skill:  { grad: { type: 'linearGradient', angle: '135deg', startColor: '#C0863E', endColor: '#9A6526' }, pillBg: '#F7EAD6', pillFg: '#8A5E1E', body: '#FDF9F2', chipBg: '#F6EAD7', chipFg: '#8A5E1E', border: '#EAD9BE' },
+    feature:{ grad: { type: 'linearGradient', angle: '135deg', startColor: '#5A3A22', endColor: '#3A2416' }, pillBg: '#EDE3D6', pillFg: '#5A3617', body: '#FBF7F2', chipBg: '#EDE3D6', chipFg: '#5A3617', border: '#E4D6C6' }
+  };
+  // 大色塊分類標頭：左邊序號圓、右邊分類名＋副標
+  const catHeader = (grad, num, title, sub) => ({
+    type: 'box', layout: 'horizontal', background: grad, paddingAll: '16px', paddingStart: '18px', spacing: 'md', alignItems: 'center',
+    contents: [
+      { type: 'box', layout: 'vertical', flex: 0, width: '34px', height: '34px', backgroundColor: '#FFFFFF', cornerRadius: '999px', justifyContent: 'center',
+        contents: [text(num, { size: 'lg', weight: 'bold', color: '#3A2416', align: 'center' })] },
+      { type: 'box', layout: 'vertical', flex: 1, contents: [
+        text(title, { size: 'lg', weight: 'bold', color: '#FFFFFF' }),
+        text(sub, { size: 'xxs', color: '#FFFFFFCC', margin: 'xs', wrap: true })
+      ] }
+    ]
+  });
+  // 可直接點的範例列（點一句就記／或觸發功能）；chip 顏色跟著主題
+  const line = (t, cmd, desc, sendText) => ({
+    type: 'box', layout: 'horizontal', alignItems: 'center', spacing: 'md', margin: 'md', paddingAll: '10px',
+    backgroundColor: '#FFFFFF', cornerRadius: '12px', borderColor: t.border, borderWidth: '1px',
     action: { type: 'message', label: (sendText || cmd).slice(0, 20), text: sendText || cmd },
     contents: [
-      { type: 'box', layout: 'vertical', flex: 0, backgroundColor: C.tint, cornerRadius: '8px',
+      { type: 'box', layout: 'vertical', flex: 0, backgroundColor: t.chipBg, cornerRadius: '8px',
         paddingAll: '7px', paddingStart: '12px', paddingEnd: '12px',
-        contents: [text(cmd, { size: 'sm', weight: 'bold', color: C.brand, wrap: false })] },
+        contents: [text(cmd, { size: 'sm', weight: 'bold', color: t.chipFg, wrap: false })] },
       text(desc, { size: 'xs', color: C.muted, flex: 1, gravity: 'center', wrap: true }),
       text('›', { size: 'lg', color: '#D8CDBA', flex: 0, gravity: 'center' })
     ]
   });
-  // 分類徽章（明確標示這張卡是哪一類）
-  const cat = (label, tone) => ({
-    type: 'box', layout: 'horizontal', contents: [{
-      type: 'box', layout: 'vertical', flex: 0, backgroundColor: tone.bg, cornerRadius: '999px',
-      paddingAll: '4px', paddingStart: '12px', paddingEnd: '12px',
-      contents: [text(label, { size: 'xs', weight: 'bold', color: tone.fg })]
-    }]
-  });
+
+  const t1 = THEME.common;
   const bubble1 = {
-    type: 'bubble', size: 'mega', header: header('快速記錄 · 常用打字'),
-    body: { type: 'box', layout: 'vertical', paddingAll: '18px', backgroundColor: BODY_BG, contents: [
-      cat('① 常用｜每天這樣記', { bg: C.oliveTint, fg: C.olive }),
-      text('點一句就記，熟了直接打字最快', { size: 'xxs', color: C.muted, margin: 'md', wrap: true }),
-      line('水 60', '喝水'),
-      line('罐頭 皇家 30', '食物＋品牌＋幾克'),
-      line('藥 早 已吃', '餵藥'),
-      line('水20 乾糧4 藥早已吃', '一句話一次記多筆')
+    type: 'bubble', size: 'mega', header: catHeader(t1.grad, '1', '常用', '每天這樣打就好'),
+    body: { type: 'box', layout: 'vertical', paddingAll: '16px', backgroundColor: t1.body, contents: [
+      text('點一句就記，熟了直接打字最快', { size: 'xxs', color: C.muted, wrap: true }),
+      line(t1, '水 60', '喝水'),
+      line(t1, '罐頭 皇家 30', '食物＋品牌＋幾克'),
+      line(t1, '藥 早 已吃', '餵藥'),
+      line(t1, '水20 乾糧4 藥早已吃', '一句話一次記多筆')
     ] }
   };
+  const t2 = THEME.skill;
   const bubble2 = {
-    type: 'bubble', size: 'mega', header: header('快速記錄 · 進階記法'),
-    body: { type: 'box', layout: 'vertical', paddingAll: '18px', backgroundColor: BODY_BG, contents: [
-      cat('② 進階記法｜需要時再用', { bg: '#F7EFE4', fg: '#8A5E35' }),
-      text('品牌、加水、補登、換貓', { size: 'xxs', color: C.muted, margin: 'md', wrap: true }),
-      line('乾糧 希爾斯 20', '指定品牌'),
-      line('罐頭 30 加水 10', '罐頭另外加水'),
-      line('昨天 21:30 水 20', '補登・指定時間'),
-      line('蚵仔', '換一隻貓記（打名字）', '如何記錄')
+    type: 'bubble', size: 'mega', header: catHeader(t2.grad, '2', '進階記法', '品牌・加水・補登・換貓'),
+    body: { type: 'box', layout: 'vertical', paddingAll: '16px', backgroundColor: t2.body, contents: [
+      text('需要時再用，記得更完整', { size: 'xxs', color: C.muted, wrap: true }),
+      line(t2, '乾糧 希爾斯 20', '指定品牌'),
+      line(t2, '罐頭 30 加水 10', '罐頭另外加水'),
+      line(t2, '昨天 21:30 水 20', '補登・指定時間'),
+      line(t2, '蚵仔', '換一隻貓記（打名字）', '完整記法')
     ] },
     footer: { type: 'box', layout: 'horizontal', paddingAll: '10px', backgroundColor: FOOTER_COLOR, contents: [
-      { type: 'button', height: 'sm', style: 'secondary', color: C.brand,
-        action: { type: 'message', label: '完整記法', text: '如何記錄' } }
+      { type: 'button', height: 'sm', style: 'secondary', color: t2.pillFg,
+        action: { type: 'message', label: '完整記法', text: '完整記法' } }
     ] }
   };
+  const t3 = THEME.feature;
   const featBtn = (label, sendText) => ({
-    type: 'button', height: 'sm', style: 'secondary', color: C.brand, margin: 'md',
+    type: 'button', height: 'sm', style: 'primary', color: t3.grad.endColor, margin: 'md',
     action: { type: 'message', label: label.slice(0, 20), text: sendText }
   });
   const bubble3 = {
-    type: 'bubble', size: 'mega', header: header('快速記錄 · 進階功能'),
-    body: { type: 'box', layout: 'vertical', paddingAll: '18px', backgroundColor: BODY_BG, contents: [
-      cat('③ 進階功能｜帳號與多人', { bg: C.tint, fg: C.brand }),
-      text('用電腦、找人一起照護', { size: 'xxs', color: C.muted, margin: 'md', wrap: true }),
+    type: 'bubble', size: 'mega', header: catHeader(t3.grad, '3', '進階功能', '電腦登入・多人照護'),
+    body: { type: 'box', layout: 'vertical', paddingAll: '16px', backgroundColor: t3.body, contents: [
+      text('用電腦、找人一起照護', { size: 'xxs', color: C.muted, wrap: true }),
       featBtn('💻 用電腦登入', '電腦登入'),
       featBtn('🤝 邀請一起照護（多人）', '邀請'),
-      featBtn('🌐 開啟照護站', '照護站')
+      featBtn('🖥 電腦開啟照護站', '照護站')
     ] }
   };
-  return bubble('快速記錄：常用打字（水 60・罐頭 皇家 30・藥 早 已吃）、進階記法、進階功能（電腦登入・多人照護）',
+  return bubble('如何記錄：① 常用打字（水 60・罐頭 皇家 30・藥 早 已吃）② 進階記法（品牌・補登・換貓）③ 進階功能（電腦登入・多人照護）',
     { type: 'carousel', contents: [bubble1, bubble2, bubble3] });
 }
 
