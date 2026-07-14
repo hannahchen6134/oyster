@@ -114,6 +114,10 @@
     .care-tag-care { color: var(--brand); }
     .care-remove { color: var(--seal); font-size: 13px; }
     .care-code { font-size: 27px; font-weight: 800; letter-spacing: 5px; text-align: center; margin: 12px 0; color: var(--brand); }
+    .care-copy-row { display: flex; align-items: stretch; gap: 8px; }
+    .care-copy-text { flex: 1; min-width: 0; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 13px; line-height: 1.6; color: var(--ink, #332417); user-select: all; -webkit-user-select: all; word-break: break-word; }
+    .care-copy-cmd { font-weight: 800; color: var(--brand); letter-spacing: 1px; }
+    .care-copy-btn { flex: 0 0 auto; align-self: stretch; white-space: nowrap; }
     .eyebrow {
       display: inline-block; color: var(--brand); font-size: 11px; font-weight: 600;
       letter-spacing: 0.3em; text-transform: uppercase;
@@ -2406,12 +2410,23 @@
         inviteBtn.disabled = true;
         try {
           const r = await api('care/invite', { method: 'POST' });
+          const joinCmd = '加入 ' + r.code;
+          const shareMsg = '一起照顧貓咪吧！加入官方 LINE「喵喵照護安心管家」，傳「' + joinCmd + '」就完成，7 天內有效。';
           $('careInviteBox').innerHTML = `
             <div class="block" style="margin-top:12px;background:var(--brand-tint);border-color:transparent">
-              <p style="margin:0;font-size:13px">把這組邀請碼給對方：</p>
-              <div class="care-code">${esc(r.code)}</div>
-              <p class="muted" style="margin:0;font-size:12px;line-height:1.7">請對方加入官方 LINE「喵喵照護安心管家」後輸入：<br><b style="color:var(--brand)">加入 ${esc(r.code)}</b><br>7 天內有效，可以給好幾個人。</p>
+              <p style="margin:0 0 10px;font-size:13px">把下面這句傳給對方就好：</p>
+              <div class="care-copy-row">
+                <span class="care-copy-text" id="careShareMsg">${esc(shareMsg)}</span>
+                <button class="btn btn-primary btn-sm care-copy-btn" id="careCopyMsgBtn" type="button">複製</button>
+              </div>
+              <p class="muted" style="margin:14px 0 6px;font-size:12px">對方要輸入的指令（也可單獨複製）：</p>
+              <div class="care-copy-row">
+                <span class="care-copy-text care-copy-cmd" id="careJoinCmd">${esc(joinCmd)}</span>
+                <button class="btn btn-secondary btn-sm care-copy-btn" id="careCopyCmdBtn" type="button">複製</button>
+              </div>
             </div>`;
+          $('careCopyMsgBtn').addEventListener('click', () => copyText(shareMsg, '已複製，貼到聊天室傳給對方就好。'));
+          $('careCopyCmdBtn').addEventListener('click', () => copyText(joinCmd, '已複製「' + joinCmd + '」。'));
         } catch (error) { toast('產生邀請碼失敗，請稍後再試', true); }
         inviteBtn.disabled = false;
       });
