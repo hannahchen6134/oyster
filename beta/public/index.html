@@ -103,6 +103,10 @@
     .topbar .spacer { flex: 1; }
     .pet-switch { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
     .pet-switch-hint { font-size: 10px; color: var(--muted); white-space: nowrap; letter-spacing: .02em; }
+    .food-kcal-preview { margin-top: 8px; font-size: 13px; font-weight: 600; letter-spacing: .01em; min-height: 1em; }
+    .food-kcal-preview:empty { display: none; }
+    .food-kcal-preview.ok { color: var(--brand); }
+    .food-kcal-preview.warn { color: var(--seal); font-weight: 500; }
     .eyebrow {
       display: inline-block; color: var(--brand); font-size: 11px; font-weight: 600;
       letter-spacing: 0.3em; text-transform: uppercase;
@@ -1427,6 +1431,7 @@
           ${state.foods.length ? `<div class="field"><label>食物品項（選了會自動算熱量與水分）</label>
             <select name="foodId"><option value="">— 不指定 —</option>${foodOptions}</select>
           </div>` : '<input type="hidden" name="foodId" value="">'}
+          <div class="food-kcal-preview" id="foodKcalPreview"></div>
         </div>
         <div class="log-med">
           <div class="grid grid-2">
@@ -1474,6 +1479,38 @@
       form.querySelectorAll('.log-water').forEach((el) => el.classList.toggle('hidden', category !== 'water'));
       form.querySelectorAll('.log-food').forEach((el) => el.classList.toggle('hidden', category !== 'food'));
       form.querySelectorAll('.log-med').forEach((el) => el.classList.toggle('hidden', category !== 'med'));
+      if (category === 'food') updateFoodKcalPreview(form);
+    }
+
+    // 記食物時即時預估熱量/水分，與後端計算邏輯一致：
+    // 有選品項 → 用它；沒選但該類型只有一種品項 → 自動套用；都對不上 → 提醒要選品項。
+    function updateFoodKcalPreview(form) {
+      const box = form.querySelector('#foodKcalPreview');
+      if (!box) return;
+      const grams = Number((form.querySelector('[name="foodAmount"]') || {}).value || 0);
+      const foodType = (form.querySelector('[name="foodType"]') || {}).value || '';
+      const foodId = (form.querySelector('[name="foodId"]') || {}).value || '';
+      const alive = (state.foods || []).filter((f) => !f.isDeleted);
+      let food = foodId ? alive.find((f) => f.foodId === foodId) : null;
+      if (!food) {
+        const sameType = alive.filter((f) => f.foodType === foodType);
+        if (sameType.length === 1) food = sameType[0];
+      }
+      if (!grams) { box.className = 'food-kcal-preview'; box.textContent = ''; return; }
+      const isWet = foodType === '罐頭' || foodType === '濕食';
+      if (food && Number(food.kcalPerGram) > 0) {
+        const kcal = Math.round(grams * Number(food.kcalPerGram) * 10) / 10;
+        const ratio = Number(food.waterRatio) > 0 ? Number(food.waterRatio) : (isWet ? 0.8 : 0);
+        const water = Math.round(grams * ratio * 10) / 10;
+        box.className = 'food-kcal-preview ok';
+        box.textContent = `≈ ${kcal} kcal${water ? `　含水 ${water} ml` : ''}（${food.displayName}）`;
+      } else {
+        const others = alive.filter((f) => f.foodType === foodType).length;
+        box.className = 'food-kcal-preview warn';
+        box.textContent = others > 1
+          ? `「${foodType}」有多個品項，請在上面選一個，才能算熱量`
+          : `這個品項還沒設定熱量公式，熱量先不計入`;
+      }
     }
 
     function collectLogForm(form) {
@@ -1536,6 +1573,11 @@
       const form = $('modalForm');
       syncLogFormVisibility(form);
       form.querySelector('[name="category"]').addEventListener('change', () => syncLogFormVisibility(form));
+      // 記食物時，改類型/克數/品項都即時更新熱量預估
+      ['foodType', 'foodId', 'foodAmount'].forEach((name) => {
+        const el = form.querySelector(`[name="${name}"]`);
+        if (el) el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', () => updateFoodKcalPreview(form));
+      });
       // 選了常用藥物 → 自動帶入該藥的預設劑量（若劑量欄還是空的）
       const medNameEl = form.querySelector('[name="medName"]');
       if (medNameEl && medNameEl.tagName === 'SELECT') {
