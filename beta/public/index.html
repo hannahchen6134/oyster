@@ -849,45 +849,6 @@
 
       <!-- 回診 -->
       <section class="panel hidden" id="trendView">
-        <div class="block" style="margin-top:14px">
-          <div class="section-head">
-            <h2>喵喵回診安心摘要</h2>
-          </div>
-          <p class="muted" style="margin:2px 0 10px;font-size:12.5px" id="visitRangeLine"></p>
-          <div class="range-chips">
-            <button data-range="7" type="button">7 天</button>
-            <button data-range="14" type="button" class="active">14 天</button>
-            <button data-range="30" type="button">30 天</button>
-          </div>
-          <div id="visitHighlights"></div>
-          <details class="fold-inline">
-            <summary>展開完整摘要 ›</summary>
-            <div id="visitSummaryView" style="margin-top:6px"><div class="vs-empty">整理中…</div></div>
-          </details>
-          <div class="field" style="margin-top:16px">
-            <label for="vetAskNote">想請醫生協助確認（選填，會放進摘要）</label>
-            <textarea id="vetAskNote" rows="2" placeholder="例如：最近喝水變少，想確認要不要追蹤腎指數"></textarea>
-          </div>
-          <div class="vs-actions">
-            <button class="btn btn-primary btn-sm" id="copyVisitSummaryBtn" type="button">複製回診摘要</button>
-            <button class="btn btn-secondary btn-sm" id="goTodayFromVisit" type="button">開啟今日紀錄</button>
-            <button class="btn btn-secondary btn-sm" id="goLabFromVisit" type="button">查看血檢紀錄</button>
-            <button class="btn btn-secondary btn-sm" id="pdfReportBtn" type="button">PDF 報告</button>
-          </div>
-          <p class="muted" style="margin:12px 0 0;font-size:11.5px;line-height:1.6">本摘要為飼主日常照護紀錄整理，可提供醫生參考，不作為醫療診斷依據；回診前請與飼主當面核對。</p>
-        </div>
-        <details class="block fold">
-          <summary>
-            <span class="fold-title">給醫生的一句話（今天）</span>
-            <span class="fold-toggle">＋</span>
-          </summary>
-          <div class="fold-body">
-            <div id="doctorNote" class="doctor-text">今天還沒有紀錄。</div>
-            <div style="display:flex;justify-content:flex-end;margin-top:10px">
-              <button class="btn btn-secondary btn-sm" id="copyDoctorBtn" type="button">複製</button>
-            </div>
-          </div>
-        </details>
         <details class="block fold">
           <summary>
             <span class="fold-title" id="visitFoldTitle">看診紀錄</span>
@@ -1970,35 +1931,7 @@
       state.visits = visitsData.rows;
       state.labs = labsData.rows;
 
-      const todayLabel = `${Number(to.slice(5, 7))}月${Number(to.slice(8, 10))}日`;
-      $('doctorNote').textContent = buildDoctorNote(dayData.summary, todayLabel);
       renderDayVisits();
-      const rows7 = data.rows.filter((row) => row.date >= from7);
-      const vsData = buildVisitSummary(rows7, from7, to, dayData.summary);
-      $('visitRangeLine').textContent = `${vsData.petName}｜日期區間 ${vsData.rangeText}`;
-      const askEl = $('vetAskNote');
-      if (askEl) askEl.value = localStorage.getItem(`vetAsk:${state.petId}`) || '';
-      $('visitSummaryView').innerHTML = visitSummaryHtml(vsData);
-      state.visitSummaryCopy = visitSummaryCopyText(vsData);
-      state.vsData = vsData;
-      // 本週重點：一眼看完，細節收在「展開完整摘要」
-      const recorded7 = rows7.filter((row) => row.entryCount > 0);
-      const avg7 = (pick) => (recorded7.length
-        ? Math.round(recorded7.reduce((total, row) => total + (Number(pick(row)) || 0), 0) / recorded7.length)
-        : 0);
-      const vomitDays = recorded7.filter((row) => row.vomitCount > 0).length;
-      const issueDays = recorded7.filter((row) => row.medIssueCount > 0).length;
-      const attention = [];
-      if (vomitDays) attention.push(`嘔吐 ${vomitDays} 天`);
-      if (issueDays) attention.push(`用藥留意 ${issueDays} 天`);
-      const highlightRows = [
-        ['紀錄', `${recorded7.length}／${state.visitRange} 天有紀錄`],
-        ['日均水分', recorded7.length ? `${avg7((row) => row.totalWaterMl)} ml` : '—'],
-        ['日均熱量', recorded7.length ? `${avg7((row) => row.kcal)} kcal` : '—'],
-        ['留意', attention.length ? attention.join('・') : '這 7 天都很平穩']
-      ];
-      $('visitHighlights').innerHTML = highlightRows.map(([k, v]) => `
-        <div class="vs-row"><span class="vs-date">${esc(k)}</span><span class="vs-val">${esc(v)}</span></div>`).join('');
       const latestLab = latestLabInfo();
       $('labLatestLine').textContent = latestLab
         ? `最近一次：${latestLab.date}｜${latestLab.text}`
@@ -2768,58 +2701,6 @@
         toast('複製沒有成功，請長按文字手動複製。', true);
       }
     }
-    $('copyDoctorBtn').addEventListener('click', () =>
-      copyText($('doctorNote').textContent, '已複製，可直接貼給醫生。'));
-    // PDF 報告：組一份醫生友善的完整版，開列印視窗（可另存為 PDF）
-    function buildPrintReport() {
-      const pet = currentPet() || {};
-      const today = todayStr();
-      const meta = [
-        pet.birthday ? `生日 ${pet.birthday}` : '',
-        pet.weightKg ? `體重 ${pet.weightKg} kg` : '',
-        pet.chipNumber ? `晶片 ${pet.chipNumber}` : '',
-        pet.conditionNote ? `狀況 ${pet.conditionNote}` : ''
-      ].filter(Boolean).join('｜');
-      const labGroups = new Map();
-      for (const row of state.labs || []) {
-        if (!labGroups.has(row.testDate)) labGroups.set(row.testDate, []);
-        labGroups.get(row.testDate).push(row);
-      }
-      const labHtml = labGroups.size
-        ? `<h2>血檢紀錄</h2>` + [...labGroups.entries()].sort((a, b) => b[0].localeCompare(a[0])).map(([date, rows]) =>
-            `<div class="pr-meta">${esc(date)}</div><div>${rows.map((r) => `${esc(r.itemName)} ${fmt(r.value)}${r.unit ? ` ${esc(r.unit)}` : ''}`).join('、')}</div>`).join('')
-        : '';
-      const tableEl = document.querySelector('#trendView .table-wrap table');
-      $('printReport').innerHTML = `
-        <h1>${esc(pet.petName || '貓貓')}｜照護報告</h1>
-        <div class="pr-meta">${esc(meta || '')}</div>
-        <div class="pr-meta">產生日期 ${esc(today)}・喵喵照護安心管家</div>
-        <h2>近 ${state.visitRange} 天摘要</h2>
-        <pre>${esc(state.visitSummaryCopy || '')}</pre>
-        ${labHtml}
-        <h2>近 30 天每日總覽</h2>
-        ${tableEl ? tableEl.outerHTML : ''}
-        <div class="pr-foot">本報告由飼主日常記錄產生，數字可能因輸入而有誤，僅供獸醫師參考、不作為醫療診斷依據；回診前請再次核對數字無誤。</div>`;
-    }
-    $('pdfReportBtn').addEventListener('click', () => {
-      buildPrintReport();
-      window.print();
-    });
-
-    $('copyVisitSummaryBtn').addEventListener('click', () =>
-      copyText(state.visitSummaryCopy || '', '已複製回診摘要，可以貼給醫生。'));
-    $('goTodayFromVisit').addEventListener('click', () => switchTab('today'));
-    $('goLabFromVisit').addEventListener('click', () => {
-      const block = $('labTrendBlock');
-      if (block.classList.contains('hidden')) { toast('還沒有血檢紀錄，可到「設定 → 血檢紀錄」新增。'); return; }
-      block.open = true;
-      block.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-    $('vetAskNote').addEventListener('input', (event) => {
-      if (!state.petId) return;
-      localStorage.setItem(`vetAsk:${state.petId}`, event.target.value);
-      if (state.vsData) state.visitSummaryCopy = visitSummaryCopyText(state.vsData);
-    });
     $('copyHandoffBtn').addEventListener('click', () =>
       copyText(buildHandoffText(), '已複製今日交接卡，可以直接貼給家人朋友。'));
     $('showAllLogsBtn').addEventListener('click', () => {
