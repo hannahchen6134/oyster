@@ -397,8 +397,8 @@
     .daycards { display: flex; flex-direction: column; gap: 0; width: 100vw; margin-left: 50%; transform: translateX(-50%); padding: 0 10px; box-sizing: border-box; }
     /* 每天是一列（不是白框卡片）：只用細線分隔，無底色/邊框/陰影 */
     .daycard {
-      display: flex; flex-direction: column; gap: 6px; cursor: pointer;
-      padding: 12px 4px; border: none; border-bottom: 1px solid var(--line);
+      display: flex; flex-direction: column; gap: 4px; cursor: pointer;
+      padding: 9px 4px; border: none; border-bottom: 1px solid var(--line);
       background: transparent; box-shadow: none;
     }
     .daycard:last-child { border-bottom: none; }
@@ -407,17 +407,17 @@
     /* 同一行：日期（左）＋四顆膠囊（中，平均撐滿）＋查看當天（右）；腸胃狀態在下方 */
     .dc-top { display: flex; align-items: center; gap: 7px; }
     .dc-date { flex: 0 0 auto; text-align: center; line-height: 1.05; }
-    .dc-date b { display: block; font-size: 14px; color: var(--brand); letter-spacing: .01em; }
-    .dc-date span { font-size: 10px; color: var(--muted); }
+    .dc-date b { display: block; font-size: 13px; color: var(--brand); letter-spacing: .01em; }
+    .dc-date span { font-size: 9.5px; color: var(--muted); }
     /* 四等分欄位（各佔 1/4），標籤在上、數字在下 → 結構上絕不會溢出，字放大也一樣 */
     .dc-pills { flex: 1 1 auto; min-width: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; }
     .dc-pills .pill {
       min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
-      text-align: center; line-height: 1.08; padding: 3px 3px; border-radius: 7px; border: 1px solid; overflow: hidden;
+      text-align: center; line-height: 1.05; padding: 2px 3px; border-radius: 6px; border: 1px solid; overflow: hidden;
     }
-    .dc-pills .pill .lbl { font-size: 7px; opacity: .85; }
-    .dc-pills .pill .val { font-size: 10px; font-weight: 800; white-space: nowrap; }
-    .dc-pills .pill .val .u { font-size: 7px; font-weight: 600; }
+    .dc-pills .pill .lbl { font-size: 6.5px; opacity: .8; }
+    .dc-pills .pill .val { font-size: 9px; font-weight: 800; white-space: nowrap; }
+    .dc-pills .pill .val .u { font-size: 6.5px; font-weight: 600; }
     .dc-pills .pill.p-water { background: #eaf3f0; border-color: #d3e6df; color: #3a6f61; }
     .dc-pills .pill.p-water .val { color: #2f7d6a; }
     .dc-pills .pill.p-wet   { background: #f5ede0; border-color: #e8d9bf; color: #7a5a2e; }
@@ -426,7 +426,7 @@
     .dc-pills .pill.p-dry .val  { color: #9a6a1e; }
     .dc-pills .pill.p-kcal  { background: #efeaf6; border-color: #ddd4ea; color: #5c5080; }
     .dc-pills .pill.p-kcal .val { color: #5b4a86; }
-    .dc-sub { font-size: 11.5px; color: var(--muted); padding-left: 2px; }
+    .dc-sub { font-size: 11px; color: var(--muted); padding-left: 2px; }
     .dc-sub .warn-txt { color: var(--seal); font-weight: 700; }
     .dc-sub .dc-open { color: var(--brand); font-weight: 700; }
     /* 精簡圓形按鈕（「查看當天」改用小箭頭，把寬度留給四項數字） */
@@ -2030,11 +2030,12 @@
         const attn = [];
         if (row.vomitCount) attn.push(`嘔吐 ${row.vomitCount} 次`);
         if (row.medIssueCount) attn.push(`用藥留意 ${row.medIssueCount}`);
-        const status = warn
-          ? `<span class="warn-txt">需留意（${attn.join('・')}）</span>`
-          : '穩定';
         const f1 = (v) => (Math.round((Number(v) || 0) * 10) / 10).toFixed(1);
-        const otherTxt = Number(row.otherFoodG) > 0 ? ` · 其他 ${f1(row.otherFoodG)} g` : '';
+        // 狀態列只留「需留意（有嘔吐/用藥）」與「其他 g」；穩定與筆數不顯示，保持清爽
+        const subParts = [];
+        if (warn) subParts.push(`<span class="warn-txt">需留意（${attn.join('・')}）</span>`);
+        if (Number(row.otherFoodG) > 0) subParts.push(`其他 ${f1(row.otherFoodG)} g`);
+        subParts.push(`<span class="dc-open" data-day="${esc(row.date)}">查看當天 ›</span>`);
         return `
         <div class="daycard ${warn ? 'warn' : ''}" data-day="${esc(row.date)}" role="button" tabindex="0">
           <div class="dc-top">
@@ -2046,7 +2047,7 @@
               <span class="pill p-dry"><span class="lbl">乾糧</span><span class="val">${f1(row.dryFoodG)}<span class="u"> g</span></span></span>
             </div>
           </div>
-          <div class="dc-sub">${row.entryCount} 筆紀錄 · 腸胃：${status}${otherTxt}<span class="dc-open" data-day="${esc(row.date)}"> · 查看當天 ›</span></div>
+          <div class="dc-sub">${subParts.join(' · ')}</div>
         </div>`;
       }).join('');
     }
