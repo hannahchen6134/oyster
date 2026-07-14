@@ -410,14 +410,14 @@
     .dc-date b { display: block; font-size: 14px; color: var(--brand); letter-spacing: .01em; }
     .dc-date span { font-size: 10px; color: var(--muted); }
     /* 四等分欄位（各佔 1/4），標籤在上、數字在下 → 結構上絕不會溢出，字放大也一樣 */
-    .dc-pills { flex: 1 1 auto; min-width: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+    .dc-pills { flex: 1 1 auto; min-width: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; }
     .dc-pills .pill {
       min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
-      text-align: center; line-height: 1.12; padding: 5px 3px; border-radius: 8px; border: 1px solid; overflow: hidden;
+      text-align: center; line-height: 1.08; padding: 3px 3px; border-radius: 7px; border: 1px solid; overflow: hidden;
     }
-    .dc-pills .pill .lbl { font-size: 8.5px; }
-    .dc-pills .pill .val { font-size: 12px; font-weight: 800; white-space: nowrap; }
-    .dc-pills .pill .val .u { font-size: 8.5px; font-weight: 600; }
+    .dc-pills .pill .lbl { font-size: 7px; opacity: .85; }
+    .dc-pills .pill .val { font-size: 10px; font-weight: 800; white-space: nowrap; }
+    .dc-pills .pill .val .u { font-size: 7px; font-weight: 600; }
     .dc-pills .pill.p-water { background: #eaf3f0; border-color: #d3e6df; color: #3a6f61; }
     .dc-pills .pill.p-water .val { color: #2f7d6a; }
     .dc-pills .pill.p-wet   { background: #f5ede0; border-color: #e8d9bf; color: #7a5a2e; }
