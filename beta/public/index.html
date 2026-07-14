@@ -409,13 +409,13 @@
     .dc-date { flex: 0 0 auto; text-align: center; line-height: 1.05; }
     .dc-date b { display: block; font-size: 14px; color: var(--brand); letter-spacing: .01em; }
     .dc-date span { font-size: 10px; color: var(--muted); }
-    .dc-pills { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: nowrap; gap: 3px; overflow-x: auto; scrollbar-width: none; }
+    .dc-pills { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: nowrap; gap: 2px; overflow-x: auto; scrollbar-width: none; }
     .dc-pills::-webkit-scrollbar { display: none; }
     .dc-pills .pill {
       flex: 0 0 auto; display: inline-flex; align-items: baseline; gap: 2px;
-      padding: 5px 5px; border-radius: 8px; font-size: 7.5px; white-space: nowrap; border: 1px solid;
+      padding: 5px 4px; border-radius: 7px; font-size: 7px; white-space: nowrap; border: 1px solid;
     }
-    .dc-pills .pill b { font-size: 9px; font-weight: 800; }
+    .dc-pills .pill b { font-size: 8.5px; font-weight: 800; }
     .dc-pills .pill.p-water { background: #eaf3f0; border-color: #d3e6df; color: #3a6f61; }
     .dc-pills .pill.p-water b { color: #2f7d6a; }
     .dc-pills .pill.p-wet   { background: #f5ede0; border-color: #e8d9bf; color: #7a5a2e; }
@@ -2032,8 +2032,7 @@
           ? `<span class="warn-txt">需留意（${attn.join('・')}）</span>`
           : '穩定';
         const f1 = (v) => (Math.round((Number(v) || 0) * 10) / 10).toFixed(1);
-        const otherPill = Number(row.otherFoodG) > 0
-          ? `<span class="pill p-dry">其他 <b>${f1(row.otherFoodG)}</b> g</span>` : '';
+        const otherTxt = Number(row.otherFoodG) > 0 ? ` · 其他 ${f1(row.otherFoodG)} g` : '';
         return `
         <div class="daycard ${warn ? 'warn' : ''}" data-day="${esc(row.date)}" role="button" tabindex="0">
           <div class="dc-top">
@@ -2043,10 +2042,9 @@
               <span class="pill p-kcal">熱量約 <b>${f1(row.kcal)}</b> kcal</span>
               <span class="pill p-wet">總罐頭 <b>${f1(row.wetFoodG)}</b> g</span>
               <span class="pill p-dry">乾糧 <b>${f1(row.dryFoodG)}</b> g</span>
-              ${otherPill}
             </div>
           </div>
-          <div class="dc-sub">${row.entryCount} 筆紀錄 · 腸胃：${status}<span class="dc-open" data-day="${esc(row.date)}"> · 查看當天 ›</span></div>
+          <div class="dc-sub">${row.entryCount} 筆紀錄 · 腸胃：${status}${otherTxt}<span class="dc-open" data-day="${esc(row.date)}"> · 查看當天 ›</span></div>
         </div>`;
       }).join('');
     }
