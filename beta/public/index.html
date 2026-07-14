@@ -927,7 +927,7 @@
             <span class="fold-toggle">＋</span>
           </summary>
           <div class="fold-body">
-            <p class="scroll-hint" style="text-align:left;margin:0 2px 10px">每一天一列，先看加總，再點「查看當天」切回當天細節。</p>
+            <p class="scroll-hint" style="text-align:left;margin:0 2px 10px">每一天一列，先看加總；點任何一天可看當日細節。</p>
             <div class="range-chips" id="tableRangeChips">
               <button data-trange="30" type="button" class="active">30 天</button>
               <button data-trange="60" type="button">60 天</button>
@@ -2031,11 +2031,10 @@
         if (row.vomitCount) attn.push(`嘔吐 ${row.vomitCount} 次`);
         if (row.medIssueCount) attn.push(`用藥留意 ${row.medIssueCount}`);
         const f1 = (v) => (Math.round((Number(v) || 0) * 10) / 10).toFixed(1);
-        // 狀態列只留「需留意（有嘔吐/用藥）」與「其他 g」；穩定與筆數不顯示，保持清爽
+        // 狀態列只在「有嘔吐/用藥留意」或「有其他食物」時才出現，正常日只留數字，最好掃視
         const subParts = [];
         if (warn) subParts.push(`<span class="warn-txt">需留意（${attn.join('・')}）</span>`);
         if (Number(row.otherFoodG) > 0) subParts.push(`其他 ${f1(row.otherFoodG)} g`);
-        subParts.push(`<span class="dc-open" data-day="${esc(row.date)}">查看當天 ›</span>`);
         return `
         <div class="daycard ${warn ? 'warn' : ''}" data-day="${esc(row.date)}" role="button" tabindex="0">
           <div class="dc-top">
@@ -2047,7 +2046,7 @@
               <span class="pill p-dry"><span class="lbl">乾糧</span><span class="val">${f1(row.dryFoodG)}<span class="u"> g</span></span></span>
             </div>
           </div>
-          <div class="dc-sub">${subParts.join(' · ')}</div>
+          ${subParts.length ? `<div class="dc-sub">${subParts.join(' · ')}</div>` : ''}
         </div>`;
       }).join('');
     }
