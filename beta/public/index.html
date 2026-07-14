@@ -2411,20 +2411,39 @@
           <div class="care-who"><b>${esc(m.name)}</b><span class="care-tag care-tag-care">共同照護</span></div>
           ${isOwner ? `<button class="link-btn care-remove" data-remove="${esc(m.memberLineUserId)}" type="button">移除</button>` : ''}
         </div>`).join('') : '<div class="muted" style="padding:12px 4px;font-size:13px">還沒有其他人加入。</div>';
+      const canShare = state.liff && state.liff.canShare;
+      const shareBtn = (isOwner && canShare)
+        ? `<button class="btn btn-primary" id="careShareBtn" type="button" style="width:100%;margin-top:16px">🟢 邀請 LINE 好友（一鍵送出）</button>`
+        : '';
       const inviteBlock = isOwner
-        ? `<button class="btn btn-primary" id="careInviteBtn" type="button" style="width:100%;margin-top:16px">＋ 邀請一起照護</button><div id="careInviteBox"></div>`
+        ? `${shareBtn}<button class="btn ${canShare ? 'btn-secondary' : 'btn-primary'}" id="careInviteBtn" type="button" style="width:100%;margin-top:${canShare ? '10' : '16'}px">${canShare ? '或複製邀請碼給對方' : '＋ 邀請一起照護'}</button><div id="careInviteBox"></div>`
         : `<div class="muted" style="margin-top:16px;font-size:13px">你是共同照護者。想邀請更多人，請飼主本人操作。</div>`;
       list.innerHTML = explain
         + `<div class="set-group-title">照護成員</div><div class="block set-card" style="margin-top:0">${ownerRow}${memberRows}</div>`
         + inviteBlock;
+
+      const LINE_ADD = 'https://line.me/R/ti/p/@232mjffx';
+      const buildShareMsg = (code) => '一起照顧貓咪吧 🐈 ① 加入官方 LINE：' + LINE_ADD + ' ② 加入後打這組邀請碼：' + code + '（7 天內有效）';
+
+      // 一鍵挑 LINE 好友送出（LIFF shareTargetPicker）
+      const shareBtnEl = $('careShareBtn');
+      if (shareBtnEl) shareBtnEl.addEventListener('click', async () => {
+        shareBtnEl.disabled = true;
+        try {
+          const r = await api('care/invite', { method: 'POST' });
+          const result = await liff.shareTargetPicker([{ type: 'text', text: buildShareMsg(r.code) }]);
+          if (result) toast('已送出邀請！對方加入官方 LINE、打邀請碼就完成 🐈');
+        } catch (error) { toast('分享沒成功，改用下面的複製邀請也可以', true); }
+        shareBtnEl.disabled = false;
+      });
 
       const inviteBtn = $('careInviteBtn');
       if (inviteBtn) inviteBtn.addEventListener('click', async () => {
         inviteBtn.disabled = true;
         try {
           const r = await api('care/invite', { method: 'POST' });
-          const lineUrl = 'https://line.me/R/ti/p/@232mjffx';
-          const shareMsg = '一起照顧貓咪吧 🐈 ① 加入官方 LINE：' + lineUrl + ' ② 加入後打這組邀請碼：' + r.code + '（7 天內有效）';
+          const lineUrl = LINE_ADD;
+          const shareMsg = buildShareMsg(r.code);
           $('careInviteBox').innerHTML = `
             <div class="block" style="margin-top:12px;background:var(--brand-tint);border-color:transparent">
               <p style="margin:0 0 10px;font-size:13px">把下面這整段傳給對方就好：</p>
@@ -2624,7 +2643,26 @@
       if (btn) btn.addEventListener('click', () => { localStorage.setItem('disclaimerAck', '1'); bar.remove(); });
     }
 
+    function loadScript(src) {
+      return new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = src; s.onload = resolve; s.onerror = reject;
+        document.head.appendChild(s);
+      });
+    }
+    // 若後台有設 LIFF_ID，就載入 LIFF SDK 讓「挑好友送出邀請」可用；沒設就靜默略過（退回複製邀請）
+    async function initLiff() {
+      try {
+        const cfg = await fetch('/api/liff-config').then((r) => r.json()).catch(() => ({}));
+        if (!cfg || !cfg.liffId) return;
+        await loadScript('https://static.line-scdn.net/liff/edge/2/sdk.js');
+        await liff.init({ liffId: cfg.liffId });
+        state.liff = { ready: true, inClient: liff.isInClient(), canShare: liff.isApiAvailable('shareTargetPicker') };
+      } catch (error) { /* LIFF 不可用就當沒有，功能自動退回複製邀請 */ }
+    }
+
     async function bootstrap() {
+      initLiff(); // 背景載入，不擋主流程
       // 從網址 hash 取 token（LINE 登入連結）與深連結目標 go=
       const hashMatch = location.hash.match(/token=([a-zA-Z0-9]+)/);
       const goMatch = location.hash.match(/[#&]go=([a-z]+)/);
