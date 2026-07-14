@@ -6,7 +6,8 @@ import {
   getUser, updateUser, listPets, getPet, createPet,
   listFoods, getFood,
   insertLog, getLog, getLogsForDay, updateLog, softDeleteLog,
-  recomputeDay, getSummaries, getSessionUser, getRecentLogsByPet
+  recomputeDay, getSummaries, getSessionUser, getRecentLogsByPet,
+  resolveDataOwner
 } from './db.js';
 import { computeDailySummary, deriveFoodFields } from './summary.js';
 import { matchFood } from './parser.js';
@@ -70,6 +71,8 @@ export async function handleApi(request, env, url) {
   const token = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
   const lineUserId = await getSessionUser(db, token);
   if (!lineUserId) return jsonResponse({ ok: false, message: '這個照護站連結已過期。請回 LINE 輸入「照護站」取得新的專屬連結，你的既有照護資料不會因連結過期而消失。' }, 401);
+  // 共同照護者以自己的 LINE 登入，資料解析到飼主本人；飼主本人時 dataOwnerId === lineUserId，行為不變。
+  const dataOwnerId = await resolveDataOwner(db, lineUserId);
 
   const segments = url.pathname.replace(/^\/api\/?/, '').split('/').filter(Boolean);
   const resource = segments[0] || '';
@@ -80,8 +83,8 @@ export async function handleApi(request, env, url) {
     if (resource === 'me') {
       if (method === 'GET') {
         const user = await getUser(db, lineUserId);
-        const pets = await listPets(db, lineUserId);
-        return jsonResponse({ ok: true, user, pets, plan: planStatus(user) });
+        const pets = await listPets(db, dataOwnerId);
+        return jsonResponse({ ok: true, user, pets, plan: planStatus(user), isCaregiver: dataOwnerId !== lineUserId });
       }
       if (method === 'PUT') {
         const body = await request.json();
@@ -94,7 +97,7 @@ export async function handleApi(request, env, url) {
       const petId = url.searchParams.get('petId') || '';
       const date = url.searchParams.get('date') || '';
       if (!isValidDate(date)) return jsonResponse({ ok: false, message: '日期格式錯誤' }, 400);
-      if (!(await assertPetOwner(db, petId, lineUserId))) return forbidden();
+      if (!(await assertPetOwner(db, petId, dataOwnerId))) return forbidden();
       const logs = await getLogsForDay(db, petId, date);
       return jsonResponse({ ok: true, date, logs, summary: computeDailySummary(logs) });
     }
@@ -104,7 +107,7 @@ export async function handleApi(request, env, url) {
       const from = url.searchParams.get('from') || '';
       const to = url.searchParams.get('to') || '';
       if (!isValidDate(from) || !isValidDate(to)) return jsonResponse({ ok: false, message: '日期格式錯誤' }, 400);
-      if (!(await assertPetOwner(db, petId, lineUserId))) return forbidden();
+      if (!(await assertPetOwner(db, petId, dataOwnerId))) return forbidden();
       const rows = await getSummaries(db, petId, from, to);
       return jsonResponse({ ok: true, rows });
     }
@@ -113,7 +116,7 @@ export async function handleApi(request, env, url) {
       const petId = url.searchParams.get('petId') || '';
       const month = url.searchParams.get('month') || '';
       if (!/^\d{4}-\d{2}$/.test(month)) return jsonResponse({ ok: false, message: '月份格式錯誤' }, 400);
-      if (!(await assertPetOwner(db, petId, lineUserId))) return forbidden();
+      if (!(await assertPetOwner(db, petId, dataOwnerId))) return forbidden();
       const rows = await getSummaries(db, petId, `${month}-01`, `${month}-31`);
       const { results: visits } = await db
         .prepare(
@@ -128,21 +131,21 @@ export async function handleApi(request, env, url) {
     if (resource === 'recent' && method === 'GET') {
       const petId = url.searchParams.get('petId') || '';
       const limit = Math.min(50, Math.max(1, Number(url.searchParams.get('limit')) || 20));
-      if (!(await assertPetOwner(db, petId, lineUserId))) return forbidden();
+      if (!(await assertPetOwner(db, petId, dataOwnerId))) return forbidden();
       const logs = await getRecentLogsByPet(db, petId, limit);
       return jsonResponse({ ok: true, logs });
     }
 
     if (resource === 'logs') {
-      return handleLogs(db, request, method, resourceId, lineUserId);
+      return handleLogs(db, request, method, resourceId, dataOwnerId, lineUserId);
     }
 
     if (resource === 'labs') {
-      return handleLabs(db, request, url, method, resourceId, lineUserId);
+      return handleLabs(db, request, url, method, resourceId, dataOwnerId);
     }
 
     if (RESOURCES[resource]) {
-      return handleCrud(db, RESOURCES[resource], request, url, method, resourceId, lineUserId);
+      return handleCrud(db, RESOURCES[resource], request, url, method, resourceId, dataOwnerId);
     }
 
     return jsonResponse({ ok: false, message: 'Not found' }, 404);
@@ -164,7 +167,7 @@ async function assertPetOwner(db, petId, lineUserId) {
 
 // ---------- logs（新增/修改/刪除都要重算 daily_summary）----------
 
-async function handleLogs(db, request, method, logId, lineUserId) {
+async function handleLogs(db, request, method, logId, lineUserId, actorId = lineUserId) {
   if (method === 'POST') {
     const body = await request.json();
     const petId = String(body.petId || '');
@@ -195,10 +198,10 @@ async function handleLogs(db, request, method, logId, lineUserId) {
       medForm: String(body.medForm || ''),
       beforeMeal: String(body.beforeMeal || ''),
       note: String(body.note || ''),
-      recordedBy: lineUserId,
+      recordedBy: actorId,
       isBackfilled: eventDateTime.slice(0, 10) === taipeiNowDateTime().slice(0, 10) ? 0 : 1,
       source: 'web',
-      updatedBy: lineUserId
+      updatedBy: actorId
     });
 
     const saved = await insertLog(db, log);
@@ -218,7 +221,7 @@ async function handleLogs(db, request, method, logId, lineUserId) {
     }
 
     const merged = await applyDerivedFields(db, { ...existing, ...body });
-    const updated = await updateLog(db, logId, merged, lineUserId);
+    const updated = await updateLog(db, logId, merged, actorId);
 
     const oldDate = String(existing.eventDateTime).slice(0, 10);
     const newDate = String(updated.eventDateTime).slice(0, 10);

@@ -433,6 +433,73 @@ export async function getSessionUser(db, token) {
   return session.lineUserId;
 }
 
+// ---------- 共同照護（care_members）----------
+// 資料一律掛在「飼主本人（ownerLineUserId）」名下；共同照護者以自己的 LINE 加入後，
+// 操作時解析到飼主，讓多人一起記錄／查看同一批貓咪。
+
+// 這個 LINE 使用者實際要操作誰的資料：
+//  - 自己有貓 → 就是自己（飼主本人，行為完全不變）
+//  - 自己沒貓但是某人的共同照護者 → 那位飼主
+//  - 都不是 → 自己
+export async function resolveDataOwner(db, actorLineUserId) {
+  if (!actorLineUserId) return actorLineUserId;
+  const own = await db
+    .prepare('SELECT 1 FROM pets WHERE ownerLineUserId = ? AND isDeleted = 0 LIMIT 1')
+    .bind(actorLineUserId).first();
+  if (own) return actorLineUserId;
+  const member = await db
+    .prepare("SELECT ownerLineUserId FROM care_members WHERE memberLineUserId = ? AND status = 'accepted' ORDER BY acceptedAt DESC LIMIT 1")
+    .bind(actorLineUserId).first();
+  return member ? member.ownerLineUserId : actorLineUserId;
+}
+
+export async function listCareMembers(db, ownerLineUserId) {
+  const { results } = await db
+    .prepare("SELECT * FROM care_members WHERE ownerLineUserId = ? AND status = 'accepted' ORDER BY acceptedAt")
+    .bind(ownerLineUserId).all();
+  return results || [];
+}
+
+// 邀請碼：6 碼（去掉易混淆字元），存在 app_kv，7 天有效、可重複使用（方便一次找幾個人）
+function newInviteCode() {
+  const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 6; i += 1) code += alphabet[Math.floor(Math.random() * alphabet.length)];
+  return code;
+}
+
+export async function createCareInvite(db, ownerLineUserId) {
+  const code = newInviteCode();
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  await appKvSet(db, `invite:${code}`, JSON.stringify({ ownerLineUserId, expiresAt }));
+  return code;
+}
+
+export async function redeemCareInvite(db, code, memberLineUserId) {
+  const raw = await appKvGet(db, `invite:${String(code || '').toUpperCase()}`);
+  if (!raw) return { ok: false, reason: 'not_found' };
+  let payload;
+  try { payload = JSON.parse(raw); } catch { return { ok: false, reason: 'not_found' }; }
+  if (!payload.ownerLineUserId) return { ok: false, reason: 'not_found' };
+  if (String(payload.expiresAt) < nowIso()) return { ok: false, reason: 'expired' };
+  if (payload.ownerLineUserId === memberLineUserId) return { ok: false, reason: 'self' };
+
+  const now = nowIso();
+  const existing = await db
+    .prepare('SELECT memberId FROM care_members WHERE memberLineUserId = ? AND ownerLineUserId = ?')
+    .bind(memberLineUserId, payload.ownerLineUserId).first();
+  if (existing) {
+    await db.prepare("UPDATE care_members SET status = 'accepted', role = 'caregiver', acceptedAt = ?, updatedAt = ? WHERE memberId = ?")
+      .bind(now, now, existing.memberId).run();
+    return { ok: true, ownerLineUserId: payload.ownerLineUserId, already: true };
+  }
+  await db.prepare(
+    `INSERT INTO care_members (memberId, petId, ownerLineUserId, memberLineUserId, role, status, invitedAt, acceptedAt, createdAt, updatedAt)
+     VALUES (?, '*', ?, ?, 'caregiver', 'accepted', ?, ?, ?, ?)`
+  ).bind(newId(), payload.ownerLineUserId, memberLineUserId, now, now, now, now).run();
+  return { ok: true, ownerLineUserId: payload.ownerLineUserId };
+}
+
 // 使用者最近一筆未刪除的紀錄（給「改 54」「剩 20」「刪除」修正上一筆用）
 export async function getLastLogByUser(db, lineUserId) {
   return db
