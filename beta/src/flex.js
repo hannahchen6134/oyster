@@ -433,9 +433,9 @@ export function exampleCard() {
   const footer = {
     type: 'box', layout: 'horizontal', spacing: 'sm', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
     contents: [
-      { type: 'button', height: 'sm', style: 'secondary', color: C.brand,
+      { type: 'button', height: 'sm', style: 'primary', color: C.brand,
         action: { type: 'message', label: '完整記法', text: '完整記法' } },
-      { type: 'button', height: 'sm', style: 'secondary', color: C.brand,
+      { type: 'button', height: 'sm', style: 'primary', color: C.brand,
         action: { type: 'message', label: '改用按鈕', text: '按鈕記錄' } }
     ]
   };
@@ -573,7 +573,7 @@ export function quickRecordCarousel() {
       line(t2, '蚵仔', '換一隻貓記（打名字）', '完整記法')
     ] },
     footer: { type: 'box', layout: 'horizontal', paddingAll: '10px', backgroundColor: FOOTER_COLOR, contents: [
-      { type: 'button', height: 'sm', style: 'secondary', color: t2.pillFg,
+      { type: 'button', height: 'sm', style: 'primary', color: t2.grad.endColor,
         action: { type: 'message', label: '完整記法', text: '完整記法' } }
     ] }
   };
