@@ -2041,9 +2041,8 @@
               <span class="pill p-dry">乾糧 <b>${f1(row.dryFoodG)}</b> g</span>
               ${otherPill}
             </div>
-            <button class="dc-btn" data-day="${esc(row.date)}" type="button" aria-label="查看當天">›</button>
           </div>
-          <div class="dc-sub">${row.entryCount} 筆紀錄 · 腸胃：${status}<span class="dc-open" data-day="${esc(row.date)}"> · 查看當天</span></div>
+          <div class="dc-sub">${row.entryCount} 筆紀錄 · 腸胃：${status}<span class="dc-open" data-day="${esc(row.date)}"> · 查看當天 ›</span></div>
         </div>`;
       }).join('');
     }
