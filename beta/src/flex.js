@@ -517,6 +517,74 @@ export function recordTutorialFlex() {
     { type: 'bubble', size: 'mega', header: header('完整記法・照著打就會'), body, footer });
 }
 
+// 快速記錄：左右滑動的分類卡（常用打字／進階記法／進階功能）
+export function quickRecordCarousel() {
+  // 可直接點的範例列（點一句就記／或觸發功能）
+  const line = (cmd, desc, sendText) => ({
+    type: 'box', layout: 'horizontal', alignItems: 'center', spacing: 'md',
+    margin: 'md', paddingAll: '10px',
+    backgroundColor: '#FBF8F1', cornerRadius: '12px', borderColor: '#E9E0CE', borderWidth: '1px',
+    action: { type: 'message', label: (sendText || cmd).slice(0, 20), text: sendText || cmd },
+    contents: [
+      { type: 'box', layout: 'vertical', flex: 0, backgroundColor: C.tint, cornerRadius: '8px',
+        paddingAll: '7px', paddingStart: '12px', paddingEnd: '12px',
+        contents: [text(cmd, { size: 'sm', weight: 'bold', color: C.brand, wrap: false })] },
+      text(desc, { size: 'xs', color: C.muted, flex: 1, gravity: 'center', wrap: true }),
+      text('›', { size: 'lg', color: '#D8CDBA', flex: 0, gravity: 'center' })
+    ]
+  });
+  // 分類徽章（明確標示這張卡是哪一類）
+  const cat = (label, tone) => ({
+    type: 'box', layout: 'horizontal', contents: [{
+      type: 'box', layout: 'vertical', flex: 0, backgroundColor: tone.bg, cornerRadius: '999px',
+      paddingAll: '4px', paddingStart: '12px', paddingEnd: '12px',
+      contents: [text(label, { size: 'xs', weight: 'bold', color: tone.fg })]
+    }]
+  });
+  const bubble1 = {
+    type: 'bubble', size: 'mega', header: header('快速記錄 · 常用打字'),
+    body: { type: 'box', layout: 'vertical', paddingAll: '18px', backgroundColor: BODY_BG, contents: [
+      cat('① 常用｜每天這樣記', { bg: C.oliveTint, fg: C.olive }),
+      text('點一句就記，熟了直接打字最快', { size: 'xxs', color: C.muted, margin: 'md', wrap: true }),
+      line('水 60', '喝水'),
+      line('罐頭 皇家 30', '食物＋品牌＋幾克'),
+      line('藥 早 已吃', '餵藥'),
+      line('水20 乾糧4 藥早已吃', '一句話一次記多筆')
+    ] }
+  };
+  const bubble2 = {
+    type: 'bubble', size: 'mega', header: header('快速記錄 · 進階記法'),
+    body: { type: 'box', layout: 'vertical', paddingAll: '18px', backgroundColor: BODY_BG, contents: [
+      cat('② 進階記法｜需要時再用', { bg: '#F7EFE4', fg: '#8A5E35' }),
+      text('品牌、加水、補登、換貓', { size: 'xxs', color: C.muted, margin: 'md', wrap: true }),
+      line('乾糧 希爾斯 20', '指定品牌'),
+      line('罐頭 30 加水 10', '罐頭另外加水'),
+      line('昨天 21:30 水 20', '補登・指定時間'),
+      line('蚵仔', '換一隻貓記（打名字）', '如何記錄')
+    ] },
+    footer: { type: 'box', layout: 'horizontal', paddingAll: '10px', backgroundColor: FOOTER_COLOR, contents: [
+      { type: 'button', height: 'sm', style: 'secondary', color: C.brand,
+        action: { type: 'message', label: '完整記法', text: '如何記錄' } }
+    ] }
+  };
+  const featBtn = (label, sendText) => ({
+    type: 'button', height: 'sm', style: 'secondary', color: C.brand, margin: 'md',
+    action: { type: 'message', label: label.slice(0, 20), text: sendText }
+  });
+  const bubble3 = {
+    type: 'bubble', size: 'mega', header: header('快速記錄 · 進階功能'),
+    body: { type: 'box', layout: 'vertical', paddingAll: '18px', backgroundColor: BODY_BG, contents: [
+      cat('③ 進階功能｜帳號與多人', { bg: C.tint, fg: C.brand }),
+      text('用電腦、找人一起照護', { size: 'xxs', color: C.muted, margin: 'md', wrap: true }),
+      featBtn('💻 用電腦登入', '電腦登入'),
+      featBtn('🤝 邀請一起照護（多人）', '邀請'),
+      featBtn('🌐 開啟照護站', '照護站')
+    ] }
+  };
+  return bubble('快速記錄：常用打字（水 60・罐頭 皇家 30・藥 早 已吃）、進階記法、進階功能（電腦登入・多人照護）',
+    { type: 'carousel', contents: [bubble1, bubble2, bubble3] });
+}
+
 export function menuFlex() {
   const row = (cells) => ({ type: 'box', layout: 'horizontal', spacing: 'md', margin: 'md', contents: cells });
   const body = {
