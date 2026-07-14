@@ -107,6 +107,13 @@
     .food-kcal-preview:empty { display: none; }
     .food-kcal-preview.ok { color: var(--brand); }
     .food-kcal-preview.warn { color: var(--seal); font-weight: 500; }
+    .care-row { display: flex; align-items: center; justify-content: space-between; padding: 13px 4px; border-bottom: 1px solid var(--line); }
+    .care-row:last-child { border-bottom: none; }
+    .care-who { display: flex; align-items: center; gap: 9px; }
+    .care-tag { font-size: 11px; font-weight: 600; color: var(--muted); background: var(--brand-tint); border-radius: 999px; padding: 2px 10px; }
+    .care-tag-care { color: var(--brand); }
+    .care-remove { color: var(--seal); font-size: 13px; }
+    .care-code { font-size: 27px; font-weight: 800; letter-spacing: 5px; text-align: center; margin: 12px 0; color: var(--brand); }
     .eyebrow {
       display: inline-block; color: var(--brand); font-size: 11px; font-weight: 600;
       letter-spacing: 0.3em; text-transform: uppercase;
@@ -2328,6 +2335,9 @@
       ['開始使用', [
         ['onboarding', '喵爸媽安心上手', '第一次使用的 5 個小步驟']
       ]],
+      ['一起照護', [
+        ['care', '共同照護', '邀請家人・幫手一起記錄，重點即時通知']
+      ]],
       ['貓咪與日常', [
         ['pets', '貓咪資料', '名字、生日、體重與健康備註'],
         ['foods', '常吃的食物', '設定後，記錄會自動算熱量與水分'],
@@ -2361,6 +2371,57 @@
         </div>`;
     }
 
+    async function renderCarePage() {
+      const list = $('settingsList');
+      list.innerHTML = '<div class="empty">載入中…</div>';
+      let data;
+      try { data = await api('care/members'); }
+      catch (error) { list.innerHTML = '<div class="empty">載入失敗，請稍後再試。</div>'; return; }
+      const isOwner = data.isOwner;
+      const members = data.members || [];
+      const explain = `
+        <div class="block" style="margin-top:0">
+          <p style="margin:0;font-weight:700">一起照護，重要的事不漏接</p>
+          <p class="muted" style="margin:8px 0 0;font-size:13px;line-height:1.7">
+            邀請家人或幫手加入後，他們用自己的 LINE 記錄，都會記進你的貓咪。
+            <b style="color:var(--brand)">藥、嘔吐等重點事件會即時通知彼此</b>；
+            日常的吃飯喝水，則在<b style="color:var(--brand)">每晚彙整</b>一次，不會一直吵你。
+          </p>
+        </div>`;
+      const ownerRow = `<div class="care-row"><div class="care-who"><b>${esc(data.owner.name)}</b><span class="care-tag">飼主</span></div></div>`;
+      const memberRows = members.length ? members.map((m) => `
+        <div class="care-row">
+          <div class="care-who"><b>${esc(m.name)}</b><span class="care-tag care-tag-care">共同照護</span></div>
+          ${isOwner ? `<button class="link-btn care-remove" data-remove="${esc(m.memberLineUserId)}" type="button">移除</button>` : ''}
+        </div>`).join('') : '<div class="muted" style="padding:12px 4px;font-size:13px">還沒有其他人加入。</div>';
+      const inviteBlock = isOwner
+        ? `<button class="btn btn-primary" id="careInviteBtn" type="button" style="width:100%;margin-top:16px">＋ 邀請一起照護</button><div id="careInviteBox"></div>`
+        : `<div class="muted" style="margin-top:16px;font-size:13px">你是共同照護者。想邀請更多人，請飼主本人操作。</div>`;
+      list.innerHTML = explain
+        + `<div class="set-group-title">照護成員</div><div class="block set-card" style="margin-top:0">${ownerRow}${memberRows}</div>`
+        + inviteBlock;
+
+      const inviteBtn = $('careInviteBtn');
+      if (inviteBtn) inviteBtn.addEventListener('click', async () => {
+        inviteBtn.disabled = true;
+        try {
+          const r = await api('care/invite', { method: 'POST' });
+          $('careInviteBox').innerHTML = `
+            <div class="block" style="margin-top:12px;background:var(--brand-tint);border-color:transparent">
+              <p style="margin:0;font-size:13px">把這組邀請碼給對方：</p>
+              <div class="care-code">${esc(r.code)}</div>
+              <p class="muted" style="margin:0;font-size:12px;line-height:1.7">請對方加入官方 LINE「喵喵照護安心管家」後輸入：<br><b style="color:var(--brand)">加入 ${esc(r.code)}</b><br>7 天內有效，可以給好幾個人。</p>
+            </div>`;
+        } catch (error) { toast('產生邀請碼失敗，請稍後再試', true); }
+        inviteBtn.disabled = false;
+      });
+      list.querySelectorAll('[data-remove]').forEach((btn) => btn.addEventListener('click', async () => {
+        if (!confirm('確定移除這位共同照護者？移除後他就無法再看到與記錄你的貓咪。')) return;
+        try { await api('care/member?memberLineUserId=' + encodeURIComponent(btn.dataset.remove), { method: 'DELETE' }); toast('已移除'); await renderCarePage(); }
+        catch (error) { toast('移除失敗，請稍後再試', true); }
+      }));
+    }
+
     async function loadSettings() {
       const isMenu = !state.settingsTab;
       $('settingsMenu').classList.toggle('hidden', !isMenu);
@@ -2372,6 +2433,13 @@
         $('settingsHint').textContent = '第一次使用？照著下面 5 步，安心開始。';
         $('settingsAddBtn').classList.add('hidden');
         renderOnboarding();
+        return;
+      }
+
+      if (state.settingsTab === 'care') {
+        $('settingsHint').textContent = '邀請家人或幫手，一起記錄同一批貓咪。';
+        $('settingsAddBtn').classList.add('hidden');
+        await renderCarePage();
         return;
       }
 

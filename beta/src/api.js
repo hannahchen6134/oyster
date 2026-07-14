@@ -7,7 +7,7 @@ import {
   listFoods, getFood,
   insertLog, getLog, getLogsForDay, updateLog, softDeleteLog,
   recomputeDay, getSummaries, getSessionUser, getRecentLogsByPet,
-  resolveDataOwner
+  resolveDataOwner, createCareInvite, listCareMembers
 } from './db.js';
 import { computeDailySummary, deriveFoodFields } from './summary.js';
 import { matchFood } from './parser.js';
@@ -144,6 +144,10 @@ export async function handleApi(request, env, url) {
       return handleLabs(db, request, url, method, resourceId, dataOwnerId);
     }
 
+    if (resource === 'care') {
+      return handleCare(db, url, method, resourceId, dataOwnerId, lineUserId);
+    }
+
     if (RESOURCES[resource]) {
       return handleCrud(db, RESOURCES[resource], request, url, method, resourceId, dataOwnerId);
     }
@@ -157,6 +161,37 @@ export async function handleApi(request, env, url) {
 
 function forbidden() {
   return jsonResponse({ ok: false, message: '沒有權限存取這筆資料' }, 403);
+}
+
+// ---------- 共同照護（邀請碼、成員清單、移除）----------
+async function handleCare(db, url, method, resourceId, ownerId, actorId) {
+  if (resourceId === 'invite' && method === 'POST') {
+    const code = await createCareInvite(db, ownerId);
+    return jsonResponse({ ok: true, code });
+  }
+  if (resourceId === 'members' && method === 'GET') {
+    const members = await listCareMembers(db, ownerId);
+    const ownerUser = await getUser(db, ownerId);
+    const rows = [];
+    for (const m of members) {
+      const u = await getUser(db, m.memberLineUserId);
+      rows.push({ memberLineUserId: m.memberLineUserId, name: (u && u.displayName) || '照護者', acceptedAt: m.acceptedAt });
+    }
+    return jsonResponse({
+      ok: true,
+      owner: { name: (ownerUser && ownerUser.displayName) || '飼主' },
+      members: rows,
+      isOwner: actorId === ownerId
+    });
+  }
+  if (resourceId === 'member' && method === 'DELETE') {
+    if (actorId !== ownerId) return forbidden(); // 只有飼主本人可移除共同照護者
+    const memberLineUserId = url.searchParams.get('memberLineUserId') || '';
+    await db.prepare('DELETE FROM care_members WHERE ownerLineUserId = ? AND memberLineUserId = ?')
+      .bind(ownerId, memberLineUserId).run();
+    return jsonResponse({ ok: true });
+  }
+  return jsonResponse({ ok: false, message: 'Not found' }, 404);
 }
 
 async function assertPetOwner(db, petId, lineUserId) {

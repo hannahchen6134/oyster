@@ -460,6 +460,13 @@ export async function listCareMembers(db, ownerLineUserId) {
   return results || [];
 }
 
+// 照護圈：飼主本人 ＋ 所有已接受的共同照護者（用來互相通知）。單人時就只有飼主自己。
+export async function listCareCircle(db, ownerLineUserId) {
+  const members = await listCareMembers(db, ownerLineUserId);
+  const ids = [ownerLineUserId, ...members.map((m) => m.memberLineUserId)];
+  return [...new Set(ids.filter(Boolean))];
+}
+
 // 邀請碼：6 碼（去掉易混淆字元），存在 app_kv，7 天有效、可重複使用（方便一次找幾個人）
 function newInviteCode() {
   const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
