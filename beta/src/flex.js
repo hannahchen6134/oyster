@@ -443,6 +443,80 @@ export function exampleCard() {
     { type: 'bubble', size: 'mega', header: header('怎麼記？打字最快'), body, footer });
 }
 
+// ---------- 完整記法教學卡（固定小字、短句不換行） ----------
+// 純文字訊息會跟著手機系統字級放大而在半句處斷行（例：「冠關 水↵20」）；
+// 改用 Flex 卡把字級鎖小、每句都短到不會折行，指令左、說明右，乾淨好讀。
+export function recordTutorialFlex() {
+  const rows = [];
+  const sec = (title) => {
+    rows.push({ type: 'separator', margin: 'xl', color: '#F0EADF' });
+    rows.push(text(title, { size: 'xs', weight: 'bold', color: C.olive, margin: 'md' }));
+  };
+  // 指令左（暖墨、粗、不換行）＋ 說明右（沙灰、極小、不換行）
+  const cmd = (command, gloss = '') => {
+    const line = { type: 'box', layout: 'baseline', margin: 'sm', contents: [
+      text(command, { size: 'sm', weight: 'bold', color: C.ink, flex: 0 })
+    ] };
+    if (gloss) line.contents.push(text(gloss, { size: 'xxs', color: C.muted, flex: 1, align: 'end', gravity: 'bottom' }));
+    rows.push(line);
+  };
+
+  rows.push(text('照著打就會記，數字是幾克或幾 ml', { size: 'xs', color: C.muted, wrap: true }));
+
+  sec('喝水');
+  cmd('水 60');
+
+  sec('吃飯（可帶品牌）');
+  cmd('乾糧 4');
+  cmd('罐頭 30');
+  cmd('罐頭 皇家 30', '帶品牌');
+  cmd('乾糧 希爾斯 20', '帶品牌');
+  cmd('罐頭 30 加水 10', '另外加水');
+
+  sec('用藥');
+  cmd('藥 早 已吃');
+  cmd('藥 心臟藥 晚 已吃', '指定藥名');
+  cmd('已吃／未餵／吐掉／拒吃');
+
+  sec('症狀・精神');
+  cmd('吐 白色泡沫');
+  cmd('大便 偏軟');
+  cmd('尿尿');
+  cmd('營養補充 益生菌');
+  cmd('精神 活動力差');
+  cmd('備註 今天梳毛');
+
+  sec('一次記多筆');
+  cmd('水20 乾糧4 藥早已吃', '一句記三筆');
+
+  sec('補登・指定時間');
+  cmd('昨天 21:30 水 20');
+  cmd('14:30 水 20');
+
+  sec('多隻貓');
+  cmd('蚵仔', '打名字＝之後都記牠');
+  cmd('冠關 水 20', '只記一筆給別隻');
+
+  sec('記錯了');
+  cmd('改 54', '改上一筆數量');
+  cmd('剩 20', '沒吃完扣掉');
+  cmd('刪除', '刪掉上一筆');
+
+  const body = {
+    type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
+    contents: rows
+  };
+  const footer = {
+    type: 'box', layout: 'vertical', paddingAll: '14px', paddingStart: '20px', paddingEnd: '20px', backgroundColor: FOOTER_COLOR,
+    contents: [
+      text('先到照護站設好「常吃的食物」，之後打品牌就會自動算熱量與水分。',
+        { size: 'xxs', color: C.brand, wrap: true })
+    ]
+  };
+  return bubble('完整記法：水 60、罐頭 皇家 30、藥 早 已吃、水20 乾糧4 藥早已吃、昨天 21:30 水 20',
+    { type: 'bubble', size: 'mega', header: header('完整記法・照著打就會'), body, footer });
+}
+
 export function menuFlex() {
   const row = (cells) => ({ type: 'box', layout: 'horizontal', spacing: 'md', margin: 'md', contents: cells });
   const body = {
