@@ -422,19 +422,21 @@ export function exampleCard() {
     contents: [
       text('直接打字最快，照著點點看就懂了', { size: 'xs', color: C.muted, align: 'center', wrap: true }),
       line('水 60', '記一筆喝水 60 ml'),
-      line('罐頭 30', '記一筆罐頭 30 克'),
+      line('罐頭 皇家 30', '食物＋品牌＋幾克'),
       line('藥 早 已吃', '記早上的藥已經餵了'),
       line('水20 乾糧4 藥早已吃', '一句話一次記三筆'),
       { type: 'separator', margin: 'xl', color: '#F0EADF' },
-      text('平常怎麼說就怎麼打，「喝了60」「吃了罐頭30」也看得懂',
-        { size: 'xxs', color: C.muted, align: 'center', wrap: true, margin: 'lg' })
+      text('品牌、換貓、加水、補登… 打「如何記錄」看完整記法',
+        { size: 'xxs', color: C.brand, align: 'center', wrap: true, margin: 'lg' })
     ]
   };
   const footer = {
-    type: 'box', layout: 'horizontal', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
+    type: 'box', layout: 'horizontal', spacing: 'sm', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
     contents: [
       { type: 'button', height: 'sm', style: 'secondary', color: C.brand,
-        action: { type: 'message', label: '改用按鈕點選', text: '按鈕記錄' } }
+        action: { type: 'message', label: '完整記法', text: '如何記錄' } },
+      { type: 'button', height: 'sm', style: 'secondary', color: C.brand,
+        action: { type: 'message', label: '改用按鈕', text: '按鈕記錄' } }
     ]
   };
   return bubble('照著打打看：水 60、罐頭 30、藥 早 已吃、水20 乾糧4 藥早已吃',
