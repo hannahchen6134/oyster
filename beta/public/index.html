@@ -390,7 +390,10 @@
     /* 近 N 天給醫生看：每天一列，全部同一行（日期＋四項＋查看當天），像 CODEX。
        用滿整個螢幕寬度（跳出窄欄）＋精簡小膠囊，手機也塞得下一行。 */
     /* 這個摺疊區要讓整行卡片跳出窄欄用滿螢幕，需允許溢出（其他 fold 仍維持裁切） */
-    .block.fold.daycards-fold { overflow: visible; }
+    /* 這個摺疊區的卡片用滿螢幕寬，因此拿掉外層面板底色/邊框/陰影，避免露出多餘白板塊 */
+    .block.fold.daycards-fold { overflow: visible; background: transparent; border: none; box-shadow: none; padding: 0; margin-top: 18px; }
+    .daycards-fold > summary { padding-left: 2px; padding-right: 2px; }
+    .daycards-fold .fold-body { padding: 2px 2px 4px; }
     .daycards { display: flex; flex-direction: column; gap: 9px; width: 100vw; margin-left: 50%; transform: translateX(-50%); padding: 0 10px; box-sizing: border-box; }
     .daycard {
       display: flex; flex-direction: column; gap: 6px; cursor: pointer;
