@@ -394,15 +394,16 @@
     .block.fold.daycards-fold { overflow: visible; background: transparent; border: none; box-shadow: none; padding: 0; margin-top: 18px; }
     .daycards-fold > summary { padding-left: 2px; padding-right: 2px; }
     .daycards-fold .fold-body { padding: 2px 2px 4px; }
-    .daycards { display: flex; flex-direction: column; gap: 9px; width: 100vw; margin-left: 50%; transform: translateX(-50%); padding: 0 10px; box-sizing: border-box; }
+    .daycards { display: flex; flex-direction: column; gap: 0; width: 100vw; margin-left: 50%; transform: translateX(-50%); padding: 0 10px; box-sizing: border-box; }
+    /* 每天是一列（不是白框卡片）：只用細線分隔，無底色/邊框/陰影 */
     .daycard {
       display: flex; flex-direction: column; gap: 6px; cursor: pointer;
-      padding: 11px 10px; border: 1px solid var(--line); border-radius: 14px;
-      background: linear-gradient(180deg, #fffef9, var(--sheet));
-      box-shadow: 0 1px 0 rgba(90,54,23,.04);
+      padding: 12px 4px; border: none; border-bottom: 1px solid var(--line);
+      background: transparent; box-shadow: none;
     }
-    .daycard:active { background: var(--soft); }
-    .daycard.warn { border-color: var(--seal); background: linear-gradient(180deg, #fffdf7, var(--seal-tint)); }
+    .daycard:last-child { border-bottom: none; }
+    .daycard:active { background: rgba(115,73,33,0.04); }
+    .daycard.warn { background: var(--seal-tint); }
     /* 同一行：日期（左）＋四顆膠囊（中，平均撐滿）＋查看當天（右）；腸胃狀態在下方 */
     .dc-top { display: flex; align-items: center; gap: 7px; }
     .dc-date { flex: 0 0 auto; text-align: center; line-height: 1.05; }
