@@ -9,6 +9,7 @@ import {
   recomputeDay, getSummaries, getSessionUser, getRecentLogsByPet
 } from './db.js';
 import { computeDailySummary, deriveFoodFields } from './summary.js';
+import { matchFood } from './parser.js';
 import { jsonResponse, newId, nowIso, isValidDate, isValidDateTime, taipeiNowDateTime } from './util.js';
 
 const RESOURCES = {
@@ -246,7 +247,18 @@ async function applyDerivedFields(db, log) {
     result.unit = 'ml';
   }
   if (result.category === 'food') {
-    const food = result.foodId ? await getFood(db, result.foodId) : null;
+    let food = result.foodId ? await getFood(db, result.foodId) : null;
+    // 沒指定公式時，比照 LINE：先用品名比對常吃的食物，再用「該類型唯一公式」自動套用，
+    // 這樣在網站只選了「乾糧／罐頭」也能算出熱量，不會顯示 0。
+    if (!food) {
+      const foods = await listFoods(db, result.lineUserId);
+      food = matchFood(foods, result.itemName, result.foodType);
+      if (!food && !String(result.itemName || '').trim()) {
+        const sameType = foods.filter((item) => !item.isDeleted && item.foodType === result.foodType);
+        if (sameType.length === 1) food = sameType[0];
+      }
+      if (food) result.foodId = food.foodId; // 綁定公式，之後編輯或重算才會持續正確
+    }
     if (food) {
       if (!result.itemName) result.itemName = food.displayName;
       if (!result.foodType) result.foodType = food.foodType;
