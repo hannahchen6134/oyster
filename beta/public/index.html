@@ -554,10 +554,16 @@
       box-shadow: var(--shadow-lift);
     }
     .login-card h1 { font-size: 32px; }
-    .login-steps { margin: 28px auto 0; max-width: 320px; text-align: left; }
+    .login-steps { margin: 28px auto 0; max-width: 340px; text-align: left; }
     .login-step { display: flex; gap: 14px; align-items: baseline; padding: 11px 2px; border-bottom: 1px solid var(--line); }
     .login-step:last-child { border-bottom: none; }
     .login-step .num { font-family: var(--serif); color: var(--brand); font-weight: 600; font-size: 15px; }
+    .login-code-box { margin: 24px auto 0; max-width: 340px; text-align: left; background: var(--brand-tint); border-radius: 14px; padding: 16px; }
+    .login-code-label { font-size: 13px; color: var(--ink, #332417); line-height: 1.6; margin-bottom: 10px; }
+    .login-code-row { display: flex; gap: 8px; }
+    .login-code-row input { flex: 1; min-width: 0; padding: 11px 12px; font-size: 17px; letter-spacing: 3px; text-align: center; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+    .login-code-row .btn { flex: 0 0 auto; }
+    .login-code-msg { margin-top: 10px; font-size: 12.5px; color: var(--seal); }
 
     /* 頁面模式：h1 底下的小標，避免和貓名擠成一行亂斷行 */
     .page-mode {
@@ -746,12 +752,19 @@
           這個照護站連結已過期。請回 LINE 輸入「照護站」取得新的專屬連結。<br>
           <b>你的既有照護資料不會因連結過期而消失。</b>
         </div>
-        <div class="login-steps">
-          <div class="login-step"><span class="num">1</span><span>打開「喵喵照護安心管家」官方 LINE</span></div>
-          <div class="login-step"><span class="num">2</span><span>輸入 <b>照護站</b></span></div>
-          <div class="login-step"><span class="num">3</span><span>點機器人回覆的專屬連結</span></div>
+        <div class="login-code-box">
+          <div class="login-code-label">用電腦登入：在 LINE 打「<b>電腦登入</b>」取得一組登入碼，輸入這裡</div>
+          <div class="login-code-row">
+            <input id="loginCodeInput" inputmode="numeric" maxlength="6" placeholder="6 位數字登入碼" autocomplete="one-time-code">
+            <button class="btn btn-primary" id="loginCodeBtn" type="button">登入</button>
+          </div>
+          <div class="login-code-msg hidden" id="loginCodeMsg"></div>
         </div>
-        <p class="muted" style="margin-top:22px">連結會隨使用自動延長效期；就算過期，既有資料也不會消失。</p>
+        <div class="login-steps">
+          <div class="login-step"><span class="num">1</span><span>加入「喵喵照護安心管家」官方 LINE</span></div>
+          <div class="login-step"><span class="num">2</span><span>手機：輸入 <b>照護站</b> 點連結就進<br>電腦：輸入 <b>電腦登入</b> 拿上面的登入碼</span></div>
+        </div>
+        <p class="muted" style="margin-top:22px">登入後這台裝置會記住你，之後直接開網址就進得去；就算過期，既有資料也不會消失。</p>
         <p class="disclaimer">喵喵照護安心管家目前為 Beta 測試版，主要用途是協助飼主紀錄日常照護資料，方便回顧、交接與回診時參考。所有數字為飼主自行記錄，可能因輸入而有誤，提供給獸醫師前請自行核對。本工具不提供醫療診斷、治療建議或緊急判斷。如貓咪出現明顯不適，請直接聯繫獸醫。</p>
       </div>
     </section>
@@ -2899,6 +2912,32 @@
         $('modalSaveBtn').click();
       }
     });
+
+    // 電腦登入：輸入 LINE 取得的 6 位登入碼 → 換 session → 進站
+    async function submitLoginCode() {
+      const input = $('loginCodeInput');
+      const msg = $('loginCodeMsg');
+      const code = (input.value || '').replace(/\D/g, '').slice(0, 6);
+      if (code.length !== 6) { msg.textContent = '請輸入 6 位數字登入碼。'; msg.classList.remove('hidden'); return; }
+      const btn = $('loginCodeBtn');
+      btn.disabled = true; msg.classList.add('hidden');
+      try {
+        const res = await fetch('/api/login-code', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.token) throw new Error(data.message || '登入碼無效或已過期。');
+        localStorage.setItem(TOKEN_KEY, data.token);
+        state.token = data.token;
+        await bootstrap();
+      } catch (error) {
+        msg.textContent = error.message || '登入失敗，請再試一次。';
+        msg.classList.remove('hidden');
+        btn.disabled = false;
+      }
+    }
+    $('loginCodeBtn').addEventListener('click', submitLoginCode);
+    $('loginCodeInput').addEventListener('keydown', (event) => { if (event.key === 'Enter') submitLoginCode(); });
 
     bootstrap();
   </script>

@@ -507,6 +507,28 @@ export async function redeemCareInvite(db, code, memberLineUserId) {
   return { ok: true, ownerLineUserId: payload.ownerLineUserId };
 }
 
+// ---------- 電腦登入碼（在 LINE 取碼 → 電腦網站輸入即可登入）----------
+// 6 位數字、10 分鐘有效、用一次即失效。存在 app_kv。
+export async function createLoginCode(db, lineUserId) {
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+  await appKvSet(db, `logincode:${code}`, JSON.stringify({ lineUserId, expiresAt }));
+  return code;
+}
+
+export async function redeemLoginCode(db, code) {
+  const clean = String(code || '').trim();
+  if (!/^\d{6}$/.test(clean)) return null;
+  const key = `logincode:${clean}`;
+  const raw = await appKvGet(db, key);
+  if (!raw) return null;
+  let payload;
+  try { payload = JSON.parse(raw); } catch { return null; }
+  if (!payload.lineUserId || String(payload.expiresAt) < nowIso()) return null;
+  await db.prepare('DELETE FROM app_kv WHERE k = ?').bind(key).run(); // 一次性
+  return payload.lineUserId;
+}
+
 // 使用者最近一筆未刪除的紀錄（給「改 54」「剩 20」「刪除」修正上一筆用）
 export async function getLastLogByUser(db, lineUserId) {
   return db
