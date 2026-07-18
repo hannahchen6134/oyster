@@ -414,32 +414,32 @@
     .block.fold.daycards-fold { overflow: visible; background: transparent; border: none; box-shadow: none; padding: 0; margin-top: 18px; }
     .daycards-fold > summary { padding-left: 2px; padding-right: 2px; }
     .daycards-fold .fold-body { padding: 2px 2px 4px; }
-    .daycards { display: flex; flex-direction: column; gap: 0; }
-    /* 給醫生看的日表：表頭在最上（單位只寫一次）＋斑馬紋＋大數字，異常整列淡紅 */
-    .trend-thead, .tr-main { display: grid; grid-template-columns: 62px repeat(4, 1fr); gap: 6px; align-items: baseline; }
-    .trend-thead {
-      position: sticky; top: 0; z-index: 1; background: var(--sheet);
-      padding: 8px 8px 7px; border-bottom: 2px solid var(--line-strong);
-      font-size: 11.5px; font-weight: 700; letter-spacing: .02em;
+    /* 近 N 天給醫生看：CODEX 風格——每天一張卡，四個有標籤的彩色小膠囊＋筆數/腸胃狀態＋查看當天 */
+    .daycards { display: flex; flex-direction: column; gap: 10px; }
+    .dcard {
+      display: flex; align-items: center; gap: 12px; cursor: pointer;
+      background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 13px 15px;
+      transition: box-shadow .15s, border-color .15s;
     }
-    .trend-thead span { text-align: right; color: var(--ink-soft); }
-    .trend-thead .c-date { text-align: left; }
-    .trend-thead .u { display: block; font-size: 9.5px; font-weight: 500; color: var(--muted); margin-top: 1px; }
-    .trend-thead .h-water { color: #206e5e; }
-    .trend-thead .h-kcal { color: #8a5a24; }
-    .trend-row { cursor: pointer; border-bottom: 1px solid var(--line); }
-    .trend-row:nth-child(odd) { background: rgba(120, 108, 84, .05); }  /* 斑馬紋 */
-    .trend-row:active { background: rgba(115, 73, 33, .1); }
-    .trend-row.warn { background: var(--seal-tint); }
-    .trend-row.warn:nth-child(odd) { background: #f6e4dd; }
-    .tr-main { padding: 10px 8px; }
-    .tr-main .c-date { display: flex; flex-direction: column; line-height: 1.12; }
-    .tr-main .c-date b { font-size: 14px; font-weight: 700; color: var(--ink); }
-    .tr-main .c-date i { font-size: 10px; font-style: normal; color: var(--muted); }
-    .tr-main .c-num { text-align: right; font-size: 16px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
-    .tr-main .c-num.zero { color: var(--muted); font-weight: 500; }
-    .tr-note { padding: 0 8px 10px; font-size: 12px; color: var(--muted); }
-    .tr-note .warn-txt { color: var(--seal); font-weight: 700; }
+    .dcard:hover { box-shadow: var(--shadow-soft); border-color: var(--line-strong); }
+    .dcard.warn { background: #fbf2ef; border-color: rgba(191, 59, 32, .22); }
+    .dcard-left { flex: 1; min-width: 0; }
+    .dcard-date { font-size: 15px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; letter-spacing: .01em; }
+    .dcard-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+    .dpill { font-size: 12.5px; padding: 4px 11px; border-radius: 999px; white-space: nowrap; line-height: 1.5; }
+    .dpill b { font-weight: 800; margin: 0 1px; font-variant-numeric: tabular-nums; }
+    .dpill.p-water { background: #e5f2ec; color: #2b7a66; }
+    .dpill.p-wet   { background: #ebf1dd; color: #5c7031; }
+    .dpill.p-dry   { background: #f4ebd4; color: #886722; }
+    .dpill.p-kcal  { background: #ece7f3; color: #5a4a84; }
+    .dcard-sub { font-size: 12px; color: var(--muted); margin-top: 9px; }
+    .dcard-sub .warn-txt { color: var(--seal); font-weight: 700; }
+    .dcard-view {
+      flex: none; align-self: center; white-space: nowrap;
+      background: var(--brand-tint); border: 1px solid rgba(115, 73, 33, .25); border-radius: 999px;
+      padding: 9px 15px; font-size: 13px; font-weight: 600; color: var(--brand); cursor: pointer;
+    }
+    .dcard-view:hover { background: #ede0cb; border-color: var(--brand); }
     /* 精簡圓形按鈕（「查看當天」改用小箭頭，把寬度留給四項數字） */
     .dc-btn {
       flex: 0 0 auto; width: 30px; height: 30px; padding: 0; border-radius: 50%;
@@ -908,7 +908,7 @@
             <p class="muted" style="font-size:12px;margin:8px 0 0">數值可提供醫生參考，高低請以你的醫生判讀為準。輸入與編輯在「設定 → 血檢紀錄」。</p>
           </div>
         </details>
-        <details class="block fold" open>
+        <details class="block fold">
           <summary>
             <span class="fold-title">近 30 天趨勢<span class="fold-count">水分・熱量</span></span>
             <span class="fold-toggle">＋</span>
@@ -2027,32 +2027,25 @@
         list.innerHTML = `<div class="hero-empty" style="border-radius:16px">近 ${state.tableDays} 天還沒有紀錄<span>記一筆吃飯、喝水或用藥就會開始統計。</span></div>`;
         return;
       }
-      const WEEK = '日一二三四五六';
       const f1 = (v) => (Math.round((Number(v) || 0) * 10) / 10).toFixed(1);
-      const num = (v) => { const n = Number(v) || 0; return `<span class="c-num${n === 0 ? ' zero' : ''}">${f1(n)}</span>`; };
-      const head = `<div class="trend-thead">
-        <span class="c-date">日期</span>
-        <span class="h-water">水分<span class="u">ml</span></span>
-        <span class="h-kcal">熱量<span class="u">kcal</span></span>
-        <span>罐頭<span class="u">g</span></span>
-        <span>乾糧<span class="u">g</span></span>
-      </div>`;
-      list.innerHTML = head + rows.map((row) => {
+      list.innerHTML = rows.map((row) => {
         const warn = row.vomitCount || row.medIssueCount;
-        const dow = WEEK[new Date(`${row.date}T00:00:00`).getDay()];
-        const attn = [];
-        if (row.vomitCount) attn.push(`嘔吐 ${row.vomitCount} 次`);
-        if (row.medIssueCount) attn.push(`用藥留意 ${row.medIssueCount}`);
-        const noteBits = [];
-        if (warn) noteBits.push(`<span class="warn-txt">⚠ 需留意（${attn.join('・')}）</span>`);
-        if (Number(row.otherFoodG) > 0) noteBits.push(`其他 ${f1(row.otherFoodG)} g`);
+        const status = warn ? '<span class="warn-txt">需留意</span>' : '穩定';
+        const subBits = [`${row.entryCount} 筆紀錄`, `腸胃狀態：${status}`];
+        if (Number(row.otherFoodG) > 0) subBits.push(`尚有 ${f1(row.otherFoodG)} g 未設定熱量`);
         return `
-        <div class="trend-row ${warn ? 'warn' : ''}" data-day="${esc(row.date)}" role="button" tabindex="0">
-          <div class="tr-main">
-            <span class="c-date"><b>${esc(row.date.slice(5).replace('-', '/'))}</b><i>週${dow}</i></span>
-            ${num(row.totalWaterMl)}${num(row.kcal)}${num(row.wetFoodG)}${num(row.dryFoodG)}
+        <div class="dcard ${warn ? 'warn' : ''}" data-day="${esc(row.date)}" role="button" tabindex="0">
+          <div class="dcard-left">
+            <div class="dcard-date">${esc(row.date)}</div>
+            <div class="dcard-pills">
+              <span class="dpill p-water">總水分 <b>${f1(row.totalWaterMl)}</b> ml</span>
+              <span class="dpill p-wet">總罐頭 <b>${f1(row.wetFoodG)}</b> g</span>
+              <span class="dpill p-dry">乾糧 <b>${f1(row.dryFoodG)}</b> g</span>
+              <span class="dpill p-kcal">熱量約 <b>${f1(row.kcal)}</b> kcal</span>
+            </div>
+            <div class="dcard-sub">${subBits.join(' · ')}</div>
           </div>
-          ${noteBits.length ? `<div class="tr-note">${noteBits.join(' · ')}</div>` : ''}
+          <button class="dcard-view" data-day="${esc(row.date)}" type="button">查看當天</button>
         </div>`;
       }).join('');
     }
@@ -2768,7 +2761,7 @@
         return switchTab('today');
       }
 
-      const dayCardBtn = event.target.closest('.trend-row[data-day]');
+      const dayCardBtn = event.target.closest('.dcard[data-day], .dcard-view[data-day]');
       if (dayCardBtn) {
         state.date = dayCardBtn.dataset.day;
         return switchTab('today');
