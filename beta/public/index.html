@@ -101,8 +101,12 @@
     .muted { color: var(--muted); font-size: 13.5px; }
     .topbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
     .topbar .spacer { flex: 1; }
-    .pet-switch { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
-    .pet-switch-hint { font-size: 10px; color: var(--muted); white-space: nowrap; letter-spacing: .02em; }
+    /* 標題即切換器：隱形 select 蓋在名字上，多貓時顯示小箭頭 */
+    .pet-title { position: relative; display: inline-flex; align-items: baseline; gap: 9px; cursor: pointer; }
+    .pet-title select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; border: none; padding: 0; cursor: pointer; }
+    .pet-caret { font-size: 17px; color: var(--brand); transform: translateY(-3px); }
+    .pet-title.single { cursor: default; }
+    .pet-title.single select { pointer-events: none; }
     .food-kcal-preview { margin-top: 8px; font-size: 13px; font-weight: 600; letter-spacing: .01em; min-height: 1em; }
     .food-kcal-preview:empty { display: none; }
     .food-kcal-preview.ok { color: var(--brand); }
@@ -749,7 +753,6 @@
       /* 寵物切換：釘在標題右上角，不再孤零零卡在標題和分頁中間 */
       .topbar { row-gap: 10px; flex-wrap: nowrap; align-items: flex-start; gap: 10px; }
       .topbar > div:first-child { min-width: 0; }
-      .pet-switch { flex: none; margin-top: 4px; }
       .date-inline { display: block; margin-top: 3px; }
       .date-inline::before { content: none; }
       .tabs { gap: 16px; margin-top: 18px; }
@@ -815,14 +818,15 @@
       <header class="page-head">
         <div class="topbar">
           <div>
-            <h1 id="petTitle">貓貓</h1>
+            <!-- 名字本身就是切換器：多貓時出現小箭頭，點名字換貓（LINE 也記給牠） -->
+            <label class="pet-title" id="petSwitch" title="LINE 紀錄會跟著切換">
+              <h1 id="petTitle">貓貓</h1>
+              <span class="pet-caret hidden" id="petCaret" aria-hidden="true">▾</span>
+              <select id="petSelect" aria-label="切換貓咪，LINE 紀錄會跟著切換" tabindex="-1"></select>
+            </label>
             <div class="page-mode"><span id="pageMode">今天的照護確認</span><span class="date-inline" id="dateLine"></span></div>
           </div>
           <div class="spacer"></div>
-          <div class="pet-switch hidden" id="petSwitch">
-            <select id="petSelect" aria-label="選擇貓咪（LINE 也會記給牠）" style="width:auto;min-width:104px"></select>
-            <span class="pet-switch-hint">切換後・LINE 也記給牠</span>
-          </div>
         </div>
         <div class="tabs">
           <button class="tab active" data-tab="today" type="button">今天</button>
@@ -1147,6 +1151,8 @@
       $('dayPicker').value = state.date;
       const dispDow = '日一二三四五六'[new Date(`${state.date}T00:00:00`).getDay()];
       $('dayPickerLabel').textContent = `${Number(state.date.slice(5, 7))}月${Number(state.date.slice(8, 10))}日（${dispDow}）`;
+      // 「回到今天」只在瀏覽過去日期時出現
+      $('goTodayBtn').classList.toggle('hidden', state.date === todayStr());
       const isToday = state.date === todayStr();
       $('pageMode').textContent = isToday ? '今天的照護確認' : `${Number(state.date.slice(5, 7))}月${Number(state.date.slice(8, 10))}日的照護紀錄`;
       $('confirmTitle').textContent = isToday ? '今日照護確認' : '當日照護確認';
@@ -1174,7 +1180,6 @@
         el.innerHTML = `
           <div class="hero-head">
             <span class="hero-title">${isToday ? '今日累計' : '當日累計'}</span>
-            <span class="hero-date">${dateLabel}</span>
           </div>
           <div class="hero-empty">${isToday ? '今天還沒有紀錄' : '這天沒有紀錄'}<span>記一筆吃飯、喝水或用藥，就會開始統計今日水分與熱量。</span></div>`;
         return;
@@ -1203,7 +1208,6 @@
       el.innerHTML = `
         <div class="hero-head">
           <span class="hero-title">${isToday ? '今日累計' : '當日累計'}</span>
-          <span class="hero-date">${dateLabel}</span>
         </div>
         ${bar('總水分', 'ml', s.totalWaterMl, pet?.goalWaterMl)}
         ${bar('總熱量', 'kcal', s.kcal, pet?.goalKcal)}
@@ -2697,7 +2701,9 @@
           ? state.user.defaultPetId
           : state.pets[0].petId;
       }
-      $('petSwitch').classList.toggle('hidden', state.pets.length <= 1);
+      const singlePet = state.pets.length <= 1;
+      $('petSwitch').classList.toggle('single', singlePet);
+      $('petCaret').classList.toggle('hidden', singlePet);
       $('petSelect').innerHTML = state.pets.map((pet) =>
         `<option value="${esc(pet.petId)}" ${pet.petId === state.petId ? 'selected' : ''}>${esc(pet.petName)}</option>`).join('');
       $('petSelect').classList.toggle('hidden', state.pets.length <= 1);
