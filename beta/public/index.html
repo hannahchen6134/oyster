@@ -427,11 +427,12 @@
     .dcard:hover { background: #faf7f1; }
     .dcard-date { flex: none; width: 35px; font-size: 11px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; line-height: 1.3; }
     .dcard-mid { flex: 1; min-width: 0; overflow: hidden; }
-    /* 四項數字固定一列、字縮小填滿，不換行、不飛出框、不加底板 */
-    .dcard-pills { display: flex; flex-wrap: nowrap; gap: 1px; }
-    .dpill { flex: none; font-size: clamp(6px, 1.58vw, 7px); padding: 3px 3px; border-radius: 999px; white-space: nowrap; line-height: 1.5; }
-    /* 一般手機（≥392px）有較多寬度，數字放大一點更好讀，仍保證同一行不裁切 */
-    @media (min-width: 392px) { .dpill { font-size: clamp(6.6px, 1.86vw, 8.2px); } }
+    /* 四項數字固定一列、字放大填滿，不換行、不飛出框、不加底板；
+       用小圓形＋按鈕取代「查看當天」文字，省下的寬度全留給數字 */
+    .dcard-pills { display: flex; flex-wrap: nowrap; gap: 2px; }
+    /* 窄手機用小字，一般手機（≥392px）放大——兩者都保證四項數字同一行不裁切（已用 999.9 最壞值實測） */
+    .dpill { flex: none; font-size: clamp(6px, 1.75vw, 7px); padding: 3px 4px; border-radius: 999px; white-space: nowrap; line-height: 1.5; }
+    @media (min-width: 392px) { .dpill { font-size: clamp(7px, 1.9vw, 8px); } }
     .dpill b { font-weight: 800; margin: 0 1px; font-variant-numeric: tabular-nums; }
     .dpill.p-water { background: #e5f2ec; color: #2b7a66; }
     .dpill.p-wet   { background: #ebf1dd; color: #5c7031; }
@@ -439,10 +440,13 @@
     .dpill.p-kcal  { background: #ece7f3; color: #5a4a84; }
     .dcard-sub { font-size: 11.5px; color: var(--muted); margin-top: 8px; }
     .dcard-sub .warn-txt { color: var(--seal); font-weight: 700; }
+    /* 小圓形「＋」按鈕：取代原本的「查看當天」文字，把整行寬度留給四項數字 */
     .dcard-view {
-      flex: none; align-self: center; white-space: nowrap;
-      background: var(--brand-tint); border: 1px solid rgba(115, 73, 33, .22); border-radius: 999px;
-      padding: 5px 6px; font-size: 9px; font-weight: 600; color: var(--brand); cursor: pointer;
+      flex: none; align-self: center;
+      width: 30px; height: 30px; padding: 0; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--brand-tint); border: 1px solid rgba(115, 73, 33, .22);
+      font-size: 19px; font-weight: 400; line-height: 1; color: var(--brand); cursor: pointer;
     }
     .dcard-view:hover { background: #ede0cb; border-color: var(--brand); }
     /* 精簡圓形按鈕（「查看當天」改用小箭頭，把寬度留給四項數字） */
@@ -2056,7 +2060,7 @@
             </div>
             <div class="dcard-sub">${subBits.join(' · ')}</div>
           </div>
-          <button class="dcard-view" data-day="${esc(row.date)}" type="button">查看當天</button>
+          <button class="dcard-view" data-day="${esc(row.date)}" type="button" aria-label="查看 ${esc(row.date)} 當天細節">＋</button>
         </div>`;
       }).join('');
     }
