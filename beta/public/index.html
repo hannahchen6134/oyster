@@ -424,14 +424,20 @@
     .dcard:hover { background: #faf7f1; }
     /* 每天一行：日期在左（整齊一行），數值同一列，右邊放特殊情況膠囊；點整列看細節 */
     .dcard-date { flex: none; white-space: nowrap; font-size: 12px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; letter-spacing: .01em; }
-    /* 標籤只留一個字（水/罐/乾）＋無單位，只有 kcal 留單位；一行不換行、不裁切 */
-    .dcard-pills { flex: 1; min-width: 0; display: flex; flex-wrap: nowrap; justify-content: space-between; gap: 4px; overflow: hidden; }
-    .dpill { flex: none; font-size: clamp(7.5px, 2.3vw, 11px); padding: 3px 6px; border-radius: 999px; white-space: nowrap; line-height: 1.5; }
+    /* 固定欄位的 grid：每列的水/罐/乾/kcal 各佔固定欄寬 → 每天的數值上下對齊；
+       最右保留特殊欄（吐/漏藥/疫苗/除蟲），沒有時留空、欄位不跑掉 */
+    .dcard-pills { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.35fr) auto; gap: 4px; align-items: center; }
+    .dpill { min-width: 0; overflow: hidden; text-align: center; font-size: clamp(7.5px, 2.3vw, 11px); padding: 3px 2px; border-radius: 999px; white-space: nowrap; line-height: 1.5; }
     .dpill b { font-weight: 800; margin: 0 1px; font-variant-numeric: tabular-nums; }
-    /* 配色收斂進設計系統：水/罐/乾＝同一紙褐淡底（靠字分辨，安靜不花）；
-       kcal＝唯一重點（較深褐）；特殊狀況＝朱紅一色（不細分） */
-    .dpill.p-water, .dpill.p-wet, .dpill.p-dry { background: var(--brand-tint); color: #6d5335; }
-    .dpill.p-kcal  { background: #e9dcc4; color: var(--brand); }
+    /* 特殊欄：固定寬度、可疊多顆 */
+    .dspecials { width: 34px; display: flex; flex-direction: column; gap: 2px; align-items: stretch; }
+    .dspecials:empty::before { content: ''; display: block; }
+    .dspecials .dpill { padding: 3px 2px; }
+    /* 分色：水＝湖水綠、罐＝草綠、乾＝麥色、kcal＝藕紫；特殊＝朱紅一色 */
+    .dpill.p-water { background: #e5f2ec; color: #2b7a66; }
+    .dpill.p-wet   { background: #ebf1dd; color: #5c7031; }
+    .dpill.p-dry   { background: #f4ebd4; color: #886722; }
+    .dpill.p-kcal  { background: #ece7f3; color: #5a4a84; }
     .dpill.p-warn  { background: var(--seal-tint); color: var(--seal); font-weight: 700; }
     .dcard-sub { font-size: 11.5px; color: var(--muted); margin-top: 8px; }
     .dcard-sub .warn-txt { color: var(--seal); font-weight: 700; }
@@ -2062,7 +2068,7 @@
             <span class="dpill p-wet">罐 <b>${f1(row.wetFoodG)}</b></span>
             <span class="dpill p-dry">乾 <b>${f1(row.dryFoodG)}</b></span>
             <span class="dpill p-kcal"><b>${f1(row.kcal)}</b> kcal</span>
-            ${specials.join('')}
+            <span class="dspecials">${specials.join('')}</span>
           </div>
         </div>`;
       }).join('');
