@@ -571,6 +571,7 @@
       display: flex; align-items: baseline; gap: 4px; flex-wrap: wrap;
     }
     .date-inline { font-size: 13px; font-weight: 500; color: var(--muted); letter-spacing: 0.1em; }
+    .date-inline::before { content: "・"; margin: 0 2px 0 4px; color: var(--line-strong); }
     /* 快速新增(手機大按鈕)：要一眼看得出是按鈕 */
     .quick-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
     .qbtn {
@@ -706,8 +707,13 @@
       .block { padding: 20px 17px; }
       h1 { font-size: 30px; }
       .date-line { margin-top: 6px; }
-      .topbar { row-gap: 14px; }
-      .tabs { gap: 16px; margin-top: 14px; }
+      /* 寵物切換：釘在標題右上角，不再孤零零卡在標題和分頁中間 */
+      .topbar { row-gap: 10px; flex-wrap: nowrap; align-items: flex-start; gap: 10px; }
+      .topbar > div:first-child { min-width: 0; }
+      .pet-switch { flex: none; margin-top: 4px; }
+      .date-inline { display: block; margin-top: 3px; }
+      .date-inline::before { content: none; }
+      .tabs { gap: 16px; margin-top: 18px; }
       .panel { margin-top: 28px; }
       .toolbar { row-gap: 12px; }
       .toolbar .btn-primary { width: 100%; order: 9; margin-top: 4px; }
@@ -2698,7 +2704,7 @@
       // 免責聲明改為只放頁尾（頂部橫幅移除，避免每次一打開就擋在最上面）
       const tpe = todayStr();
       const dow = '日一二三四五六'[new Date(`${tpe}T00:00:00`).getDay()];
-      $('dateLine').textContent = `・${Number(tpe.slice(5, 7))}月${Number(tpe.slice(8, 10))}日（${dow}）`;
+      $('dateLine').textContent = `${Number(tpe.slice(5, 7))}月${Number(tpe.slice(8, 10))}日（${dow}）`;
       // 深連結：go=pet → 直接開「設定 → 貓咪資料」；go=settings → 設定選單
       if (goTarget === 'pet') {
         state.settingsTab = 'pets';
