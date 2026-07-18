@@ -38,6 +38,11 @@ export function summaryBlock(summary) {
   if (summary.stoolCount > 0) gutParts.push(`便便 ${summary.stoolCount}`);
   if (gutParts.length) lines.push(gutParts.join('・'));
 
+  const careParts = [];
+  if (summary.vaccineCount > 0) careParts.push('疫苗');
+  if (summary.dewormCount > 0) careParts.push('除蟲');
+  if (careParts.length) lines.push(`處置 ${careParts.join('・')}`);
+
   if (summary.vomitNotes?.length) lines.push(`嘔吐：${summary.vomitNotes.join('；')}`);
   if (summary.stoolNotes?.length) lines.push(`便便：${summary.stoolNotes.join('；')}`);
   if (summary.moodNotes?.length) lines.push(`精神：${summary.moodNotes.join('；')}`);

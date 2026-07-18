@@ -52,6 +52,8 @@ export function computeDailySummary(logs) {
     stoolCount: 0,
     urineCount: 0,
     supplementCount: 0,
+    vaccineCount: 0,
+    dewormCount: 0,
     entryCount: 0,
     abnormalFlags: [],
     vomitNotes: [],
@@ -117,6 +119,14 @@ export function computeDailySummary(logs) {
         summary.supplementNotes.push(log.note ? `${log.itemName ? log.itemName + ' ' : ''}${log.note}` : (log.itemName || '有紀錄'));
         break;
       }
+      case 'vaccine': {
+        summary.vaccineCount += 1;
+        break;
+      }
+      case 'deworm': {
+        summary.dewormCount += 1;
+        break;
+      }
       case 'mood': {
         if (log.note) summary.moodNotes.push(noteWithTime(log));
         break;
@@ -138,6 +148,9 @@ export function computeDailySummary(logs) {
   if (summary.vomitCount > 0) summary.abnormalFlags.push('vomit');
   if (summary.medIssueCount > 0) summary.abnormalFlags.push('medIssue');
   if (summary.moodNotes.length > 0) summary.abnormalFlags.push('mood');
+  // 照護處置也放進 flags（daily_summary 不用改表就能讓前端顯示膠囊）
+  if (summary.vaccineCount > 0) summary.abnormalFlags.push('vaccine');
+  if (summary.dewormCount > 0) summary.abnormalFlags.push('deworm');
 
   return summary;
 }

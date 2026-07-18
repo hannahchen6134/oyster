@@ -83,7 +83,6 @@
       white-space: nowrap;
     }
     .colophon::before, .colophon::after { content: ''; flex: 1; height: 1px; background: var(--line); }
-    .colophon .paw { width: 17px; height: 15px; flex: none; }
     .login-cat { width: 132px; margin: 0 auto 10px; display: block; opacity: 0.92; }
 
     h1 {
@@ -250,11 +249,9 @@
     }
     .block .section-head { margin-top: 0; margin-bottom: 10px; }
     .block .empty { background: none; border: none; padding: 18px 8px; }
-    /* 類別色：低飽和的莫蘭迪色分類 */
-    .chip-water { background: #eef1e1; color: #5d6c36; border-color: #dae0c3; }
-    .chip-dry { background: #f5f1e3; color: #7a662f; border-color: #e3d9bd; }
-    .chip-wet { background: #f7efe4; color: #8a5e35; border-color: #e8d7c0; }
-    .chip-kcal { background: #f8f2e5; color: #91702f; border-color: #ecdfc0; }
+    /* 類別 chips：收斂為系統色——一般＝紙褐淡底，kcal＝深一階（唯一重點），用藥＝描邊強調 */
+    .chip-water, .chip-dry, .chip-wet { background: var(--brand-tint); color: #6d5335; border-color: rgba(115, 73, 33, 0.18); }
+    .chip-kcal { background: #e9dcc4; color: var(--brand); border-color: rgba(115, 73, 33, 0.25); }
     .chip-med { background: var(--brand-tint); color: var(--brand); border-color: rgba(115, 73, 33, 0.35); }
     .chip-neutral { background: var(--sheet-soft); color: var(--ink-soft); border-color: var(--line-strong); }
     .empty {
@@ -268,7 +265,6 @@
       background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 54' fill='none' stroke='%23734921' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 17 L11 5 L22 11'/%3E%3Cpath d='M49 17 L53 5 L42 11'/%3E%3Cellipse cx='32' cy='31' rx='21' ry='18'/%3E%3Ccircle cx='25' cy='29' r='1.6' fill='%23734921' stroke='none'/%3E%3Ccircle cx='39' cy='29' r='1.6' fill='%23734921' stroke='none'/%3E%3Cpath d='M28 35 q2 3 4 0 M32 35 q2 3 4 0'/%3E%3Cpath d='M4 27 l7 1 M4 34 l7 -1 M60 27 l-7 1 M60 34 l-7 -1'/%3E%3C/svg%3E");
     }
     /* 標題旁的小肉球（線條版） */
-    .head-paw { width: 24px; height: 21px; flex: none; opacity: 0.8; }
     .doctor-note {
       margin-top: 20px; padding: 16px 20px;
       border: 1px solid rgba(115, 73, 33, 0.14); border-left: 3px solid var(--brand);
@@ -368,8 +364,8 @@
       font-size: 11.5px; font-weight: 600; line-height: 1.3;
       font-variant-numeric: tabular-nums; letter-spacing: 0.02em;
     }
-    .cal-num.water { color: #55652f; }
-    .cal-num.kcal { color: #9c5f28; }
+    .cal-num.water { color: #6d5335; }
+    .cal-num.kcal { color: var(--brand); }
     /* 事件標記：質感小色點取代 emoji */
     .cal-dots { display: flex; gap: 4px; margin-top: 5px; align-items: center; min-height: 6px; }
     .cdot { width: 6px; height: 6px; border-radius: 50%; flex: none; }
@@ -432,12 +428,11 @@
     .dcard-pills { flex: 1; min-width: 0; display: flex; flex-wrap: nowrap; justify-content: space-between; gap: 4px; overflow: hidden; }
     .dpill { flex: none; font-size: clamp(7.5px, 2.3vw, 11px); padding: 3px 6px; border-radius: 999px; white-space: nowrap; line-height: 1.5; }
     .dpill b { font-weight: 800; margin: 0 1px; font-variant-numeric: tabular-nums; }
-    .dpill.p-water { background: #e5f2ec; color: #2b7a66; }
-    .dpill.p-wet   { background: #ebf1dd; color: #5c7031; }
-    .dpill.p-dry   { background: #f4ebd4; color: #886722; }
-    .dpill.p-kcal  { background: #ece7f3; color: #5a4a84; }
-    /* 特殊情況（嘔吐→吐、漏藥）：紅色系膠囊，放在最右邊提醒 */
-    .dpill.p-warn  { background: #fbe4dd; color: #bf3b20; font-weight: 700; }
+    /* 配色收斂進設計系統：水/罐/乾＝同一紙褐淡底（靠字分辨，安靜不花）；
+       kcal＝唯一重點（較深褐）；特殊狀況＝朱紅一色（不細分） */
+    .dpill.p-water, .dpill.p-wet, .dpill.p-dry { background: var(--brand-tint); color: #6d5335; }
+    .dpill.p-kcal  { background: #e9dcc4; color: var(--brand); }
+    .dpill.p-warn  { background: var(--seal-tint); color: var(--seal); font-weight: 700; }
     .dcard-sub { font-size: 11.5px; color: var(--muted); margin-top: 8px; }
     .dcard-sub .warn-txt { color: var(--seal); font-weight: 700; }
     /* 小圓形「＋」按鈕：取代原本的「查看當天」文字，把整行寬度留給四項數字 */
@@ -590,6 +585,14 @@
     .qbtn .q-plus { color: #E7C79A; font-weight: 500; font-size: 16px; }
     .qbtn:hover { filter: brightness(1.06); box-shadow: 0 1px 1px rgba(60, 40, 20, 0.10), 0 8px 22px rgba(122, 76, 34, 0.20); }
     .qbtn:active { transform: translateY(1px); filter: brightness(0.96); box-shadow: 0 1px 2px rgba(27, 29, 26, 0.10); }
+    /* 層級：主要三顆（吃飯/喝水/用藥）實心；其餘描邊淺底，畫面輕、動線清楚 */
+    .qbtn.qbtn-sub {
+      background: var(--sheet); color: var(--brand);
+      border: 1px solid rgba(115, 73, 33, 0.30);
+      box-shadow: 0 1px 2px rgba(58, 42, 24, 0.05);
+    }
+    .qbtn.qbtn-sub .q-plus { color: rgba(115, 73, 33, 0.55); }
+    .qbtn.qbtn-sub:hover { background: var(--brand-tint); filter: none; border-color: var(--brand); box-shadow: 0 2px 8px rgba(115, 73, 33, 0.12); }
     /* 今日累計 hero：一打開先看到的重點（水分/熱量對照目標） */
     .today-hero { padding-top: 22px; padding-bottom: 22px; }
     .hero-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 18px; }
@@ -805,17 +808,16 @@
         <div class="block">
           <div class="section-head">
             <h2>快速記一筆</h2>
-            <svg class="head-paw" viewBox="0 0 24 21" fill="none" stroke="var(--brand)" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><ellipse cx="12" cy="14.5" rx="5" ry="4"/><circle cx="5.2" cy="8.6" r="2.1"/><circle cx="12" cy="6.4" r="2.1"/><circle cx="18.8" cy="8.6" r="2.1"/></svg>
           </div>
           <div class="quick-grid">
             <button class="qbtn" data-quick="food" type="button"><span class="q-plus">＋</span>吃飯</button>
             <button class="qbtn" data-quick="water" type="button"><span class="q-plus">＋</span>喝水</button>
             <button class="qbtn" data-quick="med" type="button"><span class="q-plus">＋</span>用藥</button>
-            <button class="qbtn" data-quick="vomit" type="button"><span class="q-plus">＋</span>嘔吐</button>
-            <button class="qbtn" data-quick="stool" type="button"><span class="q-plus">＋</span>大小便</button>
-            <button class="qbtn" data-quick="mood" type="button"><span class="q-plus">＋</span>精神</button>
-            <button class="qbtn" data-quick="supplement" type="button"><span class="q-plus">＋</span>營養補充</button>
-            <button class="qbtn" data-quick="note" type="button"><span class="q-plus">＋</span>備註</button>
+            <button class="qbtn qbtn-sub" data-quick="vomit" type="button"><span class="q-plus">＋</span>嘔吐</button>
+            <button class="qbtn qbtn-sub" data-quick="stool" type="button"><span class="q-plus">＋</span>大小便</button>
+            <button class="qbtn qbtn-sub" data-quick="mood" type="button"><span class="q-plus">＋</span>精神</button>
+            <button class="qbtn qbtn-sub" data-quick="supplement" type="button"><span class="q-plus">＋</span>營養補充</button>
+            <button class="qbtn qbtn-sub" data-quick="note" type="button"><span class="q-plus">＋</span>備註</button>
           </div>
           <div class="day-toolbar">
             <div class="date-nav">
@@ -964,7 +966,7 @@
         </div>
       </section>
 
-      <footer class="colophon"><svg class="paw" viewBox="0 0 18 16" aria-hidden="true"><ellipse cx="9" cy="11" rx="4.2" ry="3.4" fill="var(--brand)" opacity="0.75"/><circle cx="3.4" cy="6.4" r="1.9" fill="var(--brand)" opacity="0.55"/><circle cx="9" cy="4.6" r="1.9" fill="var(--brand)" opacity="0.55"/><circle cx="14.6" cy="6.4" r="1.9" fill="var(--brand)" opacity="0.55"/></svg>讓每一次紀錄，都是對貓貓的守護</footer>
+      <footer class="colophon">讓每一次紀錄，都是對貓貓的守護</footer>
       <p class="disclaimer">喵喵照護安心管家目前為 Beta 測試版，主要用途是協助飼主紀錄日常照護資料，方便回顧、交接與回診時參考。所有數字為飼主自行記錄，可能因輸入而有誤，提供給獸醫師前請自行核對。本工具不提供醫療診斷、治療建議或緊急判斷。如貓咪出現明顯不適，請直接聯繫獸醫。<br>你的照護資料只用於本服務的紀錄與摘要功能，請勿將專屬照護站連結轉傳給不相關的人。</p>
     </div>
   </div>
@@ -1092,7 +1094,8 @@
     // ---------- 今日明細 ----------
     const CATEGORY_LABEL = {
       water: '喝水', food: '食物', med: '藥物',
-      vomit: '嘔吐', stool: '大便', urine: '尿尿', supplement: '營養補充', mood: '精神', note: '備註'
+      vomit: '嘔吐', stool: '大便', urine: '尿尿', supplement: '營養補充', mood: '精神', note: '備註',
+      vaccine: '疫苗', deworm: '除蟲'
     };
 
     const MED_LABEL = (status) => status === '漏餵' ? '未餵' : status;
@@ -2047,6 +2050,10 @@
         const specials = [];
         if (Number(row.vomitCount) > 0) specials.push(`<span class="dpill p-warn">吐${Number(row.vomitCount) > 1 ? ' ' + row.vomitCount : ''}</span>`);
         if (Number(row.medIssueCount) > 0) specials.push(`<span class="dpill p-warn">漏藥</span>`);
+        let dayFlags = [];
+        try { dayFlags = JSON.parse(row.abnormalFlags || '[]'); } catch (e) { dayFlags = []; }
+        if (dayFlags.includes('vaccine')) specials.push('<span class="dpill p-warn">疫苗</span>');
+        if (dayFlags.includes('deworm')) specials.push('<span class="dpill p-warn">除蟲</span>');
         return `
         <div class="dcard" data-day="${esc(row.date)}" role="button" tabindex="0">
           <div class="dcard-date">${esc(row.date.slice(5).replace('-', '/'))}</div>

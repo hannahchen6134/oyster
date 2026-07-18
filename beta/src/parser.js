@@ -29,6 +29,9 @@ const SUPPLEMENT_WORDS = new Set(['營養補充', '保健品', '保健', '補充
 // 只有「通用類別詞」才用來切段；像「益生菌」是品名，不該把它從前面的營養補充切開
 const SUPPLEMENT_HEAD_WORDS = new Set(['營養補充', '保健品', '保健', '補充']);
 const MOOD_WORDS = new Set(['精神']);
+// 照護處置：疫苗、除蟲（醫生回顧時要看得到的大事）
+const VACCINE_WORDS = new Set(['疫苗', '打疫苗', '預防針', '打了疫苗']);
+const DEWORM_WORDS = new Set(['除蟲', '驅蟲', '除蚤', '驅蟲藥', '除蟲藥']);
 const MOOD_DETAIL_WORDS = new Set(['沒精神', '精神差', '活力差', '懶懶的', '沒活力']);
 // 句首的動詞雜訊：吃了罐頭30g、餵了乾糧4g
 const LEAD_VERBS = new Set(['吃了', '餵了', '吃', '餵', '吃掉', '餵食', '有吃', '有餵']);
@@ -429,6 +432,18 @@ function parseSegment(tokens, dayOffset, time) {
     record.category = 'mood';
     const detail = MOOD_DETAIL_WORDS.has(head) ? [head, ...rest] : rest;
     record.note = detail.join(' ');
+    return { type: 'record', record };
+  }
+
+  // 疫苗 / 除蟲（照護處置，可帶備註：例如「疫苗 三合一」）
+  if (VACCINE_WORDS.has(head)) {
+    record.category = 'vaccine';
+    record.note = rest.join(' ');
+    return { type: 'record', record };
+  }
+  if (DEWORM_WORDS.has(head)) {
+    record.category = 'deworm';
+    record.note = rest.join(' ');
     return { type: 'record', record };
   }
 
