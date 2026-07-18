@@ -417,7 +417,7 @@
     /* 近 N 天給醫生看：CODEX 風格——每天一張卡，四個有標籤的彩色小膠囊＋筆數/腸胃狀態＋查看當天 */
     /* 一個白底圓角面板，每天一列，用細分隔線隔開（不是各自的卡片底板）
        這段表格資訊密，往兩側撐滿版面（抵銷外層 18px + fold 2px padding），把寬度留給四項數字 */
-    .daycards { display: flex; flex-direction: column; background: #fff; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; margin: 0 -20px; }
+    .daycards { display: flex; flex-direction: column; background: #fff; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; margin: 0 -22px; }
     .dcard {
       display: flex; align-items: center; gap: 6px; cursor: pointer;
       padding: 12px 8px; border-top: 1px solid var(--line);
@@ -425,11 +425,11 @@
     }
     .dcard:first-child { border-top: none; }
     .dcard:hover { background: #faf7f1; }
-    .dcard-date { flex: none; width: 40px; font-size: 11.5px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; line-height: 1.3; }
+    .dcard-date { flex: none; width: 38px; font-size: 11px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; line-height: 1.3; }
     .dcard-mid { flex: 1; min-width: 0; overflow: hidden; }
     /* 四項數字固定一列、字縮小填滿，不換行、不飛出框、不加底板 */
-    .dcard-pills { display: flex; flex-wrap: nowrap; gap: 2px; }
-    .dpill { flex: none; font-size: clamp(6.5px, 1.68vw, 8px); padding: 3px 4px; border-radius: 999px; white-space: nowrap; line-height: 1.5; }
+    .dcard-pills { display: flex; flex-wrap: nowrap; gap: 1px; }
+    .dpill { flex: none; font-size: clamp(6.5px, 1.68vw, 8px); padding: 3px 3px; border-radius: 999px; white-space: nowrap; line-height: 1.5; }
     .dpill b { font-weight: 800; margin: 0 1px; font-variant-numeric: tabular-nums; }
     .dpill.p-water { background: #e5f2ec; color: #2b7a66; }
     .dpill.p-wet   { background: #ebf1dd; color: #5c7031; }
@@ -440,7 +440,7 @@
     .dcard-view {
       flex: none; align-self: center; white-space: nowrap;
       background: var(--brand-tint); border: 1px solid rgba(115, 73, 33, .22); border-radius: 999px;
-      padding: 5px 7px; font-size: 10px; font-weight: 600; color: var(--brand); cursor: pointer;
+      padding: 5px 6px; font-size: 9.5px; font-weight: 600; color: var(--brand); cursor: pointer;
     }
     .dcard-view:hover { background: #ede0cb; border-color: var(--brand); }
     /* 精簡圓形按鈕（「查看當天」改用小箭頭，把寬度留給四項數字） */
@@ -698,8 +698,8 @@
       .day-toolbar .link-btn { font-size: 12.5px; padding: 5px 12px; }
 
       /* 手機：留白加大、區塊間距拉開，讓每一段都能呼吸 */
-      .shell { width: calc(100% - 30px); padding-top: 14px; }
-      #appView { padding: 30px 18px 44px; border-radius: 0 0 14px 14px; }
+      .shell { width: calc(100% - 40px); padding-top: 16px; }
+      #appView { padding: 30px 22px 44px; border-radius: 0 0 14px 14px; }
       #appView::after { border-radius: 0; }
       .block { padding: 20px 17px; }
       h1 { font-size: 30px; }
