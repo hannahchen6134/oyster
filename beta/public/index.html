@@ -2294,28 +2294,39 @@
       }
       let settings = {};
       try { settings = JSON.parse(pet.reminderJson || '{}'); } catch (error) { /* ignore */ }
+      let curHour = Number(state.user && state.user.reminderHour);
+      if (!Number.isInteger(curHour) || curHour < 0 || curHour > 23) curHour = 21;
+      const hourOpts = Array.from({ length: 18 }, (_, i) => i + 6) // 6:00–23:00
+        .map((h) => `<option value="${h}" ${h === curHour ? 'selected' : ''}>${String(h).padStart(2, '0')}:00</option>`).join('');
+      const hourLabel = `${String(curHour).padStart(2, '0')}:00`;
       container.innerHTML = `
         <div class="block" style="margin-top:0">
+          <div class="field" style="margin-bottom:0">
+            <label>每日總結・提醒發送時間</label>
+            <select id="reminderHourSel">${hourOpts}</select>
+          </div>
+          <div class="muted" style="font-size:12.5px;margin-top:8px">每天這個時間傳一次；有共同照護者時，這份每日總結也會一起發給大家。</div>
+        </div>
+        <div class="set-group-title">想被提醒的狀況</div>
+        <div class="block set-card" style="margin-top:0">
           ${REMINDER_ITEMS.map((item) => `
-            <label style="display:flex;align-items:flex-start;gap:10px;padding:10px 2px;border-bottom:1px solid var(--line);cursor:pointer;letter-spacing:0">
+            <label style="display:flex;align-items:flex-start;gap:10px;padding:11px 2px;border-bottom:1px solid var(--line);cursor:pointer;letter-spacing:0">
               <input type="checkbox" name="reminderItem" value="${item.key}" style="width:auto;margin-top:4px" ${settings[item.key] ? 'checked' : ''}>
               <span><b style="font-size:14px">${item.label}</b><br>
               <span class="muted" style="font-size:12.5px">${item.desc}</span></span>
             </label>`).join('')}
-          <div class="muted" style="font-size:12.5px;margin-top:10px">每晚 21:00 檢查一次，有需要才會傳 LINE 給你；一切正常就不打擾。</div>
-          <div style="display:flex;justify-content:flex-end;margin-top:10px">
-            <button class="btn btn-primary btn-sm" id="reminderSaveBtn" type="button">儲存提醒設定</button>
-          </div>
-        </div>`;
+          <div class="muted" style="font-size:12.5px;margin-top:10px">${hourLabel} 檢查一次，有需要才會傳 LINE 給你；一切正常就不打擾。</div>
+        </div>
+        <button class="btn btn-primary" id="reminderSaveBtn" type="button" style="width:100%;margin-top:14px">儲存</button>`;
       $('reminderSaveBtn').addEventListener('click', async () => {
         const next = {};
         document.querySelectorAll('[name="reminderItem"]').forEach((el) => { next[el.value] = el.checked; });
+        const hour = Number($('reminderHourSel').value);
         try {
-          await api(`pets/${pet.petId}`, {
-            method: 'PUT',
-            body: JSON.stringify({ reminderJson: JSON.stringify(next) })
-          });
-          toast('已儲存，每晚 21:00 會幫你把關');
+          await api(`pets/${pet.petId}`, { method: 'PUT', body: JSON.stringify({ reminderJson: JSON.stringify(next) }) });
+          await api('me', { method: 'PUT', body: JSON.stringify({ reminderHour: hour }) });
+          if (state.user) state.user.reminderHour = hour;
+          toast(`已儲存，每天 ${String(hour).padStart(2, '0')}:00 會幫你把關`);
           await refreshPets();
         } catch (error) {
           toast(error.message, true);
