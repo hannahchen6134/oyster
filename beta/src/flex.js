@@ -49,10 +49,9 @@ function text(content, options = {}) {
 function header(title) {
   return {
     type: 'box', layout: 'horizontal', background: HEADER_BG,
-    paddingAll: '15px', paddingStart: '20px', paddingEnd: '16px',
+    paddingAll: '15px', paddingStart: '20px', paddingEnd: '20px',
     contents: [
-      text(title, { color: '#FFFFFF', weight: 'bold', size: 'sm', flex: 1 }),
-      text('喵喵照護', { color: '#D9C3A8', size: 'xxs', align: 'end', gravity: 'center', flex: 0 })
+      text(title, { color: '#FFFFFF', weight: 'bold', size: 'sm', flex: 1 })
     ]
   };
 }
@@ -76,20 +75,26 @@ function statRow(label, value) {
   };
 }
 
-// 迷你數據卡：一排 2–3 格（同 menuCell 質感）
-function statCell(label, value, unit) {
+// 迷你數據卡：一排 2–3 格；accent＝類別色（數字上色＋頂端色條），讓三格一眼分得出來
+function statCell(label, value, unit, accent) {
+  const contents = [
+    text(label, { size: 'xxs', color: C.muted, align: 'center' }),
+    text(value, { size: 'lg', weight: 'bold', color: accent || '#3F2B18', align: 'center', margin: 'xs' }),
+    text(unit, { size: 'xxs', color: C.muted, align: 'center' })
+  ];
+  if (accent) {
+    contents.unshift({ type: 'box', layout: 'vertical', height: '3px', width: '22px', backgroundColor: accent, cornerRadius: '999px', contents: [{ type: 'filler' }] });
+  }
   return {
-    type: 'box', layout: 'vertical', flex: 1,
-    backgroundColor: '#FBF8F1', cornerRadius: '12px',
-    borderColor: '#E9E0CE', borderWidth: '1px',
-    paddingTop: '10px', paddingBottom: '10px', paddingStart: '4px', paddingEnd: '4px',
-    contents: [
-      text(label, { size: 'xxs', color: C.muted, align: 'center' }),
-      text(value, { size: 'lg', weight: 'bold', color: '#3F2B18', align: 'center', margin: 'xs' }),
-      text(unit, { size: 'xxs', color: C.muted, align: 'center' })
-    ]
+    type: 'box', layout: 'vertical', flex: 1, alignItems: 'center',
+    backgroundColor: '#FFFFFF', cornerRadius: '12px',
+    borderColor: '#EBE3D4', borderWidth: '1px',
+    paddingTop: '9px', paddingBottom: '10px', paddingStart: '4px', paddingEnd: '4px', spacing: 'xs',
+    contents
   };
 }
+// 類別色（水＝藍綠、食物＝琥珀、熱量＝棕），與網站一致
+const STAT_ACCENT = { water: '#2F8A86', food: '#B9772E', kcal: '#8A5A2C' };
 
 function statCellRow(cells) {
   return { type: 'box', layout: 'horizontal', spacing: 'md', margin: 'md', contents: cells };
@@ -130,8 +135,8 @@ function parseGoalSlots(pet) {
   }
 }
 
-// 目標區（有設定才出現）：進度條 + 藥時段 + 鼓勵語
-function goalContents(pet, summary, date) {
+// 目標區（有設定才出現）：進度條 + 藥時段 +（可選）鼓勵語
+function goalContents(pet, summary, date, showEncourage = true) {
   const goalWater = Number(pet?.goalWaterMl) || 0;
   const goalKcal = Number(pet?.goalKcal) || 0;
   const slots = parseGoalSlots(pet);
@@ -148,11 +153,13 @@ function goalContents(pet, summary, date) {
     const parts = slots.map((slot) => `${slot} ${doneSlots.has(slot) ? '✓' : '—'}`).join('　');
     contents.push(statRow('藥', parts));
   }
-  // 取文字版目標區的最後一行（鼓勵語）
-  const section = goalSection(pet, summary, date);
-  const lastLine = section.split('\n').filter(Boolean).pop() || '';
-  if (lastLine && !lastLine.startsWith('──')) {
-    contents.push(text(lastLine, { size: 'xs', color: C.inkSoft, wrap: true, margin: 'md' }));
+  // 鼓勵語只在今日卡出現，記錄卡不重複（showEncourage=false）
+  if (showEncourage) {
+    const section = goalSection(pet, summary, date);
+    const lastLine = section.split('\n').filter(Boolean).pop() || '';
+    if (lastLine && !lastLine.startsWith('──')) {
+      contents.push(text(lastLine, { size: 'xs', color: C.inkSoft, wrap: true, margin: 'md' }));
+    }
   }
   return contents;
 }
@@ -173,11 +180,11 @@ export function recordFlex({ pet, categoryKey, mainText, subText, summary, date,
       { type: 'separator', margin: 'lg', color: '#F0EADF' },
       text('今日累積', { size: 'xs', color: C.muted, margin: 'lg', weight: 'bold' }),
       statCellRow([
-        statCell('水分', fmt(summary.totalWaterMl), 'ml'),
-        statCell('食物', fmt((Number(summary.dryFoodG) || 0) + (Number(summary.wetFoodG) || 0) + (Number(summary.otherFoodG) || 0)), 'g'),
-        statCell('熱量', fmt(summary.kcal), 'kcal')
+        statCell('水分', fmt(summary.totalWaterMl), 'ml', STAT_ACCENT.water),
+        statCell('食物', fmt((Number(summary.dryFoodG) || 0) + (Number(summary.wetFoodG) || 0) + (Number(summary.otherFoodG) || 0)), 'g', STAT_ACCENT.food),
+        statCell('熱量', fmt(summary.kcal), 'kcal', STAT_ACCENT.kcal)
       ]),
-      ...goalContents(pet, summary, date),
+      ...goalContents(pet, summary, date, false),
       ...hints.filter(Boolean).map((hint) =>
         text(`※ ${hint.replace(/\n/g, '')}`, { size: 'xs', color: C.muted, wrap: true, margin: 'md' })),
       ...(tip ? [text(tip, { size: 'xxs', color: C.muted, wrap: true, margin: 'lg' })] : [])
@@ -207,9 +214,9 @@ export function multiRecordFlex(pet, lines, summary, date) {
       { type: 'separator', margin: 'lg', color: '#F0EADF' },
       text('今日累積', { size: 'xs', color: C.muted, margin: 'lg', weight: 'bold' }),
       statCellRow([
-        statCell('水分', fmt(summary.totalWaterMl), 'ml'),
-        statCell('食物', fmt(foodG), 'g'),
-        statCell('熱量', fmt(summary.kcal), 'kcal')
+        statCell('水分', fmt(summary.totalWaterMl), 'ml', STAT_ACCENT.water),
+        statCell('食物', fmt(foodG), 'g', STAT_ACCENT.food),
+        statCell('熱量', fmt(summary.kcal), 'kcal', STAT_ACCENT.kcal)
       ]),
       ...goalContents(pet, summary, date)
     ]
@@ -240,9 +247,9 @@ export function todayFlex({ pet, date, summary, dateLabel }) {
     contents: [
       text(`共 ${summary.entryCount} 筆紀錄`, { size: 'xs', color: C.muted, align: 'center' }),
       statCellRow([
-        statCell('水分', fmt(summary.totalWaterMl), 'ml'),
-        statCell('食物', fmt(totalFood), 'g'),
-        statCell('熱量', fmt(summary.kcal), 'kcal')
+        statCell('水分', fmt(summary.totalWaterMl), 'ml', STAT_ACCENT.water),
+        statCell('食物', fmt(totalFood), 'g', STAT_ACCENT.food),
+        statCell('熱量', fmt(summary.kcal), 'kcal', STAT_ACCENT.kcal)
       ]),
       statRow('藥', medValue),
       ...(gutParts.length ? [statRow('腸胃', gutParts.join('・'))] : []),
@@ -667,8 +674,8 @@ export function weekFlex(petName, rows) {
       ...dayRows,
       { type: 'separator', margin: 'xl', color: '#F0EADF' },
       statCellRow([
-        statCell('日均水分', fmt(avg((row) => row.totalWaterMl)), 'ml'),
-        statCell('日均熱量', fmt(avg((row) => row.kcal)), 'kcal')
+        statCell('日均水分', fmt(avg((row) => row.totalWaterMl)), 'ml', STAT_ACCENT.water),
+        statCell('日均熱量', fmt(avg((row) => row.kcal)), 'kcal', STAT_ACCENT.kcal)
       ])
     ]
   };
