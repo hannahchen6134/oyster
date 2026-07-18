@@ -19,8 +19,8 @@
       --sheet: #fdfdfb;          /* 紙面 */
       --sheet-soft: #f7f4ec;
       --ink: #1b1d1a;
-      --ink-soft: #4c5049;
-      --muted: #878b80;
+      --ink-soft: #43473f;
+      --muted: #6b6e63;
       --line: #e2e0d6;           /* 規線 */
       --line-strong: #b8bbac;
       --brand: #734921;          /* 松綠：結構與行動 */
@@ -575,20 +575,27 @@
     /* 快速新增(手機大按鈕)：要一眼看得出是按鈕 */
     .quick-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
     .qbtn {
-      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-      min-height: 54px; padding: 0 8px; border: 1px solid rgba(74, 48, 22, 0.28); border-radius: 15px;
-      background: linear-gradient(180deg, #855A34 0%, #6E4A28 100%);
-      color: #F6EDDF; font-weight: 600; font-size: 15px; letter-spacing: 0.02em;
+      --cat: var(--brand);
+      display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+      min-height: 52px; padding: 0 8px;
+      border: 1px solid var(--line); border-left: 3px solid var(--cat); border-radius: 13px;
+      background: #fff;
+      color: var(--ink); font-weight: 600; font-size: 15px; letter-spacing: 0.02em;
       white-space: nowrap;
-      box-shadow: 0 1px 1px rgba(60, 40, 20, 0.10), 0 6px 18px rgba(122, 76, 34, 0.13);
-      cursor: pointer; transition: filter .16s, box-shadow .16s, transform .06s;
+      box-shadow: 0 1px 2px rgba(60, 40, 20, 0.05);
+      cursor: pointer; transition: box-shadow .16s, transform .06s, border-color .16s;
     }
-    .qbtn .q-plus { color: #E7C79A; font-weight: 500; font-size: 16px; }
-    .qbtn:hover {
-      filter: brightness(1.06);
-      box-shadow: 0 1px 1px rgba(60, 40, 20, 0.10), 0 8px 22px rgba(122, 76, 34, 0.20);
-    }
-    .qbtn:active { transform: translateY(1px); filter: brightness(0.96); box-shadow: 0 1px 2px rgba(27, 29, 26, 0.10); }
+    .qbtn .q-plus { color: var(--cat); font-weight: 800; font-size: 17px; }
+    .qbtn[data-quick="food"]       { --cat: #B9772E; }
+    .qbtn[data-quick="water"]      { --cat: #2F8A86; }
+    .qbtn[data-quick="med"]        { --cat: #734921; }
+    .qbtn[data-quick="vomit"]      { --cat: #BF3B20; }
+    .qbtn[data-quick="stool"]      { --cat: #5D6C36; }
+    .qbtn[data-quick="mood"]       { --cat: #7A6A3A; }
+    .qbtn[data-quick="supplement"] { --cat: #C08A2E; }
+    .qbtn[data-quick="note"]       { --cat: #8A8579; }
+    .qbtn:hover { box-shadow: 0 3px 10px rgba(60, 40, 20, 0.10); border-color: var(--cat); }
+    .qbtn:active { transform: translateY(1px); box-shadow: 0 1px 2px rgba(27, 29, 26, 0.10); }
     /* 今日累計 hero：一打開先看到的重點（水分/熱量對照目標） */
     .today-hero { padding-top: 22px; padding-bottom: 22px; }
     .hero-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 18px; }
@@ -596,9 +603,9 @@
     .hero-date { font-size: 12.5px; color: var(--muted); }
     .pg + .pg { margin-top: 20px; }
     .pg-top { display: flex; align-items: baseline; justify-content: space-between; }
-    .pg-name { font-size: 14.5px; font-weight: 700; color: var(--ink-soft); letter-spacing: .04em; }
+    .pg-name { font-size: 15px; font-weight: 700; color: var(--ink); letter-spacing: .04em; }
     .pg-num { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
-    .pg-num b { font-family: var(--serif); font-size: 24px; font-weight: 700; color: var(--brand); margin-right: 3px; }
+    .pg-num b { font-family: var(--serif); font-size: 32px; font-weight: 700; color: var(--ink); margin-right: 4px; line-height: 1; }
     .pg-track { height: 12px; background: #ECE3D2; border-radius: 999px; margin: 9px 0 6px; overflow: hidden; }
     .pg-track i { display: block; height: 100%; border-radius: 999px;
       background: linear-gradient(90deg, #8A5A2C, #6F4824); transition: width .5s cubic-bezier(.4,0,.2,1); }
@@ -1130,7 +1137,6 @@
         if (!goal) {
           return `<div class="pg">
             <div class="pg-top"><span class="pg-name">${name}</span><span class="pg-num"><b>${val}</b>${unit}</span></div>
-            <div class="pg-hint">尚未設定每日目標 · <a data-goto-goal="1">去設定</a></div>
           </div>`;
         }
         const pct = Math.max(0, Math.min(100, Math.round((val / goal) * 100)));
@@ -1151,7 +1157,8 @@
           <span class="hero-date">${dateLabel}</span>
         </div>
         ${bar('總水分', 'ml', s.totalWaterMl, pet?.goalWaterMl)}
-        ${bar('總熱量', 'kcal', s.kcal, pet?.goalKcal)}`;
+        ${bar('總熱量', 'kcal', s.kcal, pet?.goalKcal)}
+        ${(!Number(pet?.goalWaterMl) && !Number(pet?.goalKcal)) ? '<div class="pg-hint" style="margin-top:12px">設定每日目標，就能看到「還差多少」 · <a data-goto-goal="1">去設定</a></div>' : ''}`;
     }
 
     // 每筆紀錄的主要內容(交接卡/最近一筆共用)
