@@ -297,10 +297,7 @@
     }
     .fold .fold-sub { font-family: "Noto Sans TC", sans-serif; font-size: 11.5px; font-weight: 500; color: var(--muted); letter-spacing: 0; line-height: 1.4; }
     .fold .fold-count { margin-left: 9px; color: var(--muted); font-size: 12.5px; font-weight: 500; font-family: "Noto Sans TC", sans-serif; letter-spacing: 0; }
-    /* 三個折疊區用不同左色條區隔：今日確認＝棕、每一筆＝藍綠、最近＝琥珀 */
-    .fold.sec-confirm summary::before { background: linear-gradient(180deg, #8a5a2c, #734921); }
-    .fold.sec-logs summary::before { background: linear-gradient(180deg, #3a9a8f, #2F8A86); }
-    .fold.sec-recent summary::before { background: linear-gradient(180deg, #c99247, #B0702A); }
+    /* 三個折疊區改用「說明副標」區隔，左色條維持統一棕色，避免顏色太花 */
     .fold .fold-toggle {
       width: 27px; height: 27px; border-radius: 50%; flex: none;
       border: 1px solid rgba(115, 73, 33, 0.3); color: var(--brand);
@@ -572,27 +569,17 @@
     /* 快速新增(手機大按鈕)：要一眼看得出是按鈕 */
     .quick-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
     .qbtn {
-      --cat: var(--brand); --cat-bg: #f1ebe1;
-      display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-      min-height: 54px; padding: 0 8px;
-      border: 1.5px solid var(--cat); border-radius: 14px;
-      background: var(--cat-bg);
-      color: #2a251d; font-weight: 700; font-size: 15.5px; letter-spacing: 0.02em;
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      min-height: 54px; padding: 0 8px; border: 1px solid rgba(74, 48, 22, 0.28); border-radius: 15px;
+      background: linear-gradient(180deg, #855A34 0%, #6E4A28 100%);
+      color: #F6EDDF; font-weight: 600; font-size: 15px; letter-spacing: 0.02em;
       white-space: nowrap;
-      box-shadow: 0 1px 2px rgba(60, 40, 20, 0.05);
-      cursor: pointer; transition: box-shadow .16s, transform .06s, filter .16s;
+      box-shadow: 0 1px 1px rgba(60, 40, 20, 0.10), 0 6px 18px rgba(122, 76, 34, 0.13);
+      cursor: pointer; transition: filter .16s, box-shadow .16s, transform .06s;
     }
-    .qbtn .q-plus { color: var(--cat); font-weight: 800; font-size: 18px; }
-    .qbtn[data-quick="food"]       { --cat: #B0702A; --cat-bg: #F7EEDC; }
-    .qbtn[data-quick="water"]      { --cat: #2F8A86; --cat-bg: #E4F1EE; }
-    .qbtn[data-quick="med"]        { --cat: #734921; --cat-bg: #F1E8DB; }
-    .qbtn[data-quick="vomit"]      { --cat: #BF3B20; --cat-bg: #FAE7E1; }
-    .qbtn[data-quick="stool"]      { --cat: #5D6C36; --cat-bg: #ECF0DE; }
-    .qbtn[data-quick="mood"]       { --cat: #7C6B34; --cat-bg: #F2ECD9; }
-    .qbtn[data-quick="supplement"] { --cat: #B5811F; --cat-bg: #F7EFD6; }
-    .qbtn[data-quick="note"]       { --cat: #7E7A6E; --cat-bg: #EEECE5; }
-    .qbtn:hover { box-shadow: 0 3px 10px rgba(60, 40, 20, 0.12); filter: brightness(0.98); }
-    .qbtn:active { transform: translateY(1px); box-shadow: 0 1px 2px rgba(27, 29, 26, 0.10); }
+    .qbtn .q-plus { color: #E7C79A; font-weight: 500; font-size: 16px; }
+    .qbtn:hover { filter: brightness(1.06); box-shadow: 0 1px 1px rgba(60, 40, 20, 0.10), 0 8px 22px rgba(122, 76, 34, 0.20); }
+    .qbtn:active { transform: translateY(1px); filter: brightness(0.96); box-shadow: 0 1px 2px rgba(27, 29, 26, 0.10); }
     /* 今日累計 hero：一打開先看到的重點（水分/熱量對照目標） */
     .today-hero { padding-top: 22px; padding-bottom: 22px; }
     .hero-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 18px; }
