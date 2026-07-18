@@ -290,11 +290,17 @@
       background: linear-gradient(180deg, #8a5a2c, var(--brand));
     }
     .fold summary:hover { background: rgba(115, 73, 33, 0.03); }
+    .fold .fold-head { flex: 1; display: flex; flex-direction: column; gap: 3px; }
     .fold .fold-title {
       flex: 1; font-family: var(--serif); font-weight: 600; font-size: 16.5px;
       letter-spacing: 0.05em; color: var(--ink);
     }
+    .fold .fold-sub { font-family: "Noto Sans TC", sans-serif; font-size: 11.5px; font-weight: 500; color: var(--muted); letter-spacing: 0; line-height: 1.4; }
     .fold .fold-count { margin-left: 9px; color: var(--muted); font-size: 12.5px; font-weight: 500; font-family: "Noto Sans TC", sans-serif; letter-spacing: 0; }
+    /* 三個折疊區用不同左色條區隔：今日確認＝棕、每一筆＝藍綠、最近＝琥珀 */
+    .fold.sec-confirm summary::before { background: linear-gradient(180deg, #8a5a2c, #734921); }
+    .fold.sec-logs summary::before { background: linear-gradient(180deg, #3a9a8f, #2F8A86); }
+    .fold.sec-recent summary::before { background: linear-gradient(180deg, #c99247, #B0702A); }
     .fold .fold-toggle {
       width: 27px; height: 27px; border-radius: 50%; flex: none;
       border: 1px solid rgba(115, 73, 33, 0.3); color: var(--brand);
@@ -566,26 +572,26 @@
     /* 快速新增(手機大按鈕)：要一眼看得出是按鈕 */
     .quick-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
     .qbtn {
-      --cat: var(--brand);
+      --cat: var(--brand); --cat-bg: #f1ebe1;
       display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-      min-height: 52px; padding: 0 8px;
-      border: 1px solid var(--line); border-left: 3px solid var(--cat); border-radius: 13px;
-      background: #fff;
-      color: var(--ink); font-weight: 600; font-size: 15px; letter-spacing: 0.02em;
+      min-height: 54px; padding: 0 8px;
+      border: 1.5px solid var(--cat); border-radius: 14px;
+      background: var(--cat-bg);
+      color: #2a251d; font-weight: 700; font-size: 15.5px; letter-spacing: 0.02em;
       white-space: nowrap;
       box-shadow: 0 1px 2px rgba(60, 40, 20, 0.05);
-      cursor: pointer; transition: box-shadow .16s, transform .06s, border-color .16s;
+      cursor: pointer; transition: box-shadow .16s, transform .06s, filter .16s;
     }
-    .qbtn .q-plus { color: var(--cat); font-weight: 800; font-size: 17px; }
-    .qbtn[data-quick="food"]       { --cat: #B9772E; }
-    .qbtn[data-quick="water"]      { --cat: #2F8A86; }
-    .qbtn[data-quick="med"]        { --cat: #734921; }
-    .qbtn[data-quick="vomit"]      { --cat: #BF3B20; }
-    .qbtn[data-quick="stool"]      { --cat: #5D6C36; }
-    .qbtn[data-quick="mood"]       { --cat: #7A6A3A; }
-    .qbtn[data-quick="supplement"] { --cat: #C08A2E; }
-    .qbtn[data-quick="note"]       { --cat: #8A8579; }
-    .qbtn:hover { box-shadow: 0 3px 10px rgba(60, 40, 20, 0.10); border-color: var(--cat); }
+    .qbtn .q-plus { color: var(--cat); font-weight: 800; font-size: 18px; }
+    .qbtn[data-quick="food"]       { --cat: #B0702A; --cat-bg: #F7EEDC; }
+    .qbtn[data-quick="water"]      { --cat: #2F8A86; --cat-bg: #E4F1EE; }
+    .qbtn[data-quick="med"]        { --cat: #734921; --cat-bg: #F1E8DB; }
+    .qbtn[data-quick="vomit"]      { --cat: #BF3B20; --cat-bg: #FAE7E1; }
+    .qbtn[data-quick="stool"]      { --cat: #5D6C36; --cat-bg: #ECF0DE; }
+    .qbtn[data-quick="mood"]       { --cat: #7C6B34; --cat-bg: #F2ECD9; }
+    .qbtn[data-quick="supplement"] { --cat: #B5811F; --cat-bg: #F7EFD6; }
+    .qbtn[data-quick="note"]       { --cat: #7E7A6E; --cat-bg: #EEECE5; }
+    .qbtn:hover { box-shadow: 0 3px 10px rgba(60, 40, 20, 0.12); filter: brightness(0.98); }
     .qbtn:active { transform: translateY(1px); box-shadow: 0 1px 2px rgba(27, 29, 26, 0.10); }
     /* 今日累計 hero：一打開先看到的重點（水分/熱量對照目標） */
     .today-hero { padding-top: 22px; padding-bottom: 22px; }
@@ -820,9 +826,12 @@
             <button class="btn btn-secondary btn-sm" id="addLogBtn" type="button">補登其他時間</button>
           </div>
         </div>
-        <details class="block fold">
+        <details class="block fold sec-confirm">
           <summary>
-            <span class="fold-title" id="confirmTitle">今日照護確認</span>
+            <span class="fold-head">
+              <span class="fold-title" id="confirmTitle">今日照護確認</span>
+              <span class="fold-sub">水分・熱量・用藥・腸胃，今天一次確認</span>
+            </span>
             <span class="fold-toggle">＋</span>
           </summary>
           <div class="fold-body">
@@ -834,9 +843,12 @@
             </div>
           </div>
         </details>
-        <details class="block fold">
+        <details class="block fold sec-logs">
           <summary>
-            <span class="fold-title">每一筆紀錄<span class="fold-count" id="logCount"></span></span>
+            <span class="fold-head">
+              <span class="fold-title">每一筆紀錄<span class="fold-count" id="logCount"></span></span>
+              <span class="fold-sub">今天記的每一筆，可編輯或刪除</span>
+            </span>
             <span class="fold-toggle">＋</span>
           </summary>
           <div class="fold-body">
@@ -846,9 +858,12 @@
             </div>
           </div>
         </details>
-        <details class="block fold" id="recentFold">
+        <details class="block fold sec-recent" id="recentFold">
           <summary>
-            <span class="fold-title">最近的紀錄<span class="fold-count" id="recentCount"></span></span>
+            <span class="fold-head">
+              <span class="fold-title">最近的紀錄<span class="fold-count" id="recentCount"></span></span>
+              <span class="fold-sub">不分日期・由新到舊，睡前掃一眼</span>
+            </span>
             <span class="fold-toggle">＋</span>
           </summary>
           <div class="fold-body">
