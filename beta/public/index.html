@@ -28,6 +28,7 @@
       --seal: #bf3b20;           /* 朱紅：印章，僅今天與異常 */
       --seal-tint: #f9ebe5;
       --serif: "Noto Serif TC", "Songti TC", "PMingLiU", serif;
+      --radius-lg: 20px;
       --radius: 14px;
       --radius-sm: 10px;
       --shadow-soft: 0 1px 3px rgba(58, 42, 24, 0.10), 0 4px 10px rgba(58, 42, 24, 0.06), 0 12px 30px rgba(115, 73, 33, 0.14);
@@ -56,15 +57,14 @@
       position: relative;
       background: linear-gradient(180deg, #fffdf8 0%, var(--sheet-soft) 100%);
       border: 1px solid rgba(115, 73, 33, 0.12);
-      border-top: none;
-      border-radius: 0 0 var(--radius) var(--radius);
+      border-radius: var(--radius-lg);
       box-shadow: var(--shadow-lift);
       padding: 34px 44px 44px;
+      overflow: hidden; /* 讓頂端咖啡帶跟著四角圓角收邊 */
     }
-    /* 頂端暖咖啡漸層帶，讓網站和 LINE 卡片同一個世界 */
+    /* 頂端暖咖啡漸層帶，讓網站和 LINE 卡片同一個世界（overflow 已幫它收圓角） */
     #appView::after {
       content: ''; position: absolute; top: 0; left: 0; right: 0; height: 6px;
-      border-radius: 6px 6px 0 0;
       background: linear-gradient(90deg, #8a5a2c 0%, var(--brand) 45%, #5a3617 100%);
     }
     #appView::before, .login-card::before {
@@ -282,12 +282,18 @@
     }
     /* 標題旁的小肉球（線條版） */
     .doctor-note {
-      margin-top: 20px; padding: 16px 20px;
-      border: 1px solid rgba(115, 73, 33, 0.14); border-left: 3px solid var(--brand);
-      border-radius: var(--radius-sm) var(--radius) var(--radius) var(--radius-sm);
+      position: relative;
+      margin-top: 20px; padding: 16px 20px 16px 26px;
+      border: 1px solid rgba(115, 73, 33, 0.14);
+      border-radius: var(--radius);
       background: linear-gradient(135deg, var(--brand-tint), rgba(255, 255, 255, 0.7));
       box-shadow: var(--shadow-soft);
       line-height: 1.75; color: var(--ink-soft); font-size: 14px;
+    }
+    /* 咖啡色記號：內縮、兩端圓，跟區塊標題前的小記號同一種語彙 */
+    .doctor-note::before {
+      content: ''; position: absolute; left: 12px; top: 17px; bottom: 17px; width: 3px;
+      border-radius: 3px; background: linear-gradient(180deg, #8a5a2c, var(--brand));
     }
     .doctor-note #doctorNote { font-family: var(--serif); font-size: 14.5px; letter-spacing: 0.02em; }
     /* 收合區塊：預設收起，首頁保持乾淨 */
@@ -716,13 +722,18 @@
       padding: 12px 14px; color: var(--ink-soft);
     }
     .disclaimer { margin: 18px auto 0; max-width: 560px; font-size: 11.5px; line-height: 1.7; color: var(--muted); text-align: center; }
-    /* 免責聲明：平常一行小字，點「完整說明」才展開條列 */
-    .disclaimer-fold { margin: 18px auto 0; max-width: 560px; font-size: 11.5px; line-height: 1.7; color: var(--muted); }
-    .disclaimer-fold summary { list-style: none; cursor: pointer; text-align: center; letter-spacing: 0.02em; }
+    /* 免責聲明：平常只有一個極小的灰字連結，點了才展開條列 */
+    .disclaimer-fold { margin: 14px auto 0; max-width: 520px; font-size: 11px; line-height: 1.7; color: var(--muted); }
+    .disclaimer-fold summary {
+      list-style: none; cursor: pointer; text-align: center; letter-spacing: 0.06em;
+      color: var(--line-strong); font-size: 11px; padding: 4px;
+      transition: color 0.15s;
+    }
+    .disclaimer-fold summary:hover { color: var(--muted); }
     .disclaimer-fold summary::-webkit-details-marker { display: none; }
-    .df-more { margin-left: 8px; color: var(--brand); text-decoration: underline; text-underline-offset: 2px; }
-    .disclaimer-fold[open] .df-more { display: none; }
-    .disclaimer-fold ul { margin: 10px auto 0; padding-left: 18px; text-align: left; max-width: 480px; }
+    .df-caret { display: inline-block; margin-left: 5px; transition: transform 0.2s; }
+    .disclaimer-fold[open] .df-caret { transform: rotate(180deg); }
+    .disclaimer-fold ul { margin: 8px auto 0; padding-left: 18px; text-align: left; max-width: 470px; color: var(--muted); }
     .disclaimer-fold li { margin-top: 4px; }
     .onboard-step { display: flex; gap: 12px; padding: 12px 2px; border-bottom: 1px solid var(--line); font-size: 14.5px; }
     .onboard-step:last-child { border-bottom: none; }
@@ -757,8 +768,7 @@
 
       /* 手機：留白加大、區塊間距拉開，讓每一段都能呼吸 */
       .shell { width: calc(100% - 40px); padding-top: 16px; }
-      #appView { padding: 30px 22px 44px; border-radius: 0 0 var(--radius) var(--radius); }
-      #appView::after { border-radius: 0; }
+      #appView { padding: 30px 22px 44px; border-radius: var(--radius-lg); }
       .block { padding: 20px 17px; }
       h1 { font-size: 30px; }
       .date-line { margin-top: 6px; }
@@ -822,11 +832,11 @@
         </div>
         <p class="muted" style="margin-top:22px">登入後這台裝置會記住你，之後直接開網址就進得去；就算過期，既有資料也不會消失。</p>
         <details class="disclaimer-fold">
-          <summary>Beta 測試版・紀錄輔助工具，不提供醫療判斷<span class="df-more">完整說明</span></summary>
+          <summary>免責聲明<span class="df-caret">⌄</span></summary>
           <ul>
-            <li>主要用途：協助飼主紀錄日常照護資料，方便回顧、交接與回診參考。</li>
+            <li>Beta 測試版・紀錄輔助工具，不提供醫療診斷、治療建議或緊急判斷。</li>
             <li>所有數字為飼主自行記錄，可能因輸入而有誤，提供給獸醫師前請自行核對。</li>
-            <li>不提供醫療診斷、治療建議或緊急判斷；貓咪明顯不適請直接聯繫獸醫。</li>
+            <li>貓咪出現明顯不適，請直接聯繫獸醫。</li>
           </ul>
         </details>
       </div>
@@ -1026,11 +1036,11 @@
 
       <footer class="colophon">讓每一次紀錄，都是對貓貓的守護</footer>
       <details class="disclaimer-fold">
-        <summary>Beta 測試版・紀錄輔助工具，不提供醫療判斷<span class="df-more">完整說明</span></summary>
+        <summary>免責聲明與資料使用<span class="df-caret">⌄</span></summary>
         <ul>
-          <li>主要用途：協助飼主紀錄日常照護資料，方便回顧、交接與回診參考。</li>
+          <li>Beta 測試版・紀錄輔助工具，不提供醫療診斷、治療建議或緊急判斷。</li>
           <li>所有數字為飼主自行記錄，可能因輸入而有誤，提供給獸醫師前請自行核對。</li>
-          <li>不提供醫療診斷、治療建議或緊急判斷；貓咪明顯不適請直接聯繫獸醫。</li>
+          <li>貓咪出現明顯不適，請直接聯繫獸醫。</li>
           <li>照護資料只用於本服務的紀錄與摘要，請勿將專屬連結轉傳給不相關的人。</li>
         </ul>
       </details>
