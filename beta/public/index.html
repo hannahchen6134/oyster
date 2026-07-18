@@ -35,8 +35,9 @@
       --glow-brand: 0 0 0 3px rgba(115, 73, 33, 0.13), 0 5px 16px rgba(115, 73, 33, 0.22);
     }
     * { box-sizing: border-box; }
-    html { -webkit-text-size-adjust: 100%; background: var(--paper); }
+    html { -webkit-text-size-adjust: 100%; -moz-text-size-adjust: 100%; text-size-adjust: 100%; background: var(--paper); }
     body {
+      -webkit-text-size-adjust: 100%; text-size-adjust: 100%;
       margin: 0;
       min-height: 100vh;
       font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
@@ -419,20 +420,18 @@
        這段表格資訊密，往兩側撐滿版面（抵銷外層 18px + fold 2px padding），把寬度留給四項數字 */
     .daycards { display: flex; flex-direction: column; background: #fff; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; margin: 0 -22px; }
     .dcard {
-      display: flex; align-items: center; gap: 6px; cursor: pointer;
-      padding: 12px 8px; border-top: 1px solid var(--line);
+      display: flex; align-items: center; gap: 10px; cursor: pointer;
+      padding: 13px 12px; border-top: 1px solid var(--line);
       transition: background .15s;
     }
     .dcard:first-child { border-top: none; }
     .dcard:hover { background: #faf7f1; }
-    .dcard-date { flex: none; width: 35px; font-size: 11px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; line-height: 1.3; }
+    /* 日期放最上面、整齊排成一行；下面四項數字吃滿整行 → 寬度最大、絕不裁切 */
+    .dcard-date { white-space: nowrap; font-size: 13px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; letter-spacing: .01em; }
     .dcard-mid { flex: 1; min-width: 0; overflow: hidden; }
-    /* 四項數字固定一列、字放大填滿，不換行、不飛出框、不加底板；
-       用小圓形＋按鈕取代「查看當天」文字，省下的寬度全留給數字 */
-    .dcard-pills { display: flex; flex-wrap: nowrap; gap: 2px; }
-    /* 窄手機用小字，一般手機（≥392px）放大——兩者都保證四項數字同一行不裁切（已用 999.9 最壞值實測） */
-    .dpill { flex: none; font-size: clamp(6px, 1.75vw, 7px); padding: 3px 4px; border-radius: 999px; white-space: nowrap; line-height: 1.5; }
-    @media (min-width: 392px) { .dpill { font-size: clamp(7px, 1.9vw, 8px); } }
+    /* 標籤只留一個字（水/罐/乾），熱量只留數字＋kcal；沒有按鈕 → 數字放大、絕不裁切 */
+    .dcard-pills { display: flex; flex-wrap: nowrap; gap: 4px; margin-top: 8px; }
+    .dpill { flex: none; font-size: clamp(8.5px, 2.6vw, 12px); padding: 4px 7px; border-radius: 999px; white-space: nowrap; line-height: 1.5; }
     .dpill b { font-weight: 800; margin: 0 1px; font-variant-numeric: tabular-nums; }
     .dpill.p-water { background: #e5f2ec; color: #2b7a66; }
     .dpill.p-wet   { background: #ebf1dd; color: #5c7031; }
@@ -2050,17 +2049,16 @@
         if (Number(row.otherFoodG) > 0) subBits.push(`尚有 ${f1(row.otherFoodG)} g 未設定熱量`);
         return `
         <div class="dcard" data-day="${esc(row.date)}" role="button" tabindex="0">
-          <div class="dcard-date">${esc(row.date)}</div>
           <div class="dcard-mid">
+            <div class="dcard-date">${esc(row.date)}</div>
             <div class="dcard-pills">
-              <span class="dpill p-water">總水分 <b>${f1(row.totalWaterMl)}</b> ml</span>
-              <span class="dpill p-wet">總罐頭 <b>${f1(row.wetFoodG)}</b> g</span>
-              <span class="dpill p-dry">乾糧 <b>${f1(row.dryFoodG)}</b> g</span>
-              <span class="dpill p-kcal">熱量約 <b>${f1(row.kcal)}</b> kcal</span>
+              <span class="dpill p-water">水 <b>${f1(row.totalWaterMl)}</b> ml</span>
+              <span class="dpill p-wet">罐 <b>${f1(row.wetFoodG)}</b> g</span>
+              <span class="dpill p-dry">乾 <b>${f1(row.dryFoodG)}</b> g</span>
+              <span class="dpill p-kcal"><b>${f1(row.kcal)}</b> kcal</span>
             </div>
             <div class="dcard-sub">${subBits.join(' · ')}</div>
           </div>
-          <button class="dcard-view" data-day="${esc(row.date)}" type="button" aria-label="查看 ${esc(row.date)} 當天細節">＋</button>
         </div>`;
       }).join('');
     }
