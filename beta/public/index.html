@@ -415,29 +415,32 @@
     .daycards-fold > summary { padding-left: 2px; padding-right: 2px; }
     .daycards-fold .fold-body { padding: 2px 2px 4px; }
     /* 近 N 天給醫生看：CODEX 風格——每天一張卡，四個有標籤的彩色小膠囊＋筆數/腸胃狀態＋查看當天 */
-    .daycards { display: flex; flex-direction: column; gap: 10px; }
+    /* 一個白底圓角面板，每天一列，用細分隔線隔開（不是各自的卡片底板）
+       這段表格資訊密，往兩側撐滿版面（抵銷外層 18px + fold 2px padding），把寬度留給四項數字 */
+    .daycards { display: flex; flex-direction: column; background: #fff; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; margin: 0 -20px; }
     .dcard {
-      display: flex; align-items: center; gap: 12px; cursor: pointer;
-      background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 13px 15px;
-      transition: box-shadow .15s, border-color .15s;
+      display: flex; align-items: center; gap: 6px; cursor: pointer;
+      padding: 12px 8px; border-top: 1px solid var(--line);
+      transition: background .15s;
     }
-    .dcard:hover { box-shadow: var(--shadow-soft); border-color: var(--line-strong); }
-    .dcard.warn { background: #fbf2ef; border-color: rgba(191, 59, 32, .22); }
-    .dcard-left { flex: 1; min-width: 0; }
-    .dcard-date { font-size: 15px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; letter-spacing: .01em; }
-    .dcard-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
-    .dpill { font-size: 12.5px; padding: 4px 11px; border-radius: 999px; white-space: nowrap; line-height: 1.5; }
+    .dcard:first-child { border-top: none; }
+    .dcard:hover { background: #faf7f1; }
+    .dcard-date { flex: none; width: 40px; font-size: 11.5px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; line-height: 1.3; }
+    .dcard-mid { flex: 1; min-width: 0; overflow: hidden; }
+    /* 四項數字固定一列、字縮小填滿，不換行、不飛出框、不加底板 */
+    .dcard-pills { display: flex; flex-wrap: nowrap; gap: 2px; }
+    .dpill { flex: none; font-size: clamp(6.5px, 1.68vw, 8px); padding: 3px 4px; border-radius: 999px; white-space: nowrap; line-height: 1.5; }
     .dpill b { font-weight: 800; margin: 0 1px; font-variant-numeric: tabular-nums; }
     .dpill.p-water { background: #e5f2ec; color: #2b7a66; }
     .dpill.p-wet   { background: #ebf1dd; color: #5c7031; }
     .dpill.p-dry   { background: #f4ebd4; color: #886722; }
     .dpill.p-kcal  { background: #ece7f3; color: #5a4a84; }
-    .dcard-sub { font-size: 12px; color: var(--muted); margin-top: 9px; }
+    .dcard-sub { font-size: 11.5px; color: var(--muted); margin-top: 8px; }
     .dcard-sub .warn-txt { color: var(--seal); font-weight: 700; }
     .dcard-view {
       flex: none; align-self: center; white-space: nowrap;
-      background: var(--brand-tint); border: 1px solid rgba(115, 73, 33, .25); border-radius: 999px;
-      padding: 9px 15px; font-size: 13px; font-weight: 600; color: var(--brand); cursor: pointer;
+      background: var(--brand-tint); border: 1px solid rgba(115, 73, 33, .22); border-radius: 999px;
+      padding: 5px 7px; font-size: 10px; font-weight: 600; color: var(--brand); cursor: pointer;
     }
     .dcard-view:hover { background: #ede0cb; border-color: var(--brand); }
     /* 精簡圓形按鈕（「查看當天」改用小箭頭，把寬度留給四項數字） */
@@ -2034,9 +2037,9 @@
         const subBits = [`${row.entryCount} 筆紀錄`, `腸胃狀態：${status}`];
         if (Number(row.otherFoodG) > 0) subBits.push(`尚有 ${f1(row.otherFoodG)} g 未設定熱量`);
         return `
-        <div class="dcard ${warn ? 'warn' : ''}" data-day="${esc(row.date)}" role="button" tabindex="0">
-          <div class="dcard-left">
-            <div class="dcard-date">${esc(row.date)}</div>
+        <div class="dcard" data-day="${esc(row.date)}" role="button" tabindex="0">
+          <div class="dcard-date">${esc(row.date)}</div>
+          <div class="dcard-mid">
             <div class="dcard-pills">
               <span class="dpill p-water">總水分 <b>${f1(row.totalWaterMl)}</b> ml</span>
               <span class="dpill p-wet">總罐頭 <b>${f1(row.wetFoodG)}</b> g</span>
