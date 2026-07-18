@@ -128,13 +128,21 @@
       border-bottom: 1px solid var(--line-strong);
     }
     .tab {
+      position: relative;
       border: none; background: none; color: var(--muted); cursor: pointer; font: inherit;
       font-weight: 500; font-size: 15.5px; letter-spacing: 0.04em;
-      padding: 8px 2px 12px; border-bottom: 2px solid transparent; margin-bottom: -1px;
+      padding: 10px 6px 14px; margin-bottom: -1px;
       transition: color 0.15s;
     }
+    /* 底線用滑入動畫，切換更順 */
+    .tab::after {
+      content: ''; position: absolute; left: 4px; right: 4px; bottom: 0; height: 2.5px;
+      border-radius: 2px; background: var(--brand);
+      transform: scaleX(0); transform-origin: center; transition: transform 0.22s ease;
+    }
     .tab:hover { color: var(--ink); }
-    .tab.active { color: var(--ink); font-weight: 600; border-bottom-color: var(--brand); }
+    .tab.active { color: var(--ink); font-weight: 600; }
+    .tab.active::after { transform: scaleX(1); }
     .tab:focus-visible {
       outline: none; border-radius: var(--radius-sm);
       box-shadow: 0 0 0 3px rgba(115, 73, 33, 0.22);
@@ -422,6 +430,9 @@
     }
     .dcard:first-child { border-top: none; }
     .dcard:hover { background: #faf7f1; }
+    /* 每列可點的視覺線索：右端極淡箭頭，hover 時變品牌色 */
+    .dcard::after { content: '›'; flex: none; font-size: 15px; font-weight: 600; color: var(--line-strong); margin-left: 2px; transition: color .15s; }
+    .dcard:hover::after { color: var(--brand); }
     /* 每天一行：日期在左（整齊一行），數值同一列，右邊放特殊情況膠囊；點整列看細節 */
     .dcard-date { flex: none; white-space: nowrap; font-size: 12px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; letter-spacing: .01em; }
     /* 固定欄位的 grid：每列的水/罐/乾/kcal 各佔固定欄寬 → 每天的數值上下對齊；
@@ -520,9 +531,9 @@
     .field { margin-bottom: 13px; }
     .toast {
       position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%);
-      background: #3a2a18; color: #fff; padding: 11px 22px; border-radius: 999px;
-      box-shadow: 0 10px 30px rgba(27, 29, 26, 0.3);
-      font-size: 14px; z-index: 60; opacity: 0; transition: opacity 0.25s; pointer-events: none;
+      background: #3a2a18; color: #fff; padding: 9px 18px; border-radius: 999px;
+      box-shadow: 0 8px 24px rgba(27, 29, 26, 0.25);
+      font-size: 13.5px; z-index: 60; opacity: 0; transition: opacity 0.25s; pointer-events: none;
       max-width: 90vw;
     }
     .toast.show { opacity: 1; }
@@ -1040,7 +1051,8 @@
     function toast(message, isError) {
       const el = $('toast');
       el.textContent = message;
-      el.style.background = isError ? '#b4544d' : '#223235';
+      // 配色跟著設計系統：成功＝暖墨褐、錯誤＝印章朱紅
+      el.style.background = isError ? 'var(--seal)' : '#3a2a18';
       el.classList.add('show');
       clearTimeout(el._timer);
       el._timer = setTimeout(() => el.classList.remove('show'), 2600);
@@ -1327,7 +1339,7 @@
         if (!body.visitDate) throw new Error('請填看診日');
         if (visit) await api(`visits/${visit.visitId}`, { method: 'PUT', body: JSON.stringify(body) });
         else await api('visits', { method: 'POST', body: JSON.stringify(body) });
-        toast('已幫你記下來了，看診紀錄已更新。');
+        toast('已記錄');
         await loadTrend();
       });
     }
@@ -1614,7 +1626,7 @@
         const body = collectLogForm(form);
         if (log) await api(`logs/${log.logId}`, { method: 'PUT', body: JSON.stringify(body) });
         else await api('logs', { method: 'POST', body: JSON.stringify(body) });
-        toast(log ? '已更新這筆紀錄，今日照護摘要已重新整理。' : '已幫你記下來了，可在今日照護確認與回診摘要中查看。');
+        toast(log ? '已更新' : '已記錄');
         await loadDay();
         if ($('recentFold') && $('recentFold').open) await loadRecent();
       });
@@ -2206,7 +2218,7 @@
               goalMedSlots: JSON.stringify(checked)
             })
           });
-          toast('已儲存，之後 LINE 總結會顯示目標進度');
+          toast('已儲存');
           await refreshPets();
         } catch (error) {
           toast(error.message, true);
@@ -2290,7 +2302,7 @@
           method: 'POST',
           body: JSON.stringify({ petId: state.petId, testDate: $('labDate').value, items })
         });
-        toast('已儲存血檢報告');
+        toast('已儲存');
         await loadSettings();
       });
     }
@@ -2345,7 +2357,7 @@
           await api(`pets/${pet.petId}`, { method: 'PUT', body: JSON.stringify({ reminderJson: JSON.stringify(next) }) });
           await api('me', { method: 'PUT', body: JSON.stringify({ reminderHour: hour }) });
           if (state.user) state.user.reminderHour = hour;
-          toast(`已儲存，每天 ${String(hour).padStart(2, '0')}:00 會幫你把關`);
+          toast(`已儲存・每天 ${String(hour).padStart(2, '0')}:00 發送`);
           await refreshPets();
         } catch (error) {
           toast(error.message, true);
@@ -2462,8 +2474,8 @@
         try {
           const r = await api('care/invite', { method: 'POST' });
           const result = await liff.shareTargetPicker([{ type: 'text', text: buildShareMsg(r.code) }]);
-          if (result) toast('已送出邀請！對方加入官方 LINE、打邀請碼就完成 🐈');
-        } catch (error) { toast('分享沒成功，改用下面的複製邀請也可以', true); }
+          if (result) toast('已送出邀請');
+        } catch (error) { toast('分享沒成功，可改用複製邀請', true); }
         shareBtnEl.disabled = false;
       });
 
@@ -2492,16 +2504,16 @@
                 <button class="btn btn-secondary btn-sm care-copy-btn" id="careCopyCmdBtn" type="button">複製</button>
               </div>
             </div>`;
-          $('careCopyMsgBtn').addEventListener('click', () => copyText(shareMsg, '已複製，貼到聊天室傳給對方就好。'));
-          $('careCopyUrlBtn').addEventListener('click', () => copyText(lineUrl, '已複製官方 LINE 連結。'));
-          $('careCopyCmdBtn').addEventListener('click', () => copyText(r.code, '已複製邀請碼 ' + r.code + '。'));
-        } catch (error) { toast('產生邀請碼失敗，請稍後再試', true); }
+          $('careCopyMsgBtn').addEventListener('click', () => copyText(shareMsg, '已複製'));
+          $('careCopyUrlBtn').addEventListener('click', () => copyText(lineUrl, '已複製'));
+          $('careCopyCmdBtn').addEventListener('click', () => copyText(r.code, '已複製'));
+        } catch (error) { toast('產生失敗，請再試一次', true); }
         inviteBtn.disabled = false;
       });
       list.querySelectorAll('[data-remove]').forEach((btn) => btn.addEventListener('click', async () => {
         if (!confirm('確定移除這位共同照護者？移除後他就無法再看到與記錄你的貓咪。')) return;
         try { await api('care/member?memberLineUserId=' + encodeURIComponent(btn.dataset.remove), { method: 'DELETE' }); toast('已移除'); await renderCarePage(); }
-        catch (error) { toast('移除失敗，請稍後再試', true); }
+        catch (error) { toast('移除失敗，請再試一次', true); }
       }));
     }
 
@@ -2815,7 +2827,7 @@
         if (!confirm('確定要刪除這筆看診紀錄嗎？')) return;
         try {
           await api(`visits/${visitDelBtn.dataset.visitDel}`, { method: 'DELETE' });
-          toast('已刪除這筆看診紀錄。');
+          toast('已刪除');
           return loadTrend();
         } catch (error) {
           return toast(error.message, true);
@@ -2881,12 +2893,12 @@
         try {
           if (isLog) {
             await api(`logs/${id}`, { method: 'DELETE' });
-            toast('已刪除這筆紀錄，統計已重新整理。');
+            toast('已刪除');
             if (isRecent) await loadRecent();
             return loadDay();
           }
           await api(`${state.settingsTab}/${id}`, { method: 'DELETE' });
-          toast('已刪除。');
+          toast('已刪除');
           await loadSettings();
           if (state.settingsTab === 'pets') await refreshPets();
         } catch (error) {
@@ -2916,11 +2928,11 @@
         await navigator.clipboard.writeText(text);
         toast(doneMessage);
       } catch (error) {
-        toast('複製沒有成功，請長按文字手動複製。', true);
+        toast('複製失敗，請長按文字手動複製', true);
       }
     }
     $('copyHandoffBtn').addEventListener('click', () =>
-      copyText(buildHandoffText(), '已複製今日交接卡，可以直接貼給家人朋友。'));
+      copyText(buildHandoffText(), '已複製'));
     $('showAllLogsBtn').addEventListener('click', () => {
       state.showAllLogs = true;
       renderLogs(state.dayLogs || []);
