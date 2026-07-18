@@ -28,9 +28,9 @@
       --seal: #bf3b20;           /* 朱紅：印章，僅今天與異常 */
       --seal-tint: #f9ebe5;
       --serif: "Noto Serif TC", "Songti TC", "PMingLiU", serif;
-      --radius: 12px;
-      --radius-sm: 9px;
-      --shadow-soft: 0 1px 2px rgba(58, 42, 24, 0.05), 0 7px 20px rgba(115, 73, 33, 0.07);
+      --radius: 14px;
+      --radius-sm: 10px;
+      --shadow-soft: 0 1px 3px rgba(58, 42, 24, 0.10), 0 4px 10px rgba(58, 42, 24, 0.06), 0 12px 30px rgba(115, 73, 33, 0.14);
       --shadow-lift: 0 1px 3px rgba(58, 42, 24, 0.06), 0 14px 38px rgba(58, 42, 24, 0.10), 0 36px 90px rgba(115, 73, 33, 0.08);
       --glow-brand: 0 0 0 3px rgba(115, 73, 33, 0.13), 0 5px 16px rgba(115, 73, 33, 0.22);
     }
@@ -115,7 +115,7 @@
     .care-remove { color: var(--seal); font-size: 13px; }
     .care-code { font-size: 27px; font-weight: 800; letter-spacing: 5px; text-align: center; margin: 12px 0; color: var(--brand); }
     .care-copy-row { display: flex; align-items: stretch; gap: 8px; }
-    .care-copy-text { flex: 1; min-width: 0; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 13px; line-height: 1.6; color: var(--ink, #332417); user-select: all; -webkit-user-select: all; word-break: break-word; }
+    .care-copy-text { flex: 1; min-width: 0; background: #fff; border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 10px 12px; font-size: 13px; line-height: 1.6; color: var(--ink, #332417); user-select: all; -webkit-user-select: all; word-break: break-word; }
     .care-copy-cmd { font-weight: 800; color: var(--brand); letter-spacing: 1px; }
     .care-copy-btn { flex: 0 0 auto; align-self: stretch; white-space: nowrap; }
     .eyebrow {
@@ -238,8 +238,8 @@
     /* 區塊卡：每個段落用柔影優雅區隔 */
     .block {
       background: linear-gradient(180deg, #fffefb 0%, #f8f2e6 100%);
-      border: 1px solid rgba(115, 73, 33, 0.14); border-radius: 14px;
-      box-shadow: 0 1px 3px rgba(90, 54, 23, 0.05), 0 10px 26px rgba(90, 54, 23, 0.08);
+      border: 1px solid rgba(115, 73, 33, 0.14); border-radius: var(--radius);
+      box-shadow: var(--shadow-soft);
       padding: 20px 22px; margin-top: 26px;
     }
     /* 每張卡的標題前加品牌色小記號，一眼分區 */
@@ -414,7 +414,7 @@
     /* 近 N 天給醫生看：CODEX 風格——每天一張卡，四個有標籤的彩色小膠囊＋筆數/腸胃狀態＋查看當天 */
     /* 一個白底圓角面板，每天一列，用細分隔線隔開（不是各自的卡片底板）
        這段表格資訊密，往兩側撐滿版面（抵銷外層 18px + fold 2px padding），把寬度留給四項數字 */
-    .daycards { display: flex; flex-direction: column; background: #fff; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; margin: 0 -22px; }
+    .daycards { display: flex; flex-direction: column; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; margin: 0 -22px; }
     .dcard {
       display: flex; align-items: center; gap: 8px; cursor: pointer;
       padding: 12px 10px; border-top: 1px solid var(--line);
@@ -562,10 +562,10 @@
     .login-step { display: flex; gap: 14px; align-items: baseline; padding: 11px 2px; border-bottom: 1px solid var(--line); }
     .login-step:last-child { border-bottom: none; }
     .login-step .num { font-family: var(--serif); color: var(--brand); font-weight: 600; font-size: 15px; }
-    .login-code-box { margin: 24px auto 0; max-width: 340px; text-align: left; background: var(--brand-tint); border-radius: 14px; padding: 16px; }
+    .login-code-box { margin: 24px auto 0; max-width: 340px; text-align: left; background: var(--brand-tint); border-radius: var(--radius); padding: 16px; }
     .login-code-label { font-size: 13px; color: var(--ink, #332417); line-height: 1.6; margin-bottom: 10px; }
     .login-code-row { display: flex; gap: 8px; }
-    .login-code-row input { flex: 1; min-width: 0; padding: 11px 12px; font-size: 17px; letter-spacing: 3px; text-align: center; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+    .login-code-row input { flex: 1; min-width: 0; padding: 11px 12px; font-size: 17px; letter-spacing: 3px; text-align: center; border: 1px solid var(--line); border-radius: var(--radius-sm); background: #fff; }
     .login-code-row .btn { flex: 0 0 auto; }
     .login-code-msg { margin-top: 10px; font-size: 12.5px; color: var(--seal); }
 
@@ -581,7 +581,7 @@
     .quick-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
     .qbtn {
       display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-      min-height: 54px; padding: 0 8px; border: 1px solid rgba(74, 48, 22, 0.28); border-radius: 15px;
+      min-height: 54px; padding: 0 8px; border: 1px solid rgba(74, 48, 22, 0.28); border-radius: var(--radius);
       background: linear-gradient(180deg, #855A34 0%, #6E4A28 100%);
       color: #F6EDDF; font-weight: 600; font-size: 15px; letter-spacing: 0.02em;
       white-space: nowrap;
@@ -715,7 +715,7 @@
 
       /* 手機：留白加大、區塊間距拉開，讓每一段都能呼吸 */
       .shell { width: calc(100% - 40px); padding-top: 16px; }
-      #appView { padding: 30px 22px 44px; border-radius: 0 0 14px 14px; }
+      #appView { padding: 30px 22px 44px; border-radius: 0 0 var(--radius) var(--radius); }
       #appView::after { border-radius: 0; }
       .block { padding: 20px 17px; }
       h1 { font-size: 30px; }
@@ -801,7 +801,7 @@
         <div class="tabs">
           <button class="tab active" data-tab="today" type="button">今天</button>
           <button class="tab" data-tab="calendar" type="button">月曆</button>
-          <button class="tab" data-tab="trend" type="button">回診</button>
+          <button class="tab" data-tab="trend" type="button">回顧</button>
           <button class="tab" data-tab="settings" type="button">設定</button>
         </div>
       </header>
@@ -1089,7 +1089,7 @@
       $('trendView').classList.toggle('hidden', tab !== 'trend');
       $('settingsView').classList.toggle('hidden', tab !== 'settings');
       if (tab === 'calendar') $('pageMode').textContent = '照護月曆';
-      if (tab === 'trend') $('pageMode').textContent = '回診安心摘要';
+      if (tab === 'trend') $('pageMode').textContent = '紀錄回顧・回診摘要';
       if (tab === 'settings') $('pageMode').textContent = '設定';
       if (tab === 'today') loadDay();
       if (tab === 'calendar') loadCalendar();
@@ -2048,7 +2048,7 @@
       const tc = $('tableCount'); if (tc) tc.textContent = `（${rows.length} 天有紀錄）`;
       const list = $('dayCardList');
       if (!rows.length) {
-        list.innerHTML = `<div class="hero-empty" style="border-radius:16px">近 ${state.tableDays} 天還沒有紀錄<span>記一筆吃飯、喝水或用藥就會開始統計。</span></div>`;
+        list.innerHTML = `<div class="hero-empty" style="border-radius:14px">近 ${state.tableDays} 天還沒有紀錄<span>記一筆吃飯、喝水或用藥就會開始統計。</span></div>`;
         return;
       }
       const f1 = (v) => (Math.round((Number(v) || 0) * 10) / 10).toFixed(1);

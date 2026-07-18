@@ -27,9 +27,9 @@ const C = {
 };
 
 const CATEGORY_STYLE = {
-  water: { label: '喝水', bg: C.oliveTint, fg: C.olive },
-  dry: { label: '乾糧', bg: '#F5F1E3', fg: '#7A662F' },
-  wet: { label: '罐頭/濕食', bg: '#F7EFE4', fg: '#8A5E35' },
+  water: { label: '喝水', bg: '#E5F2EC', fg: '#2B7A66' },
+  dry: { label: '乾糧', bg: '#F4EBD4', fg: '#886722' },
+  wet: { label: '罐頭/濕食', bg: '#EBF1DD', fg: '#5C7031' },
   med: { label: '藥物', bg: C.tint, fg: C.brand },
   vomit: { label: '嘔吐', bg: C.sealTint, fg: C.seal },
   stool: { label: '便便', bg: C.soft, fg: C.inkSoft },
@@ -94,7 +94,8 @@ function statCell(label, value, unit, accent) {
   };
 }
 // 類別色（水＝藍綠、食物＝琥珀、熱量＝棕），與網站一致
-const STAT_ACCENT = { water: '#2F8A86', food: '#B9772E', kcal: '#8A5A2C' };
+// 與照護站網站同一套色票：水＝湖水綠、食物＝麥色、熱量＝藕紫
+const STAT_ACCENT = { water: '#2B7A66', food: '#886722', kcal: '#5A4A84' };
 
 function statCellRow(cells) {
   return { type: 'box', layout: 'horizontal', spacing: 'md', margin: 'md', contents: cells };
