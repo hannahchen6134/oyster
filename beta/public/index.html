@@ -224,15 +224,17 @@
 
     .entry {
       display: grid; grid-template-columns: 64px 1fr auto; gap: 14px; align-items: start;
-      padding: 13px 2px; border-bottom: 1px solid var(--line);
+      padding: 13px 2px; border-top: 1px solid var(--line);
       cursor: pointer; border-radius: var(--radius-sm);
       transition: background 0.12s;
     }
+    .entry:first-child { border-top: none; }
     .entry:hover { background: rgba(115, 73, 33, 0.04); }
+    /* 同一時間的後續列：緊貼上一列、不畫分隔線 → 視覺上是同一筆 */
+    .entry.cont { border-top: none; padding-top: 0; margin-top: -7px; }
     .entry .entry-actions { display: none; }
     .entry.open { background: var(--brand-tint); padding-left: 8px; padding-right: 8px; }
     .entry.open .entry-actions { display: flex; }
-    .entry:last-child { border-bottom: none; }
     .entry-time {
       font-size: 15px; font-weight: 600; color: var(--ink);
       font-variant-numeric: tabular-nums; padding-top: 2px;
@@ -261,9 +263,11 @@
     }
     .block .section-head { margin-top: 0; margin-bottom: 10px; }
     .block .empty { background: none; border: none; padding: 18px 8px; }
-    /* 類別 chips：收斂為系統色——一般＝紙褐淡底，kcal＝深一階（唯一重點），用藥＝描邊強調 */
-    .chip-water, .chip-dry, .chip-wet { background: var(--brand-tint); color: #6d5335; border-color: rgba(115, 73, 33, 0.18); }
-    .chip-kcal { background: #e9dcc4; color: var(--brand); border-color: rgba(115, 73, 33, 0.25); }
+    /* 類別 chips：分色與「回顧」的膠囊一致（水＝湖水綠、罐＝草綠、乾＝麥色、熱量＝藕紫） */
+    .chip-water { background: #e5f2ec; color: #2b7a66; border-color: #cde4d9; }
+    .chip-wet   { background: #ebf1dd; color: #5c7031; border-color: #dbe5c2; }
+    .chip-dry   { background: #f4ebd4; color: #886722; border-color: #e8d9b3; }
+    .chip-kcal  { background: #ece7f3; color: #5a4a84; border-color: #dcd4e8; }
     .chip-med { background: var(--brand-tint); color: var(--brand); border-color: rgba(115, 73, 33, 0.35); }
     .chip-neutral { background: var(--sheet-soft); color: var(--ink-soft); border-color: var(--line-strong); }
     .empty {
@@ -712,6 +716,14 @@
       padding: 12px 14px; color: var(--ink-soft);
     }
     .disclaimer { margin: 18px auto 0; max-width: 560px; font-size: 11.5px; line-height: 1.7; color: var(--muted); text-align: center; }
+    /* 免責聲明：平常一行小字，點「完整說明」才展開條列 */
+    .disclaimer-fold { margin: 18px auto 0; max-width: 560px; font-size: 11.5px; line-height: 1.7; color: var(--muted); }
+    .disclaimer-fold summary { list-style: none; cursor: pointer; text-align: center; letter-spacing: 0.02em; }
+    .disclaimer-fold summary::-webkit-details-marker { display: none; }
+    .df-more { margin-left: 8px; color: var(--brand); text-decoration: underline; text-underline-offset: 2px; }
+    .disclaimer-fold[open] .df-more { display: none; }
+    .disclaimer-fold ul { margin: 10px auto 0; padding-left: 18px; text-align: left; max-width: 480px; }
+    .disclaimer-fold li { margin-top: 4px; }
     .onboard-step { display: flex; gap: 12px; padding: 12px 2px; border-bottom: 1px solid var(--line); font-size: 14.5px; }
     .onboard-step:last-child { border-bottom: none; }
     .onboard-step .num { font-family: var(--serif); color: var(--brand); font-weight: 700; }
@@ -809,7 +821,14 @@
           <div class="login-step"><span class="num">2</span><span>手機：輸入 <b>照護站</b> 點連結就進<br>電腦：輸入 <b>電腦登入</b> 拿上面的登入碼</span></div>
         </div>
         <p class="muted" style="margin-top:22px">登入後這台裝置會記住你，之後直接開網址就進得去；就算過期，既有資料也不會消失。</p>
-        <p class="disclaimer">喵喵照護安心管家目前為 Beta 測試版，主要用途是協助飼主紀錄日常照護資料，方便回顧、交接與回診時參考。所有數字為飼主自行記錄，可能因輸入而有誤，提供給獸醫師前請自行核對。本工具不提供醫療診斷、治療建議或緊急判斷。如貓咪出現明顯不適，請直接聯繫獸醫。</p>
+        <details class="disclaimer-fold">
+          <summary>Beta 測試版・紀錄輔助工具，不提供醫療判斷<span class="df-more">完整說明</span></summary>
+          <ul>
+            <li>主要用途：協助飼主紀錄日常照護資料，方便回顧、交接與回診參考。</li>
+            <li>所有數字為飼主自行記錄，可能因輸入而有誤，提供給獸醫師前請自行核對。</li>
+            <li>不提供醫療診斷、治療建議或緊急判斷；貓咪明顯不適請直接聯繫獸醫。</li>
+          </ul>
+        </details>
       </div>
     </section>
 
@@ -1006,7 +1025,15 @@
       </section>
 
       <footer class="colophon">讓每一次紀錄，都是對貓貓的守護</footer>
-      <p class="disclaimer">喵喵照護安心管家目前為 Beta 測試版，主要用途是協助飼主紀錄日常照護資料，方便回顧、交接與回診時參考。所有數字為飼主自行記錄，可能因輸入而有誤，提供給獸醫師前請自行核對。本工具不提供醫療診斷、治療建議或緊急判斷。如貓咪出現明顯不適，請直接聯繫獸醫。<br>你的照護資料只用於本服務的紀錄與摘要功能，請勿將專屬照護站連結轉傳給不相關的人。</p>
+      <details class="disclaimer-fold">
+        <summary>Beta 測試版・紀錄輔助工具，不提供醫療判斷<span class="df-more">完整說明</span></summary>
+        <ul>
+          <li>主要用途：協助飼主紀錄日常照護資料，方便回顧、交接與回診參考。</li>
+          <li>所有數字為飼主自行記錄，可能因輸入而有誤，提供給獸醫師前請自行核對。</li>
+          <li>不提供醫療診斷、治療建議或緊急判斷；貓咪明顯不適請直接聯繫獸醫。</li>
+          <li>照護資料只用於本服務的紀錄與摘要，請勿將專屬連結轉傳給不相關的人。</li>
+        </ul>
+      </details>
     </div>
   </div>
 
@@ -1390,8 +1417,12 @@
       const shown = state.showAllLogs ? logs : logs.slice(-5);
       $('showAllLogsBtn').classList.toggle('hidden', state.showAllLogs || total <= 5);
       $('showAllLogsBtn').textContent = `查看全部 ${total} 筆`;
+      // 同一時間段的紀錄收成同一筆：時間只顯示一次，後續列緊貼、不畫分隔線
+      let prevTime = null;
       container.innerHTML = shown.map((log) => {
-        // 類別 → 低飽和色系：喝水藍、乾糧麥色、罐頭陶土、熱量琥珀、藥松綠、其他中性
+        const timeStr = String(log.eventDateTime).slice(11, 16) || '--:--';
+        const isCont = timeStr === prevTime;
+        prevTime = timeStr;
         const foodChipClass = log.foodType === '乾糧' ? 'chip-dry' : 'chip-wet';
         const catChipClass = {
           water: 'chip-water', food: foodChipClass, med: 'chip-med',
@@ -1410,8 +1441,8 @@
         }
         if (log.category === 'vomit') chips.push('<span class="chip warn">需留意</span>');
         return `
-          <div class="entry" data-entry="${esc(log.logId)}">
-            <div class="entry-time">${esc(String(log.eventDateTime).slice(11, 16) || '--:--')}${log.isBackfilled ? '<div class="entry-by">補登</div>' : ''}</div>
+          <div class="entry ${isCont ? 'cont' : ''}" data-entry="${esc(log.logId)}">
+            <div class="entry-time">${isCont ? '' : esc(timeStr)}${!isCont && log.isBackfilled ? '<div class="entry-by">補登</div>' : ''}</div>
             <div>
               <div class="chips">${chips.join('')}</div>
               ${log.note ? `<div class="entry-note">${esc(log.note)}</div>` : ''}
