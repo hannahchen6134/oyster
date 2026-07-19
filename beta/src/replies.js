@@ -25,28 +25,43 @@ export function summaryBlock(summary) {
 
   const meds = summary.meds || [];
   if (!meds.length) {
-    lines.push('藥 尚無紀錄');
+    lines.push('💊 藥　尚無紀錄');
   } else {
     for (const med of meds) {
       const label = [med.slot, med.name].filter(Boolean).join(' ');
-      lines.push(`藥 ${label ? `${label} ` : ''}${displayMedStatus(med.status)}`);
+      const mark = med.status === '已吃' ? '✓' : `⚠ ${displayMedStatus(med.status)}`;
+      lines.push(`💊 ${label ? `${label} ` : ''}${mark}`);
     }
   }
 
   const gutParts = [];
   if (summary.vomitCount > 0) gutParts.push(`嘔吐 ${summary.vomitCount}`);
   if (summary.stoolCount > 0) gutParts.push(`便便 ${summary.stoolCount}`);
-  if (gutParts.length) lines.push(gutParts.join('・'));
+  if (gutParts.length) lines.push(`🩺 ${gutParts.join('・')}`);
 
   const careParts = [];
   if (summary.vaccineCount > 0) careParts.push('疫苗');
   if (summary.dewormCount > 0) careParts.push('除蟲');
-  if (careParts.length) lines.push(`處置 ${careParts.join('・')}`);
+  if (careParts.length) lines.push(`💉 ${careParts.join('・')}`);
 
   if (summary.vomitNotes?.length) lines.push(`嘔吐：${summary.vomitNotes.join('；')}`);
   if (summary.stoolNotes?.length) lines.push(`便便：${summary.stoolNotes.join('；')}`);
   if (summary.moodNotes?.length) lines.push(`精神：${summary.moodNotes.join('；')}`);
 
+  return lines.join('\n');
+}
+
+// 單筆記錄的輕量回覆：一行確認＋最相關的當日累積（不再每筆都跳大卡）
+// 完整狀態改由「今日確認」卡呈現，避免聊天室被洗版。
+export function lightRecordReply(description, category, summary, isToday = true) {
+  const day = isToday ? '今日' : '當日';
+  const lines = [`✓ 已記　${description}`];
+  if (category === 'water') {
+    lines.push(`${day}水分 ${formatNumber(summary.totalWaterMl)} ml`);
+  } else if (category === 'food') {
+    lines.push(`${day}熱量 ${formatNumber(summary.kcal)} kcal・水分 ${formatNumber(summary.totalWaterMl)} ml`);
+  }
+  // 藥／嘔吐／便便等：只確認，不附累積（想看整體點「今日確認」）
   return lines.join('\n');
 }
 

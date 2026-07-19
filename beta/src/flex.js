@@ -236,11 +236,14 @@ export function multiRecordFlex(pet, lines, summary, date) {
 export function todayFlex({ pet, date, summary, dateLabel }) {
   const meds = summary.meds || [];
   const medValue = meds.length
-    ? meds.map((m) => `${[m.slot, m.name].filter(Boolean).join(' ')}${m.status === '已吃' ? '✓' : displayMedStatus(m.status)}`).join('、')
+    ? meds.map((m) => `${[m.slot, m.name].filter(Boolean).join(' ')} ${m.status === '已吃' ? '✓' : `⚠${displayMedStatus(m.status)}`}`).join('、')
     : '尚無紀錄';
   const gutParts = [];
   if (summary.vomitCount > 0) gutParts.push(`嘔吐 ${summary.vomitCount}`);
   if (summary.stoolCount > 0) gutParts.push(`便便 ${summary.stoolCount}`);
+  const careParts = [];
+  if (summary.vaccineCount > 0) careParts.push('疫苗');
+  if (summary.dewormCount > 0) careParts.push('除蟲');
 
   const totalFood = (Number(summary.dryFoodG) || 0) + (Number(summary.wetFoodG) || 0) + (Number(summary.otherFoodG) || 0);
   const body = {
@@ -252,8 +255,9 @@ export function todayFlex({ pet, date, summary, dateLabel }) {
         statCell('食物', fmt(totalFood), 'g', STAT_ACCENT.food),
         statCell('熱量', fmt(summary.kcal), 'kcal', STAT_ACCENT.kcal)
       ]),
-      statRow('藥', medValue),
-      ...(gutParts.length ? [statRow('腸胃', gutParts.join('・'))] : []),
+      statRow('💊 藥', medValue),
+      ...(gutParts.length ? [statRow('🩺 腸胃', gutParts.join('・'))] : []),
+      ...(careParts.length ? [statRow('💉 處置', careParts.join('・'))] : []),
       ...goalContents(pet, summary, date)
     ]
   };

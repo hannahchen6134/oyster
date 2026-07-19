@@ -2,16 +2,20 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<!-- LINE 圖文選單設計稿：以 1250×843 檢視、deviceScaleFactor 2 輸出 2500×1686 -->
+<!-- LINE 圖文選單設計稿：以 1250×843 檢視、deviceScaleFactor 2 輸出 2500×1686
+     動線分區：上排＝今天要做的（記錄／確認，留在對話）；下排＝查看與前往（淺米區帶）。
+     會開網站的兩格（照護站、回診）右上角加 ↗ 角標，代表會離開對話。 -->
 <style>
   :root {
     --bg: #f7f4ee;
     --surface: #fffefb;
+    --band: #f3eee3;
     --ink: #2b2a26;
     --muted: #8b867a;
     --line: #e3ddd0;
     --brand: #734921;
     --brand-deep: #5a3617;
+    --tint: #efe6d5;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -25,19 +29,31 @@
     grid-template-rows: 1fr 1fr;
   }
   .cell {
+    position: relative;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     gap: 14px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line);
     background: var(--surface);
   }
   .cell:nth-child(3n) { border-right: none; }
   .cell:nth-child(n+4) { border-bottom: none; }
-  .cell.accent { background: var(--brand); }
-  .cell.accent .label { color: #fff; }
-  .cell.accent .cmd { color: rgba(255, 255, 255, 0.75); }
-  .cell.accent svg { stroke: #fff; }
-  svg { width: 64px; height: 64px; stroke: var(--brand); stroke-width: 1.6; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  /* 下排「查看與前往」區帶：淺米底，和上排的白底分開 */
+  .cell.zone-view { background: var(--band); }
+  /* 上排與下排之間的分隔：較深一階的規線，強化「兩區」 */
+  .cell:nth-child(4), .cell:nth-child(5), .cell:nth-child(6) { border-top: 2px solid #d9d0be; }
+  /* 照護站：主要入口，品牌淡底 highlight（不用整塊深咖啡，較不搶眼、較耐看） */
+  .cell.primary { background: var(--tint); }
+  svg { width: 62px; height: 62px; stroke: var(--brand); stroke-width: 1.6; fill: none; stroke-linecap: round; stroke-linejoin: round; }
   .label { font-family: "Noto Serif TC", serif; font-size: 34px; font-weight: 600; letter-spacing: 0.06em; }
-  .cmd { font-size: 19px; color: var(--muted); letter-spacing: 0.1em; }
+  .cmd { font-size: 19px; color: var(--muted); letter-spacing: 0.08em; }
+  .cell.primary .label { color: var(--brand-deep); }
+  /* 開網站角標：右上角 ↗，代表會離開對話 */
+  .ext {
+    position: absolute; top: 20px; right: 22px;
+    display: flex; align-items: center; gap: 6px;
+    font-size: 16px; color: var(--brand); letter-spacing: 0.06em;
+    background: rgba(115, 73, 33, 0.10); border-radius: 999px; padding: 5px 12px;
+  }
+  .ext svg { width: 20px; height: 20px; stroke: var(--brand); stroke-width: 2.2; }
 </style>
 </head>
 <body>
@@ -57,17 +73,19 @@
       <div class="label">今日確認</div>
       <div class="cmd">看今天狀況</div>
     </div>
-    <div class="cell accent">
+    <div class="cell zone-view primary">
+      <div class="ext"><span>網站</span><svg viewBox="0 0 24 24"><path d="M7 17 L17 7"/><path d="M8.5 7 H17 V15.5"/></svg></div>
       <svg viewBox="0 0 24 24"><circle cx="12" cy="13.5" r="7"/><path d="M7.2 8.6 L5.6 3.8 L10.2 6.4"/><path d="M16.8 8.6 L18.4 3.8 L13.8 6.4"/><path d="M9.5 13.2 q1.2 1.2 2.5 0"/><path d="M12 13.2 q1.2 1.2 2.5 0"/></svg>
       <div class="label">喵喵照護站</div>
-      <div class="cmd">點我開啟網站</div>
+      <div class="cmd">開啟網站</div>
     </div>
-    <div class="cell">
+    <div class="cell zone-view">
       <svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 2.8v4M16 2.8v4"/></svg>
       <div class="label">照護月曆</div>
-      <div class="cmd">傳送「月曆」</div>
+      <div class="cmd">在對話看月曆</div>
     </div>
-    <div class="cell">
+    <div class="cell zone-view">
+      <div class="ext"><span>網站</span><svg viewBox="0 0 24 24"><path d="M7 17 L17 7"/><path d="M8.5 7 H17 V15.5"/></svg></div>
       <svg viewBox="0 0 24 24"><path d="M7 3.5v5a5 5 0 0 0 10 0v-5"/><path d="M12 13.5v2.5a4 4 0 0 0 4 4h1"/><circle cx="19" cy="20" r="1.6"/></svg>
       <div class="label">回診資訊</div>
       <div class="cmd">近 30 天回顧</div>
