@@ -855,7 +855,7 @@
           </div>
           <div class="login-code-msg hidden" id="loginCodeMsg"></div>
         </div>
-        <p class="login-hint">手機用戶：在官方 LINE 選單點 <b>喵喵照護站</b>，就會自動登入進來。</p>
+        <p class="login-hint">手機用戶：在官方 LINE 選單點 <b>喵喵照護站</b>，點連結就進來。</p>
         <div id="liffDebug" style="margin-top:18px;padding:10px 12px;border:1px dashed var(--line-strong);border-radius:8px;font-size:11px;line-height:1.6;color:var(--ink-soft);word-break:break-all;text-align:left">偵測中…</div>
         <details class="disclaimer-fold">
           <summary>免責聲明<span class="df-caret">⌄</span></summary>
@@ -1183,9 +1183,6 @@
       $('loginView').classList.remove('hidden');
       $('appView').classList.add('hidden');
       $('loginExpired').classList.toggle('hidden', !expired);
-      // 暫時的 LIFF 診斷（排查自動登入用；查好會移除）
-      const dbgEl = $('liffDebug');
-      if (dbgEl) dbgEl.textContent = state.liffDebug ? 'LIFF: ' + JSON.stringify(state.liffDebug) : '';
     }
 
     function switchTab(tab) {
@@ -2816,6 +2813,12 @@
       const dbg = { step: 'start' };
       state.liffDebug = dbg;
       state.liff = state.liff || {};
+      // 防迴圈：LIFF 登入每個分頁 session 只嘗試一次。萬一 liff.init 想重導迴圈，
+      // 第二次載入就直接跳過 → 迴圈被打斷、頁面用一般 token 流程正常顯示。
+      try {
+        if (sessionStorage.getItem('liffTried')) { dbg.skipped = 'alreadyTried'; renderLiffDebug(); return; }
+        sessionStorage.setItem('liffTried', '1');
+      } catch (error) { /* sessionStorage 不可用就照舊 */ }
       try {
         renderLiffDebug();
         const cfg = await fetch('/api/liff-config').then((r) => r.json()).catch(() => ({}));
@@ -2858,7 +2861,7 @@
     }
 
     async function bootstrap() {
-      // 一進來就先把登入頁顯示出來，避免「兩個畫面都隱藏」造成整頁空白轉圈；成功登入後再切到主畫面
+      // 一進來先顯示登入頁，避免載入期間整頁空白；成功後再切主畫面
       showLogin(false);
       const liffReady = initLiff();
       // 從網址 hash 取 token（LINE 登入連結）與深連結目標 go=
@@ -2869,12 +2872,10 @@
         localStorage.setItem(TOKEN_KEY, hashMatch[1]);
         history.replaceState(null, '', location.pathname);
       }
-      // 先等 LIFF（但最多 4.5 秒，避免 LIFF 卡住讓整頁一直轉圈）：
-      // 在 LINE 內時，LIFF 換發的新登入「優先」於 localStorage 裡可能過期的舊 token
+      // 在 LINE 內時，LIFF 換發的新登入優先於可能過期的舊 token；最多等 5 秒
       try {
-        await Promise.race([liffReady, new Promise((resolve) => setTimeout(resolve, 4500))]);
+        await Promise.race([liffReady, new Promise((resolve) => setTimeout(resolve, 5000))]);
       } catch (error) { /* ignore */ }
-      // 把 LIFF 診斷更新到登入頁那行小字（排查用）
       const dbgEl = $('liffDebug');
       if (dbgEl && state.liffDebug) dbgEl.textContent = 'LIFF: ' + JSON.stringify(state.liffDebug);
       if (state.liff && state.liff.autoToken) {
@@ -2883,7 +2884,7 @@
       } else {
         state.token = localStorage.getItem(TOKEN_KEY) || '';
       }
-      if (!state.token) return; // 已停在登入頁（含診斷）
+      if (!state.token) return; // 已停在登入頁
 
       try {
         await refreshPets();
