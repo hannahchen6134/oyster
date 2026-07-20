@@ -170,7 +170,7 @@ function bubble(altText, contents) {
 }
 
 // ---------- 記錄確認卡 ----------
-export function recordFlex({ pet, categoryKey, mainText, subText, summary, date, logId, hints = [], title = '', tip = '' }) {
+export function recordFlex({ pet, categoryKey, mainText, subText, summary, date, logId, hints = [], title = '', tip = '', siteUrl = '' }) {
   const style = CATEGORY_STYLE[categoryKey] || CATEGORY_STYLE.note;
   const body = {
     type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
@@ -197,7 +197,10 @@ export function recordFlex({ pet, categoryKey, mainText, subText, summary, date,
       { type: 'button', height: 'sm', style: 'link', color: C.brand,
         action: { type: 'postback', label: '刪除這筆', data: `action=delLog&logId=${logId}`, displayText: '刪除剛剛那筆' } },
       { type: 'button', height: 'sm', style: 'primary', color: C.brand,
-        action: { type: 'message', label: '開啟照護站', text: '照護站' } }
+        // 直接開網站（已烤入登入連結）；沒有 siteUrl 時退回舊的訊息觸發
+        action: siteUrl
+          ? { type: 'uri', label: '開啟照護站', uri: siteUrl }
+          : { type: 'message', label: '開啟照護站', text: '照護站' } }
     ]
   };
   const headerTitle = title || `已記錄・${pet?.petName || '貓貓'}`;
@@ -205,7 +208,7 @@ export function recordFlex({ pet, categoryKey, mainText, subText, summary, date,
 }
 
 // 一則訊息記多筆時的合併確認卡：條列這次記了哪幾筆 ＋ 當天累積
-export function multiRecordFlex(pet, lines, summary, date) {
+export function multiRecordFlex(pet, lines, summary, date, siteUrl = '') {
   const foodG = (Number(summary.dryFoodG) || 0) + (Number(summary.wetFoodG) || 0) + (Number(summary.otherFoodG) || 0);
   const body = {
     type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
@@ -226,14 +229,16 @@ export function multiRecordFlex(pet, lines, summary, date) {
     type: 'box', layout: 'horizontal', spacing: 'sm', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
     contents: [
       { type: 'button', height: 'sm', style: 'primary', color: C.brand,
-        action: { type: 'message', label: '開啟照護站', text: '照護站' } }
+        action: siteUrl
+          ? { type: 'uri', label: '開啟照護站', uri: siteUrl }
+          : { type: 'message', label: '開啟照護站', text: '照護站' } }
     ]
   };
   return bubble(`已記錄 ${lines.length} 筆`, { type: 'bubble', size: 'mega', header: header(`已記錄・${pet?.petName || '貓貓'}`), body, footer });
 }
 
 // ---------- 今日總結卡 ----------
-export function todayFlex({ pet, date, summary, dateLabel }) {
+export function todayFlex({ pet, date, summary, dateLabel, siteUrl = '' }) {
   const meds = summary.meds || [];
   const medValue = meds.length
     ? meds.map((m) => `${[m.slot, m.name].filter(Boolean).join(' ')} ${m.status === '已吃' ? '✓' : `⚠${displayMedStatus(m.status)}`}`).join('、')
@@ -265,7 +270,9 @@ export function todayFlex({ pet, date, summary, dateLabel }) {
     type: 'box', layout: 'horizontal', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
     contents: [
       { type: 'button', height: 'sm', style: 'primary', color: C.brand,
-        action: { type: 'message', label: '開啟照護站', text: '照護站' } }
+        action: siteUrl
+          ? { type: 'uri', label: '開啟照護站', uri: siteUrl }
+          : { type: 'message', label: '開啟照護站', text: '照護站' } }
     ]
   };
   return bubble(
