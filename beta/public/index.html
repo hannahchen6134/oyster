@@ -751,6 +751,14 @@
       padding: 13px 15px; color: var(--ink-soft); letter-spacing: 0.01em;
     }
     .login-notice b { font-weight: 600; color: var(--seal); }
+    /* 只在 LINE 內顯示的「回 LINE 對話」：關掉 LIFF 視窗 */
+    .back-to-line {
+      display: block; margin: 30px auto 0; padding: 10px 22px;
+      background: var(--sheet); border: 1px solid var(--line-strong); border-radius: 999px;
+      color: var(--brand); font-size: 13.5px; font-weight: 600; cursor: pointer;
+      box-shadow: var(--shadow-soft);
+    }
+    .back-to-line:hover { background: var(--brand-tint); border-color: var(--brand); }
     .disclaimer { margin: 18px auto 0; max-width: 560px; font-size: 11.5px; line-height: 1.7; color: var(--muted); text-align: center; }
     /* 免責聲明：平常只有一個極小的灰字連結，點了才展開條列 */
     .disclaimer-fold { margin: 14px auto 0; max-width: 520px; font-size: 11px; line-height: 1.7; color: var(--muted); }
@@ -848,6 +856,7 @@
           <div class="login-code-msg hidden" id="loginCodeMsg"></div>
         </div>
         <p class="login-hint">手機用戶：在官方 LINE 選單點 <b>喵喵照護站</b>，就會自動登入進來。</p>
+        <div id="liffDebug" style="margin-top:14px;font-size:10px;line-height:1.5;color:var(--line-strong);word-break:break-all"></div>
         <details class="disclaimer-fold">
           <summary>免責聲明<span class="df-caret">⌄</span></summary>
           <ul>
@@ -1056,6 +1065,7 @@
         </div>
       </section>
 
+      <button class="back-to-line hidden" id="backToLineBtn" type="button">‹　回 LINE 對話</button>
       <footer class="colophon">讓每一次紀錄，都是對貓貓的守護</footer>
       <details class="disclaimer-fold">
         <summary>免責聲明與資料使用<span class="df-caret">⌄</span></summary>
@@ -1173,6 +1183,9 @@
       $('loginView').classList.remove('hidden');
       $('appView').classList.add('hidden');
       $('loginExpired').classList.toggle('hidden', !expired);
+      // 暫時的 LIFF 診斷（排查自動登入用；查好會移除）
+      const dbgEl = $('liffDebug');
+      if (dbgEl) dbgEl.textContent = state.liffDebug ? 'LIFF: ' + JSON.stringify(state.liffDebug) : '';
     }
 
     function switchTab(tab) {
@@ -2796,31 +2809,41 @@
     }
     // 載入 LIFF：讓「挑好友送出邀請」可用，並在 LINE 內用 LINE 身分自動換發登入（免網址帶 token）
     async function initLiff() {
+      const dbg = { step: 'start' };
+      state.liffDebug = dbg;
+      state.liff = state.liff || {};
       try {
         const cfg = await fetch('/api/liff-config').then((r) => r.json()).catch(() => ({}));
+        dbg.liffId = cfg && cfg.liffId ? 'set' : 'none';
         if (!cfg || !cfg.liffId) return;
         await loadScript('https://static.line-scdn.net/liff/edge/2/sdk.js');
         await liff.init({ liffId: cfg.liffId });
-        state.liff = { ready: true, inClient: liff.isInClient(), canShare: liff.isApiAvailable('shareTargetPicker') };
+        dbg.inClient = liff.isInClient();
+        dbg.loggedIn = liff.isLoggedIn();
+        state.liff = { ready: true, inClient: dbg.inClient, canShare: liff.isApiAvailable('shareTargetPicker') };
         // 已登入就拿 access token 向後端換發本人 session（後端用它取回 userId，和機器人同 Provider 一致）
-        if (liff.isLoggedIn && liff.isLoggedIn()) {
+        if (liff.isLoggedIn()) {
           const accessToken = liff.getAccessToken && liff.getAccessToken();
+          dbg.gotToken = !!accessToken;
           if (accessToken) {
             const res = await fetch('/api/liff-login', {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ accessToken })
-            }).then((r) => r.json()).catch(() => ({}));
+            }).then((r) => r.json()).catch((e) => ({ message: String(e && e.message || e) }));
+            dbg.loginOk = !!(res && res.ok);
+            dbg.loginMsg = res && res.message;
             if (res && res.ok && res.token) state.liff.autoToken = res.token;
           }
-        } else if (state.liff.inClient && liff.login) {
+        } else if (dbg.inClient && liff.login) {
           // 在 LINE 內卻還沒登入 → 觸發登入（回來後會自動換發）
+          dbg.action = 'login';
           try { liff.login(); } catch (error) { /* ignore */ }
         }
-      } catch (error) { /* LIFF 不可用就當沒有，功能自動退回原本流程 */ }
+      } catch (error) { dbg.error = String(error && error.message || error); }
     }
 
     async function bootstrap() {
-      const liffReady = initLiff(); // 背景載入；沒有現成 token 時才會等它（見下）
+      const liffReady = initLiff();
       // 從網址 hash 取 token（LINE 登入連結）與深連結目標 go=
       const hashMatch = location.hash.match(/token=([a-zA-Z0-9]+)/);
       const goMatch = location.hash.match(/[#&]go=([a-z]+)/);
@@ -2829,14 +2852,13 @@
         localStorage.setItem(TOKEN_KEY, hashMatch[1]);
         history.replaceState(null, '', location.pathname);
       }
-      state.token = localStorage.getItem(TOKEN_KEY) || '';
-      // 沒有現成 token（可能是在 LINE 內用 LIFF 網址打開）→ 等 LIFF 自動登入換發
-      if (!state.token) {
-        try { await liffReady; } catch (error) { /* ignore */ }
-        if (state.liff && state.liff.autoToken) {
-          state.token = state.liff.autoToken;
-          localStorage.setItem(TOKEN_KEY, state.token);
-        }
+      // 先等 LIFF：在 LINE 內時，LIFF 換發的新登入「優先」於 localStorage 裡可能過期的舊 token
+      try { await liffReady; } catch (error) { /* ignore */ }
+      if (state.liff && state.liff.autoToken) {
+        state.token = state.liff.autoToken;
+        localStorage.setItem(TOKEN_KEY, state.token);
+      } else {
+        state.token = localStorage.getItem(TOKEN_KEY) || '';
       }
       if (!state.token) return showLogin();
 
@@ -2850,6 +2872,12 @@
 
       $('loginView').classList.add('hidden');
       $('appView').classList.remove('hidden');
+      // 在 LINE 內（LIFF）才顯示「回 LINE 對話」，點了關掉視窗回聊天室
+      if (state.liff && state.liff.inClient) {
+        const backBtn = $('backToLineBtn');
+        backBtn.classList.remove('hidden');
+        backBtn.addEventListener('click', () => { try { liff.closeWindow(); } catch (error) { /* ignore */ } });
+      }
       // 免責聲明改為只放頁尾（頂部橫幅移除，避免每次一打開就擋在最上面）
       const tpe = todayStr();
       const dow = '日一二三四五六'[new Date(`${tpe}T00:00:00`).getDay()];
