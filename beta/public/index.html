@@ -2823,9 +2823,9 @@
       state.liff = state.liff || {};
       // 防迴圈：最多嘗試 2 次；超過就跳過，避免無限重導。每個新 session 會重置。
       try {
-        const tries = Number(sessionStorage.getItem('liffTries_d') || '0');
+        const tries = Number(sessionStorage.getItem('liffTries_e') || '0');
         if (tries >= 3) { dbg.skipped = 'maxTries'; renderLiffDebug(); return; }
-        sessionStorage.setItem('liffTries_d', String(tries + 1));
+        sessionStorage.setItem('liffTries_e', String(tries + 1));
         dbg.tries = tries + 1;
       } catch (error) { /* sessionStorage 不可用就照舊 */ }
       window.addEventListener('beforeunload', () => { dbg.unloaded = true; postLiffDebug(); });
