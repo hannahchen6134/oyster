@@ -2849,6 +2849,7 @@
           new Promise((_, reject) => setTimeout(() => reject(new Error('init-timeout')), 6000))
         ]);
         dbg.inited = true;
+        try { sessionStorage.removeItem('liffTries_h'); } catch (error) { /* ignore */ }
         dbg.inClient = liff.isInClient();
         dbg.loggedIn = liff.isLoggedIn();
         renderLiffDebug();
@@ -2880,10 +2881,14 @@
       showLogin(false);
       const liffReady = initLiff();
       // 從網址 hash 取 token（LINE 登入連結）與深連結目標 go=
-      const hashMatch = location.hash.match(/token=([a-zA-Z0-9]+)/);
+      // 注意：一定要錨定 [#&]token=，否則會誤吃 LIFF 的 context_token / access_token
+      const hashMatch = location.hash.match(/[#&]token=([a-zA-Z0-9]+)/);
       const goMatch = location.hash.match(/[#&]go=([a-z]+)/);
       const goTarget = goMatch ? goMatch[1] : '';
-      if (hashMatch) {
+      // LIFF 開啟時網址帶有 liff.state / context_token 等參數，liff.init 要靠它們完成初始化；
+      // 這種情況絕對不能動網址（之前在這裡洗掉參數，造成 init 無限重導）
+      const hasLiffParams = /liff\.state|liffClientId|context_token=|access_token=/.test(location.search + location.hash);
+      if (hashMatch && !hasLiffParams) {
         localStorage.setItem(TOKEN_KEY, hashMatch[1]);
         history.replaceState(null, '', location.pathname);
       }
