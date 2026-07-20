@@ -489,6 +489,19 @@
     .dpill.p-dry   { background: #f4ebd4; color: #886722; }
     .dpill.p-kcal  { background: #ece7f3; color: #5a4a84; }
     .dpill.p-warn  { background: var(--seal-tint); color: var(--seal); font-weight: 700; }
+    /* 給醫生的重點整理：白底、按時間列點，截圖友善 */
+    .digest-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+    .digest-toolbar .range-chips { margin: 0; }
+    .digest-card { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 4px 14px; }
+    .digest-row { display: flex; gap: 8px; align-items: baseline; padding: 9px 0; border-bottom: 1px solid var(--line-soft, #f0ebe0); font-size: 13.5px; line-height: 1.6; }
+    .digest-row:last-child { border-bottom: none; }
+    .digest-when { flex: none; width: 86px; color: var(--ink); font-variant-numeric: tabular-nums; }
+    .digest-when small { display: block; color: var(--muted); font-size: 11px; letter-spacing: 0.03em; }
+    .digest-tag { flex: none; font-size: 11px; padding: 2px 8px; border-radius: 999px; background: var(--seal-tint); color: var(--seal); font-weight: 700; white-space: nowrap; }
+    .digest-tag.t-care { background: #ece7f3; color: #5a4a84; }   /* 疫苗/除蟲/回診＝處置紫 */
+    .digest-tag.t-note { background: #f4ebd4; color: #886722; }   /* 備註/觀察＝麥色 */
+    .digest-text { flex: 1; min-width: 0; color: var(--ink); overflow-wrap: anywhere; }
+    .digest-empty { padding: 22px 4px; text-align: center; color: var(--muted); font-size: 13px; }
     .dcard-sub { font-size: 11.5px; color: var(--muted); margin-top: 8px; }
     .dcard-sub .warn-txt { color: var(--seal); font-weight: 700; }
     /* 小圓形「＋」按鈕：取代原本的「查看當天」文字，把整行寬度留給四項數字 */
@@ -1007,6 +1020,24 @@
 
       <!-- 回診 -->
       <section class="panel hidden" id="trendView">
+        <details class="block fold" open>
+          <summary>
+            <span class="fold-title">給醫生的重點整理<span class="fold-count" id="digestCount"></span></span>
+            <span class="fold-toggle">＋</span>
+          </summary>
+          <div class="fold-body">
+            <div class="digest-toolbar">
+              <div class="range-chips" id="digestRangeChips">
+                <button data-drange="7" type="button">7 天</button>
+                <button data-drange="14" type="button" class="active">14 天</button>
+                <button data-drange="30" type="button">30 天</button>
+              </div>
+              <button class="btn btn-secondary btn-sm" id="digestCopyBtn" type="button">複製文字</button>
+            </div>
+            <div class="digest-card" id="digestCard"></div>
+            <p class="muted" style="font-size:12px;margin:10px 2px 0">只列有狀況的日子，沒列出＝無特殊紀錄。截圖或按「複製文字」貼給醫生都可以。</p>
+          </div>
+        </details>
         <details class="block fold">
           <summary>
             <span class="fold-title" id="visitFoldTitle">看診紀錄</span>
@@ -2130,6 +2161,77 @@
       return { date, text };
     }
 
+    // ── 給醫生的重點整理 ─────────────────────────────
+    // 收錄：特殊事件（吐/疫苗/除蟲/漏藥/精神/備註）＋任何寫了備註的紀錄＋回診，按時間排序
+    const DIGEST_LABELS = {
+      vomit: ['吐', 'warn'], mood: ['精神', 'warn'], stool: ['便便', 'warn'], urine: ['尿尿', 'warn'],
+      med: ['用藥', 'warn'], vaccine: ['疫苗', 'care'], deworm: ['除蟲', 'care'],
+      note: ['備註', 'note'], water: ['喝水', 'note'], food: ['進食', 'note'], supplement: ['保健', 'note']
+    };
+    function digestItems(data) {
+      const items = [];
+      for (const log of data.logs || []) {
+        const date = String(log.eventDateTime).slice(0, 10);
+        // 補記的紀錄時間是推定值，不顯示時分
+        const time = Number(log.isBackfilled) ? '' : String(log.eventDateTime).slice(11, 16);
+        const [label, tone] = DIGEST_LABELS[log.category] || ['紀錄', 'note'];
+        const bits = [];
+        if (log.category === 'med') {
+          bits.push(`${log.itemName || '藥'}${log.medSlot ? `（${log.medSlot}）` : ''}${log.medStatus}`);
+          if (log.note) bits.push(log.note);
+        } else {
+          if (log.itemName) bits.push(log.itemName);
+          if (Number(log.amount)) bits.push(`${log.amount}${log.unit || ''}`);
+          if (log.note) bits.push(log.note);
+        }
+        items.push({ date, time, label, tone, text: bits.join('，') || label });
+      }
+      for (const v of data.visits || []) {
+        const bits = [];
+        if (v.reason) bits.push(v.reason);
+        if (v.doctorInstruction) bits.push(`醫囑：${v.doctorInstruction}`);
+        if (v.note) bits.push(v.note);
+        items.push({ date: v.visitDate, time: v.visitTime || '', label: '回診', tone: 'care', text: bits.join('，') || '回診' });
+      }
+      items.sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
+      return items;
+    }
+    function digestWhen(date) {
+      const dow = '日一二三四五六'[new Date(`${date}T00:00:00`).getDay()];
+      return `${Number(date.slice(5, 7))}/${date.slice(8, 10)}（${dow}）`;
+    }
+    async function loadDigest() {
+      if (!state.petId) return;
+      state.digestDays = state.digestDays || 14;
+      const data = await api(`highlights?petId=${state.petId}&days=${state.digestDays}`);
+      state.digestData = data;
+      const items = digestItems(data);
+      const dc = $('digestCount');
+      if (dc) dc.textContent = items.length ? `（${items.length} 筆）` : '';
+      const card = $('digestCard');
+      if (!card) return;
+      if (!items.length) {
+        card.innerHTML = `<div class="digest-empty">近 ${state.digestDays} 天沒有需要注意的紀錄 🐾</div>`;
+        return;
+      }
+      card.innerHTML = items.map((it) => `
+        <div class="digest-row">
+          <span class="digest-when">${esc(digestWhen(it.date))}${it.time ? `<small>${esc(it.time)}</small>` : ''}</span>
+          <span class="digest-tag t-${esc(it.tone)}">${esc(it.label)}</span>
+          <span class="digest-text">${esc(it.text)}</span>
+        </div>`).join('');
+    }
+    // 純文字版：貼進 LINE 給醫生用
+    function digestPlainText() {
+      const data = state.digestData;
+      if (!data) return '';
+      const items = digestItems(data);
+      const pet = (state.pets || []).find((p) => p.petId === state.petId);
+      const head = `${pet ? pet.petName : '貓貓'}｜須注意事項（${digestWhen(data.from)}〜${digestWhen(data.to)}）`;
+      if (!items.length) return `${head}\n這段期間沒有特殊狀況`;
+      return [head, ...items.map((it) => `${digestWhen(it.date)}${it.time ? ` ${it.time}` : ''}　${it.label}：${it.text}`)].join('\n');
+    }
+
     async function loadTrend() {
       if (!state.petId) return;
       const to = todayStr();
@@ -2154,6 +2256,7 @@
 
       renderTrendCharts(data.rows, fromDate, to);
       renderLabTrend();
+      await loadDigest();
       await loadTable();
     }
 
@@ -2967,6 +3070,13 @@
           el.classList.toggle('active', el === trangeBtn));
         return loadTable();
       }
+      const drangeBtn = event.target.closest('#digestRangeChips [data-drange]');
+      if (drangeBtn) {
+        state.digestDays = Number(drangeBtn.dataset.drange) || 14;
+        document.querySelectorAll('#digestRangeChips [data-drange]').forEach((el) =>
+          el.classList.toggle('active', el === drangeBtn));
+        return loadDigest();
+      }
 
       const calCell = event.target.closest('.cal-cell[data-date]');
       if (calCell) {
@@ -3123,6 +3233,14 @@
       openLogModal(null);
     });
     $('addVisitBtn').addEventListener('click', () => openDayVisitModal(null));
+    $('digestCopyBtn').addEventListener('click', async () => {
+      const text = digestPlainText();
+      if (!text) return;
+      try {
+        await navigator.clipboard.writeText(text);
+        toast('已複製，貼上就能傳給醫生');
+      } catch (error) { toast('複製失敗，請改用截圖', true); }
+    });
     $('calPrevBtn').addEventListener('click', () => {
       const [year, month] = state.calMonth.split('-').map(Number);
       const date = new Date(year, month - 2, 1);

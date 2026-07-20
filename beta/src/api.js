@@ -11,7 +11,7 @@ import {
 } from './db.js';
 import { computeDailySummary, deriveFoodFields } from './summary.js';
 import { matchFood } from './parser.js';
-import { jsonResponse, newId, nowIso, isValidDate, isValidDateTime, taipeiNowDateTime } from './util.js';
+import { jsonResponse, newId, nowIso, isValidDate, isValidDateTime, taipeiNowDateTime, taipeiToday } from './util.js';
 
 const RESOURCES = {
   pets: {
@@ -134,6 +134,37 @@ export async function handleApi(request, env, url) {
       if (!(await assertPetOwner(db, petId, dataOwnerId))) return forbidden();
       const logs = await getRecentLogsByPet(db, petId, limit);
       return jsonResponse({ ok: true, logs });
+    }
+
+    // 給醫生的重點整理：期間內的特殊事件（吐/疫苗/除蟲/漏藥/精神/備註）＋任何寫了備註的紀錄＋回診
+    if (resource === 'highlights' && method === 'GET') {
+      const petId = url.searchParams.get('petId') || '';
+      const days = Math.min(90, Math.max(1, Number(url.searchParams.get('days')) || 14));
+      if (!(await assertPetOwner(db, petId, dataOwnerId))) return forbidden();
+      const today = taipeiToday();
+      const from = new Date(Date.parse(`${today}T00:00:00Z`) - (days - 1) * 86400000).toISOString().slice(0, 10);
+      const { results: logs } = await db
+        .prepare(
+          `SELECT eventDateTime, category, itemName, amount, unit, medStatus, medSlot, note, isBackfilled
+           FROM logs
+           WHERE petId = ? AND isDeleted = 0 AND substr(eventDateTime, 1, 10) >= ?
+             AND (category IN ('vomit', 'vaccine', 'deworm', 'note', 'mood')
+                  OR (category = 'med' AND medStatus IN ('漏餵', '吐掉', '拒吃'))
+                  OR note <> '')
+           ORDER BY eventDateTime ASC`
+        )
+        .bind(petId, from)
+        .all();
+      const { results: visits } = await db
+        .prepare(
+          `SELECT visitDate, visitTime, reason, doctorInstruction, note
+           FROM vet_visits
+           WHERE petId = ? AND isDeleted = 0 AND visitDate >= ? AND visitDate <= ?
+           ORDER BY visitDate ASC`
+        )
+        .bind(petId, from, today)
+        .all();
+      return jsonResponse({ ok: true, from, to: today, logs: logs || [], visits: visits || [] });
     }
 
     if (resource === 'logs') {
