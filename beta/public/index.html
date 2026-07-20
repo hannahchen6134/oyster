@@ -83,7 +83,6 @@
       white-space: nowrap;
     }
     .colophon::before, .colophon::after { content: ''; flex: 1; height: 1px; background: var(--line); }
-    .login-cat { width: 132px; margin: 0 auto 10px; display: block; opacity: 0.92; }
 
     h1 {
       margin: 0; font-family: var(--serif); font-weight: 700;
@@ -603,17 +602,23 @@
     .login-wrap { min-height: calc(100vh - 150px); display: flex; align-items: center; justify-content: center; }
     .login-card {
       position: relative;
-      max-width: 440px; width: 100%; text-align: center; padding: 46px 36px 40px;
-      background: var(--sheet); border: 1px solid rgba(27, 29, 26, 0.08);
-      border-top: 3px solid var(--ink); border-radius: 0 0 var(--radius) var(--radius);
+      max-width: 420px; width: 100%; text-align: center; padding: 42px 32px 32px;
+      background: linear-gradient(180deg, #fffdf8 0%, var(--sheet-soft) 100%);
+      border: 1px solid rgba(115, 73, 33, 0.12);
+      border-radius: var(--radius-lg);
       box-shadow: var(--shadow-lift);
+      overflow: hidden;
     }
-    .login-card h1 { font-size: 32px; }
-    .login-steps { margin: 28px auto 0; max-width: 340px; text-align: left; }
-    .login-step { display: flex; gap: 14px; align-items: baseline; padding: 11px 2px; border-bottom: 1px solid var(--line); }
-    .login-step:last-child { border-bottom: none; }
-    .login-step .num { font-family: var(--serif); color: var(--brand); font-weight: 600; font-size: 15px; }
-    .login-code-box { margin: 24px auto 0; max-width: 340px; text-align: left; background: var(--brand-tint); border-radius: var(--radius); padding: 16px; }
+    /* 頂端咖啡漸層線，和主畫面同一個世界 */
+    .login-card::after {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 6px;
+      background: linear-gradient(90deg, #8a5a2c 0%, var(--brand) 45%, #5a3617 100%);
+    }
+    .login-card h1 { font-size: 34px; margin-top: 12px; }
+    .login-tagline { color: var(--muted); font-size: 14px; margin-top: 10px; }
+    .login-hint { color: var(--muted); font-size: 13px; line-height: 1.7; margin-top: 20px; }
+    .login-hint b { color: var(--brand); font-weight: 600; }
+    .login-code-box { margin: 26px auto 0; max-width: 340px; text-align: left; background: var(--brand-tint); border-radius: var(--radius); padding: 16px 16px 18px; }
     .login-code-label { font-size: 13px; color: var(--ink, #332417); line-height: 1.6; margin-bottom: 10px; }
     .login-code-row { display: flex; gap: 8px; }
     .login-code-row input { flex: 1; min-width: 0; padding: 11px 12px; font-size: 17px; letter-spacing: 3px; text-align: center; border: 1px solid var(--line); border-radius: var(--radius-sm); background: #fff; }
@@ -821,35 +826,22 @@
     <!-- 登入畫面 -->
     <section id="loginView" class="login-wrap hidden">
       <div class="panel login-card">
-        <svg class="login-cat" viewBox="0 0 140 90" fill="none" stroke="var(--brand)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M30 66 C16 52 24 28 52 24 C76 20 96 28 100 44 C103 56 95 64 82 66 C62 70 44 70 30 66 Z"/>
-          <circle cx="103" cy="38" r="15"/>
-          <path d="M92 28 L89 16 L100 24"/>
-          <path d="M108 25 L114 14 L117 27"/>
-          <path d="M97 39 q3 2.5 6 0"/>
-          <path d="M107 39 q3 2.5 6 0"/>
-          <path d="M30 66 C20 66 15 58 21 52 C25 48 31 50 30 56"/>
-        </svg>
         <div class="eyebrow">喵喵照護安心管家</div>
-        <h1 style="margin-top:14px">照護站</h1>
-        <p class="muted" style="margin-top:10px">讓每一次紀錄，都是對貓貓的守護。</p>
+        <h1>照護站</h1>
+        <p class="login-tagline">讓每一次紀錄，都是對貓貓的守護。</p>
         <div class="login-notice hidden" id="loginExpired">
-          這個照護站連結已過期。請回 LINE 輸入「照護站」取得新的專屬連結。<br>
-          <b>你的既有照護資料不會因連結過期而消失。</b>
+          這個連結已過期，請回 LINE 點「喵喵照護站」重新進入。<br>
+          <b>你的照護資料不會因連結過期而消失。</b>
         </div>
         <div class="login-code-box">
-          <div class="login-code-label">用電腦登入：在 LINE 打「<b>電腦登入</b>」取得一組登入碼，輸入這裡</div>
+          <div class="login-code-label">用電腦登入：在 LINE 輸入「<b>電腦登入</b>」取得 6 位數登入碼</div>
           <div class="login-code-row">
             <input id="loginCodeInput" inputmode="numeric" maxlength="6" placeholder="6 位數字登入碼" autocomplete="one-time-code">
             <button class="btn btn-primary" id="loginCodeBtn" type="button">登入</button>
           </div>
           <div class="login-code-msg hidden" id="loginCodeMsg"></div>
         </div>
-        <div class="login-steps">
-          <div class="login-step"><span class="num">1</span><span>加入「喵喵照護安心管家」官方 LINE</span></div>
-          <div class="login-step"><span class="num">2</span><span>手機：輸入 <b>照護站</b> 點連結就進<br>電腦：輸入 <b>電腦登入</b> 拿上面的登入碼</span></div>
-        </div>
-        <p class="muted" style="margin-top:22px">登入後這台裝置會記住你，之後直接開網址就進得去；就算過期，既有資料也不會消失。</p>
+        <p class="login-hint">手機用戶：在官方 LINE 選單點 <b>喵喵照護站</b>，就會自動登入進來。</p>
         <details class="disclaimer-fold">
           <summary>免責聲明<span class="df-caret">⌄</span></summary>
           <ul>
@@ -2804,16 +2796,19 @@
         await loadScript('https://static.line-scdn.net/liff/edge/2/sdk.js');
         await liff.init({ liffId: cfg.liffId });
         state.liff = { ready: true, inClient: liff.isInClient(), canShare: liff.isApiAvailable('shareTargetPicker') };
-        // 已登入就拿 id_token 向後端換發本人 session（sub＝LINE userId，和機器人同 Provider 一致）
+        // 已登入就拿 access token 向後端換發本人 session（後端用它取回 userId，和機器人同 Provider 一致）
         if (liff.isLoggedIn && liff.isLoggedIn()) {
-          const idToken = liff.getIDToken && liff.getIDToken();
-          if (idToken) {
+          const accessToken = liff.getAccessToken && liff.getAccessToken();
+          if (accessToken) {
             const res = await fetch('/api/liff-login', {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ idToken })
+              body: JSON.stringify({ accessToken })
             }).then((r) => r.json()).catch(() => ({}));
             if (res && res.ok && res.token) state.liff.autoToken = res.token;
           }
+        } else if (state.liff.inClient && liff.login) {
+          // 在 LINE 內卻還沒登入 → 觸發登入（回來後會自動換發）
+          try { liff.login(); } catch (error) { /* ignore */ }
         }
       } catch (error) { /* LIFF 不可用就當沒有，功能自動退回原本流程 */ }
     }
