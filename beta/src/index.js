@@ -834,7 +834,8 @@ async function handleTextMessage(event, env, baseUrl) {
 
   // 說明選單卡的教學子頁
   if (['如何記錄', '如何紀錄', '如何記', '怎麼記', '怎麼記錄', '記法', '記錄方式', '怎麼用'].includes(text)) {
-    await replyOrPushFlex(env, event, quickRecordCarousel(), recordTutorial());
+    const howtoSiteUrl = await siteLink(env, baseUrl, lineUserId);
+    await replyOrPushFlex(env, event, quickRecordCarousel({ petName: pet?.petName || '', siteUrl: howtoSiteUrl }), recordTutorial());
     return;
   }
   if (['完整記法', '完整記錄', '所有記法', '記法大全'].includes(text)) {
@@ -1316,6 +1317,7 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
     description = `藥${label ? ` ${label}` : ''} ${record.medStatus}`;
   } else if (record.category === 'vomit') {
     description = `嘔吐${record.note ? `：${record.note}` : ''}`;
+    if (!record.note) hints.push('補一句吐了什麼更好給醫生看，\n例：「嘔吐 乾乾吃太快」\n會自動整理進回顧的重點整理。');
   } else if (record.category === 'stool') {
     description = `便便${record.note ? `：${record.note}` : ''}`;
   } else if (record.category === 'urine') {

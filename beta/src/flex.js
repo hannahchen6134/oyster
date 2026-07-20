@@ -560,7 +560,7 @@ export function recordTutorialFlex() {
 }
 
 // 如何記錄：左右滑動的分類卡，三類用不同色系明確區隔（常用／進階記法／進階功能）
-export function quickRecordCarousel() {
+export function quickRecordCarousel(opts = {}) {
   // 三種色系主題：綠（常用）→ 琥珀（進階記法）→ 深棕（進階功能）
   const THEME = {
     common: { grad: { type: 'linearGradient', angle: '135deg', startColor: '#6E7A3A', endColor: '#4F5A28' }, pillBg: '#EEF1E1', pillFg: '#4F5A28', body: '#FBFCF6', chipBg: '#EEF1E1', chipFg: '#5D6C36', border: '#DDE3C8' },
@@ -579,11 +579,11 @@ export function quickRecordCarousel() {
       ] }
     ]
   });
-  // 可直接點的範例列（點一句就記／或觸發功能）；chip 顏色跟著主題
-  const line = (t, cmd, desc, sendText) => ({
+  // 範例列：點了把字「帶進輸入框」讓使用者改好再送（fillInText），不會直接記錄假資料
+  const line = (t, cmd, desc, fillText) => ({
     type: 'box', layout: 'horizontal', alignItems: 'center', spacing: 'md', margin: 'md', paddingAll: '10px',
     backgroundColor: '#FFFFFF', cornerRadius: '12px', borderColor: t.border, borderWidth: '1px',
-    action: { type: 'message', label: (sendText || cmd).slice(0, 20), text: sendText || cmd },
+    action: { type: 'postback', label: cmd.slice(0, 20), data: 'action=fill', inputOption: 'openKeyboard', fillInText: fillText || cmd },
     contents: [
       { type: 'box', layout: 'vertical', flex: 0, backgroundColor: t.chipBg, cornerRadius: '8px',
         paddingAll: '7px', paddingStart: '12px', paddingEnd: '12px',
@@ -597,11 +597,14 @@ export function quickRecordCarousel() {
   const bubble1 = {
     type: 'bubble', size: 'mega', header: catHeader(t1.grad, '1', '常用', '每天這樣打就好'),
     body: { type: 'box', layout: 'vertical', paddingAll: '16px', backgroundColor: t1.body, contents: [
-      text('點一句就記，熟了直接打字最快', { size: 'xxs', color: C.muted, wrap: true }),
+      text('點一句會帶進輸入框，改好數字再送出', { size: 'xxs', color: C.muted, wrap: true }),
       line(t1, '水 60', '喝水'),
       line(t1, '罐頭 皇家 30', '食物＋品牌＋幾克'),
       line(t1, '藥 早 已吃', '餵藥'),
-      line(t1, '水20 乾糧4 藥早已吃', '一句話一次記多筆')
+      line(t1, '嘔吐 吐了乾乾', '症狀＋描述'),
+      line(t1, '備註 精神比較好', '自由觀察'),
+      line(t1, '水20 乾糧4 藥早已吃', '一次記多筆'),
+      text('症狀多寫幾個字，會自動整理進回顧的「給醫生的重點整理」', { size: 'xxs', color: C.muted, wrap: true, margin: 'md' })
     ] }
   };
   const t2 = THEME.skill;
@@ -612,7 +615,7 @@ export function quickRecordCarousel() {
       line(t2, '乾糧 希爾斯 20', '指定品牌'),
       line(t2, '罐頭 30 加水 10', '罐頭另外加水'),
       line(t2, '昨天 21:30 水 20', '補登・指定時間'),
-      line(t2, '蚵仔', '換一隻貓記（打名字）', '完整記法')
+      line(t2, opts.petName || '貓貓名字', '換一隻貓記（打名字）', opts.petName || '')
     ] },
     footer: { type: 'box', layout: 'horizontal', paddingAll: '10px', backgroundColor: FOOTER_COLOR, contents: [
       { type: 'button', height: 'sm', style: 'primary', color: t2.grad.endColor,
@@ -625,12 +628,16 @@ export function quickRecordCarousel() {
     action: { type: 'message', label: label.slice(0, 20), text: sendText }
   });
   const bubble3 = {
-    type: 'bubble', size: 'mega', header: catHeader(t3.grad, '3', '進階功能', '電腦登入・多人照護'),
+    type: 'bubble', size: 'mega', header: catHeader(t3.grad, '3', '進階功能', '照護站・多人照護'),
     body: { type: 'box', layout: 'vertical', paddingAll: '16px', backgroundColor: t3.body, contents: [
-      text('用電腦、找人一起照護', { size: 'xxs', color: C.muted, wrap: true }),
-      featBtn('💻 用電腦登入', '電腦登入'),
+      text('開網站看整理、找人一起照護', { size: 'xxs', color: C.muted, wrap: true }),
+      // 有 LIFF 連結就直接開（免登入、少跳一則回覆）；沒有才退回文字指令
+      opts.siteUrl
+        ? { type: 'button', height: 'sm', style: 'primary', color: t3.grad.endColor, margin: 'md',
+            action: { type: 'uri', label: '🐾 開啟照護站（免登入）', uri: opts.siteUrl } }
+        : featBtn('🐾 開啟照護站', '照護站'),
       featBtn('🤝 邀請一起照護（多人）', '邀請'),
-      featBtn('🖥 電腦開啟照護站', '照護站')
+      featBtn('💻 用電腦登入', '電腦登入')
     ] }
   };
   return bubble('如何記錄：① 常用打字（水 60・罐頭 皇家 30・藥 早 已吃）② 進階記法（品牌・補登・換貓）③ 進階功能（電腦登入・多人照護）',
