@@ -491,7 +491,12 @@
     .dpill.p-warn  { background: var(--seal-tint); color: var(--seal); font-weight: 700; }
     /* 給醫生的重點整理：白底、按時間列點，截圖友善 */
     .digest-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
-    .digest-toolbar .range-chips { margin: 0; }
+    /* 範圍切換：一體成形的分段膠囊（字不折行，窄螢幕也不會變圓球） */
+    .digest-seg { display: flex; flex: none; background: var(--sheet); border: 1px solid var(--line-strong); border-radius: 999px; padding: 2px; }
+    .digest-seg button { border: none; background: transparent; color: var(--ink-soft); font-size: 12.5px; font-weight: 600; padding: 5px 13px; border-radius: 999px; white-space: nowrap; cursor: pointer; }
+    .digest-seg button.active { background: var(--brand); color: #fff; }
+    /* 複製：安靜的文字鈕，不搶截圖畫面 */
+    .digest-copy { border: none; background: transparent; color: var(--brand); font-size: 12.5px; font-weight: 600; letter-spacing: 0.04em; padding: 6px 2px; white-space: nowrap; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--line-strong); }
     .digest-card { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 4px 14px; }
     .digest-row { display: flex; gap: 8px; align-items: baseline; padding: 9px 0; border-bottom: 1px solid var(--line-soft, #f0ebe0); font-size: 13.5px; line-height: 1.6; }
     .digest-row:last-child { border-bottom: none; }
@@ -1027,12 +1032,12 @@
           </summary>
           <div class="fold-body">
             <div class="digest-toolbar">
-              <div class="range-chips" id="digestRangeChips">
-                <button data-drange="7" type="button">7 天</button>
-                <button data-drange="14" type="button" class="active">14 天</button>
-                <button data-drange="30" type="button">30 天</button>
+              <div class="digest-seg" id="digestRangeChips">
+                <button data-drange="7" type="button">7天</button>
+                <button data-drange="14" type="button" class="active">14天</button>
+                <button data-drange="30" type="button">30天</button>
               </div>
-              <button class="btn btn-secondary btn-sm" id="digestCopyBtn" type="button">複製文字</button>
+              <button class="digest-copy" id="digestCopyBtn" type="button">複製文字</button>
             </div>
             <div class="digest-card" id="digestCard"></div>
             <p class="muted" style="font-size:12px;margin:10px 2px 0">只列有狀況的日子，沒列出＝無特殊紀錄。截圖或按「複製文字」貼給醫生都可以。</p>
@@ -2162,10 +2167,10 @@
     }
 
     // ── 給醫生的重點整理 ─────────────────────────────
-    // 收錄：特殊事件（吐/疫苗/除蟲/漏藥/精神/備註）＋任何寫了備註的紀錄＋回診，按時間排序
+    // 收錄：特殊事件（吐/疫苗/除蟲/精神/備註）＋寫了備註的食水便尿；用藥與回診不列
     const DIGEST_LABELS = {
       vomit: ['吐', 'warn'], mood: ['精神', 'warn'], stool: ['便便', 'warn'], urine: ['尿尿', 'warn'],
-      med: ['用藥', 'warn'], vaccine: ['疫苗', 'care'], deworm: ['除蟲', 'care'],
+      vaccine: ['疫苗', 'care'], deworm: ['除蟲', 'care'],
       note: ['備註', 'note'], water: ['喝水', 'note'], food: ['進食', 'note'], supplement: ['保健', 'note']
     };
     function digestItems(data) {
@@ -2176,22 +2181,10 @@
         const time = Number(log.isBackfilled) ? '' : String(log.eventDateTime).slice(11, 16);
         const [label, tone] = DIGEST_LABELS[log.category] || ['紀錄', 'note'];
         const bits = [];
-        if (log.category === 'med') {
-          bits.push(`${log.itemName || '藥'}${log.medSlot ? `（${log.medSlot}）` : ''}${log.medStatus}`);
-          if (log.note) bits.push(log.note);
-        } else {
-          if (log.itemName) bits.push(log.itemName);
-          if (Number(log.amount)) bits.push(`${log.amount}${log.unit || ''}`);
-          if (log.note) bits.push(log.note);
-        }
+        if (log.itemName) bits.push(log.itemName);
+        if (Number(log.amount)) bits.push(`${log.amount}${log.unit || ''}`);
+        if (log.note) bits.push(log.note);
         items.push({ date, time, label, tone, text: bits.join('，') || label });
-      }
-      for (const v of data.visits || []) {
-        const bits = [];
-        if (v.reason) bits.push(v.reason);
-        if (v.doctorInstruction) bits.push(`醫囑：${v.doctorInstruction}`);
-        if (v.note) bits.push(v.note);
-        items.push({ date: v.visitDate, time: v.visitTime || '', label: '回診', tone: 'care', text: bits.join('，') || '回診' });
       }
       items.sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
       return items;
