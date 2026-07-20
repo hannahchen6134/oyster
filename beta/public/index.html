@@ -2825,7 +2825,11 @@
         await loadScript('https://static.line-scdn.net/liff/edge/2/sdk.js');
         dbg.sdk = 'loaded';
         renderLiffDebug();
-        await liff.init({ liffId: cfg.liffId });
+        // liff.init 加逾時：卡住超過 6 秒就放棄（避免無限等待，並在診斷標記 initTimeout）
+        await Promise.race([
+          liff.init({ liffId: cfg.liffId }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('init-timeout')), 6000))
+        ]);
         dbg.inited = true;
         dbg.inClient = liff.isInClient();
         dbg.loggedIn = liff.isLoggedIn();
