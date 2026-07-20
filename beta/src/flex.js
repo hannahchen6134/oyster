@@ -5,10 +5,11 @@
 import { goalSection, recordPrompt } from './replies.js';
 import { BRAND, displayMedStatus } from './brand.js';
 
-// 卡身：淺米色斜向漸層；標題：暖棕漸層
-const BODY_BG = '#FFFFFF';
+// 卡身：暖米白（和照護站網站同一個紙面世界，不用冷白）；標題：暖棕漸層
+const BODY_BG = '#FFFDF8';
 const HEADER_BG = { type: 'linearGradient', angle: '135deg', startColor: '#8A5A2C', endColor: '#6A4119' };
-const FOOTER_COLOR = '#FFFFFF';
+const FOOTER_COLOR = '#FAF6EE';
+const SEPARATOR = '#EDE4D6'; // 和網站 --line 同色
 
 const C = {
   brand: '#734921',
@@ -144,7 +145,7 @@ function goalContents(pet, summary, date, showEncourage = true) {
   if (!goalWater && !goalKcal && !slots.length) return [];
 
   const contents = [
-    { type: 'separator', margin: 'lg', color: '#F0EADF' },
+    { type: 'separator', margin: 'lg', color: SEPARATOR },
     text('今日目標', { size: 'xs', color: C.muted, margin: 'lg', weight: 'bold' })
   ];
   if (goalWater > 0) contents.push(progressBar(`水分 ${fmt(summary.totalWaterMl)} / ${fmt(goalWater)} ml`, summary.totalWaterMl, goalWater));
@@ -178,7 +179,7 @@ export function recordFlex({ pet, categoryKey, mainText, subText, summary, date,
       { type: 'box', layout: 'horizontal', contents: [tag(style.label, style)] },
       text(mainText, { size: 'xl', weight: 'bold', color: C.ink, margin: 'md', wrap: true }),
       ...(subText ? [text(subText, { size: 'xs', color: C.muted, wrap: true, margin: 'sm' })] : []),
-      { type: 'separator', margin: 'lg', color: '#F0EADF' },
+      { type: 'separator', margin: 'lg', color: SEPARATOR },
       text('今日累積', { size: 'xs', color: C.muted, margin: 'lg', weight: 'bold' }),
       statCellRow([
         statCell('水分', fmt(summary.totalWaterMl), 'ml', STAT_ACCENT.water),
@@ -195,7 +196,7 @@ export function recordFlex({ pet, categoryKey, mainText, subText, summary, date,
     type: 'box', layout: 'horizontal', spacing: 'sm', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
     contents: [
       { type: 'button', height: 'sm', style: 'link', color: C.brand,
-        action: { type: 'postback', label: '刪除這筆', data: `action=delLog&logId=${logId}`, displayText: '刪除剛剛那筆' } },
+        action: { type: 'postback', label: '刪除這筆', data: `action=delAsk&logId=${logId}`, displayText: '刪除剛剛那筆' } },
       { type: 'button', height: 'sm', style: 'primary', color: C.brand,
         // 直接開網站（已烤入登入連結）；沒有 siteUrl 時退回舊的訊息觸發
         action: siteUrl
@@ -215,7 +216,7 @@ export function multiRecordFlex(pet, lines, summary, date, siteUrl = '') {
     contents: [
       { type: 'box', layout: 'horizontal', contents: [tag(`一次記了 ${lines.length} 筆`, CATEGORY_STYLE.note)] },
       ...lines.map((line) => text(`· ${line}`, { size: 'md', weight: 'bold', color: C.ink, wrap: true, margin: 'sm' })),
-      { type: 'separator', margin: 'lg', color: '#F0EADF' },
+      { type: 'separator', margin: 'lg', color: SEPARATOR },
       text('今日累積', { size: 'xs', color: C.muted, margin: 'lg', weight: 'bold' }),
       statCellRow([
         statCell('水分', fmt(summary.totalWaterMl), 'ml', STAT_ACCENT.water),
@@ -288,7 +289,7 @@ export function websiteFlex(url) {
     contents: [
       text('點下方按鈕直接登入', { size: 'md', weight: 'bold', color: '#3F2B18', align: 'center' }),
       text('月曆・回診摘要・血檢趨勢\n每一筆紀錄都能修改補登', { size: 'xs', color: C.muted, wrap: true, align: 'center', margin: 'md' }),
-      { type: 'separator', margin: 'xl', color: '#F0EADF' },
+      { type: 'separator', margin: 'xl', color: SEPARATOR },
       text('連結會隨使用自動延長效期；就算過期，輸入「照護站」拿新連結，資料都不會消失。請勿轉傳給別人。', { size: 'xxs', color: C.muted, wrap: true, margin: 'lg' })
     ]
   };
@@ -330,6 +331,28 @@ export function onboardCard({ step = '', title, subtitle = '', rows = [], hint =
 }
 
 // ---------- 已刪除：安心卡＋照護站按鈕 ----------
+// 刪除前的二次確認卡（避免手機誤觸一鍵刪資料）
+export function confirmDeleteFlex(logId, desc) {
+  const body = {
+    type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
+    contents: [
+      text('確定要刪除這筆嗎？', { size: 'md', weight: 'bold', color: C.ink }),
+      ...(desc ? [text(desc, { size: 'sm', color: C.inkSoft, wrap: true, margin: 'md' })] : []),
+      text('刪除後就找不回來了', { size: 'xs', color: C.muted, margin: 'md' })
+    ]
+  };
+  const footer = {
+    type: 'box', layout: 'horizontal', spacing: 'sm', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
+    contents: [
+      { type: 'button', height: 'sm', style: 'secondary',
+        action: { type: 'postback', label: '保留', data: 'action=cancelDel', displayText: '保留這筆' } },
+      { type: 'button', height: 'sm', style: 'primary', color: C.seal,
+        action: { type: 'postback', label: '確定刪除', data: `action=delLog&logId=${logId}`, displayText: '確定刪除' } }
+    ]
+  };
+  return bubble('確定要刪除這筆嗎？', { type: 'bubble', body, footer });
+}
+
 export function deletedCard(url) {
   const body = {
     type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
@@ -444,7 +467,7 @@ export function exampleCard() {
       line('罐頭 皇家 30', '食物＋品牌＋幾克'),
       line('藥 早 已吃', '記早上的藥已經餵了'),
       line('水20 乾糧4 藥早已吃', '一句話一次記三筆'),
-      { type: 'separator', margin: 'xl', color: '#F0EADF' },
+      { type: 'separator', margin: 'xl', color: SEPARATOR },
       text('品牌、換貓、加水、補登… 打「如何記錄」看完整記法',
         { size: 'xxs', color: C.brand, align: 'center', wrap: true, margin: 'lg' })
     ]
@@ -468,7 +491,7 @@ export function exampleCard() {
 export function recordTutorialFlex() {
   const rows = [];
   const sec = (title) => {
-    rows.push({ type: 'separator', margin: 'xl', color: '#F0EADF' });
+    rows.push({ type: 'separator', margin: 'xl', color: SEPARATOR });
     rows.push(text(title, { size: 'xs', weight: 'bold', color: C.olive, margin: 'md' }));
   };
   // 指令左（暖墨、粗、不換行）＋ 說明右（沙灰、極小、不換行）
@@ -642,7 +665,7 @@ export function recordMenuFlex(introText = '想記哪一種？點一下就開始
       row([cell('大便', '次數與形狀', '記大便'), cell('尿尿', '量與顏色', '記尿尿')]),
       row([cell('嘔吐', '顏色與內容', '記嘔吐'), cell('精神', '活動力如何', '記精神')]),
       row([cell('其他備註', '想補充的小事', '記備註')]),
-      { type: 'separator', margin: 'xl', color: '#F0EADF' },
+      { type: 'separator', margin: 'xl', color: SEPARATOR },
       text('熟了就直接打字更快：水 60・罐頭 30・藥 早 已吃', { size: 'xxs', color: C.brand, align: 'center', wrap: true, margin: 'lg' }),
       text('補登昨天：昨天 21:30 水 20', { size: 'xxs', color: C.muted, align: 'center', margin: 'sm' })
     ]
@@ -684,7 +707,7 @@ export function weekFlex(petName, rows) {
     contents: [
       text('長條＝總水分（ml）', { size: 'xs', color: C.muted, align: 'center' }),
       ...dayRows,
-      { type: 'separator', margin: 'xl', color: '#F0EADF' },
+      { type: 'separator', margin: 'xl', color: SEPARATOR },
       statCellRow([
         statCell('日均水分', fmt(avg((row) => row.totalWaterMl)), 'ml', STAT_ACCENT.water),
         statCell('日均熱量', fmt(avg((row) => row.kcal)), 'kcal', STAT_ACCENT.kcal)
@@ -796,7 +819,7 @@ export function monthFlex(petName, month, rows, today, calendarUrl = '') {
 
   const body = {
     type: 'box', layout: 'vertical', paddingAll: '16px', backgroundColor: BODY_BG,
-    contents: [weekHeader, ...weeks, { type: 'separator', margin: 'lg', color: '#F0EADF' }, legend]
+    contents: [weekHeader, ...weeks, { type: 'separator', margin: 'lg', color: SEPARATOR }, legend]
   };
 
   const thisMonth = today.slice(0, 7);
@@ -839,7 +862,7 @@ export function recentFlex(petName, items) {
   items.forEach((item) => {
     if (item.dateLabel !== lastDate) {
       contents.push(text(item.dateLabel, { size: 'sm', weight: 'bold', color: C.brand, margin: lastDate ? 'xl' : 'lg' }));
-      contents.push({ type: 'separator', margin: 'sm', color: '#F0EADF' });
+      contents.push({ type: 'separator', margin: 'sm', color: SEPARATOR });
       lastDate = item.dateLabel;
     }
 
@@ -906,7 +929,7 @@ export function reminderFlex(pet, lines) {
     type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
     contents: [
       ...items,
-      { type: 'separator', margin: 'lg', color: '#F0EADF' },
+      { type: 'separator', margin: 'lg', color: SEPARATOR },
       text('做了但忘了記的話，補記一下就好；有不放心的狀況請諮詢獸醫師。',
         { size: 'xs', color: C.muted, wrap: true, margin: 'lg' })
     ]
@@ -939,7 +962,7 @@ export function visitReminderFlex(pet, visits, vetsById, dateLabel) {
     if (visit.reason) contents.push(statRow('原因', visit.reason));
   }
   contents.push(
-    { type: 'separator', margin: 'lg', color: '#F0EADF' },
+    { type: 'separator', margin: 'lg', color: SEPARATOR },
     text('回診前可先看「回診摘要」，或到照護站的「回診」頁一鍵複製給醫生',
       { size: 'xs', color: C.muted, wrap: true, margin: 'lg' })
   );
