@@ -2842,6 +2842,8 @@
     }
 
     async function bootstrap() {
+      // 一進來就先把登入頁顯示出來，避免「兩個畫面都隱藏」造成整頁空白轉圈；成功登入後再切到主畫面
+      showLogin(false);
       const liffReady = initLiff();
       // 從網址 hash 取 token（LINE 登入連結）與深連結目標 go=
       const hashMatch = location.hash.match(/token=([a-zA-Z0-9]+)/);
@@ -2856,13 +2858,16 @@
       try {
         await Promise.race([liffReady, new Promise((resolve) => setTimeout(resolve, 4500))]);
       } catch (error) { /* ignore */ }
+      // 把 LIFF 診斷更新到登入頁那行小字（排查用）
+      const dbgEl = $('liffDebug');
+      if (dbgEl && state.liffDebug) dbgEl.textContent = 'LIFF: ' + JSON.stringify(state.liffDebug);
       if (state.liff && state.liff.autoToken) {
         state.token = state.liff.autoToken;
         localStorage.setItem(TOKEN_KEY, state.token);
       } else {
         state.token = localStorage.getItem(TOKEN_KEY) || '';
       }
-      if (!state.token) return showLogin();
+      if (!state.token) return; // 已停在登入頁（含診斷）
 
       try {
         await refreshPets();
