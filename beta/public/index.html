@@ -665,18 +665,19 @@
     }
     .date-inline { font-size: 13px; font-weight: 500; color: var(--muted); letter-spacing: 0.1em; }
     .date-inline::before { content: "・"; margin: 0 2px 0 4px; color: var(--line-strong); }
-    /* 快速新增(手機大按鈕)：要一眼看得出是按鈕 */
-    .quick-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    /* 快速新增(手機大按鈕)：要一眼看得出是按鈕。
+       minmax(0,1fr)＋min-width:0＋clamp 字級：格子縮得下去，字自動變小，任何字級設定都不會把按鈕擠出卡片 */
+    .quick-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
     .qbtn {
-      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-      min-height: 54px; padding: 0 8px; border: 1px solid rgba(74, 48, 22, 0.28); border-radius: var(--radius);
+      display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+      min-width: 0; min-height: 54px; padding: 0 4px; border: 1px solid rgba(74, 48, 22, 0.28); border-radius: var(--radius);
       background: linear-gradient(180deg, #855A34 0%, #6E4A28 100%);
-      color: #F6EDDF; font-weight: 600; font-size: 15px; letter-spacing: 0.02em;
+      color: #F6EDDF; font-weight: 600; font-size: clamp(12px, 3.4vw, 15px); letter-spacing: 0.02em;
       white-space: nowrap;
       box-shadow: 0 1px 1px rgba(60, 40, 20, 0.10), 0 6px 18px rgba(122, 76, 34, 0.13);
       cursor: pointer; transition: filter .16s, box-shadow .16s, transform .06s;
     }
-    .qbtn .q-plus { color: #E7C79A; font-weight: 500; font-size: 16px; }
+    .qbtn .q-plus { color: #E7C79A; font-weight: 500; font-size: 1.05em; }
     .qbtn:hover { filter: brightness(1.06); box-shadow: 0 1px 1px rgba(60, 40, 20, 0.10), 0 8px 22px rgba(122, 76, 34, 0.20); }
     .qbtn:active { transform: translateY(1px); filter: brightness(0.96); box-shadow: 0 1px 2px rgba(27, 29, 26, 0.10); }
     /* 層級：主要三顆（吃飯/喝水/用藥）實心；其餘描邊淺底，畫面輕、動線清楚 */
@@ -822,8 +823,8 @@
     }
 
     @media (max-width: 760px) {
-      .quick-grid { grid-template-columns: repeat(3, 1fr); gap: 9px; }
-      .qbtn { min-height: 50px; font-size: 14.5px; }
+      .quick-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+      .qbtn { min-height: 50px; font-size: clamp(12px, 3.9vw, 14.5px); }
       .page-mode { font-size: 15.5px; }
       .day-toolbar { row-gap: 12px; }
       .day-toolbar .btn-secondary { flex: 1 0 100%; }
@@ -2173,6 +2174,10 @@
       vaccine: ['疫苗', 'care'], deworm: ['除蟲', 'care'],
       note: ['備註', 'note'], water: ['喝水', 'note'], food: ['進食', 'note'], supplement: ['保健', 'note']
     };
+    // 吃藥流水帳（「早藥」「晚藥」「藥已吃」…）就算記成備註也不列——這裡只放貓咪要注意的狀況
+    function isMedChore(text) {
+      return /^[早中午晚夜]?\s*(藥|吃藥|餵藥|漏藥)\s*(已吃|吃了|有吃|沒吃|ok)?$/i.test(String(text).trim());
+    }
     function digestItems(data) {
       const items = [];
       for (const log of data.logs || []) {
@@ -2184,7 +2189,9 @@
         if (log.itemName) bits.push(log.itemName);
         if (Number(log.amount)) bits.push(`${log.amount}${log.unit || ''}`);
         if (log.note) bits.push(log.note);
-        items.push({ date, time, label, tone, text: bits.join('，') || label });
+        const text = bits.join('，') || label;
+        if (log.category === 'note' && isMedChore(text)) continue;
+        items.push({ date, time, label, tone, text });
       }
       items.sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
       return items;
