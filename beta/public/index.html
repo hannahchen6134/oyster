@@ -620,6 +620,15 @@
     .login-tagline { color: var(--muted); font-size: 13px; letter-spacing: 0.06em; margin-top: 14px; }
     .login-hint { color: var(--muted); font-size: 12.5px; line-height: 1.8; letter-spacing: 0.02em; margin-top: 22px; }
     .login-hint b { color: var(--brand); font-weight: 600; }
+    /* LIFF 自動登入過場：進行中只顯示這行，不閃手動登入表單 */
+    .liff-wait { display: none; margin-top: 26px; color: var(--muted); font-size: 13.5px; letter-spacing: 0.08em; }
+    .liff-wait::after { content: '⋯'; animation: liffDots 1.2s steps(3, end) infinite; }
+    @keyframes liffDots { 0% { opacity: 0.2 } 50% { opacity: 1 } 100% { opacity: 0.2 } }
+    .login-card.liff-pending .login-code-box,
+    .login-card.liff-pending .login-hint,
+    .login-card.liff-pending .login-notice,
+    .login-card.liff-pending .disclaimer-fold { display: none; }
+    .login-card.liff-pending .liff-wait { display: block; }
     .login-code-box { margin: 28px auto 0; max-width: 340px; text-align: left; background: rgba(244, 237, 224, 0.5); border: 1px solid rgba(115, 73, 33, 0.1); border-radius: var(--radius); padding: 17px 17px 19px; }
     .login-code-label { letter-spacing: 0.02em; }
     .login-code-row input { font-weight: 500; }
@@ -856,7 +865,7 @@
           <div class="login-code-msg hidden" id="loginCodeMsg"></div>
         </div>
         <p class="login-hint">手機用戶：在官方 LINE 選單點 <b>喵喵照護站</b>，點連結就進來。</p>
-        <div id="liffDebug" style="margin-top:18px;padding:10px 12px;border:1px dashed var(--line-strong);border-radius:8px;font-size:11px;line-height:1.6;color:var(--ink-soft);word-break:break-all;text-align:left">偵測中…</div>
+        <div class="liff-wait">正在用 LINE 身分登入</div>
         <details class="disclaimer-fold">
           <summary>免責聲明<span class="df-caret">⌄</span></summary>
           <ul>
@@ -2804,90 +2813,59 @@
         document.head.appendChild(s);
       });
     }
-    // 載入 LIFF：讓「挑好友送出邀請」可用，並在 LINE 內用 LINE 身分自動換發登入（免網址帶 token）
-    function postLiffDebug() {
-      try {
-        const data = JSON.stringify(state.liffDebug || {});
-        if (navigator.sendBeacon) navigator.sendBeacon('/api/liff-debug', data);
-        else fetch('/api/liff-debug', { method: 'POST', body: data, keepalive: true }).catch(() => {});
-      } catch (error) { /* ignore */ }
-    }
-    function renderLiffDebug() {
-      const el = document.getElementById('liffDebug');
-      if (el && state.liffDebug) el.textContent = 'LIFF: ' + JSON.stringify(state.liffDebug);
-      postLiffDebug();
-    }
+    // 載入 LIFF：在 LINE 內用 LINE 身分自動登入（免登入碼），並讓「挑好友送出邀請」可用
     async function initLiff() {
-      const dbg = { step: 'start' };
-      state.liffDebug = dbg;
       state.liff = state.liff || {};
-      // 最先記錄「LINE 實際打開的原始網址」（含 liff.state / code），在 SDK 清掉它之前抓到
-      dbg.entry = (location.pathname + location.search + location.hash).slice(0, 160);
-      renderLiffDebug();
-      // 防迴圈：最多嘗試 3 次；超過就跳過，避免無限重導。每個新 session 會重置。
+      // 防迴圈保險：LIFF 初始化正常會重載一次頁面；若異常連續重導，最多 3 次就放棄改走手動登入
       try {
         const tries = Number(sessionStorage.getItem('liffTries_h') || '0');
-        if (tries >= 3) { dbg.skipped = 'maxTries'; renderLiffDebug(); return; }
+        if (tries >= 3) return;
         sessionStorage.setItem('liffTries_h', String(tries + 1));
-        dbg.tries = tries + 1;
       } catch (error) { /* sessionStorage 不可用就照舊 */ }
-      window.addEventListener('beforeunload', () => { dbg.unloaded = true; postLiffDebug(); });
       try {
-        renderLiffDebug();
         const cfg = await fetch('/api/liff-config').then((r) => r.json()).catch(() => ({}));
-        dbg.liffId = cfg && cfg.liffId ? 'set' : 'none';
-        renderLiffDebug();
         if (!cfg || !cfg.liffId) return;
         await loadScript('https://static.line-scdn.net/liff/edge/2/sdk.js');
-        dbg.sdk = 'loaded';
-        try { dbg.inClientPre = typeof liff.isInClient === 'function' ? liff.isInClient() : 'na'; } catch (e) { dbg.inClientPre = 'err'; }
-        dbg.href = location.href.slice(0, 120);
-        renderLiffDebug();
-        // liff.init 加逾時：卡住超過 6 秒就放棄（避免無限等待，並在診斷標記 initTimeout）
+        // init 逾時保險：卡超過 6 秒就放棄，讓頁面停在手動登入
         await Promise.race([
           liff.init({ liffId: cfg.liffId }),
           new Promise((_, reject) => setTimeout(() => reject(new Error('init-timeout')), 6000))
         ]);
-        dbg.inited = true;
         try { sessionStorage.removeItem('liffTries_h'); } catch (error) { /* ignore */ }
-        dbg.inClient = liff.isInClient();
-        dbg.loggedIn = liff.isLoggedIn();
-        renderLiffDebug();
-        state.liff = { ready: true, inClient: dbg.inClient, canShare: liff.isApiAvailable('shareTargetPicker') };
-        // 已登入就拿 access token 向後端換發本人 session（後端用它取回 userId，和機器人同 Provider 一致）
+        state.liff = { ready: true, inClient: liff.isInClient(), canShare: liff.isApiAvailable('shareTargetPicker') };
+        // 在 LINE 內已登入：拿 access token 向後端換發本人 session（和機器人同 Provider，身分一致）
         if (liff.isLoggedIn()) {
           const accessToken = liff.getAccessToken && liff.getAccessToken();
-          dbg.gotToken = !!accessToken;
-          renderLiffDebug();
           if (accessToken) {
             const res = await fetch('/api/liff-login', {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ accessToken })
-            }).then((r) => r.json()).catch((e) => ({ message: String(e && e.message || e) }));
-            dbg.loginOk = !!(res && res.ok);
-            dbg.loginMsg = res && res.message;
-            renderLiffDebug();
+            }).then((r) => r.json()).catch(() => null);
             if (res && res.ok && res.token) state.liff.autoToken = res.token;
           }
-        } else {
-          dbg.action = 'skip-login';
         }
-      } catch (error) { dbg.error = String(error && error.message || error); }
-      renderLiffDebug();
+      } catch (error) { /* LIFF 失敗不擋手動登入 */ }
+    }
+
+    // LIFF 自動登入進行中：登入卡只顯示「正在用 LINE 身分登入」，不閃手動登入表單
+    function setLiffPending(pending) {
+      const card = document.querySelector('.login-card');
+      if (card) card.classList.toggle('liff-pending', pending);
     }
 
     async function bootstrap() {
       // 一進來先顯示登入頁，避免載入期間整頁空白；成功後再切主畫面
       showLogin(false);
+      // LIFF 開啟時網址帶有 liff.state / context_token 等參數，liff.init 要靠它們完成初始化；
+      // 這種情況絕對不能動網址（之前在這裡洗掉參數，造成 init 無限重導），
+      // 並先顯示「LINE 登入中」過場，不閃手動登入表單
+      const hasLiffParams = /liff\.state|liffClientId|context_token=|access_token=/.test(location.search + location.hash);
+      if (hasLiffParams) setLiffPending(true);
       const liffReady = initLiff();
       // 從網址 hash 取 token（LINE 登入連結）與深連結目標 go=
       // 注意：一定要錨定 [#&]token=，否則會誤吃 LIFF 的 context_token / access_token
       const hashMatch = location.hash.match(/[#&]token=([a-zA-Z0-9]+)/);
-      const goMatch = location.hash.match(/[#&]go=([a-z]+)/);
-      const goTarget = goMatch ? goMatch[1] : '';
-      // LIFF 開啟時網址帶有 liff.state / context_token 等參數，liff.init 要靠它們完成初始化；
-      // 這種情況絕對不能動網址（之前在這裡洗掉參數，造成 init 無限重導）
-      const hasLiffParams = /liff\.state|liffClientId|context_token=|access_token=/.test(location.search + location.hash);
+      const goEarly = location.hash.match(/[#&]go=([a-z]+)/);
       if (hashMatch && !hasLiffParams) {
         localStorage.setItem(TOKEN_KEY, hashMatch[1]);
         history.replaceState(null, '', location.pathname);
@@ -2896,21 +2874,23 @@
       try {
         await Promise.race([liffReady, new Promise((resolve) => setTimeout(resolve, 5000))]);
       } catch (error) { /* ignore */ }
-      const dbgEl = $('liffDebug');
-      if (dbgEl && state.liffDebug) dbgEl.textContent = 'LIFF: ' + JSON.stringify(state.liffDebug);
+      // 深連結 go=：LIFF 連結會轉成 ?go=…（init 完成後才回寫網址），一般登入連結則是 #go=…
+      const goLate = (location.search + location.hash).match(/[?#&]go=([a-z]+)/);
+      const goTarget = (goLate || goEarly) ? (goLate || goEarly)[1] : '';
       if (state.liff && state.liff.autoToken) {
         state.token = state.liff.autoToken;
         localStorage.setItem(TOKEN_KEY, state.token);
       } else {
         state.token = localStorage.getItem(TOKEN_KEY) || '';
       }
-      if (!state.token) return; // 已停在登入頁
+      if (!state.token) { setLiffPending(false); return; } // 自動登入沒成 → 顯示手動登入表單
 
       try {
         await refreshPets();
         state.foods = (await api('foods')).rows;
         if (state.petId) state.meds = (await api(`meds?petId=${state.petId}`)).rows;
       } catch (error) {
+        setLiffPending(false);
         return; // 401 時 api() 已切到登入畫面
       }
 
