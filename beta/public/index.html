@@ -2193,7 +2193,8 @@
         if (log.category === 'note' && isMedChore(text)) continue;
         items.push({ date, time, label, tone, text });
       }
-      items.sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
+      // 最近的在最上面（新 → 舊），跟回顧其他卡片一致
+      items.sort((a, b) => `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`));
       return items;
     }
     function digestWhen(date) {
