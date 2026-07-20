@@ -2823,9 +2823,9 @@
       state.liff = state.liff || {};
       // 防迴圈：最多嘗試 2 次；超過就跳過，避免無限重導。每個新 session 會重置。
       try {
-        const tries = Number(sessionStorage.getItem('liffTries_e') || '0');
+        const tries = Number(sessionStorage.getItem('liffTries_f') || '0');
         if (tries >= 3) { dbg.skipped = 'maxTries'; renderLiffDebug(); return; }
-        sessionStorage.setItem('liffTries_e', String(tries + 1));
+        sessionStorage.setItem('liffTries_f', String(tries + 1));
         dbg.tries = tries + 1;
       } catch (error) { /* sessionStorage 不可用就照舊 */ }
       window.addEventListener('beforeunload', () => { dbg.unloaded = true; postLiffDebug(); });
@@ -2837,6 +2837,8 @@
         if (!cfg || !cfg.liffId) return;
         await loadScript('https://static.line-scdn.net/liff/edge/2/sdk.js');
         dbg.sdk = 'loaded';
+        try { dbg.inClientPre = typeof liff.isInClient === 'function' ? liff.isInClient() : 'na'; } catch (e) { dbg.inClientPre = 'err'; }
+        dbg.href = location.href.slice(0, 120);
         renderLiffDebug();
         // liff.init 加逾時：卡住超過 6 秒就放棄（避免無限等待，並在診斷標記 initTimeout）
         await Promise.race([
