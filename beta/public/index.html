@@ -370,36 +370,35 @@
     .cal-dow:nth-child(7) { color: rgba(106, 116, 64, 0.85); }
     .cal-cell:nth-child(7n+8):not(.today) .cal-daynum { color: rgba(191, 59, 32, 0.8); }
     .cal-cell:nth-child(7n+14):not(.today) .cal-daynum { color: rgba(106, 116, 64, 0.95); }
+    /* 月曆格：概覽版——日期＋一條水位條，狀況只用角落小標記；有紀錄的日子做成清楚的小卡，和背景分明 */
     .cal-cell {
-      min-height: 84px; border-radius: var(--radius); border: 1px solid var(--line);
-      background: linear-gradient(180deg, #ffffff 0%, var(--sheet-soft) 100%);
-      box-shadow: 0 1px 2px rgba(27, 29, 26, 0.03);
-      padding: 7px 6px 8px; font-size: 11px; cursor: pointer;
-      overflow: hidden; transition: box-shadow 0.15s, border-color 0.15s;
-      /* 日期／數字／點點全部置中對齊同一條軸，不再左右散開 */
-      display: flex; flex-direction: column; align-items: center;
+      min-height: 62px; border-radius: 12px; border: 1px solid rgba(115, 73, 33, 0.16);
+      background: #fffdf9;
+      box-shadow: 0 1px 2px rgba(90, 60, 30, 0.05), 0 3px 9px rgba(115, 73, 33, 0.06);
+      padding: 8px 6px; font-size: 11px; cursor: pointer; position: relative;
+      overflow: hidden; transition: box-shadow 0.15s, border-color 0.15s, transform 0.1s;
+      display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
     }
-    .cal-cell:hover { border-color: rgba(115, 73, 33, 0.55); box-shadow: var(--shadow-soft); }
-    .cal-cell.blank { visibility: hidden; }
+    .cal-cell:hover { border-color: rgba(115, 73, 33, 0.5); box-shadow: var(--shadow-soft); transform: translateY(-1px); }
+    .cal-cell.blank { visibility: hidden; box-shadow: none; border: none; background: none; }
+    /* 沒紀錄的日子：淡到幾乎透明，讓有紀錄的日子跳出來 */
+    .cal-cell.norec { background: rgba(255, 253, 249, 0.35); border-color: rgba(115, 73, 33, 0.07); box-shadow: none; }
+    .cal-cell.norec .cal-daynum { color: var(--muted); font-weight: 500; }
     .cal-daynum {
-      font-family: var(--serif); font-weight: 600; font-size: 16px; font-variant-numeric: tabular-nums;
-      width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center;
+      font-family: var(--serif); font-weight: 600; font-size: 15.5px; font-variant-numeric: tabular-nums;
+      width: 25px; height: 25px; display: inline-flex; align-items: center; justify-content: center;
       border-radius: 50%;
     }
     .cal-cell.today .cal-daynum { background: var(--seal); color: #fff; box-shadow: 0 0 0 3px rgba(191, 59, 32, 0.15); }
     .cal-cell.today { border-color: rgba(191, 59, 32, 0.35); }
-    .cal-cell.norec { background: transparent; box-shadow: none; color: var(--muted); }
-    .cal-cell.warn { background: linear-gradient(180deg, #fdf3ef, var(--seal-tint)); border-color: rgba(191, 59, 32, 0.22); }
-    /* 上排水分、下排熱量：置中、圖示固定寬度讓數字上下對齊、等寬數字 */
-    .cal-num {
-      display: flex; align-items: center; justify-content: center; gap: 1px; margin-top: 2px;
-      font-size: 11.5px; font-weight: 600; line-height: 1.35;
-      font-variant-numeric: tabular-nums; letter-spacing: 0.02em;
-    }
-    .cal-num .ci { display: inline-block; width: 13px; text-align: center; font-size: 9px; font-style: normal; opacity: 0.8; }
-    .cal-num.water { color: #6d5335; }
-    .cal-num.kcal { color: var(--brand); }
-    /* 事件標記：置中對齊，和上面數字同一條軸 */
+    .cal-cell.warn { background: linear-gradient(180deg, #fef6f3, #fbeee9); border-color: rgba(191, 59, 32, 0.2); }
+    /* 水位條：填滿比例＝當天喝水占目標，一眼看夠不夠，不用數字 */
+    .cal-wbar { width: 78%; height: 5px; margin-top: auto; background: #EFE7D8; border-radius: 999px; overflow: hidden; box-shadow: inset 0 1px 1px rgba(90, 60, 30, 0.08); }
+    .cal-wbar i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #A9793F, #7A5024); box-shadow: inset 0 1px 0 rgba(255, 240, 220, 0.4); }
+    /* 角落小標記：右上＝需注意(吐/漏藥)，左上＝回診 */
+    .cal-mark { position: absolute; top: 6px; width: 7px; height: 7px; border-radius: 50%; }
+    .cal-mark.warn { right: 6px; background: var(--seal); box-shadow: 0 0 0 2px rgba(191, 59, 32, 0.14); }
+    .cal-mark.visit { left: 6px; background: transparent; border: 1.6px solid var(--brand); box-sizing: border-box; }
     .cal-dots { display: flex; gap: 4px; margin-top: auto; padding-top: 5px; align-items: center; justify-content: center; min-height: 6px; }
     .cdot { width: 6px; height: 6px; border-radius: 50%; flex: none; }
     .cdot-med { background: var(--brand); }
@@ -411,6 +410,9 @@
       margin-top: 14px; font-size: 12px; color: var(--muted);
     }
     .cal-legend .cdot { display: inline-block; margin-right: 5px; vertical-align: 1px; }
+    .cal-legend .cal-mark { margin-right: 5px; vertical-align: 1px; }
+    .cal-legend-wbar { display: inline-block; width: 26px; height: 5px; background: #EFE7D8; border-radius: 999px; margin-right: 5px; vertical-align: 1px; overflow: hidden; }
+    .cal-legend-wbar i { display: block; width: 66%; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #A9793F, #7A5024); }
     /* 圖例改可摺疊：預設只留一行極簡提示，點「圖例」才展開完整對照 */
     .cal-legend-fold { margin-top: 14px; }
     .cal-legend-fold > summary {
@@ -886,7 +888,9 @@
       .section-head { margin-top: 34px; }
       .entry { grid-template-columns: 1fr; gap: 6px; padding: 15px 2px; }
       .entry.open .entry-actions { flex-direction: row; margin-top: 4px; }
-      .cal-cell { min-height: 74px; padding: 5px 6px 7px; }
+      .cal-cell { min-height: 56px; padding: 6px 5px; border-radius: 11px; }
+      .cal-daynum { font-size: 14.5px; width: 23px; height: 23px; }
+      .cal-wbar { width: 82%; }
       .cal-num { font-size: 11px; }
       .colophon { margin-top: 44px; }
     }
@@ -1042,17 +1046,14 @@
         <div class="cal-grid" id="calGrid"></div>
         <details class="cal-legend-fold" id="calLegend" hidden>
           <summary>
-            <span class="cal-legend-lite">上排＝水分&nbsp;·&nbsp;下排＝熱量&nbsp;·&nbsp;點一天看明細</span>
+            <span class="cal-legend-lite">橫條＝當天喝水量&nbsp;·&nbsp;點一天看完整明細</span>
             <span class="cal-legend-more">圖例</span>
           </summary>
           <div class="cal-legend">
-            <span><span class="cal-num water" style="display:inline">273</span>＝水分 ml</span>
-            <span><span class="cal-num kcal" style="display:inline">180</span>＝熱量 kcal</span>
-            <span><span class="cdot cdot-med"></span>藥</span>
-            <span><span class="cdot cdot-vomit"></span>吐</span>
-            <span><span class="cdot cdot-stool"></span>便</span>
-            <span><span class="cdot cdot-visit"></span>回診</span>
-            <span>淡紅底＝需留意</span>
+            <span><span class="cal-legend-wbar"><i></i></span>＝喝水量（越滿越接近目標）</span>
+            <span><span class="cal-mark warn" style="position:static;display:inline-block"></span>需注意（吐／漏藥）</span>
+            <span><span class="cal-mark visit" style="position:static;display:inline-block"></span>回診</span>
+            <span>點一天可看水分、熱量、用藥與每一筆</span>
           </div>
         </details>
       </section>
@@ -1843,24 +1844,25 @@
       const daysInMonth = new Date(year, month, 0).getDate();
       const firstDow = new Date(year, month - 1, 1).getDay();
       const today = todayStr();
+      const pet = (state.pets || []).find((p) => p.petId === state.petId);
+      const waterGoal = Number(pet?.goalWaterMl) || 250; // 沒設目標就用 250ml 當參考刻度
       let html = ['日', '一', '二', '三', '四', '五', '六'].map((d) => `<div class="cal-dow">${d}</div>`).join('');
       for (let i = 0; i < firstDow; i += 1) html += '<div class="cal-cell blank"></div>';
 
       for (let day = 1; day <= daysInMonth; day += 1) {
         const date = `${state.calMonth}-${String(day).padStart(2, '0')}`;
         const row = byDate[date];
-        const dots = [];
-        if (row?.medTakenCount || row?.medIssueCount) dots.push('<span class="cdot cdot-med"></span>');
-        if (row?.vomitCount) dots.push('<span class="cdot cdot-vomit"></span>');
-        if (row?.stoolCount) dots.push('<span class="cdot cdot-stool"></span>');
-        if (visitDates.has(date)) dots.push('<span class="cdot cdot-visit"></span>');
         const hasRecord = row && row.entryCount > 0;
         const isWarn = row && (row.vomitCount > 0 || row.medIssueCount > 0);
+        const isVisit = visitDates.has(date);
+        // 水位條：當天喝水占目標的比例（有紀錄才顯示；至少 6% 讓極少量也看得到）
+        const wpct = hasRecord ? Math.max(6, Math.min(100, Math.round((Number(row.totalWaterMl) || 0) / waterGoal * 100))) : 0;
         html += `
           <div class="cal-cell ${date === today ? 'today' : ''} ${hasRecord ? '' : 'norec'} ${isWarn ? 'warn' : ''}" data-date="${date}">
+            ${isVisit ? '<span class="cal-mark visit" title="回診"></span>' : ''}
+            ${isWarn ? '<span class="cal-mark warn" title="需注意"></span>' : ''}
             <div class="cal-daynum">${day}</div>
-            ${hasRecord ? `<span class="cal-num water"><i class="ci">💧</i>${fmtInt(row.totalWaterMl)}</span><span class="cal-num kcal"><i class="ci">🔥</i>${fmtInt(row.kcal)}</span>` : ''}
-            ${dots.length ? `<div class="cal-dots">${dots.join('')}</div>` : ''}
+            ${hasRecord ? `<div class="cal-wbar" title="喝水 ${fmtInt(row.totalWaterMl)} ml"><i style="width:${wpct}%"></i></div>` : ''}
           </div>`;
       }
       $('calGrid').innerHTML = html;
