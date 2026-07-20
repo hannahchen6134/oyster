@@ -856,7 +856,7 @@
           <div class="login-code-msg hidden" id="loginCodeMsg"></div>
         </div>
         <p class="login-hint">手機用戶：在官方 LINE 選單點 <b>喵喵照護站</b>，就會自動登入進來。</p>
-        <div id="liffDebug" style="margin-top:14px;font-size:10px;line-height:1.5;color:var(--line-strong);word-break:break-all"></div>
+        <div id="liffDebug" style="margin-top:18px;padding:10px 12px;border:1px dashed var(--line-strong);border-radius:8px;font-size:11px;line-height:1.6;color:var(--ink-soft);word-break:break-all;text-align:left">偵測中…</div>
         <details class="disclaimer-fold">
           <summary>免責聲明<span class="df-caret">⌄</span></summary>
           <ul>
@@ -2808,23 +2808,34 @@
       });
     }
     // 載入 LIFF：讓「挑好友送出邀請」可用，並在 LINE 內用 LINE 身分自動換發登入（免網址帶 token）
+    function renderLiffDebug() {
+      const el = document.getElementById('liffDebug');
+      if (el && state.liffDebug) el.textContent = 'LIFF: ' + JSON.stringify(state.liffDebug);
+    }
     async function initLiff() {
       const dbg = { step: 'start' };
       state.liffDebug = dbg;
       state.liff = state.liff || {};
       try {
+        renderLiffDebug();
         const cfg = await fetch('/api/liff-config').then((r) => r.json()).catch(() => ({}));
         dbg.liffId = cfg && cfg.liffId ? 'set' : 'none';
+        renderLiffDebug();
         if (!cfg || !cfg.liffId) return;
         await loadScript('https://static.line-scdn.net/liff/edge/2/sdk.js');
+        dbg.sdk = 'loaded';
+        renderLiffDebug();
         await liff.init({ liffId: cfg.liffId });
+        dbg.inited = true;
         dbg.inClient = liff.isInClient();
         dbg.loggedIn = liff.isLoggedIn();
+        renderLiffDebug();
         state.liff = { ready: true, inClient: dbg.inClient, canShare: liff.isApiAvailable('shareTargetPicker') };
         // 已登入就拿 access token 向後端換發本人 session（後端用它取回 userId，和機器人同 Provider 一致）
         if (liff.isLoggedIn()) {
           const accessToken = liff.getAccessToken && liff.getAccessToken();
           dbg.gotToken = !!accessToken;
+          renderLiffDebug();
           if (accessToken) {
             const res = await fetch('/api/liff-login', {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -2832,13 +2843,14 @@
             }).then((r) => r.json()).catch((e) => ({ message: String(e && e.message || e) }));
             dbg.loginOk = !!(res && res.ok);
             dbg.loginMsg = res && res.message;
+            renderLiffDebug();
             if (res && res.ok && res.token) state.liff.autoToken = res.token;
           }
         } else {
-          // 沒登入就不強制跳轉（避免重導迴圈卡住頁面），直接退回原本 token 流程
           dbg.action = 'skip-login';
         }
       } catch (error) { dbg.error = String(error && error.message || error); }
+      renderLiffDebug();
     }
 
     async function bootstrap() {
