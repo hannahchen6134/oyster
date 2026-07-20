@@ -669,15 +669,15 @@
        minmax(0,1fr)＋min-width:0＋clamp 字級：格子縮得下去，字自動變小，任何字級設定都不會把按鈕擠出卡片 */
     .quick-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
     .qbtn {
-      display: inline-flex; align-items: center; justify-content: center; gap: 4px;
-      min-width: 0; min-height: 54px; padding: 0 4px; border: 1px solid rgba(74, 48, 22, 0.28); border-radius: var(--radius);
+      display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+      min-width: 0; min-height: 50px; padding: 0 4px; border: 1px solid rgba(74, 48, 22, 0.24); border-radius: var(--radius);
       background: linear-gradient(180deg, #855A34 0%, #6E4A28 100%);
-      color: #F6EDDF; font-weight: 600; font-size: clamp(12px, 3.4vw, 15px); letter-spacing: 0.02em;
+      color: #F6EDDF; font-weight: 500; font-size: clamp(12.5px, 3.2vw, 14.5px); letter-spacing: 0.06em;
       white-space: nowrap;
       box-shadow: 0 1px 1px rgba(60, 40, 20, 0.10), 0 6px 18px rgba(122, 76, 34, 0.13);
       cursor: pointer; transition: filter .16s, box-shadow .16s, transform .06s;
     }
-    .qbtn .q-plus { color: #E7C79A; font-weight: 500; font-size: 1.05em; }
+    .qbtn .q-plus { color: #EBD3B0; font-weight: 400; font-size: 0.8em; opacity: 0.85; margin-right: -1px; }
     .qbtn:hover { filter: brightness(1.06); box-shadow: 0 1px 1px rgba(60, 40, 20, 0.10), 0 8px 22px rgba(122, 76, 34, 0.20); }
     .qbtn:active { transform: translateY(1px); filter: brightness(0.96); box-shadow: 0 1px 2px rgba(27, 29, 26, 0.10); }
     /* 層級：主要三顆（吃飯/喝水/用藥）實心；其餘描邊淺底，畫面輕、動線清楚 */
@@ -686,19 +686,20 @@
       border: 1px solid rgba(115, 73, 33, 0.30);
       box-shadow: 0 1px 2px rgba(58, 42, 24, 0.05);
     }
-    .qbtn.qbtn-sub .q-plus { color: rgba(115, 73, 33, 0.55); }
+    .qbtn.qbtn-sub { color: var(--ink-soft); font-weight: 500; }
+    .qbtn.qbtn-sub .q-plus { color: rgba(115, 73, 33, 0.4); }
     .qbtn.qbtn-sub:hover { background: var(--brand-tint); filter: none; border-color: var(--brand); box-shadow: 0 2px 8px rgba(115, 73, 33, 0.12); }
     /* 今日累計 hero：一打開先看到的重點（水分/熱量對照目標） */
     .today-hero { padding-top: 22px; padding-bottom: 22px; }
     .hero-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 18px; }
     .hero-title { font-family: var(--serif); font-size: 19px; font-weight: 700; color: var(--ink); letter-spacing: .02em; }
     .hero-date { font-size: 12.5px; color: var(--muted); }
-    .pg + .pg { margin-top: 20px; }
+    .pg + .pg { margin-top: 16px; }
     .pg-top { display: flex; align-items: baseline; justify-content: space-between; }
     .pg-name { font-size: 15px; font-weight: 700; color: var(--ink); letter-spacing: .04em; }
     .pg-num { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
-    .pg-num b { font-family: var(--serif); font-size: 32px; font-weight: 700; color: var(--ink); margin-right: 4px; line-height: 1; }
-    .pg-track { height: 12px; background: #ECE3D2; border-radius: 999px; margin: 9px 0 6px; overflow: hidden; }
+    .pg-num b { font-family: var(--serif); font-size: 26px; font-weight: 600; color: var(--ink); margin-right: 4px; line-height: 1; letter-spacing: .01em; }
+    .pg-track { height: 8px; background: #F0E8D9; border-radius: 999px; margin: 10px 0 6px; overflow: hidden; }
     .pg-track i { display: block; height: 100%; border-radius: 999px;
       background: linear-gradient(90deg, #8A5A2C, #6F4824); transition: width .5s cubic-bezier(.4,0,.2,1); }
     .pg-track i.done { background: linear-gradient(90deg, #7A5230, #5A3617); }
@@ -824,7 +825,7 @@
 
     @media (max-width: 760px) {
       .quick-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
-      .qbtn { min-height: 50px; font-size: clamp(12px, 3.9vw, 14.5px); }
+      .qbtn { min-height: 46px; font-size: clamp(12.5px, 3.5vw, 14px); }
       .page-mode { font-size: 15.5px; }
       .day-toolbar { row-gap: 12px; }
       .day-toolbar .btn-secondary { flex: 1 0 100%; }
@@ -935,7 +936,7 @@
             <button class="qbtn qbtn-sub" data-quick="vomit" type="button"><span class="q-plus">＋</span>嘔吐</button>
             <button class="qbtn qbtn-sub" data-quick="stool" type="button"><span class="q-plus">＋</span>大小便</button>
             <button class="qbtn qbtn-sub" data-quick="mood" type="button"><span class="q-plus">＋</span>精神</button>
-            <button class="qbtn qbtn-sub" data-quick="supplement" type="button"><span class="q-plus">＋</span>營養補充</button>
+            <button class="qbtn qbtn-sub" data-quick="supplement" type="button"><span class="q-plus">＋</span>保健</button>
             <button class="qbtn qbtn-sub" data-quick="note" type="button"><span class="q-plus">＋</span>備註</button>
           </div>
           <div class="day-toolbar">
