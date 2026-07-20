@@ -614,11 +614,16 @@
       content: ''; position: absolute; top: 0; left: 0; right: 0; height: 6px;
       background: linear-gradient(90deg, #8a5a2c 0%, var(--brand) 45%, #5a3617 100%);
     }
-    .login-card h1 { font-size: 34px; margin-top: 12px; }
-    .login-tagline { color: var(--muted); font-size: 14px; margin-top: 10px; }
-    .login-hint { color: var(--muted); font-size: 13px; line-height: 1.7; margin-top: 20px; }
+    .login-card { padding: 48px 34px 36px; }
+    .login-card .eyebrow { font-size: 10.5px; letter-spacing: 0.34em; opacity: 0.9; }
+    .login-card h1 { font-size: 27px; font-weight: 600; margin-top: 16px; letter-spacing: 0.18em; }
+    .login-tagline { color: var(--muted); font-size: 13px; letter-spacing: 0.06em; margin-top: 14px; }
+    .login-hint { color: var(--muted); font-size: 12.5px; line-height: 1.8; letter-spacing: 0.02em; margin-top: 22px; }
     .login-hint b { color: var(--brand); font-weight: 600; }
-    .login-code-box { margin: 26px auto 0; max-width: 340px; text-align: left; background: var(--brand-tint); border-radius: var(--radius); padding: 16px 16px 18px; }
+    .login-code-box { margin: 28px auto 0; max-width: 340px; text-align: left; background: rgba(244, 237, 224, 0.5); border: 1px solid rgba(115, 73, 33, 0.1); border-radius: var(--radius); padding: 17px 17px 19px; }
+    .login-code-label { letter-spacing: 0.02em; }
+    .login-code-row input { font-weight: 500; }
+    .login-card .disclaimer-fold { margin-top: 22px; }
     .login-code-label { font-size: 13px; color: var(--ink, #332417); line-height: 1.6; margin-bottom: 10px; }
     .login-code-row { display: flex; gap: 8px; }
     .login-code-row input { flex: 1; min-width: 0; padding: 11px 12px; font-size: 17px; letter-spacing: 3px; text-align: center; border: 1px solid var(--line); border-radius: var(--radius-sm); background: #fff; }
@@ -741,10 +746,11 @@
       padding: 14px 16px; color: var(--ink-soft); user-select: all;
     }
     .login-notice {
-      margin: 18px auto 0; max-width: 340px; text-align: left; font-size: 13.5px; line-height: 1.7;
-      background: var(--brand-tint); border: 1px solid rgba(115,73,33,.2); border-radius: var(--radius-sm);
-      padding: 12px 14px; color: var(--ink-soft);
+      margin: 22px auto 0; max-width: 340px; text-align: left; font-size: 12.5px; line-height: 1.8;
+      background: rgba(249, 235, 229, 0.5); border: 1px solid rgba(191, 59, 32, 0.14); border-radius: var(--radius-sm);
+      padding: 13px 15px; color: var(--ink-soft); letter-spacing: 0.01em;
     }
+    .login-notice b { font-weight: 600; color: var(--seal); }
     .disclaimer { margin: 18px auto 0; max-width: 560px; font-size: 11.5px; line-height: 1.7; color: var(--muted); text-align: center; }
     /* 免責聲明：平常只有一個極小的灰字連結，點了才展開條列 */
     .disclaimer-fold { margin: 14px auto 0; max-width: 520px; font-size: 11px; line-height: 1.7; color: var(--muted); }
