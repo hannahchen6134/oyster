@@ -606,7 +606,7 @@ export function recordTutorialFlex() {
 export function quickRecordCarousel(opts = {}) {
   // 三種色系主題：綠（常用）→ 琥珀（進階記法）→ 深棕（進階功能）
   const THEME = {
-    common: { grad: { type: 'linearGradient', angle: '135deg', startColor: '#6E7A3A', endColor: '#4F5A28' }, pillBg: '#EEF1E1', pillFg: '#4F5A28', body: '#FBFCF6', chipBg: '#EEF1E1', chipFg: '#5D6C36', border: '#DDE3C8' },
+    common: { grad: { type: 'linearGradient', angle: '135deg', startColor: '#8A5A2C', endColor: '#6A4119' }, pillBg: '#F3E7D6', pillFg: '#7A4E20', body: '#FBF7F0', chipBg: '#F3E7D6', chipFg: '#7A4E20', border: '#E9DAC4' },
     skill:  { grad: { type: 'linearGradient', angle: '135deg', startColor: '#C0863E', endColor: '#9A6526' }, pillBg: '#F7EAD6', pillFg: '#8A5E1E', body: '#FDF9F2', chipBg: '#F6EAD7', chipFg: '#8A5E1E', border: '#EAD9BE' },
     feature:{ grad: { type: 'linearGradient', angle: '135deg', startColor: '#5A3A22', endColor: '#3A2416' }, pillBg: '#EDE3D6', pillFg: '#5A3617', body: '#FBF7F2', chipBg: '#EDE3D6', chipFg: '#5A3617', border: '#E4D6C6' }
   };
