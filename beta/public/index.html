@@ -2834,10 +2834,9 @@
             dbg.loginMsg = res && res.message;
             if (res && res.ok && res.token) state.liff.autoToken = res.token;
           }
-        } else if (dbg.inClient && liff.login) {
-          // 在 LINE 內卻還沒登入 → 觸發登入（回來後會自動換發）
-          dbg.action = 'login';
-          try { liff.login(); } catch (error) { /* ignore */ }
+        } else {
+          // 沒登入就不強制跳轉（避免重導迴圈卡住頁面），直接退回原本 token 流程
+          dbg.action = 'skip-login';
         }
       } catch (error) { dbg.error = String(error && error.message || error); }
     }
@@ -2852,8 +2851,11 @@
         localStorage.setItem(TOKEN_KEY, hashMatch[1]);
         history.replaceState(null, '', location.pathname);
       }
-      // 先等 LIFF：在 LINE 內時，LIFF 換發的新登入「優先」於 localStorage 裡可能過期的舊 token
-      try { await liffReady; } catch (error) { /* ignore */ }
+      // 先等 LIFF（但最多 4.5 秒，避免 LIFF 卡住讓整頁一直轉圈）：
+      // 在 LINE 內時，LIFF 換發的新登入「優先」於 localStorage 裡可能過期的舊 token
+      try {
+        await Promise.race([liffReady, new Promise((resolve) => setTimeout(resolve, 4500))]);
+      } catch (error) { /* ignore */ }
       if (state.liff && state.liff.autoToken) {
         state.token = state.liff.autoToken;
         localStorage.setItem(TOKEN_KEY, state.token);
