@@ -332,6 +332,27 @@ export function onboardCard({ step = '', title, subtitle = '', rows = [], hint =
 
 // ---------- 已刪除：安心卡＋照護站按鈕 ----------
 // 刪除前的二次確認卡（避免手機誤觸一鍵刪資料）
+// 共同照護邀請碼卡：一鍵複製（LINE 剪貼簿按鈕；舊版 LINE 不支援時仍可長按上一則訊息複製）
+export function careInviteFlex(code, membersCount = 0) {
+  const body = {
+    type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
+    contents: [
+      text('共同照護邀請碼', { size: 'xs', color: C.muted }),
+      text(code, { size: 'xxl', weight: 'bold', color: C.brandDark, margin: 'sm', align: 'center' }),
+      text(`7 天內有效，可給多人${membersCount ? `・目前一起照護 ${membersCount} 人` : ''}`,
+        { size: 'xxs', color: C.muted, margin: 'md', wrap: true, align: 'center' })
+    ]
+  };
+  const footer = {
+    type: 'box', layout: 'vertical', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
+    contents: [
+      { type: 'button', height: 'sm', style: 'primary', color: C.brand,
+        action: { type: 'clipboard', label: '📋 複製邀請碼', clipboardText: code } }
+    ]
+  };
+  return bubble(`共同照護邀請碼：${code}`, { type: 'bubble', size: 'kilo', body, footer });
+}
+
 // 共同照護·即時通知卡：幫手記了一筆，飼主看到就能當場刪錯或開站修改
 export function careNotifyFlex(who, petName, desc, logId, siteUrl) {
   const body = {

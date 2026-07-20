@@ -9,7 +9,7 @@ import { handleApi } from './api.js';
 import { verifyLineSignature, replyOrPush, replyOrPushFlex, replyMessages, pushText, pushMessages, getProfile, getAccessToken, checkAccessToken } from './line.js';
 import { hasAnyReminder, parseReminderSettings, buildReminderLines, reminderMessage, visitReminderMessage } from './reminders.js';
 import { shortDate } from './replies.js';
-import { recordFlex, multiRecordFlex, todayFlex, websiteFlex, menuFlex, recordMenuFlex, recordTutorialFlex, quickRecordCarousel, weekFlex, monthFlex, recentFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, menuCell, exampleCard, petDataFlex, deletedCard, confirmDeleteFlex, careNotifyFlex } from './flex.js';
+import { recordFlex, multiRecordFlex, todayFlex, websiteFlex, menuFlex, recordMenuFlex, recordTutorialFlex, quickRecordCarousel, weekFlex, monthFlex, recentFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, menuCell, exampleCard, petDataFlex, deletedCard, confirmDeleteFlex, careNotifyFlex, careInviteFlex } from './flex.js';
 import { isBetaAllowed, normalizeCode, gateText } from './plan.js';
 import {
   ensureUser, updateUser, getUser, listPets, createPet, resolveDefaultPet, getPet, updatePetFields, createFoodItem, createMedItem,
@@ -750,10 +750,16 @@ async function handleTextMessage(event, env, baseUrl) {
 
   let text = normalizeText(event.message?.text || '');
 
-  // 共同照護：接受邀請——直接打 6 碼英數邀請碼即可（也相容舊寫法「加入 ABC123」）
-  const codeMatch = text.match(/^(?:加入\s*)?([A-Za-z0-9]{6})$/);
+  // 共同照護：接受邀請——直接打 6 碼英數邀請碼即可（也相容舊寫法「加入 ABC123」）；
+  // 收到整段邀請訊息直接貼上也行（從「邀請碼: XXXXXX」抓碼）
+  let codeMatch = text.match(/^(?:加入\s*)?([A-Za-z0-9]{6})$/);
+  let pastedInvite = false;
+  if (!codeMatch) {
+    const pasted = text.match(/邀請碼\s*[:：]?\s*([A-Za-z0-9]{6})\b/);
+    if (pasted) { codeMatch = pasted; pastedInvite = true; }
+  }
   if (codeMatch) {
-    const explicit = text.startsWith('加入'); // 有打「加入」＝明確要加入，無效時給提示
+    const explicit = pastedInvite || text.startsWith('加入'); // 明確要加入，無效時給提示
     const result = await redeemCareInvite(db, codeMatch[1], lineUserId);
     if (result.ok) {
       if (!isBetaAllowed(user)) await updateUser(db, lineUserId, { betaAccess: 1 });
@@ -803,9 +809,16 @@ async function handleTextMessage(event, env, baseUrl) {
       || /加入.*一起照/.test(text) || /怎麼.*加入.*人/.test(text)) {
     const code = await createCareInvite(db, ownerId);
     const members = await listCareMembers(db, ownerId);
-    let msg = `🤝 想和人一起照護貓咪？\n把下面整段傳給對方 👇\n\n一起照顧貓咪吧 🐈\n加入官方 LINE：\n${LINE_ADD_URL}\n加入後打這組邀請碼：\n${code}\n（7 天內有效，可給多人）`;
-    if (members.length) msg += `\n\n目前一起照護的有 ${members.length} 人。`;
-    await replyOrPush(env, event, msg);
+    const shareMsg = `一起照顧貓咪吧 🐈\n加入官方 LINE：\n${LINE_ADD_URL}\n加入後打這組邀請碼：\n${code}\n（7 天內有效，直接把整段訊息貼給管家也可以）`;
+    // 兩則：①可長按轉傳的整段邀請文 ②邀請碼卡（📋 一鍵複製）
+    try {
+      await replyMessages(env, event.replyToken, [
+        { type: 'text', text: `🤝 把下面整段轉傳給對方 👇\n\n${shareMsg}` },
+        careInviteFlex(code, members.length)
+      ]);
+    } catch (error) {
+      await replyOrPush(env, event, `🤝 把下面整段傳給對方 👇\n\n${shareMsg}`);
+    }
     return;
   }
 
