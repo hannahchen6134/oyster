@@ -9,7 +9,7 @@ import { handleApi } from './api.js';
 import { verifyLineSignature, replyOrPush, replyOrPushFlex, replyMessages, pushText, pushMessages, getProfile, getAccessToken, checkAccessToken } from './line.js';
 import { hasAnyReminder, parseReminderSettings, buildReminderLines, reminderMessage, visitReminderMessage } from './reminders.js';
 import { shortDate } from './replies.js';
-import { recordFlex, multiRecordFlex, todayFlex, websiteFlex, menuFlex, recordMenuFlex, recordTutorialFlex, quickRecordCarousel, weekFlex, monthFlex, recentFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, menuCell, exampleCard, petDataFlex, deletedCard, confirmDeleteFlex, careNotifyFlex, careInviteFlex } from './flex.js';
+import { recordFlex, multiRecordFlex, todayFlex, websiteFlex, menuFlex, recordMenuFlex, recordTutorialFlex, quickRecordCarousel, weekFlex, monthFlex, recentFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, onboardingCarousel, menuCell, exampleCard, petDataFlex, deletedCard, confirmDeleteFlex, careNotifyFlex, careInviteFlex } from './flex.js';
 import { isBetaAllowed, normalizeCode, gateText } from './plan.js';
 import {
   ensureUser, updateUser, getUser, listPets, createPet, resolveDefaultPet, getPet, updatePetFields, createFoodItem, createMedItem,
@@ -1544,7 +1544,7 @@ async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId, ow
   }
 
   if (query === 'onboarding') {
-    await replyOrPush(env, event, onboardingText());
+    await replyOrPushFlex(env, event, onboardingCarousel(pet?.petName || ''), onboardingText());
     return;
   }
 

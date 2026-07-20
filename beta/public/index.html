@@ -1404,7 +1404,7 @@
           ['喝水', s.waterMl > 0 ? `已紀錄 ${fmt(s.waterMl)} ml${s.foodWaterMl ? `（含食物水分共 ${fmt(s.totalWaterMl)} ml）` : ''}` : ''],
           ['用藥', medLogs.length ? `今天已紀錄 ${medLogs.length} 次` : ''],
           ['營養補充', suppLogs.length ? `已紀錄 ${suppLogs.length} 次` : ''],
-          ['腸胃', s.vomitCount > 0 ? `今天有紀錄嘔吐 ${s.vomitCount} 次` : ''],
+          ['腸胃狀況如何', s.vomitCount > 0 ? `今天有紀錄嘔吐 ${s.vomitCount} 次` : ''],
           ['大小便', excreteParts.length ? excreteParts.join('・') : ''],
           ['精神', moodLogs.length ? `最近一筆為「${moodLogs[moodLogs.length - 1].note || '有紀錄'}」` : '']
         ],

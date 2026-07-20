@@ -330,6 +330,76 @@ export function onboardCard({ step = '', title, subtitle = '', rows = [], hint =
   });
 }
 
+// 喵爸媽安心上手：Step 1/2/3 彩色步驟卡（咖啡三色系；點範例帶進輸入框，自己改好再送）
+export function onboardingCarousel(petName = '') {
+  const T = {
+    s1: { grad: { type: 'linearGradient', angle: '135deg', startColor: '#8A5A2C', endColor: '#6A4119' }, body: '#FBF7F0', chipBg: '#F3E7D6', chipFg: '#7A4E20', border: '#E9DAC4' },
+    s2: { grad: { type: 'linearGradient', angle: '135deg', startColor: '#C0863E', endColor: '#9A6526' }, body: '#FDF9F2', chipBg: '#F6EAD7', chipFg: '#8A5E1E', border: '#EAD9BE' },
+    s3: { grad: { type: 'linearGradient', angle: '135deg', startColor: '#5A3A22', endColor: '#3A2416' }, body: '#FBF7F2', chipBg: '#EDE3D6', chipFg: '#5A3617', border: '#E4D6C6' }
+  };
+  const stepHead = (grad, num, title, sub) => ({
+    type: 'box', layout: 'horizontal', background: grad, paddingAll: '16px', paddingStart: '18px', spacing: 'md', alignItems: 'center',
+    contents: [
+      { type: 'box', layout: 'vertical', flex: 0, width: '40px', height: '40px', backgroundColor: '#FFFFFF', cornerRadius: '999px', justifyContent: 'center',
+        contents: [text(num, { size: 'xl', weight: 'bold', color: '#3A2416', align: 'center' })] },
+      { type: 'box', layout: 'vertical', flex: 1, contents: [
+        text(`Step ${num}`, { size: 'xxs', color: '#FFFFFFB0', weight: 'bold' }),
+        text(title, { size: 'lg', weight: 'bold', color: '#FFFFFF', wrap: true }),
+        text(sub, { size: 'xxs', color: '#FFFFFFCC', margin: 'xs', wrap: true })
+      ] }
+    ]
+  });
+  const line = (t, cmd, desc) => ({
+    type: 'box', layout: 'horizontal', alignItems: 'center', spacing: 'md', margin: 'md', paddingAll: '10px',
+    backgroundColor: '#FFFFFF', cornerRadius: '12px', borderColor: t.border, borderWidth: '1px',
+    action: { type: 'postback', label: cmd.slice(0, 20), data: 'action=fill', inputOption: 'openKeyboard', fillInText: cmd },
+    contents: [
+      { type: 'box', layout: 'vertical', flex: 0, backgroundColor: t.chipBg, cornerRadius: '8px', paddingAll: '7px', paddingStart: '12px', paddingEnd: '12px',
+        contents: [text(cmd, { size: 'sm', weight: 'bold', color: t.chipFg, wrap: false })] },
+      text(desc, { size: 'xs', color: C.muted, flex: 1, gravity: 'center', wrap: true }),
+      text('›', { size: 'lg', color: '#D8CDBA', flex: 0, gravity: 'center' })
+    ]
+  });
+  const hintBox = (t, s) => ({
+    type: 'box', layout: 'vertical', margin: 'lg', backgroundColor: t.chipBg, cornerRadius: '10px', paddingAll: '11px',
+    contents: [text(s, { size: 'xxs', color: t.chipFg, wrap: true, align: 'center' })]
+  });
+  const t1 = T.s1;
+  const b1 = {
+    type: 'bubble', size: 'mega', header: stepHead(t1.grad, '1', '先告訴我你的貓', '建立貓咪資料'),
+    body: { type: 'box', layout: 'vertical', paddingAll: '16px', backgroundColor: t1.body, contents: [
+      text('點下面這句，把名字改成你家貓貓再送出', { size: 'xxs', color: C.muted, wrap: true }),
+      line(t1, `新增貓咪 ${petName || '蚵仔'}`, '換成你家貓的名字'),
+      hintBox(t1, '之後你記的每一筆，都會自動記到牠身上')
+    ] }
+  };
+  const t2 = T.s2;
+  const b2 = {
+    type: 'bubble', size: 'mega', header: stepHead(t2.grad, '2', '記第一筆', '挑一個你最近做的'),
+    body: { type: 'box', layout: 'vertical', paddingAll: '16px', backgroundColor: t2.body, contents: [
+      text('點一句會帶進輸入框，改好數字再送出', { size: 'xxs', color: C.muted, wrap: true }),
+      line(t2, '水 20', '喝水'),
+      line(t2, '罐頭 30', '吃飯（罐頭幾克）'),
+      line(t2, '藥 早 已吃', '餵藥'),
+      hintBox(t2, '送出後會跳一張卡，顯示今天累計多少')
+    ] }
+  };
+  const t3 = T.s3;
+  const b3 = {
+    type: 'bubble', size: 'mega', header: stepHead(t3.grad, '3', '看狀況・給醫生', '平常追蹤、回診帶走'),
+    body: { type: 'box', layout: 'vertical', paddingAll: '16px', backgroundColor: t3.body, contents: [
+      text('這兩句最常用，點了帶進輸入框送出即可', { size: 'xxs', color: C.muted, wrap: true }),
+      line(t3, '今天', '看今天喝水／熱量／用藥／腸胃'),
+      line(t3, '回診摘要', '整理近況給醫生看'),
+      hintBox(t3, '記錯了打「改 30」或「刪除」・找家人一起顧打「邀請」')
+    ] }
+  };
+  return bubble(
+    '喵爸媽安心上手：① 新增貓咪 ② 記第一筆（水 20／罐頭 30／藥 早 已吃）③ 打「今天」看狀況、「回診摘要」給醫生',
+    { type: 'carousel', contents: [b1, b2, b3] }
+  );
+}
+
 // ---------- 已刪除：安心卡＋照護站按鈕 ----------
 // 刪除前的二次確認卡（避免手機誤觸一鍵刪資料）
 // 共同照護邀請碼卡：一鍵複製（LINE 剪貼簿按鈕；舊版 LINE 不支援時仍可長按上一則訊息複製）
