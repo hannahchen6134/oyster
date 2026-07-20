@@ -2805,20 +2805,30 @@
       });
     }
     // 載入 LIFF：讓「挑好友送出邀請」可用，並在 LINE 內用 LINE 身分自動換發登入（免網址帶 token）
+    function postLiffDebug() {
+      try {
+        const data = JSON.stringify(state.liffDebug || {});
+        if (navigator.sendBeacon) navigator.sendBeacon('/api/liff-debug', data);
+        else fetch('/api/liff-debug', { method: 'POST', body: data, keepalive: true }).catch(() => {});
+      } catch (error) { /* ignore */ }
+    }
     function renderLiffDebug() {
       const el = document.getElementById('liffDebug');
       if (el && state.liffDebug) el.textContent = 'LIFF: ' + JSON.stringify(state.liffDebug);
+      postLiffDebug();
     }
     async function initLiff() {
       const dbg = { step: 'start' };
       state.liffDebug = dbg;
       state.liff = state.liff || {};
-      // 防迴圈：LIFF 登入每個分頁 session 只嘗試一次。萬一 liff.init 想重導迴圈，
-      // 第二次載入就直接跳過 → 迴圈被打斷、頁面用一般 token 流程正常顯示。
+      // 防迴圈：最多嘗試 2 次；超過就跳過，避免無限重導。每個新 session 會重置。
       try {
-        if (sessionStorage.getItem('liffTried')) { dbg.skipped = 'alreadyTried'; renderLiffDebug(); return; }
-        sessionStorage.setItem('liffTried', '1');
+        const tries = Number(sessionStorage.getItem('liffTries') || '0');
+        if (tries >= 2) { dbg.skipped = 'maxTries'; renderLiffDebug(); return; }
+        sessionStorage.setItem('liffTries', String(tries + 1));
+        dbg.tries = tries + 1;
       } catch (error) { /* sessionStorage 不可用就照舊 */ }
+      window.addEventListener('beforeunload', () => { dbg.unloaded = true; postLiffDebug(); });
       try {
         renderLiffDebug();
         const cfg = await fetch('/api/liff-config').then((r) => r.json()).catch(() => ({}));
