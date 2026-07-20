@@ -25,9 +25,11 @@ crons = ["0 * * * *"]
 [vars]
 # 部署後的網站網址（選填）。留空時會自動使用 Worker 本身的網址。
 APP_BASE_URL = ""
-# LINE LIFF app ID（喵喵照護站 LINE Login channel 底下的 LIFF）：
-# 設了就啟用「在 LINE 內直接分享共同照護邀請」；留空則退回複製邀請碼。
-LIFF_ID = "2010761757-4pUK9x8l"
+# LINE LIFF app ID（建在「喵喵照護管家」Provider 底下的 Login channel，和機器人同 Provider → User ID 一致）
+# 設了就啟用「在 LINE 內自動登入」＋「一鍵分享共同照護邀請」。
+LIFF_ID = "2010761895-7VsJuJ3C"
+# 上面 LIFF 所屬 LINE Login channel 的 Channel ID（驗證 id_token 用的 client_id）
+LIFF_CHANNEL_ID = "2010761895"
 
 # 機密請用 wrangler secret 設定，不要寫進這個檔案：
 #   wrangler secret put LINE_CHANNEL_ACCESS_TOKEN   # 固定權杖（備援用）

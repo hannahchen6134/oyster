@@ -2796,7 +2796,7 @@
         document.head.appendChild(s);
       });
     }
-    // 若後台有設 LIFF_ID，就載入 LIFF SDK 讓「挑好友送出邀請」可用；沒設就靜默略過（退回複製邀請）
+    // 載入 LIFF：讓「挑好友送出邀請」可用，並在 LINE 內用 LINE 身分自動換發登入（免網址帶 token）
     async function initLiff() {
       try {
         const cfg = await fetch('/api/liff-config').then((r) => r.json()).catch(() => ({}));
@@ -2804,11 +2804,22 @@
         await loadScript('https://static.line-scdn.net/liff/edge/2/sdk.js');
         await liff.init({ liffId: cfg.liffId });
         state.liff = { ready: true, inClient: liff.isInClient(), canShare: liff.isApiAvailable('shareTargetPicker') };
-      } catch (error) { /* LIFF 不可用就當沒有，功能自動退回複製邀請 */ }
+        // 已登入就拿 id_token 向後端換發本人 session（sub＝LINE userId，和機器人同 Provider 一致）
+        if (liff.isLoggedIn && liff.isLoggedIn()) {
+          const idToken = liff.getIDToken && liff.getIDToken();
+          if (idToken) {
+            const res = await fetch('/api/liff-login', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ idToken })
+            }).then((r) => r.json()).catch(() => ({}));
+            if (res && res.ok && res.token) state.liff.autoToken = res.token;
+          }
+        }
+      } catch (error) { /* LIFF 不可用就當沒有，功能自動退回原本流程 */ }
     }
 
     async function bootstrap() {
-      initLiff(); // 背景載入，不擋主流程
+      const liffReady = initLiff(); // 背景載入；沒有現成 token 時才會等它（見下）
       // 從網址 hash 取 token（LINE 登入連結）與深連結目標 go=
       const hashMatch = location.hash.match(/token=([a-zA-Z0-9]+)/);
       const goMatch = location.hash.match(/[#&]go=([a-z]+)/);
@@ -2818,6 +2829,14 @@
         history.replaceState(null, '', location.pathname);
       }
       state.token = localStorage.getItem(TOKEN_KEY) || '';
+      // 沒有現成 token（可能是在 LINE 內用 LIFF 網址打開）→ 等 LIFF 自動登入換發
+      if (!state.token) {
+        try { await liffReady; } catch (error) { /* ignore */ }
+        if (state.liff && state.liff.autoToken) {
+          state.token = state.liff.autoToken;
+          localStorage.setItem(TOKEN_KEY, state.token);
+        }
+      }
       if (!state.token) return showLogin();
 
       try {
