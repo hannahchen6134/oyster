@@ -332,6 +332,28 @@ export function onboardCard({ step = '', title, subtitle = '', rows = [], hint =
 
 // ---------- 已刪除：安心卡＋照護站按鈕 ----------
 // 刪除前的二次確認卡（避免手機誤觸一鍵刪資料）
+// 共同照護·即時通知卡：幫手記了一筆，飼主看到就能當場刪錯或開站修改
+export function careNotifyFlex(who, petName, desc, logId, siteUrl) {
+  const body = {
+    type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
+    contents: [
+      text(`📝 ${who} 記錄了 ${petName}`, { size: 'xs', color: C.muted }),
+      text(desc, { size: 'md', weight: 'bold', color: C.ink, wrap: true, margin: 'md' }),
+      text('記錯了嗎？可以直接刪除，或開照護站調整', { size: 'xxs', color: C.muted, margin: 'lg' })
+    ]
+  };
+  const footer = {
+    type: 'box', layout: 'horizontal', spacing: 'sm', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
+    contents: [
+      { type: 'button', height: 'sm', style: 'secondary',
+        action: { type: 'postback', label: '🗑 刪除這筆', data: `action=delAsk&logId=${logId}`, displayText: '刪除這筆' } },
+      ...(siteUrl ? [{ type: 'button', height: 'sm', style: 'primary', color: C.brand,
+        action: { type: 'uri', label: '開照護站修改', uri: siteUrl } }] : [])
+    ]
+  };
+  return bubble(`📝 ${who} 記錄了 ${petName}：${desc}`, { type: 'bubble', size: 'kilo', body, footer });
+}
+
 export function confirmDeleteFlex(logId, desc) {
   const body = {
     type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,

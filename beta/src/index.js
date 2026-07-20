@@ -9,7 +9,7 @@ import { handleApi } from './api.js';
 import { verifyLineSignature, replyOrPush, replyOrPushFlex, replyMessages, pushText, pushMessages, getProfile, getAccessToken, checkAccessToken } from './line.js';
 import { hasAnyReminder, parseReminderSettings, buildReminderLines, reminderMessage, visitReminderMessage } from './reminders.js';
 import { shortDate } from './replies.js';
-import { recordFlex, multiRecordFlex, todayFlex, websiteFlex, menuFlex, recordMenuFlex, recordTutorialFlex, quickRecordCarousel, weekFlex, monthFlex, recentFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, menuCell, exampleCard, petDataFlex, deletedCard, confirmDeleteFlex } from './flex.js';
+import { recordFlex, multiRecordFlex, todayFlex, websiteFlex, menuFlex, recordMenuFlex, recordTutorialFlex, quickRecordCarousel, weekFlex, monthFlex, recentFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, menuCell, exampleCard, petDataFlex, deletedCard, confirmDeleteFlex, careNotifyFlex } from './flex.js';
 import { isBetaAllowed, normalizeCode, gateText } from './plan.js';
 import {
   ensureUser, updateUser, getUser, listPets, createPet, resolveDefaultPet, getPet, updatePetFields, createFoodItem, createMedItem,
@@ -1381,12 +1381,17 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
 
   // 共同照護·即時通知：只要「共同照護者」記錄，飼主本人就即時收到每一筆；
   // 共同照護者自己不會被即時通知（他們只收每日總結）。背景 try/catch，不影響記錄與回覆。
+  // 通知卡附「刪除這筆／開照護站修改」：飼主看到記錯當場就能處理（刪除會先跳確認）
   const notifyActorId = opts.actorId || lineUserId; // lineUserId 為飼主本人（資料擁有者）
   if (notifyActorId && notifyActorId !== lineUserId) {
     try {
       const who = opts.caregiverName || '共同照護者';
-      await pushText(env, lineUserId, `📝 ${who} 記錄了 ${pet.petName}：${description}`);
-    } catch (error) { console.error('care notify failed:', error.message); }
+      const notifySiteUrl = await siteLink(env, opts.baseUrl, lineUserId);
+      await pushMessages(env, lineUserId, [careNotifyFlex(who, pet.petName, description, savedLog.logId, notifySiteUrl)]);
+    } catch (error) {
+      console.error('care notify failed:', error.message);
+      try { await pushText(env, lineUserId, `📝 ${opts.caregiverName || '共同照護者'} 記錄了 ${pet.petName}：${description}`); } catch (e2) { /* ignore */ }
+    }
   }
 
   const categoryKey = record.category === 'food'
