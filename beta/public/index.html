@@ -33,6 +33,9 @@
       --radius-sm: 10px;
       --shadow-soft: 0 1px 3px rgba(58, 42, 24, 0.10), 0 4px 10px rgba(58, 42, 24, 0.06), 0 12px 30px rgba(115, 73, 33, 0.14);
       --shadow-lift: 0 1px 3px rgba(58, 42, 24, 0.06), 0 14px 38px rgba(58, 42, 24, 0.10), 0 36px 90px rgba(115, 73, 33, 0.08);
+      /* 光暈卡：上緣接光的白色細高光 ＋ 暖咖啡色大範圍柔散暈影（卡片像在發光，不是壓著一塊灰） */
+      --shadow-glow: inset 0 1px 0 rgba(255, 255, 255, 0.78), 0 1px 2px rgba(58, 42, 24, 0.06), 0 8px 22px rgba(138, 90, 44, 0.11), 0 22px 52px rgba(115, 73, 33, 0.10);
+      --shadow-glow-lift: inset 0 1px 0 rgba(255, 255, 255, 0.85), 0 2px 4px rgba(58, 42, 24, 0.06), 0 18px 44px rgba(138, 90, 44, 0.13), 0 40px 100px rgba(115, 73, 33, 0.10);
       --glow-brand: 0 0 0 3px rgba(115, 73, 33, 0.13), 0 5px 16px rgba(115, 73, 33, 0.22);
     }
     * { box-sizing: border-box; }
@@ -46,6 +49,9 @@
       line-height: 1.7;
       color: var(--ink);
       background:
+        radial-gradient(760px 420px at 10% -40px, rgba(228, 182, 124, 0.16), transparent 60%),
+        radial-gradient(720px 420px at 94% 30px, rgba(214, 196, 158, 0.14), transparent 62%),
+        radial-gradient(900px 520px at 50% 42%, rgba(255, 249, 238, 0.35), transparent 70%),
         radial-gradient(1100px 480px at 50% -120px, rgba(255, 251, 242, 0.95), transparent 72%),
         linear-gradient(180deg, var(--paper-hi) 0%, var(--paper) 55%);
       background-attachment: fixed;
@@ -58,7 +64,7 @@
       background: linear-gradient(180deg, #fffdf8 0%, var(--sheet-soft) 100%);
       border: 1px solid rgba(115, 73, 33, 0.12);
       border-radius: var(--radius-lg);
-      box-shadow: var(--shadow-lift);
+      box-shadow: var(--shadow-glow-lift);
       padding: 34px 44px 44px;
       overflow: hidden; /* 讓頂端咖啡帶跟著四角圓角收邊 */
     }
@@ -252,13 +258,15 @@
     .block {
       background: linear-gradient(180deg, #fffefb 0%, #f8f2e6 100%);
       border: 1px solid rgba(115, 73, 33, 0.14); border-radius: var(--radius);
-      box-shadow: var(--shadow-soft);
+      box-shadow: var(--shadow-glow);
       padding: 20px 22px; margin-top: 26px;
     }
     /* 每張卡的標題前加品牌色小記號，一眼分區 */
     .block .section-head h2::before {
       content: ''; width: 4px; height: 17px; border-radius: 2px;
       background: linear-gradient(180deg, #8a5a2c, var(--brand)); flex: none;
+      /* 標題小豎條微微發光，畫龍點睛 */
+      box-shadow: 0 0 7px rgba(138, 90, 44, 0.5);
     }
     .block .section-head { margin-top: 0; margin-bottom: 10px; }
     .block .empty { background: none; border: none; padding: 18px 8px; }
@@ -690,7 +698,13 @@
     .qbtn.qbtn-sub .q-plus { color: rgba(115, 73, 33, 0.4); }
     .qbtn.qbtn-sub:hover { background: var(--brand-tint); filter: none; border-color: var(--brand); box-shadow: 0 2px 8px rgba(115, 73, 33, 0.12); }
     /* 今日累計 hero：一打開先看到的重點（水分/熱量對照目標） */
-    .today-hero { padding-top: 22px; padding-bottom: 22px; }
+    .today-hero {
+      padding-top: 22px; padding-bottom: 22px;
+      /* 最重要那張卡：頂部中央一抹柔光，微微透亮 */
+      background:
+        radial-gradient(135% 92% at 50% -32%, rgba(255, 250, 240, 0.92), transparent 56%),
+        linear-gradient(180deg, #fffefb 0%, #f8f2e6 100%);
+    }
     .hero-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 18px; }
     .hero-title { font-family: var(--serif); font-size: 19px; font-weight: 700; color: var(--ink); letter-spacing: .02em; }
     .hero-date { font-size: 12.5px; color: var(--muted); }
@@ -699,9 +713,12 @@
     .pg-name { font-size: 15px; font-weight: 700; color: var(--ink); letter-spacing: .04em; }
     .pg-num { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
     .pg-num b { font-family: var(--serif); font-size: 26px; font-weight: 600; color: var(--ink); margin-right: 4px; line-height: 1; letter-spacing: .01em; }
-    .pg-track { height: 8px; background: #F0E8D9; border-radius: 999px; margin: 10px 0 6px; overflow: hidden; }
+    .pg-track { height: 8px; background: #F0E8D9; border-radius: 999px; margin: 10px 0 6px; overflow: hidden;
+      box-shadow: inset 0 1px 2px rgba(90, 60, 30, 0.10); }
     .pg-track i { display: block; height: 100%; border-radius: 999px;
-      background: linear-gradient(90deg, #8A5A2C, #6F4824); transition: width .5s cubic-bezier(.4,0,.2,1); }
+      background: linear-gradient(90deg, #8A5A2C, #6F4824); transition: width .5s cubic-bezier(.4,0,.2,1);
+      /* 上緣一道細高光，讓進度條像在發亮 */
+      box-shadow: inset 0 1px 0 rgba(255, 240, 220, 0.45); }
     .pg-track i.done { background: linear-gradient(90deg, #7A5230, #5A3617); }
     .pg-foot { display: flex; align-items: baseline; justify-content: space-between; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
     .pg-foot .remain { font-weight: 700; color: var(--ink-soft); }
