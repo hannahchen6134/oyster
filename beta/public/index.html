@@ -721,17 +721,17 @@
     .qbtn.qbtn-sub .q-plus { color: rgba(115, 73, 33, 0.4); }
     /* 快速記一筆的「一路點」數字盤：大鈕、好按，不用打鍵盤 */
     .qp-prompt { font-size: 14px; color: var(--ink-soft); text-align: center; margin: 2px 0 16px; }
-    .qp-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .qp-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
     .qp-btn {
-      min-height: 74px; border-radius: var(--radius); border: 1px solid rgba(115, 73, 33, 0.2);
+      min-height: 60px; border-radius: var(--radius); border: 1px solid rgba(115, 73, 33, 0.2);
       background: linear-gradient(180deg, #fffdf9, var(--sheet-soft)); color: var(--brand);
-      font-family: var(--serif); font-weight: 700; font-size: 24px; cursor: pointer;
+      font-family: var(--serif); font-weight: 700; font-size: 20px; cursor: pointer;
       box-shadow: 0 1px 2px rgba(58, 42, 24, 0.05); transition: transform .1s, box-shadow .15s, border-color .15s;
     }
-    .qp-btn small { display: block; font-family: var(--sans, inherit); font-weight: 500; font-size: 12px; color: var(--muted); margin-top: 3px; letter-spacing: 0.02em; }
+    .qp-btn small { display: block; font-family: var(--sans, inherit); font-weight: 500; font-size: 11.5px; color: var(--muted); margin-top: 2px; letter-spacing: 0.02em; }
     .qp-btn:hover { border-color: var(--brand); box-shadow: var(--shadow-soft); transform: translateY(-1px); }
     .qp-btn:active { transform: translateY(1px); }
-    .qp-btn.qp-word { font-size: 17px; }
+    .qp-btn.qp-word { font-size: 16px; }
     .qp-custom { grid-column: 1 / -1; min-height: 46px; font-family: var(--sans, inherit); font-size: 14px; font-weight: 600; color: var(--ink-soft); background: transparent; border-style: dashed; }
     .qbtn.qbtn-sub:hover { background: var(--brand-tint); filter: none; border-color: var(--brand); box-shadow: 0 2px 8px rgba(115, 73, 33, 0.12); }
     /* 今日累計 hero：一打開先看到的重點（水分/熱量對照目標） */
