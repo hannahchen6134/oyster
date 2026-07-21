@@ -599,20 +599,55 @@ async function handlePending(env, event, { db, user, pet, pets, lineUserId, owne
 const qrMsg = (label, text) => ({ type: 'action', action: { type: 'message', label: String(label).slice(0, 20), text } });
 const qrPost = (label, data, displayText) => ({ type: 'action', action: { type: 'postback', label: String(label).slice(0, 20), data, displayText: displayText || String(label) } });
 
-// 第一層：要記什麼（乾淨的純文字圓鈕，不塞 emoji）
-// 分類順序與網站「快速記一筆」完全一致：吃飯→喝水→用藥→嘔吐→大小便→精神→保健→備註
-function recordCategoryQuick() {
+// 症狀類分類鈕（吃喝藥用一鍵捷徑，這裡只留較少用的狀況當安全網）
+function symptomCategoryQuick() {
   return [
-    qrPost('吃飯', 'action=rec&k=food', '吃飯'),
-    qrPost('喝水', 'action=rec&k=water', '喝水'),
-    qrPost('用藥', 'action=rec&k=med', '用藥'),
     qrPost('嘔吐', 'action=rec&k=vomit', '嘔吐'),
     qrPost('大小便', 'action=rec&k=stool', '大小便'),
     qrPost('精神', 'action=rec&k=mood', '精神'),
     qrPost('保健', 'action=rec&k=supplement', '保健'),
-    qrPost('備註', 'action=rec&k=note', '備註'),
-    qrPost('❓ 怎麼打字更快', 'action=howtype', '怎麼打字')
+    qrPost('備註', 'action=rec&k=note', '備註')
   ];
+}
+// 找出這隻貓的預設貓 id（給一鍵捷徑用）
+async function defaultPetId(db, lineUserId, ownerId) {
+  try {
+    const user = await getUser(db, lineUserId);
+    const pets = await listPets(db, ownerId);
+    const pet = await resolveDefaultPet(db, user, pets);
+    return pet?.petId || '';
+  } catch (error) { return ''; }
+}
+// 一鍵捷徑：把「這隻貓最常記的吃喝藥」重建成可直接送出的指令，點一下就記好（也順便讓人記住指令長怎樣）
+async function quickShortcuts(db, petId) {
+  const DEFAULTS = ['水 20', '水 30', '罐頭 30', '乾糧 5', '藥 早 已吃'];
+  let cmds = [];
+  if (petId) {
+    try {
+      const { results } = await db.prepare(
+        `SELECT category, foodType, CAST(ROUND(amount) AS INTEGER) amt, medSlot, medStatus, COUNT(*) c, MAX(eventDateTime) t
+         FROM logs WHERE petId=? AND isDeleted=0 AND category IN ('water','food','med')
+         GROUP BY category, foodType, amt, medSlot, medStatus ORDER BY c DESC, t DESC LIMIT 8`
+      ).bind(petId).all();
+      for (const r of results || []) {
+        if (r.category === 'water' && r.amt > 0) cmds.push(`水 ${r.amt}`);
+        else if (r.category === 'food' && r.foodType && r.amt > 0) cmds.push(`${r.foodType} ${r.amt}`);
+        else if (r.category === 'med') cmds.push(`藥 ${[r.medSlot, r.medStatus || '已吃'].filter(Boolean).join(' ')}`.trim());
+      }
+    } catch (error) { /* 查不到就用預設 */ }
+  }
+  cmds = [...new Set(cmds)];
+  for (const d of DEFAULTS) { if (cmds.length >= 5) break; if (!cmds.includes(d)) cmds.push(d); }
+  return cmds.slice(0, 9).map((c) => qrMsg(c, c));
+}
+// 歡迎卡＋一鍵捷徑（P1-1：新朋友加入/解鎖就能直接記第一筆）
+async function welcomeMsg(db, lineUserId, ownerId) {
+  const w = welcomeFlex();
+  try {
+    const petId = await defaultPetId(db, lineUserId, ownerId);
+    w.quickReply = { items: [...await quickShortcuts(db, petId), qrPost('❓ 怎麼打字', 'action=howtype', '怎麼打字')] };
+  } catch (error) { /* ignore */ }
+  return w;
 }
 // 第二層：每一類的常用值（點一個就記好；「其他」才要打字）
 const RECORD_L2 = {
@@ -639,6 +674,11 @@ async function handlePostback(event, env, baseUrl) {
   // 共同照護者操作時解析到飼主本人（飼主本人時 ownerId === lineUserId，行為不變）
   const ownerId = lineUserId ? await resolveDataOwner(db, lineUserId) : lineUserId;
 
+  // 其他狀況（較少記的）：點分類 → 常用描述，兩層即可
+  if (action === 'recmore') {
+    await replyOrPushQuick(env, event, '其他狀況？點一個分類 👇', symptomCategoryQuick());
+    return;
+  }
   // 教打字：熟了直接打指令最快
   if (action === 'howtype') {
     await replyOrPushQuick(env, event,
@@ -842,7 +882,7 @@ async function handleFollow(event, env) {
     await replyOrPush(env, event, gateText());
     return;
   }
-  await replyOrPushFlex(env, event, welcomeFlex(), welcomeText());
+  await replyOrPushFlex(env, event, await welcomeMsg(env.DB, lineUserId, lineUserId), welcomeText());
 }
 
 async function handleTextMessage(event, env, baseUrl) {
@@ -900,7 +940,7 @@ async function handleTextMessage(event, env, baseUrl) {
     const code = String(env.INVITE_CODE || '__closed_beta__').trim();
     if (normalizeCode(text) === normalizeCode(code)) {
       await updateUser(db, lineUserId, { betaAccess: 1 });
-      await replyOrPushFlex(env, event, welcomeFlex(), welcomeText());
+      await replyOrPushFlex(env, event, await welcomeMsg(db, lineUserId, ownerId), welcomeText());
       return;
     }
     await replyOrPush(env, event, gateText());
@@ -1640,8 +1680,16 @@ async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId, ow
   }
 
   if (query === 'recordMenu') {
-    // 「快速記錄」：鍵盤上方冒出分類大圓鈕，一路點就記好，完全不用背指令
-    await replyOrPushQuick(env, event, '要記什麼？點下面就好 👇\n（熟了直接打「水 20」更快）', recordCategoryQuick());
+    // 「快速記錄」：先教最快的打字（和「如何記錄」一致），再給這隻貓的一鍵捷徑；點一下就記好
+    const shortcuts = await quickShortcuts(db, pet?.petId || '');
+    const items = [...shortcuts, qrPost('❓ 怎麼打字', 'action=howtype', '怎麼打字'), qrPost('其他狀況（吐/便…）', 'action=recmore', '其他狀況')];
+    await replyOrPushQuick(env, event,
+      '記錄超快，兩種都行 👇\n\n'
+      + '① 直接打字（最快）：\n'
+      + '　水 20・罐頭 30・藥 早 已吃\n'
+      + '　一次多筆：水20 乾糧5 藥早已吃\n\n'
+      + '② 或點下面你常記的，一下就好：',
+      items);
     return;
   }
 
