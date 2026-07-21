@@ -171,14 +171,24 @@ function bubble(altText, contents) {
 }
 
 // ---------- 記錄確認卡 ----------
-export function recordFlex({ pet, categoryKey, mainText, subText, summary, date, logId, hints = [], title = '', tip = '', siteUrl = '' }) {
+export function recordFlex({ pet, categoryKey, mainText, subText, summary, date, logId, hints = [], title = '', tip = '', siteUrl = '', warnNoKcal = false, foodType = '' }) {
   const style = CATEGORY_STYLE[categoryKey] || CATEGORY_STYLE.note;
+  // ① 誠實確認：食物沒算到熱量時，卡片不能長得跟正常的一樣——當場用朱紅醒目標示，讓使用者立刻看到、立刻修
+  const warnBox = warnNoKcal ? [{
+    type: 'box', layout: 'vertical', backgroundColor: C.sealTint, cornerRadius: '10px',
+    paddingAll: '12px', margin: 'md', spacing: 'xs',
+    contents: [
+      text('⚠ 這一筆沒有算到熱量', { size: 'sm', weight: 'bold', color: C.seal, wrap: true }),
+      text('這個品項還沒設定「每克熱量」，先幫你把份量記下來了。設定公式後，這筆會自動補算回來。', { size: 'xxs', color: C.inkSoft, wrap: true })
+    ]
+  }] : [];
   const body = {
     type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
     contents: [
       { type: 'box', layout: 'horizontal', contents: [tag(style.label, style)] },
       text(mainText, { size: 'xl', weight: 'bold', color: C.ink, margin: 'md', wrap: true }),
       ...(subText ? [text(subText, { size: 'xs', color: C.muted, wrap: true, margin: 'sm' })] : []),
+      ...warnBox,
       { type: 'separator', margin: 'lg', color: SEPARATOR },
       text('今日累積', { size: 'xs', color: C.muted, margin: 'lg', weight: 'bold' }),
       statCellRow([
@@ -203,7 +213,10 @@ export function recordFlex({ pet, categoryKey, mainText, subText, summary, date,
         { type: 'button', height: 'sm', style: 'link', color: C.brand,
           action: { type: 'postback', label: '🗑 刪除', data: `action=delAsk&logId=${logId}`, displayText: '刪除剛剛那筆' } }
       ] },
-      { type: 'button', height: 'sm', style: 'primary', color: C.brand,
+      // ① 沒算到熱量時，把「設定熱量公式」擺成主要按鈕，讓修正就在眼前
+      ...(warnNoKcal ? [{ type: 'button', height: 'sm', style: 'primary', color: C.seal,
+        action: { type: 'message', label: '設定熱量公式', text: `設定${foodType || '罐頭'}` } }] : []),
+      { type: 'button', height: 'sm', style: warnNoKcal ? 'link' : 'primary', color: C.brand,
         // 直接開網站（已烤入登入連結）；沒有 siteUrl 時退回舊的訊息觸發
         action: siteUrl
           ? { type: 'uri', label: '開啟照護站', uri: siteUrl }
@@ -241,6 +254,48 @@ export function recordFlexCompact({ pet, categoryKey, mainText, subText, summary
     ]
   };
   return bubble(`已記錄 ${mainText}`, { type: 'bubble', size: 'kilo', body, footer });
+}
+
+// ②③ 打了品名卻對不到已建立的品項時：不默默記 0 熱量，先回這張卡讓使用者選正確品項（熱量才算得到）。
+// guessId＝模糊比對猜到最接近的品項 foodId，排最前面並標「最接近」。
+export function foodDisambigFlex({ pet, foodType, typedName, grams, options = [], guessId = '' }) {
+  const styleKey = foodType === '乾糧' ? 'dry' : (foodType === '罐頭' || foodType === '濕食') ? 'wet' : 'note';
+  const style = CATEGORY_STYLE[styleKey] || CATEGORY_STYLE.note;
+  const g = Number(grams) || 0;
+  const sorted = [...options].sort((a, b) => (b.foodId === guessId ? 1 : 0) - (a.foodId === guessId ? 1 : 0));
+  const pickButtons = sorted.slice(0, 6).map((food) => {
+    const isGuess = food.foodId === guessId;
+    return {
+      type: 'button', height: 'sm', style: isGuess ? 'primary' : 'secondary', color: isGuess ? C.brand : undefined,
+      action: {
+        type: 'postback',
+        label: `${isGuess ? '⭐ ' : ''}${String(food.displayName)}`.slice(0, 20),
+        data: `action=recFoodG&foodId=${food.foodId}&g=${g}`,
+        displayText: `${food.displayName} ${g}g`
+      }
+    };
+  });
+  const body = {
+    type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
+    contents: [
+      { type: 'box', layout: 'horizontal', contents: [tag('要確認一下', CATEGORY_STYLE.vomit)] },
+      text(`「${typedName}」我對不到已建立的品項`, { size: 'lg', weight: 'bold', color: C.ink, margin: 'md', wrap: true }),
+      text(`選正確的${foodType}，這 ${g} g 的熱量才算得進去（避免記成 0）`, { size: 'xs', color: C.muted, wrap: true, margin: 'sm' }),
+      ...(guessId ? [text('⭐ 是我猜最接近的，直接點就好', { size: 'xxs', color: C.brand, wrap: true, margin: 'sm' })] : [])
+    ]
+  };
+  const footer = {
+    type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: '12px', backgroundColor: FOOTER_COLOR,
+    contents: [
+      ...pickButtons,
+      { type: 'separator', margin: 'sm', color: SEPARATOR },
+      { type: 'button', height: 'sm', style: 'link', color: C.brand,
+        action: { type: 'message', label: `新增「${typedName}」`.slice(0, 20), text: `設定${foodType}` } },
+      { type: 'button', height: 'sm', style: 'link', color: C.muted,
+        action: { type: 'postback', label: '就先記著，不算熱量', data: `action=recFoodRaw&t=${encodeURIComponent(foodType)}&g=${g}&name=${encodeURIComponent(typedName)}`, displayText: '照打的記，先不算熱量' } }
+    ]
+  };
+  return bubble(`「${typedName}」是哪一個${foodType}？`, { type: 'bubble', size: 'mega', header: header(`確認品項・${pet?.petName || '貓貓'}`), body, footer });
 }
 
 // 一則訊息記多筆時的合併確認卡：條列這次記了哪幾筆 ＋ 當天累積

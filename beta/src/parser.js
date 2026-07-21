@@ -495,3 +495,36 @@ export function matchFood(foods, itemName, foodType) {
 
   return best;
 }
+
+// 把「罐頭/乾糧/濕食…」這種類別字從品名裡拿掉，只留可辨識的核心字（皇家罐頭 → 皇家）
+function stripFoodTypeWords(value) {
+  return String(value || '').toLowerCase().replace(/罐頭|罐罐|乾糧|乾乾|濕糧|濕食|飼料|主食罐|副食罐|罐|包/g, '').replace(/\s+/g, '').trim();
+}
+
+// 字元集合 Dice 相似度（0~1）：皇冠 vs 皇家 = 2×1 /(2+2)=0.5；希爾斯 vs 皇冠 = 0
+function charDice(a, b) {
+  const sa = new Set([...String(a)]);
+  const sb = new Set([...String(b)]);
+  if (!sa.size || !sb.size) return 0;
+  let inter = 0;
+  for (const ch of sa) if (sb.has(ch)) inter += 1;
+  return (2 * inter) / (sa.size + sb.size);
+}
+
+// 模糊比對：打的品名對不到時，猜「最接近的同類型品項」。
+// 保守——只用來在確認卡把最可能的排前面/標「最接近」，永遠不會自動記，一定要使用者點選確認。
+export function guessFood(foods, itemName, foodType) {
+  const target = stripFoodTypeWords(normalizeText(itemName || ''));
+  if (!target) return null;
+  let best = null;
+  let bestScore = 0;
+  for (const food of foods || []) {
+    if (food.isDeleted) continue;
+    if (foodType && food.foodType !== foodType) continue;
+    const cand = stripFoodTypeWords(food.displayName) || stripFoodTypeWords(food.brand) || stripFoodTypeWords(food.productName);
+    if (!cand) continue;
+    const score = charDice(target, cand);
+    if (score > bestScore) { best = food; bestScore = score; }
+  }
+  return bestScore >= 0.4 ? best : null;
+}

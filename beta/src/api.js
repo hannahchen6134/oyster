@@ -7,7 +7,7 @@ import {
   listFoods, getFood,
   insertLog, getLog, getLogsForDay, updateLog, softDeleteLog,
   recomputeDay, getSummaries, getSessionUser, getRecentLogsByPet,
-  resolveDataOwner, createCareInvite, listCareMembers, track
+  resolveDataOwner, createCareInvite, listCareMembers, track, healFoodKcal
 } from './db.js';
 import { computeDailySummary, deriveFoodFields } from './summary.js';
 import { matchFood } from './parser.js';
@@ -460,7 +460,12 @@ async function handleCrud(db, spec, request, url, method, resourceId, lineUserId
       .bind(...values)
       .run();
     const row = await db.prepare(`SELECT * FROM ${spec.table} WHERE ${spec.idColumn} = ?`).bind(id).first();
-    return jsonResponse({ ok: true, row });
+    // ④ 食物填了熱量公式 → 回頭補算過去沒算到熱量的紀錄
+    let healed = 0;
+    if (spec.table === 'food_items') {
+      try { ({ healed } = await healFoodKcal(db, row)); } catch (error) { console.error('healFoodKcal failed:', error.message); }
+    }
+    return jsonResponse({ ok: true, row, healed });
   }
 
   if (!resourceId) return jsonResponse({ ok: false, message: '缺少資源 ID' }, 400);
@@ -492,7 +497,12 @@ async function handleCrud(db, spec, request, url, method, resourceId, lineUserId
         .run();
     }
     const row = await db.prepare(`SELECT * FROM ${spec.table} WHERE ${spec.idColumn} = ?`).bind(resourceId).first();
-    return jsonResponse({ ok: true, row });
+    // ④ 食物公式被更新（例如補上/改了每克熱量）→ 回頭補算過去沒算到熱量的紀錄
+    let healed = 0;
+    if (spec.table === 'food_items') {
+      try { ({ healed } = await healFoodKcal(db, row)); } catch (error) { console.error('healFoodKcal failed:', error.message); }
+    }
+    return jsonResponse({ ok: true, row, healed });
   }
 
   if (method === 'DELETE') {

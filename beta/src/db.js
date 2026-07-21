@@ -1,7 +1,7 @@
 // D1 資料存取層：使用者、貓咪、食物、紀錄、每日總結重算、session
 // 規則：所有刪除都是 isDeleted 軟刪除；logs 有任何變動就重算該日 daily_summary。
 
-import { computeDailySummary } from './summary.js';
+import { computeDailySummary, deriveFoodFields } from './summary.js';
 import { newId, newToken, nowIso, addDays } from './util.js';
 
 // ---------- users ----------
@@ -154,6 +154,45 @@ export async function listFoods(db, ownerLineUserId) {
 
 export async function getFood(db, foodId) {
   return db.prepare('SELECT * FROM food_items WHERE foodId = ? AND isDeleted = 0').bind(foodId).first();
+}
+
+// 資料自癒（④）：設定或更新某品項的熱量公式後，回頭把「過去沒算到熱量」的紀錄補算回來。
+// 涵蓋兩種舊紀錄：(a) 已綁這個 foodId 但 kcal=0（當初建立時還沒填公式）；
+//                (b) 沒綁 foodId、但同類型且品名和這個品項完全相同、kcal=0（當初打的名字對不到才落空）。
+// 只動 kcal=0 的食物紀錄，不覆寫已經算好的資料；補完重算受影響那幾天的 daily_summary。
+// 回傳 { healed, days } 讓呼叫端可提示使用者補了幾筆。
+export async function healFoodKcal(db, food) {
+  if (!food || !(Number(food.kcalPerGram) > 0)) return { healed: 0, days: 0 };
+  const name = String(food.displayName || '').trim();
+  const { results } = await db
+    .prepare(
+      `SELECT * FROM logs
+       WHERE isDeleted = 0 AND category = 'food' AND (kcal IS NULL OR kcal = 0)
+         AND ( foodId = ?
+               OR (COALESCE(foodId, '') = '' AND foodType = ? AND itemName = ? AND ? <> '') )`
+    )
+    .bind(food.foodId, String(food.foodType || ''), name, name)
+    .all();
+  const logs = results || [];
+  if (!logs.length) return { healed: 0, days: 0 };
+
+  const affected = new Set();
+  let healed = 0;
+  for (const log of logs) {
+    const derived = deriveFoodFields(log.amount, food.foodType || log.foodType, food);
+    if (!(derived.kcal > 0)) continue;
+    await db
+      .prepare('UPDATE logs SET foodId = ?, itemName = ?, kcal = ?, waterMl = ?, updatedAt = ? WHERE logId = ?')
+      .bind(food.foodId, name || String(log.itemName || ''), derived.kcal, derived.waterMl, nowIso(), log.logId)
+      .run();
+    affected.add(`${log.petId}|${String(log.eventDateTime).slice(0, 10)}`);
+    healed += 1;
+  }
+  for (const key of affected) {
+    const [petId, date] = key.split('|');
+    await recomputeDay(db, petId, date);
+  }
+  return { healed, days: affected.size };
 }
 
 // ---------- 行為追蹤（輕量事件記錄，用來看留存/活化，失敗絕不影響功能）----------

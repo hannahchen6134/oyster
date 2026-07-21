@@ -3,20 +3,20 @@
 // /api/*    → 照護站 REST API
 // 其餘路徑 → 照護站網站（public/ 靜態資源）
 
-import { parseMessage, matchFood, normalizeText } from './parser.js';
+import { parseMessage, matchFood, guessFood, normalizeText } from './parser.js';
 import { deriveFoodFields } from './summary.js';
 import { handleApi } from './api.js';
 import { verifyLineSignature, replyOrPush, replyOrPushQuick, replyOrPushFlex, replyMessages, pushText, pushMessages, getProfile, getAccessToken, checkAccessToken } from './line.js';
 import { hasAnyReminder, parseReminderSettings, buildReminderLines, reminderMessage, visitReminderMessage } from './reminders.js';
 import { shortDate } from './replies.js';
-import { recordFlex, recordFlexCompact, multiRecordFlex, todayFlex, websiteFlex, menuFlex, recordMenuFlex, recordTutorialFlex, quickRecordCarousel, weekFlex, monthFlex, recentFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, onboardingCarousel, menuCell, exampleCard, petDataFlex, deletedCard, confirmDeleteFlex, careNotifyFlex, careInviteFlex } from './flex.js';
+import { recordFlex, recordFlexCompact, foodDisambigFlex, multiRecordFlex, todayFlex, websiteFlex, menuFlex, recordMenuFlex, recordTutorialFlex, quickRecordCarousel, weekFlex, monthFlex, recentFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, onboardingCarousel, menuCell, exampleCard, petDataFlex, deletedCard, confirmDeleteFlex, careNotifyFlex, careInviteFlex } from './flex.js';
 import { isBetaAllowed, normalizeCode, gateText } from './plan.js';
 import {
   ensureUser, updateUser, getUser, listPets, createPet, resolveDefaultPet, getPet, updatePetFields, createFoodItem, createMedItem,
   listFoods, getFood, insertLog, getLog, getLastLogByUser, softDeleteLog, updateLog,
   recomputeDay, getRecentSummaries,
   upcomingVisits, listVetsByOwner, createSession,
-  appKvGet, appKvSet, getSessionUser, track,
+  appKvGet, appKvSet, getSessionUser, track, healFoodKcal,
   resolveDataOwner, createCareInvite, redeemCareInvite, listCareMembers, listCareCircle,
   createLoginCode, redeemLoginCode
 } from './db.js';
@@ -401,21 +401,27 @@ async function createGuidedFood(db, lineUserId, foodType, name, kcalIn) {
   const isWet = foodType === '罐頭' || foodType === '濕食';
   const kcalPerGram = kcalIn > 0 ? kcalIn : 0;
   const waterRatio = isWet ? 0.8 : 0;
-  await createFoodItem(db, lineUserId, {
+  const food = await createFoodItem(db, lineUserId, {
     displayName: name,
     foodType,
     kcalPerGram,
     waterRatio,
     note: kcalIn > 0 ? '' : 'LINE 引導建立（熱量待補）'
   });
-  return { kcalPerGram, waterRatio, needsKcal: !(kcalIn > 0) };
+  // ④ 一填公式，就回頭把過去這個品項沒算到熱量的紀錄補算回來
+  let healed = 0;
+  if (kcalPerGram > 0) {
+    try { ({ healed } = await healFoodKcal(db, food)); } catch (error) { console.error('healFoodKcal failed:', error.message); }
+  }
+  return { kcalPerGram, waterRatio, needsKcal: !(kcalIn > 0), healed };
 }
 
 function foodDoneCard(name, foodType, info) {
   const waterPct = Math.round(info.waterRatio * 100);
+  const healedLine = info.healed > 0 ? `\n✓ 順便把過去 ${info.healed} 筆沒算到熱量的紀錄補算回來了。` : '';
   const subtitle = info.needsKcal
     ? `${foodType}・含水 ${waterPct}%\n熱量還沒設定，記錄時先不算熱量。到照護站「設定→常吃的食物」填每克熱量後才會計算（不會自動亂帶數字）。`
-    : `${foodType}・每克 ${info.kcalPerGram} kcal・含水 ${waterPct}%`;
+    : `${foodType}・每克 ${info.kcalPerGram} kcal・含水 ${waterPct}%${healedLine}`;
   return onboardCard({
     title: `已建立「${name}」`,
     subtitle,
@@ -829,6 +835,22 @@ async function handlePostback(event, env, baseUrl) {
     await handleRecord(env, event, pet, {
       category: 'food', foodType: food.foodType, itemName: food.displayName,
       amount: Number(data.get('g')) || 0, unit: 'g', addedWaterMl: 0, medStatus: '', medSlot: '', note: ''
+    }, ownerId, { fromButton: true, actorId: lineUserId, caregiverName, baseUrl });
+    return;
+  }
+  // ② 確認卡按「就先記著，不算熱量」→ 照打的品名如實記下（forceRaw 跳過再次確認），確認卡會標紅提醒
+  if (action === 'recFoodRaw') {
+    const t = data.get('t') || '罐頭';
+    const g = Number(data.get('g')) || 0;
+    const name = data.get('name') || '';
+    const user = await getUser(db, lineUserId);
+    const pets = await listPets(db, ownerId);
+    const pet = await resolveDefaultPet(db, user, pets);
+    if (!pet) { await replyOrPush(env, event, '還沒有建立貓咪。'); return; }
+    const caregiverName = ownerId !== lineUserId ? String(user.displayName || '') : '';
+    await handleRecord(env, event, pet, {
+      category: 'food', foodType: t, itemName: name,
+      amount: g, unit: 'g', addedWaterMl: 0, medStatus: '', medSlot: '', note: '', forceRaw: true
     }, ownerId, { fromButton: true, actorId: lineUserId, caregiverName, baseUrl });
     return;
   }
@@ -1478,6 +1500,7 @@ async function siteLink(env, baseUrl, lineUserId, go = '') {
 async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
   const db = env.DB;
   const hints = [];
+  let noKcal = false; // ① 這一筆食物是否「沒算到熱量」（要在確認卡當場標紅）
 
   // 事件時間：現在（台北）＋ dayOffset ＋ 指定時間
   let eventDateTime = taipeiNowDateTime();
@@ -1518,11 +1541,19 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
     description = `水 ${record.amount} ml`;
   } else if (record.category === 'food') {
     const foods = await listFoods(db, lineUserId);
-    // 沒寫品名時，若該類型只建了一種品項就自動套用（例如乾糧只有一種 → 直接用它的公式）
     let matched = matchFood(foods, record.itemName, record.foodType);
-    if (!matched && !record.itemName) {
-      const sameType = foods.filter((food) => food.foodType === record.foodType);
-      if (sameType.length === 1) matched = sameType[0];
+    const sameType = foods.filter((food) => !food.isDeleted && food.foodType === record.foodType);
+    // 沒寫品名時，若該類型只建了一種品項就自動套用（例如乾糧只有一種 → 直接用它的公式）
+    if (!matched && !record.itemName && sameType.length === 1) matched = sameType[0];
+    // ②③ 打了品名卻對不到、但這個類型有可選品項 → 先停下來問是哪一個，別默默記成 0 熱量。
+    //     forceRaw＝使用者已在確認卡按「就先記著不算熱量」；silent＝一則多筆，不做互動式確認。
+    if (!matched && !record.forceRaw && !opts.silent && sameType.length >= 1) {
+      const guess = guessFood(sameType, record.itemName, record.foodType);
+      await replyOrPushFlex(env, event, foodDisambigFlex({
+        pet, foodType: record.foodType, typedName: record.itemName || record.foodType,
+        grams: Number(record.amount) || 0, options: sameType, guessId: guess?.foodId || ''
+      }), `「${record.itemName || record.foodType}」對不到已建立的品項，請選正確的${record.foodType}，熱量才算得到。`);
+      return { disambiguated: true };
     }
     if (matched) {
       log.foodId = matched.foodId;
@@ -1531,11 +1562,13 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
       log.kcal = derived.kcal;
       log.waterMl = derived.waterMl;
       description = `${record.foodType} ${matched.displayName} ${record.amount} g`;
+      // 品項有對到、但這個品項本身還沒填熱量公式 → 一樣要當場標紅（① 誠實確認）
+      if (!(derived.kcal > 0)) noKcal = true;
     } else {
       const derived = deriveFoodFields(record.amount, record.foodType, null);
       log.waterMl = derived.waterMl;
       description = `${record.foodType}${record.itemName ? ` ${record.itemName}` : ''} ${record.amount} g`;
-      hints.push('這個品項還沒設定熱量公式，\n熱量先未計入。\n到照護站「設定→常吃的食物」\n新增後會自動計算。');
+      noKcal = true; // ① 沒有可對應公式：先記份量，確認卡當場標紅、給設定按鈕
     }
   } else if (record.category === 'med') {
     const label = [record.medSlot, record.itemName].filter(Boolean).join(' ');
@@ -1646,28 +1679,16 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
   if (opts.silent) {
     return { mainText, summary, eventDate, savedLog };
   }
-  // 單筆記錄：回覆記錄卡（純文字為 LINE 通知/無法顯示卡片時的備援）
+  // 單筆記錄：一律回完整卡片（不再忽大忽小分級）。純文字為 LINE 通知/無法顯示卡片時的備援。
   const fallbackText = recordReply(description, pet, summary, hints, eventDate);
-  // 分級：例行的吃喝藥用「輕卡」不洗版；只有以下情況給完整大卡——
-  // ① 要注意的類別（吐/便/尿/精神/備註/疫苗/除蟲）② 當天第一筆（開場秀累積）
-  // ③ 有提示要講（例：吐沒寫描述、食物沒熱量公式）④ 新手期（還在學，需要教學 tip）
-  const intake = ['water', 'food', 'med', 'supplement'].includes(record.category);
-  const firstOfDay = (Number(summary.entryCount) || 0) <= 1;
-  const beginnerNow = await isBeginner(db, pet.petId);
-  const useFull = !intake || firstOfDay || hints.length > 0 || beginnerNow;
-  const card = useFull
-    ? recordFlex({
-        pet, categoryKey, mainText,
-        subText: subParts.join('・'),
-        summary, date: eventDate,
-        logId: savedLog?.logId || '',
-        hints, tip, siteUrl: await siteLink(env, opts.baseUrl, lineUserId)
-      })
-    : recordFlexCompact({
-        pet, categoryKey, mainText,
-        subText: subParts.join('・'),
-        summary, logId: savedLog?.logId || ''
-      });
+  const card = recordFlex({
+    pet, categoryKey, mainText,
+    subText: subParts.join('・'),
+    summary, date: eventDate,
+    logId: savedLog?.logId || '',
+    hints, tip, siteUrl: await siteLink(env, opts.baseUrl, lineUserId),
+    warnNoKcal: record.category === 'food' && noKcal, foodType: record.foodType || ''
+  });
   await replyOrPushFlex(env, event, card, fallbackText);
   // 記錄是每天最高頻的互動：順手把專屬圖文選單保持在最新版（版本相符時只是一次快取讀取，不重建）
   if (opts.baseUrl) {
