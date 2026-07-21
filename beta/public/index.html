@@ -499,19 +499,22 @@
     .dpill.p-dry   { background: #f4ebd4; color: #886722; }
     .dpill.p-kcal  { background: #ece7f3; color: #5a4a84; }
     .dpill.p-warn  { background: var(--seal-tint); color: var(--seal); font-weight: 700; }
-    /* 飲食與水分組成：分段長條＋列點，給醫生看一眼懂 */
-    .comp-block { margin-top: 4px; }
-    .comp-block + .comp-block { margin-top: 20px; }
-    .comp-h { font-size: 13.5px; font-weight: 700; color: var(--ink); margin-bottom: 9px; display: flex; justify-content: space-between; align-items: baseline; }
-    .comp-h small { font-weight: 500; color: var(--muted); font-size: 11.5px; }
-    .comp-bar { display: flex; height: 15px; border-radius: 999px; overflow: hidden; background: #EFE7D8; box-shadow: inset 0 1px 2px rgba(90,60,30,0.08); }
-    .comp-bar i { height: 100%; }
-    .comp-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 11px; }
-    .comp-item { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
-    .comp-dot { width: 10px; height: 10px; border-radius: 3px; flex: none; }
-    .comp-item b { color: var(--ink); font-weight: 700; }
-    .comp-item span { color: var(--muted); font-size: 12px; }
-    .comp-empty { padding: 20px 4px; text-align: center; color: var(--muted); font-size: 13px; }
+    /* 飲食與水分組成：精緻分段長條＋列點，給醫生看一眼懂又有質感 */
+    .comp-block { padding: 15px 15px 16px; background: linear-gradient(180deg, #fffefb, #faf5ec); border: 1px solid rgba(115,73,33,0.1); border-radius: var(--radius); box-shadow: var(--shadow-glow); }
+    .comp-block + .comp-block { margin-top: 14px; }
+    .comp-h { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
+    .comp-h .lbl { font-family: var(--serif); font-size: 15px; font-weight: 700; color: var(--ink); letter-spacing: 0.03em; }
+    .comp-h .tot { font-family: var(--serif); font-weight: 700; color: var(--ink); font-size: 21px; line-height: 1; font-variant-numeric: tabular-nums; }
+    .comp-h .tot small { font-family: "Noto Sans TC", sans-serif; font-size: 11.5px; font-weight: 500; color: var(--muted); margin-left: 3px; letter-spacing: 0; }
+    .comp-bar { display: flex; gap: 3px; height: 18px; margin-bottom: 13px; }
+    .comp-bar i { height: 100%; border-radius: 6px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.3), 0 1px 3px rgba(90,60,30,0.12); }
+    .comp-legend { display: flex; flex-direction: column; gap: 9px; }
+    .comp-item { display: flex; align-items: center; gap: 9px; font-size: 13.5px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+    .comp-dot { width: 11px; height: 11px; border-radius: 4px; flex: none; box-shadow: inset 0 1px 0 rgba(255,255,255,0.35); }
+    .comp-item .nm { flex: 1; }
+    .comp-item .vl { font-weight: 700; color: var(--ink); }
+    .comp-item .pc { color: var(--muted); font-size: 12px; width: 44px; text-align: right; }
+    .comp-empty { padding: 22px 4px; text-align: center; color: var(--muted); font-size: 13px; }
     /* 給醫生的重點整理：白底、按時間列點，截圖友善 */
     .digest-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
     /* 範圍切換：一體成形的分段膠囊（字不折行，窄螢幕也不會變圓球） */
@@ -2471,12 +2474,12 @@
       const f1 = (v) => (Math.round((Number(v) || 0) * 10) / 10);
       const pct = (v, tot) => (tot > 0 ? Math.round((v / tot) * 100) : 0);
       const seg = (v, tot, color) => (v > 0 ? `<i style="width:${Math.max(2, (v / tot) * 100)}%;background:${color}"></i>` : '');
-      const item = (color, label, v, tot, unit) => `<span class="comp-item"><span class="comp-dot" style="background:${color}"></span>${label}　<b>${f1(v)}</b> ${unit}<span>（${pct(v, tot)}%）</span></span>`;
+      const item = (color, label, v, tot, unit) => `<div class="comp-item"><span class="comp-dot" style="background:${color}"></span><span class="nm">${label}</span><span class="vl">${f1(v)} ${unit}</span><span class="pc">${pct(v, tot)}%</span></div>`;
       const WATER1 = '#2B7A66', WATER2 = '#8FB7A8';
-      const DRY = '#886722', WET = '#5C7031', OTHER = '#B0A188';
+      const DRY = '#B07C2E', WET = '#5C7031', OTHER = '#C2B29A';
       let html = `
         <div class="comp-block">
-          <div class="comp-h">水分來源<small>合計 ${f1(totalWater)} ml</small></div>
+          <div class="comp-h"><span class="lbl">水分來源</span><span class="tot">${f1(totalWater)}<small>ml 合計</small></span></div>
           <div class="comp-bar">${seg(directWater, totalWater, WATER1)}${seg(foodWater, totalWater, WATER2)}</div>
           <div class="comp-legend">
             ${item(WATER1, '自己喝的水', directWater, totalWater, 'ml')}
@@ -2486,7 +2489,7 @@
       if (totalFood > 0) {
         html += `
         <div class="comp-block">
-          <div class="comp-h">飲食組成<small>合計 ${f1(totalFood)} g</small></div>
+          <div class="comp-h"><span class="lbl">飲食組成</span><span class="tot">${f1(totalFood)}<small>g 合計</small></span></div>
           <div class="comp-bar">${seg(dry, totalFood, DRY)}${seg(wetAsFed, totalFood, WET)}${seg(other, totalFood, OTHER)}</div>
           <div class="comp-legend">
             ${dry > 0 ? item(DRY, '乾糧', dry, totalFood, 'g') : ''}
