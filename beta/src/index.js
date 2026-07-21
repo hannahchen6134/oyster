@@ -9,7 +9,7 @@ import { handleApi } from './api.js';
 import { verifyLineSignature, replyOrPush, replyOrPushQuick, replyOrPushFlex, replyMessages, pushText, pushMessages, getProfile, getAccessToken, checkAccessToken } from './line.js';
 import { hasAnyReminder, parseReminderSettings, buildReminderLines, reminderMessage, visitReminderMessage } from './reminders.js';
 import { shortDate } from './replies.js';
-import { recordFlex, multiRecordFlex, todayFlex, websiteFlex, menuFlex, recordMenuFlex, recordTutorialFlex, quickRecordCarousel, weekFlex, monthFlex, recentFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, onboardingCarousel, menuCell, exampleCard, petDataFlex, deletedCard, confirmDeleteFlex, careNotifyFlex, careInviteFlex } from './flex.js';
+import { recordFlex, recordFlexCompact, multiRecordFlex, todayFlex, websiteFlex, menuFlex, recordMenuFlex, recordTutorialFlex, quickRecordCarousel, weekFlex, monthFlex, recentFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, onboardingCarousel, menuCell, exampleCard, petDataFlex, deletedCard, confirmDeleteFlex, careNotifyFlex, careInviteFlex } from './flex.js';
 import { isBetaAllowed, normalizeCode, gateText } from './plan.js';
 import {
   ensureUser, updateUser, getUser, listPets, createPet, resolveDefaultPet, getPet, updatePetFields, createFoodItem, createMedItem,
@@ -1608,15 +1608,26 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
   }
   // 單筆記錄：回覆記錄卡（純文字為 LINE 通知/無法顯示卡片時的備援）
   const fallbackText = recordReply(description, pet, summary, hints, eventDate);
-  // 「開啟照護站」按鈕烤入本人登入連結 → 點了直接進網站，不再先跳一則回覆
-  const siteUrl = await siteLink(env, opts.baseUrl, lineUserId);
-  const card = recordFlex({
-    pet, categoryKey, mainText,
-    subText: subParts.join('・'),
-    summary, date: eventDate,
-    logId: savedLog?.logId || '',
-    hints, tip, siteUrl
-  });
+  // 分級：例行的吃喝藥用「輕卡」不洗版；只有以下情況給完整大卡——
+  // ① 要注意的類別（吐/便/尿/精神/備註/疫苗/除蟲）② 當天第一筆（開場秀累積）
+  // ③ 有提示要講（例：吐沒寫描述、食物沒熱量公式）④ 新手期（還在學，需要教學 tip）
+  const intake = ['water', 'food', 'med', 'supplement'].includes(record.category);
+  const firstOfDay = (Number(summary.entryCount) || 0) <= 1;
+  const beginnerNow = await isBeginner(db, pet.petId);
+  const useFull = !intake || firstOfDay || hints.length > 0 || beginnerNow;
+  const card = useFull
+    ? recordFlex({
+        pet, categoryKey, mainText,
+        subText: subParts.join('・'),
+        summary, date: eventDate,
+        logId: savedLog?.logId || '',
+        hints, tip, siteUrl: await siteLink(env, opts.baseUrl, lineUserId)
+      })
+    : recordFlexCompact({
+        pet, categoryKey, mainText,
+        subText: subParts.join('・'),
+        summary, logId: savedLog?.logId || ''
+      });
   await replyOrPushFlex(env, event, card, fallbackText);
   return { mainText, summary, eventDate, savedLog };
 }

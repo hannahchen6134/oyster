@@ -214,6 +214,35 @@ export function recordFlex({ pet, categoryKey, mainText, subText, summary, date,
   return bubble(`${title ? '已更新' : '已記錄'} ${mainText}`, { type: 'bubble', size: 'mega', header: header(headerTitle), body, footer });
 }
 
+// 輕卡：例行的吃喝藥用這張——一行主內容＋一行今日累積＋小小的改/刪，不洗版
+export function recordFlexCompact({ pet, categoryKey, mainText, subText, summary, logId }) {
+  const style = CATEGORY_STYLE[categoryKey] || CATEGORY_STYLE.note;
+  const foodG = (Number(summary.dryFoodG) || 0) + (Number(summary.wetFoodG) || 0) + (Number(summary.otherFoodG) || 0);
+  const body = {
+    type: 'box', layout: 'vertical', paddingAll: '14px', backgroundColor: BODY_BG, spacing: 'sm',
+    contents: [
+      { type: 'box', layout: 'baseline', spacing: 'sm', contents: [
+        tag(style.label, style),
+        text(mainText, { size: 'md', weight: 'bold', color: C.ink, wrap: true, flex: 1 })
+      ] },
+      ...(subText ? [text(subText, { size: 'xxs', color: C.muted, wrap: true })] : []),
+      text(`今日　水 ${fmt(summary.totalWaterMl)} ml・食 ${fmt(foodG)} g・熱 ${fmt(summary.kcal)} kcal`,
+        { size: 'xxs', color: C.inkSoft, wrap: true, margin: 'sm' })
+    ]
+  };
+  const editable = ['water', 'dry', 'wet'].includes(categoryKey);
+  const footer = {
+    type: 'box', layout: 'horizontal', spacing: 'sm', paddingAll: '6px', paddingStart: '10px', paddingEnd: '10px', backgroundColor: FOOTER_COLOR,
+    contents: [
+      ...(editable ? [{ type: 'button', height: 'sm', style: 'link', color: C.brand,
+        action: { type: 'postback', label: '✏️ 改數量', data: `action=editAmount&logId=${logId}`, displayText: '改數量' } }] : []),
+      { type: 'button', height: 'sm', style: 'link', color: C.brand,
+        action: { type: 'postback', label: '🗑 刪除', data: `action=delAsk&logId=${logId}`, displayText: '刪除剛剛那筆' } }
+    ]
+  };
+  return bubble(`已記錄 ${mainText}`, { type: 'bubble', size: 'kilo', body, footer });
+}
+
 // 一則訊息記多筆時的合併確認卡：條列這次記了哪幾筆 ＋ 當天累積
 export function multiRecordFlex(pet, lines, summary, date, siteUrl = '') {
   const foodG = (Number(summary.dryFoodG) || 0) + (Number(summary.wetFoodG) || 0) + (Number(summary.otherFoodG) || 0);
