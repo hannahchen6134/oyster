@@ -835,6 +835,22 @@
     .onboard-step { display: flex; gap: 12px; padding: 12px 2px; border-bottom: 1px solid var(--line); font-size: 14.5px; }
     .onboard-step:last-child { border-bottom: none; }
     .onboard-step .num { font-family: var(--serif); color: var(--brand); font-weight: 700; }
+    /* 安心上手：Step 1/2/3 彩色步驟卡（和 LINE 卡同一套咖啡三色系） */
+    .ob-step { border-radius: var(--radius); overflow: hidden; margin-top: 14px; border: 1px solid rgba(115, 73, 33, 0.12); box-shadow: var(--shadow-glow); }
+    .ob-step:first-child { margin-top: 0; }
+    .ob-head { display: flex; align-items: center; gap: 12px; padding: 13px 16px; color: #fff; }
+    .ob-num { flex: none; width: 34px; height: 34px; border-radius: 50%; background: rgba(255, 255, 255, 0.92); color: #3A2416; font-family: var(--serif); font-weight: 700; font-size: 18px; display: flex; align-items: center; justify-content: center; }
+    .ob-head-t { display: flex; flex-direction: column; line-height: 1.25; }
+    .ob-head-t .s { font-size: 11px; letter-spacing: 0.14em; opacity: 0.82; font-weight: 600; }
+    .ob-head-t .t { font-size: 16px; font-weight: 700; }
+    .ob-body { background: #fff; padding: 14px 16px; }
+    .ob-line { display: flex; align-items: baseline; gap: 9px; font-size: 13.5px; line-height: 1.65; color: var(--ink-soft); }
+    .ob-line + .ob-line { margin-top: 8px; }
+    .ob-eg { flex: none; font-family: var(--serif); font-weight: 700; font-size: 13px; padding: 3px 9px; border-radius: 7px; white-space: nowrap; }
+    .ob-hint { margin-top: 12px; font-size: 12px; color: var(--muted); background: var(--sheet-soft); border-radius: 9px; padding: 9px 12px; line-height: 1.6; }
+    .ob-step.s1 .ob-head { background: linear-gradient(135deg, #8A5A2C, #6A4119); } .ob-step.s1 .ob-eg { background: #F3E7D6; color: #7A4E20; }
+    .ob-step.s2 .ob-head { background: linear-gradient(135deg, #C0863E, #9A6526); } .ob-step.s2 .ob-eg { background: #F6EAD7; color: #8A5E1E; }
+    .ob-step.s3 .ob-head { background: linear-gradient(135deg, #5A3A22, #3A2416); } .ob-step.s3 .ob-eg { background: #EDE3D6; color: #5A3617; }
     /* PDF 報告：用列印產生（另存為 PDF），畫面上不顯示 */
     #printReport { display: none; }
     @media print {
@@ -2623,34 +2639,41 @@
       });
     }
 
-    // 喵爸媽安心上手：5 步驟 + 連結過期的安心說明
+    // 喵爸媽安心上手：Step 1/2/3 彩色步驟卡（和 LINE 卡同步）
     function renderOnboarding() {
       const steps = [
-        ['在 LINE 直接打字就能記', '例如「水 60」「吃了罐頭 30」「藥 早 已吃」，我會幫你記下來，馬上回你一張確認卡。'],
-        ['想看今天的狀況', '在 LINE 輸入「今天」，或打開照護站的「今天」頁，就能看到今日照護確認。'],
-        ['回診前不用手忙腳亂', '打開「回診」頁，按「複製給醫生」，近 7 天的吃喝、用藥、腸胃狀況一次帶走。'],
-        ['要交接給家人朋友', '在「今天」頁按「複製交接卡」，貼到任何聊天視窗就完成交接。'],
-        ['忘了記、想補昨天的', '在 LINE 輸入「昨天 21:30 水 20」，或在網站按「補登其他時間」。']
+        ['s1', '1', '先告訴我你的貓', [
+          ['新增貓咪 蚵仔', '在 LINE 打這句（換成你家貓名），或到下方「貓咪資料」新增']
+        ], '之後你記的每一筆，都會自動記到牠身上'],
+        ['s2', '2', '記第一筆', [
+          ['水 20', '記喝水'],
+          ['罐頭 30', '記吃飯（幾克）'],
+          ['藥 早 已吃', '記餵藥']
+        ], '在 LINE 打字，或在「今天」頁點「快速記一筆」；送出後會顯示今天累計'],
+        ['s3', '3', '看狀況・給醫生', [
+          ['今天', '看今天喝水／熱量／用藥／腸胃狀況'],
+          ['回診摘要', '整理近況，回診頁按「複製給醫生」帶走']
+        ], '記錯了到「每一筆紀錄」可編輯／刪除；找家人一起顧到「共同照護」']
       ];
-      $('settingsList').innerHTML = `
-        <div class="block" style="margin-top:0">
-          ${steps.map(([title, body], i) => `
-            <div class="onboard-step">
-              <span class="num">${i + 1}</span>
-              <span><b style="font-size:14.5px">${title}</b><br><span class="muted" style="font-size:13px">${body}</span></span>
-            </div>`).join('')}
-          <div class="onboard-step">
-            <span class="num">＊</span>
-            <span><b style="font-size:14.5px">連結過期了怎麼辦？</b><br>
-            <span class="muted" style="font-size:13px">回 LINE 輸入「照護站」就能拿到新的專屬連結，<b>既有的照護資料都不會消失</b>。</span></span>
+      $('settingsList').innerHTML = steps.map(([cls, num, title, lines, hint]) => `
+        <div class="ob-step ${cls}">
+          <div class="ob-head">
+            <span class="ob-num">${num}</span>
+            <span class="ob-head-t"><span class="s">STEP ${num}</span><span class="t">${esc(title)}</span></span>
           </div>
-        </div>`;
+          <div class="ob-body">
+            ${lines.map(([eg, desc]) => `<div class="ob-line"><span class="ob-eg">${esc(eg)}</span><span>${esc(desc)}</span></div>`).join('')}
+            <div class="ob-hint">${esc(hint)}</div>
+          </div>
+        </div>`).join('') + `
+        <div class="muted" style="font-size:12.5px;margin-top:16px;line-height:1.7;text-align:center">
+          連結過期了？回 LINE 打「照護站」拿新連結，<b>資料都不會消失</b>。</div>`;
     }
 
     // 設定選單：分組 + 每項一句話說明，一次只看一件事
     const SETTINGS_MENU = [
       ['開始使用', [
-        ['onboarding', '喵爸媽安心上手', '第一次使用的 5 個小步驟']
+        ['onboarding', '喵爸媽安心上手', '3 步驟，快速上手']
       ]],
       ['一起照護', [
         ['care', '共同照護', '邀請家人・幫手一起記錄，重點即時通知']
