@@ -171,6 +171,17 @@ export async function replyOrPushFlex(env, event, flexMessage, fallbackText) {
   }
 }
 
+// 帶 Quick Reply 的文字訊息（鍵盤上方一排大圓鈕，最直覺的點按；reply 失敗改 push）
+export async function replyOrPushQuick(env, event, text, items) {
+  const msg = { type: 'text', text: truncate(text), quickReply: { items } };
+  const targetId = String(event?.source?.userId || '').trim();
+  if (event?.replyToken) {
+    try { await replyMessages(env, event.replyToken, [msg]); return; }
+    catch (error) { console.warn('quick reply failed, fallback push:', error.message); }
+  }
+  if (targetId) await pushMessages(env, targetId, [msg]);
+}
+
 // reply 失敗（例如 token 過期）時改用 push 備援
 export async function replyOrPush(env, event, text) {
   const targetId = String(event?.source?.userId || '').trim();

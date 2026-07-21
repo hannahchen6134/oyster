@@ -719,6 +719,20 @@
     }
     .qbtn.qbtn-sub { color: var(--ink-soft); font-weight: 500; }
     .qbtn.qbtn-sub .q-plus { color: rgba(115, 73, 33, 0.4); }
+    /* 快速記一筆的「一路點」數字盤：大鈕、好按，不用打鍵盤 */
+    .qp-prompt { font-size: 14px; color: var(--ink-soft); text-align: center; margin: 2px 0 16px; }
+    .qp-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .qp-btn {
+      min-height: 60px; border-radius: var(--radius); border: 1px solid rgba(115, 73, 33, 0.2);
+      background: linear-gradient(180deg, #fffdf9, var(--sheet-soft)); color: var(--brand);
+      font-family: var(--serif); font-weight: 700; font-size: 20px; cursor: pointer;
+      box-shadow: 0 1px 2px rgba(58, 42, 24, 0.05); transition: transform .1s, box-shadow .15s, border-color .15s;
+    }
+    .qp-btn small { display: block; font-family: var(--sans, inherit); font-weight: 500; font-size: 11.5px; color: var(--muted); margin-top: 2px; letter-spacing: 0.02em; }
+    .qp-btn:hover { border-color: var(--brand); box-shadow: var(--shadow-soft); transform: translateY(-1px); }
+    .qp-btn:active { transform: translateY(1px); }
+    .qp-btn.qp-word { font-size: 16px; }
+    .qp-custom { grid-column: 1 / -1; min-height: 46px; font-family: var(--sans, inherit); font-size: 14px; font-weight: 600; color: var(--ink-soft); background: transparent; border-style: dashed; }
     .qbtn.qbtn-sub:hover { background: var(--brand-tint); filter: none; border-color: var(--brand); box-shadow: 0 2px 8px rgba(115, 73, 33, 0.12); }
     /* 今日累計 hero：一打開先看到的重點（水分/熱量對照目標） */
     .today-hero {
@@ -1831,7 +1845,77 @@
       return body;
     }
 
+    // ── 快速記一筆：一路點就記好，不用打鍵盤（對齊 LINE 的點按流程）──
+    const QUICK_PAD = {
+      water: { title: '喝水', kind: 'values', unit: 'ml', values: [10, 20, 30, 50, 80], payload: (n) => ({ category: 'water', amount: n, unit: 'ml', waterMl: n }) },
+      med: { title: '用藥', kind: 'opts', opts: [['早·已吃', { category: 'med', medSlot: '早', medStatus: '已吃' }], ['晚·已吃', { category: 'med', medSlot: '晚', medStatus: '已吃' }], ['中午·已吃', { category: 'med', medSlot: '中午', medStatus: '已吃' }], ['漏餵沒吃到', { category: 'med', medStatus: '漏餵' }]] },
+      food: { title: '吃飯', kind: 'food', types: ['罐頭', '乾糧', '零食'], grams: [10, 15, 20, 30, 40] },
+      vomit: { title: '嘔吐', kind: 'chips', chips: [['透明泡沫', { category: 'vomit', note: '透明泡沫' }], ['黃色液體', { category: 'vomit', note: '黃色液體' }], ['食物或毛', { category: 'vomit', note: '食物或毛' }], ['只是吐了', { category: 'vomit', note: '' }]] },
+      stool: { title: '大小便', kind: 'chips', chips: [['正常便', { category: 'stool', note: '正常' }], ['軟便', { category: 'stool', note: '軟便' }], ['拉肚子', { category: 'stool', note: '拉肚子' }], ['尿尿正常', { category: 'urine', note: '正常' }]] },
+      mood: { title: '精神', kind: 'chips', chips: [['活力好', { category: 'mood', note: '活力好' }], ['普通', { category: 'mood', note: '普通' }], ['懶懶的', { category: 'mood', note: '懶懶的' }], ['沒精神', { category: 'mood', note: '沒精神' }]] },
+      supplement: { title: '保健', kind: 'chips', chips: [['益生菌', { category: 'supplement', itemName: '益生菌' }], ['化毛膏', { category: 'supplement', itemName: '化毛膏' }], ['離胺酸', { category: 'supplement', itemName: '離胺酸' }]] }
+    };
+    let quickPadCategory = '';
+    function qpButton(label, payload, extraClass = '') {
+      return `<button type="button" class="qp-btn ${extraClass}" data-qp="record" data-payload='${esc(JSON.stringify(payload))}'>${label}</button>`;
+    }
+    function renderQuickPad(category, foodType) {
+      const cfg = QUICK_PAD[category];
+      const custom = `<button type="button" class="qp-btn qp-custom" data-qp="custom">自訂／更多欄位…</button>`;
+      if (cfg.kind === 'values') {
+        return `<div class="qp-prompt">喝了多少 ${cfg.unit}？點一下就記好</div>
+          <div class="qp-grid">${cfg.values.map((n) => qpButton(`${n}<small>${cfg.unit}</small>`, cfg.payload(n))).join('')}${custom}</div>`;
+      }
+      if (cfg.kind === 'opts') {
+        return `<div class="qp-prompt">這次的藥？點一下就記好</div>
+          <div class="qp-grid">${cfg.opts.map(([label, p]) => qpButton(label, p, 'qp-word')).join('')}${custom}</div>`;
+      }
+      if (cfg.kind === 'chips') {
+        return `<div class="qp-prompt">點一個就記好，想細寫按「自訂」</div>
+          <div class="qp-grid">${cfg.chips.map(([label, p]) => qpButton(label, p, 'qp-word')).join('')}${custom}</div>`;
+      }
+      if (cfg.kind === 'food') {
+        if (!foodType) {
+          return `<div class="qp-prompt">吃哪一種？</div>
+            <div class="qp-grid">${cfg.types.map((t) => `<button type="button" class="qp-btn qp-word" data-qp="foodType" data-type="${esc(t)}">${esc(t)}</button>`).join('')}${custom}</div>`;
+        }
+        return `<div class="qp-prompt">${esc(foodType)}吃了幾克？點一下就記好</div>
+          <div class="qp-grid">${cfg.grams.map((n) => qpButton(`${n}<small>g</small>`, { category: 'food', foodType, amount: n, unit: 'g' })).join('')}${custom}</div>`;
+      }
+      return custom;
+    }
+    async function quickRecordDirect(payload) {
+      const now = new Date().toLocaleTimeString('en-GB', { timeZone: 'Asia/Taipei', hour12: false }).slice(0, 5);
+      const body = { petId: state.petId, eventDateTime: `${state.date} ${now}`, ...payload };
+      try {
+        await api('logs', { method: 'POST', body: JSON.stringify(body) });
+        closeModal();
+        toast('已記錄 ✓');
+        await loadDay();
+        if ($('recentFold') && $('recentFold').open) await loadRecent();
+      } catch (error) { toast(error.message || '記錄失敗', true); }
+    }
+    function quickPadClick(event) {
+      const btn = event.target.closest('[data-qp]');
+      if (!btn) return;
+      const act = btn.dataset.qp;
+      if (act === 'custom') { const c = quickPadCategory; closeModal(); return openLogModal(null, c); }
+      if (act === 'foodType') { $('modalForm').innerHTML = renderQuickPad('food', btn.dataset.type); return; }
+      if (act === 'record') { try { quickRecordDirect(JSON.parse(btn.dataset.payload)); } catch (e) { /* ignore */ } }
+    }
+    function openQuickPad(category) {
+      if (!QUICK_PAD[category]) return openLogModal(null, category); // 需要打字的（備註）走完整表單
+      quickPadCategory = category;
+      if (!openQuickPad._bound) { $('modalForm').addEventListener('click', quickPadClick); openQuickPad._bound = true; }
+      $('modalTitle').textContent = `記一筆・${QUICK_PAD[category].title}`;
+      $('modalForm').innerHTML = renderQuickPad(category);
+      modalSaveHandler = null;
+      document.querySelector('.modal-actions').style.display = 'none';
+      $('modalBackdrop').classList.add('open');
+    }
+
     function openLogModal(log, presetCategory) {
+      document.querySelector('.modal-actions').style.display = '';
       const quickTitle = presetCategory
         ? `記一筆・${presetCategory === 'stool' ? '大小便' : (CATEGORY_LABEL[presetCategory] || '')}`
         : '新增/補登紀錄';
@@ -2943,6 +3027,7 @@
       $('modalTitle').textContent = title;
       $('modalForm').innerHTML = formHtml;
       modalSaveHandler = onSave;
+      document.querySelector('.modal-actions').style.display = '';
       $('modalBackdrop').classList.add('open');
       setTimeout(() => {
         const first = $('modalForm').querySelector('input:not([type="hidden"]), select, textarea');
@@ -3221,7 +3306,7 @@
       if (quickBtn) {
         state.foods = (await api('foods')).rows;
         state.meds = (await api(`meds?petId=${state.petId}`)).rows;
-        return openLogModal(null, quickBtn.dataset.quick);
+        return openQuickPad(quickBtn.dataset.quick);
       }
 
       const editBtn = event.target.closest('[data-edit]');

@@ -6,7 +6,7 @@
 import { parseMessage, matchFood, normalizeText } from './parser.js';
 import { deriveFoodFields } from './summary.js';
 import { handleApi } from './api.js';
-import { verifyLineSignature, replyOrPush, replyOrPushFlex, replyMessages, pushText, pushMessages, getProfile, getAccessToken, checkAccessToken } from './line.js';
+import { verifyLineSignature, replyOrPush, replyOrPushQuick, replyOrPushFlex, replyMessages, pushText, pushMessages, getProfile, getAccessToken, checkAccessToken } from './line.js';
 import { hasAnyReminder, parseReminderSettings, buildReminderLines, reminderMessage, visitReminderMessage } from './reminders.js';
 import { shortDate } from './replies.js';
 import { recordFlex, multiRecordFlex, todayFlex, websiteFlex, menuFlex, recordMenuFlex, recordTutorialFlex, quickRecordCarousel, weekFlex, monthFlex, recentFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, onboardingCarousel, menuCell, exampleCard, petDataFlex, deletedCard, confirmDeleteFlex, careNotifyFlex, careInviteFlex } from './flex.js';
@@ -595,6 +595,37 @@ async function handlePending(env, event, { db, user, pet, pets, lineUserId, owne
   return false;
 }
 
+// ── Quick Reply 點按記錄：一路點就能記，不用背指令（打字仍可當捷徑）──
+const qrMsg = (label, text) => ({ type: 'action', action: { type: 'message', label: String(label).slice(0, 20), text } });
+const qrPost = (label, data, displayText) => ({ type: 'action', action: { type: 'postback', label: String(label).slice(0, 20), data, displayText: displayText || String(label) } });
+
+// 第一層：要記什麼
+function recordCategoryQuick() {
+  return [
+    qrPost('💧 喝水', 'action=rec&k=water', '喝水'),
+    qrPost('🥫 吃飯', 'action=rec&k=food', '吃飯'),
+    qrPost('💊 用藥', 'action=rec&k=med', '用藥'),
+    qrPost('🤢 嘔吐', 'action=rec&k=vomit', '嘔吐'),
+    qrPost('💩 大小便', 'action=rec&k=stool', '大小便'),
+    qrPost('😺 精神', 'action=rec&k=mood', '精神'),
+    qrPost('🐟 保健', 'action=rec&k=supplement', '保健'),
+    qrPost('📝 備註', 'action=rec&k=note', '備註')
+  ];
+}
+// 第二層：每一類的常用值（點一個就記好；「其他」才要打字）
+const RECORD_L2 = {
+  water: { prompt: '喝了多少 ml？點一下就記好', items: () => [...[10, 20, 30, 50].map((n) => qrMsg(String(n), `水 ${n}`)), qrPost('其他', 'action=rec&k=water_other', '其他數字')] },
+  med: { prompt: '這次的藥？點一下就記好', items: () => [qrMsg('早·已吃', '藥 早 已吃'), qrMsg('晚·已吃', '藥 晚 已吃'), qrMsg('中午·已吃', '藥 中午 已吃'), qrMsg('漏餵沒吃到', '藥 未餵')] },
+  food: { prompt: '吃哪一種？', items: () => [qrPost('🥫 罐頭', 'action=rec2&t=罐頭', '罐頭'), qrPost('🥣 乾糧', 'action=rec2&t=乾糧', '乾糧'), qrPost('🍬 零食', 'action=rec2&t=零食', '零食')] },
+  vomit: { prompt: '吐了什麼？點一個，或自己打描述', items: () => [qrMsg('透明泡沫', '吐 透明泡沫'), qrMsg('黃色液體', '吐 黃色液體'), qrMsg('食物或毛', '吐 食物或毛'), qrMsg('只是吐了', '吐了')] },
+  stool: { prompt: '大小便情況？點一個就好', items: () => [qrMsg('正常便', '大便 正常'), qrMsg('軟便', '軟便'), qrMsg('拉肚子', '拉肚子'), qrMsg('尿尿正常', '尿尿 正常')] },
+  mood: { prompt: '今天精神如何？', items: () => [qrMsg('活力好', '精神 活力好'), qrMsg('普通', '精神 普通'), qrMsg('懶懶的', '精神 懶懶的'), qrMsg('沒精神', '精神 沒精神')] },
+  supplement: { prompt: '補充了什麼？點一個或自己打', items: () => [qrMsg('益生菌', '保健 益生菌'), qrMsg('化毛膏', '保健 化毛膏'), qrMsg('離胺酸', '保健 離胺酸')] }
+};
+function foodGramQuick(type) {
+  return [...[10, 15, 20, 30, 40].map((n) => qrMsg(String(n), `${type} ${n}`)), qrPost('其他克數', `action=rec2other&t=${type}`, '其他克數')];
+}
+
 async function handlePostback(event, env, baseUrl) {
   const db = env.DB;
   const lineUserId = event.source?.userId;
@@ -605,6 +636,46 @@ async function handlePostback(event, env, baseUrl) {
 
   // 共同照護者操作時解析到飼主本人（飼主本人時 ownerId === lineUserId，行為不變）
   const ownerId = lineUserId ? await resolveDataOwner(db, lineUserId) : lineUserId;
+
+  // ── Quick Reply 點按記錄：第一層點分類 → 冒出第二層常用值 ──
+  if (action === 'rec') {
+    const k = data.get('k') || '';
+    if (k === 'water_other') {
+      await updateUser(db, lineUserId, { pendingAction: 'amount|水' });
+      await replyOrPush(env, event, '喝了多少 ml？直接打數字，例如 25');
+      return;
+    }
+    if (k === 'note') {
+      await updateUser(db, lineUserId, { pendingAction: 'note|note' });
+      await replyOrPush(env, event, '想記什麼？直接打字就好。');
+      return;
+    }
+    if (k === 'food') {
+      // 有建好的品項就先讓他點品項（免選類型），沒有才問類型
+      const foods = await listFoods(db, ownerId);
+      if (foods.length) {
+        const items = foods.slice(0, 10).map((food) => qrPost(String(food.displayName).slice(0, 20), `action=pickFood&foodId=${food.foodId}`, `記 ${food.displayName}`));
+        items.push(qrPost('其他/新品項', 'action=rec2&t=罐頭', '其他'));
+        await replyOrPushQuick(env, event, '吃哪一個？點一下，再點幾克', items);
+        return;
+      }
+    }
+    const spec = RECORD_L2[k];
+    if (spec) { await replyOrPushQuick(env, event, spec.prompt, spec.items()); return; }
+    return;
+  }
+  // 吃飯選了類型 → 冒出常用克數
+  if (action === 'rec2') {
+    const t = data.get('t') || '罐頭';
+    await replyOrPushQuick(env, event, `${t}吃了幾克？點一下就記好`, foodGramQuick(t));
+    return;
+  }
+  if (action === 'rec2other') {
+    const t = data.get('t') || '罐頭';
+    await updateUser(db, lineUserId, { pendingAction: `amount|${t}` });
+    await replyOrPush(env, event, `${t}吃了幾克？直接打數字，例如 30`);
+    return;
+  }
 
   // 快速紀錄點選食物品項 → 直接鎖定那個食物，只問幾克（免再打類型/品名）
   if (action === 'pickFood') {
@@ -1528,8 +1599,8 @@ async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId, ow
   }
 
   if (query === 'recordMenu') {
-    // 「快速記錄」：照著點就記一筆（打字最快），底下可切「改用按鈕」
-    await replyOrPushFlex(env, event, exampleCard(), recordPrompt(''));
+    // 「快速記錄」：鍵盤上方冒出分類大圓鈕，一路點就記好，完全不用背指令
+    await replyOrPushQuick(env, event, '要記什麼？點下面就好 👇\n（熟了直接打「水 20」更快）', recordCategoryQuick());
     return;
   }
 

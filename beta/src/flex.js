@@ -192,11 +192,17 @@ export function recordFlex({ pet, categoryKey, mainText, subText, summary, date,
       ...(tip ? [text(tip, { size: 'xxs', color: C.muted, wrap: true, margin: 'lg' })] : [])
     ]
   };
+  // 記錯了不用背指令：水/食可「改數量」，人人都會的「刪除」；下面一顆開站
+  const editable = ['water', 'dry', 'wet'].includes(categoryKey);
   const footer = {
-    type: 'box', layout: 'horizontal', spacing: 'sm', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
+    type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
     contents: [
-      { type: 'button', height: 'sm', style: 'link', color: C.brand,
-        action: { type: 'postback', label: '刪除這筆', data: `action=delAsk&logId=${logId}`, displayText: '刪除剛剛那筆' } },
+      { type: 'box', layout: 'horizontal', spacing: 'sm', contents: [
+        ...(editable ? [{ type: 'button', height: 'sm', style: 'link', color: C.brand,
+          action: { type: 'postback', label: '✏️ 改數量', data: `action=editAmount&logId=${logId}`, displayText: '改數量' } }] : []),
+        { type: 'button', height: 'sm', style: 'link', color: C.brand,
+          action: { type: 'postback', label: '🗑 刪除', data: `action=delAsk&logId=${logId}`, displayText: '刪除剛剛那筆' } }
+      ] },
       { type: 'button', height: 'sm', style: 'primary', color: C.brand,
         // 直接開網站（已烤入登入連結）；沒有 siteUrl 時退回舊的訊息觸發
         action: siteUrl
