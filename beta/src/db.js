@@ -156,6 +156,28 @@ export async function getFood(db, foodId) {
   return db.prepare('SELECT * FROM food_items WHERE foodId = ? AND isDeleted = 0').bind(foodId).first();
 }
 
+// ---------- 行為追蹤（輕量事件記錄，用來看留存/活化，失敗絕不影響功能）----------
+let eventsReady = false;
+export async function track(db, lineUserId, event, meta = '') {
+  try {
+    if (!eventsReady) {
+      await db.prepare(
+        `CREATE TABLE IF NOT EXISTS events (
+           id INTEGER PRIMARY KEY AUTOINCREMENT,
+           lineUserId TEXT NOT NULL DEFAULT '',
+           event TEXT NOT NULL,
+           meta TEXT NOT NULL DEFAULT '',
+           createdAt TEXT NOT NULL
+         )`
+      ).run();
+      eventsReady = true;
+    }
+    await db.prepare('INSERT INTO events (lineUserId, event, meta, createdAt) VALUES (?, ?, ?, ?)')
+      .bind(String(lineUserId || ''), String(event), typeof meta === 'string' ? meta : JSON.stringify(meta), nowIso())
+      .run();
+  } catch (error) { /* 追蹤壞掉不能影響產品 */ }
+}
+
 // ---------- app_kv（一般鍵值：目前存 LINE 自動換發權杖）----------
 export async function appKvGet(db, key) {
   const row = await db.prepare('SELECT v FROM app_kv WHERE k = ?').bind(String(key)).first();

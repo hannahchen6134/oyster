@@ -1313,6 +1313,20 @@
       el._timer = setTimeout(() => el.classList.remove('show'), 2600);
     }
 
+    // 輕量行為追蹤（fire-and-forget，壞掉不影響任何功能）
+    const _tracked = new Set();
+    function trackEvent(event, once) {
+      try {
+        if (!state.token) return;
+        if (once) { if (_tracked.has(event)) return; _tracked.add(event); }
+        fetch('/api/track', {
+          method: 'POST', keepalive: true,
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + state.token },
+          body: JSON.stringify({ event })
+        }).catch(() => {});
+      } catch (error) { /* ignore */ }
+    }
+
     async function api(path, options = {}) {
       let response;
       try {
@@ -1360,7 +1374,7 @@
       if (tab === 'settings') $('pageMode').textContent = '設定';
       if (tab === 'today') loadDay();
       if (tab === 'calendar') loadCalendar();
-      if (tab === 'trend') loadTrend();
+      if (tab === 'trend') { trackEvent('review_open', true); loadTrend(); }
       if (tab === 'settings') loadSettings();
     }
 
@@ -3290,6 +3304,7 @@
 
       $('loginView').classList.add('hidden');
       $('appView').classList.remove('hidden');
+      trackEvent('website_open', true);
       // 在 LINE 內（LIFF）才顯示「回 LINE 對話」，點了關掉視窗回聊天室
       if (state.liff && state.liff.inClient) {
         const backBtn = $('backToLineBtn');

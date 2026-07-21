@@ -16,7 +16,7 @@ import {
   listFoods, getFood, insertLog, getLog, getLastLogByUser, softDeleteLog, updateLog,
   recomputeDay, getRecentSummaries,
   upcomingVisits, listVetsByOwner, createSession,
-  appKvGet, appKvSet, getSessionUser,
+  appKvGet, appKvSet, getSessionUser, track,
   resolveDataOwner, createCareInvite, redeemCareInvite, listCareMembers, listCareCircle,
   createLoginCode, redeemLoginCode
 } from './db.js';
@@ -110,6 +110,42 @@ export default {
       }
       try {
         return jsonResponse({ ok: true, ...(await checkAccessToken(env)) });
+      } catch (error) {
+        return jsonResponse({ ok: false, error: error.message }, 500);
+      }
+    }
+    // 行為追蹤儀表板（唯讀彙總；用固定金鑰保護）——結束「靠感覺」，用數據看留存/活化
+    if (url.pathname === '/admin/metrics') {
+      if (url.searchParams.get('key') !== '4a3ae43160203892faab0cb3') return jsonResponse({ ok: false }, 403);
+      try {
+        const db = env.DB;
+        const today = taipeiToday();
+        const d7 = addDays(today, -6);
+        // 每位使用者的記錄留存（只算真實使用 line/web，排除匯入資料）
+        const { results: users } = await db.prepare(
+          `SELECT lineUserId,
+                  COUNT(*) recs,
+                  COUNT(DISTINCT substr(eventDateTime,1,10)) days,
+                  MIN(substr(eventDateTime,1,10)) firstDay,
+                  MAX(substr(eventDateTime,1,10)) lastDay,
+                  SUM(CASE WHEN source='web' THEN 1 ELSE 0 END) webRecs
+           FROM logs WHERE isDeleted=0 AND source IN ('line','web')
+           GROUP BY lineUserId ORDER BY days DESC, recs DESC`
+        ).all();
+        const u = users || [];
+        const summary = {
+          usersRecorded: u.length,
+          retained2d: u.filter((x) => x.days >= 2).length,
+          retained7d: u.filter((x) => x.days >= 7).length,
+          activeLast7d: u.filter((x) => x.lastDay >= d7).length,
+          totalRecords: u.reduce((t, x) => t + Number(x.recs), 0)
+        };
+        let events = [];
+        try {
+          const r = await db.prepare('SELECT event, COUNT(*) c, COUNT(DISTINCT lineUserId) users FROM events GROUP BY event ORDER BY c DESC').all();
+          events = r.results || [];
+        } catch (error) { /* events 表可能還沒建 */ }
+        return jsonResponse({ ok: true, today, summary, events, users: u });
       } catch (error) {
         return jsonResponse({ ok: false, error: error.message }, 500);
       }
@@ -706,6 +742,7 @@ async function handlePostback(event, env, baseUrl) {
   }
   // 教打字：熟了直接打指令最快
   if (action === 'howtype') {
+    await track(db, lineUserId, 'howtype');
     await replyOrPushQuick(env, event,
       '熟了之後，直接打字最快 👇（不用先點）\n\n'
       + '· 喝水 → 打「水 20」\n'
@@ -907,6 +944,7 @@ async function handleFollow(event, env) {
     await replyOrPush(env, event, gateText());
     return;
   }
+  await track(env.DB, lineUserId, 'follow');
   await replyOrPushFlex(env, event, await welcomeMsg(env.DB, lineUserId, lineUserId), welcomeText());
 }
 
@@ -939,6 +977,7 @@ async function handleTextMessage(event, env, baseUrl) {
     const explicit = pastedInvite || text.startsWith('加入'); // 明確要加入，無效時給提示
     const result = await redeemCareInvite(db, codeMatch[1], lineUserId);
     if (result.ok) {
+      await track(db, lineUserId, 'invite_redeemed');
       if (!isBetaAllowed(user)) await updateUser(db, lineUserId, { betaAccess: 1 });
       await replyOrPush(env, event, '✓ 加入成功！接下來你在這裡打「水 20」「罐頭 30」就會記進對方的貓咪，也能打「照護站」開網站看完整資料 🐈');
       try { await ensurePersonalRichMenu(env, baseUrl, lineUserId); } catch (error) { console.error('personal richmenu failed:', error.message); }
@@ -1564,6 +1603,7 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
   }
   const eventDate = eventDateTime.slice(0, 10);
   const summary = await recomputeDay(db, pet.petId, eventDate);
+  await track(db, lineUserId, 'record', { c: record.category, src: 'line' });
 
   // 共同照護·即時通知：只要「共同照護者」記錄，飼主本人就即時收到每一筆；
   // 共同照護者自己不會被即時通知（他們只收每日總結）。背景 try/catch，不影響記錄與回覆。
@@ -1712,6 +1752,7 @@ async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId, ow
   }
 
   if (query === 'recordMenu') {
+    await track(db, lineUserId, 'menu_record');
     // 「快速記錄」：先教最快的打字（和「如何記錄」一致），再給這隻貓的一鍵捷徑；點一下就記好
     const petId = pet?.petId || '';
     const shortcuts = await quickShortcuts(db, petId);
@@ -1738,6 +1779,7 @@ async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId, ow
   }
 
   if (query === 'onboarding') {
+    await track(db, lineUserId, 'onboarding_view');
     await replyOrPushFlex(env, event, onboardingCarousel(pet?.petName || ''), onboardingText());
     return;
   }

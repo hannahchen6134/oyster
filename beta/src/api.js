@@ -7,7 +7,7 @@ import {
   listFoods, getFood,
   insertLog, getLog, getLogsForDay, updateLog, softDeleteLog,
   recomputeDay, getSummaries, getSessionUser, getRecentLogsByPet,
-  resolveDataOwner, createCareInvite, listCareMembers
+  resolveDataOwner, createCareInvite, listCareMembers, track
 } from './db.js';
 import { computeDailySummary, deriveFoodFields } from './summary.js';
 import { matchFood } from './parser.js';
@@ -80,6 +80,12 @@ export async function handleApi(request, env, url) {
   const method = request.method;
 
   try {
+    // 網站行為追蹤 beacon（登入者才記；失敗不影響）
+    if (resource === 'track' && method === 'POST') {
+      const body = await request.json().catch(() => ({}));
+      await track(db, lineUserId, String(body.event || '').slice(0, 40), body.meta || '');
+      return jsonResponse({ ok: true });
+    }
     if (resource === 'me') {
       if (method === 'GET') {
         const user = await getUser(db, lineUserId);
