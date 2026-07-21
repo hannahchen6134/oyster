@@ -136,7 +136,8 @@ export async function handleApi(request, env, url) {
       return jsonResponse({ ok: true, logs });
     }
 
-    // 給醫生的重點整理：期間內的特殊事件（吐/疫苗/除蟲/精神/備註）＋寫了備註的食水便尿。
+    // 給醫生的注意事項：只放需要留意的狀況——吐/疫苗/除蟲/精神/自由備註，以及「有描述」的排便排尿。
+    // 不放喝水、進食、保健、用藥（那些是攝取量/例行，屬於組成與趨勢，不是注意事項）。
     // 用藥與回診不列（醫生要看的是異常，不是流水帳）。
     if (resource === 'highlights' && method === 'GET') {
       const petId = url.searchParams.get('petId') || '';
@@ -149,8 +150,8 @@ export async function handleApi(request, env, url) {
           `SELECT eventDateTime, category, itemName, amount, unit, note, isBackfilled
            FROM logs
            WHERE petId = ? AND isDeleted = 0 AND substr(eventDateTime, 1, 10) >= ?
-             AND category != 'med'
-             AND (category IN ('vomit', 'vaccine', 'deworm', 'note', 'mood') OR note <> '')
+             AND (category IN ('vomit', 'vaccine', 'deworm', 'note', 'mood')
+                  OR (category IN ('stool', 'urine') AND note <> ''))
            ORDER BY eventDateTime ASC`
         )
         .bind(petId, from)

@@ -723,7 +723,7 @@ export function quickRecordCarousel(opts = {}) {
       line(t1, '嘔吐 吐了乾乾', '症狀＋描述'),
       line(t1, '備註 精神比較好', '自由觀察'),
       line(t1, '水20 乾糧4 藥早已吃', '一次記多筆'),
-      text('症狀多寫幾個字，會自動整理進回顧的「給醫生的重點整理」', { size: 'xxs', color: C.muted, wrap: true, margin: 'md' })
+      text('症狀多寫幾個字，會自動整理進回顧的「給醫生的注意事項」', { size: 'xxs', color: C.muted, wrap: true, margin: 'md' })
     ] }
   };
   const t2 = THEME.skill;

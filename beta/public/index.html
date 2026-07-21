@@ -499,23 +499,23 @@
     .dpill.p-dry   { background: #f4ebd4; color: #886722; }
     .dpill.p-kcal  { background: #ece7f3; color: #5a4a84; }
     .dpill.p-warn  { background: var(--seal-tint); color: var(--seal); font-weight: 700; }
-    /* 飲食與水分組成：精緻分段長條＋列點，給醫生看一眼懂又有質感 */
-    .comp-block { padding: 15px 15px 16px; background: linear-gradient(180deg, #fffefb, #faf5ec); border: 1px solid rgba(115,73,33,0.1); border-radius: var(--radius); box-shadow: var(--shadow-glow); }
-    .comp-block + .comp-block { margin-top: 14px; }
-    .comp-h { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
-    .comp-h .lbl { font-family: var(--serif); font-size: 15px; font-weight: 700; color: var(--ink); letter-spacing: 0.03em; }
-    .comp-h .tot { font-family: var(--serif); font-weight: 700; color: var(--ink); font-size: 21px; line-height: 1; font-variant-numeric: tabular-nums; }
-    .comp-h .tot small { font-family: "Noto Sans TC", sans-serif; font-size: 11.5px; font-weight: 500; color: var(--muted); margin-left: 3px; letter-spacing: 0; }
-    .comp-bar { display: flex; gap: 3px; height: 18px; margin-bottom: 13px; }
-    .comp-bar i { height: 100%; border-radius: 6px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.3), 0 1px 3px rgba(90,60,30,0.12); }
-    .comp-legend { display: flex; flex-direction: column; gap: 9px; }
-    .comp-item { display: flex; align-items: center; gap: 9px; font-size: 13.5px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
-    .comp-dot { width: 11px; height: 11px; border-radius: 4px; flex: none; box-shadow: inset 0 1px 0 rgba(255,255,255,0.35); }
-    .comp-item .nm { flex: 1; }
+    /* 飲食與水分組成：不套內層卡（避免雙框很擠），兩段用細線分隔、細長條、留白足 */
+    .comp-block { padding: 4px 2px 20px; }
+    .comp-block + .comp-block { border-top: 1px solid var(--line); padding-top: 20px; }
+    .comp-h { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 15px; }
+    .comp-h .lbl { font-family: var(--serif); font-size: 15px; font-weight: 700; color: var(--ink); letter-spacing: 0.04em; }
+    .comp-h .tot { font-family: var(--serif); font-weight: 700; color: var(--ink); font-size: 19px; line-height: 1; font-variant-numeric: tabular-nums; }
+    .comp-h .tot small { font-family: "Noto Sans TC", sans-serif; font-size: 11px; font-weight: 500; color: var(--muted); margin-left: 3px; letter-spacing: 0; }
+    .comp-bar { display: flex; gap: 3px; height: 9px; margin-bottom: 16px; }
+    .comp-bar i { height: 100%; border-radius: 999px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.4), 0 1px 5px rgba(90,60,30,0.16); }
+    .comp-legend { display: flex; flex-direction: column; gap: 12px; }
+    .comp-item { display: flex; align-items: center; gap: 10px; font-size: 13.5px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+    .comp-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+    .comp-item .nm { flex: 1; white-space: nowrap; }
     .comp-item .vl { font-weight: 700; color: var(--ink); }
-    .comp-item .pc { color: var(--muted); font-size: 12px; width: 44px; text-align: right; }
+    .comp-item .pc { color: var(--muted); font-size: 12px; width: 40px; text-align: right; }
     .comp-empty { padding: 22px 4px; text-align: center; color: var(--muted); font-size: 13px; }
-    /* 給醫生的重點整理：白底、按時間列點，截圖友善 */
+    /* 給醫生的注意事項：白底、按時間列點，截圖友善 */
     .digest-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
     /* 範圍切換：一體成形的分段膠囊（字不折行，窄螢幕也不會變圓球） */
     .digest-seg { display: flex; flex: none; background: var(--sheet); border: 1px solid var(--line-strong); border-radius: 999px; padding: 2px; }
@@ -1128,7 +1128,7 @@
       <section class="panel hidden" id="trendView">
         <details class="block fold" open>
           <summary>
-            <span class="fold-title">給醫生的重點整理<span class="fold-count" id="digestCount"></span></span>
+            <span class="fold-title">給醫生的注意事項<span class="fold-count" id="digestCount"></span></span>
             <span class="fold-toggle">＋</span>
           </summary>
           <div class="fold-body">
@@ -1158,7 +1158,7 @@
               </div>
             </div>
             <div id="compCard"></div>
-            <p class="muted" style="font-size:12px;margin:12px 2px 0">水分分「自己喝的」與「食物帶來的」；濕食含水量高，是重要的補水來源。截圖即可給醫生看。</p>
+            <p class="muted" style="font-size:12px;margin:14px 2px 0">濕食＝罐頭與濕糧（含水量高，是重要補水來源）。水分分「自己喝的」與「食物帶來的」；截圖即可給醫生看。</p>
           </div>
         </details>
         <details class="block fold">
@@ -2355,7 +2355,7 @@
       return { date, text };
     }
 
-    // ── 給醫生的重點整理 ─────────────────────────────
+    // ── 給醫生的注意事項 ─────────────────────────────
     // 收錄：特殊事件（吐/疫苗/除蟲/精神/備註）＋寫了備註的食水便尿；用藥與回診不列
     const DIGEST_LABELS = {
       vomit: ['吐', 'warn'], mood: ['精神', 'warn'], stool: ['便便', 'warn'], urine: ['尿尿', 'warn'],
@@ -2493,7 +2493,7 @@
           <div class="comp-bar">${seg(dry, totalFood, DRY)}${seg(wetAsFed, totalFood, WET)}${seg(other, totalFood, OTHER)}</div>
           <div class="comp-legend">
             ${dry > 0 ? item(DRY, '乾糧', dry, totalFood, 'g') : ''}
-            ${wetAsFed > 0 ? item(WET, '濕食（罐頭/濕糧）', wetAsFed, totalFood, 'g') : ''}
+            ${wetAsFed > 0 ? item(WET, '濕食', wetAsFed, totalFood, 'g') : ''}
             ${other > 0 ? item(OTHER, '其他', other, totalFood, 'g') : ''}
           </div>
         </div>`;
