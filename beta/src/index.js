@@ -625,13 +625,13 @@ async function quickShortcuts(db, petId) {
   if (petId) {
     try {
       const { results } = await db.prepare(
-        `SELECT category, foodType, CAST(ROUND(amount) AS INTEGER) amt, medSlot, medStatus, COUNT(*) c, MAX(eventDateTime) t
+        `SELECT category, foodType, itemName, CAST(ROUND(amount) AS INTEGER) amt, medSlot, medStatus, COUNT(*) c, MAX(eventDateTime) t
          FROM logs WHERE petId=? AND isDeleted=0 AND category IN ('water','food','med')
-         GROUP BY category, foodType, amt, medSlot, medStatus ORDER BY c DESC, t DESC LIMIT 8`
+         GROUP BY category, foodType, itemName, amt, medSlot, medStatus ORDER BY c DESC, t DESC LIMIT 10`
       ).bind(petId).all();
       for (const r of results || []) {
         if (r.category === 'water' && r.amt > 0) cmds.push(`水 ${r.amt}`);
-        else if (r.category === 'food' && r.foodType && r.amt > 0) cmds.push(`${r.foodType} ${r.amt}`);
+        else if (r.category === 'food' && r.foodType && r.amt > 0) cmds.push(`${r.foodType}${r.itemName ? ` ${r.itemName}` : ''} ${r.amt}`);
         else if (r.category === 'med') cmds.push(`藥 ${[r.medSlot, r.medStatus || '已吃'].filter(Boolean).join(' ')}`.trim());
       }
     } catch (error) { /* 查不到就用預設 */ }
@@ -640,12 +640,28 @@ async function quickShortcuts(db, petId) {
   for (const d of DEFAULTS) { if (cmds.length >= 5) break; if (!cmds.includes(d)) cmds.push(d); }
   return cmds.slice(0, 9).map((c) => qrMsg(c, c));
 }
+// 看不懂客戶輸入時的引導：不當死路，教打字 ＋ 這隻貓的一鍵捷徑，順手就能記
+async function guideUnknown(env, event, petId) {
+  const items = [
+    qrPost('❓ 怎麼打字記錄', 'action=howtype', '怎麼打字記錄'),
+    ...await quickShortcuts(env.DB, petId),
+    qrPost('其他狀況（吐/便…）', 'action=recmore', '其他狀況')
+  ];
+  await replyOrPushQuick(env, event,
+    '咦？這句我還看不懂 🙏\n\n'
+    + '記錄可以直接打字 👇\n'
+    + '· 喝水 → 水 20\n'
+    + '· 吃飯 → 罐頭 30／乾糧 5\n'
+    + '· 餵藥 → 藥 早 已吃\n\n'
+    + '或點下面你常記的，一下就好：',
+    items);
+}
 // 歡迎卡＋一鍵捷徑（P1-1：新朋友加入/解鎖就能直接記第一筆）
 async function welcomeMsg(db, lineUserId, ownerId) {
   const w = welcomeFlex();
   try {
     const petId = await defaultPetId(db, lineUserId, ownerId);
-    w.quickReply = { items: [...await quickShortcuts(db, petId), qrPost('❓ 怎麼打字', 'action=howtype', '怎麼打字')] };
+    w.quickReply = { items: [qrPost('❓ 怎麼打字記錄', 'action=howtype', '怎麼打字記錄'), ...await quickShortcuts(db, petId)] };
   } catch (error) { /* ignore */ }
   return w;
 }
@@ -1207,7 +1223,7 @@ async function handleTextMessage(event, env, baseUrl) {
         if (res?.mainText) lines.push(res.mainText);
         if (res?.summary) { lastSummary = res.summary; lastDate = res.eventDate; }
       }
-      if (!lines.length) { await replyOrPush(env, event, unknownReply()); return; }
+      if (!lines.length) { await guideUnknown(env, event, pet?.petId || ''); return; }
       const fallback = `已記錄 ${lines.length} 筆：\n${lines.map((line) => `· ${line}`).join('\n')}`;
       const multiSiteUrl = await siteLink(env, baseUrl, lineUserId);
       await replyOrPushFlex(env, event, multiRecordFlex(pet, lines, lastSummary, lastDate, multiSiteUrl), fallback);
@@ -1309,12 +1325,8 @@ async function handleTextMessage(event, env, baseUrl) {
     }
 
     default: {
-      // 看不懂不再是死路：附上快速記錄按鈕的引導卡，一點就能繼續（打字仍可）
-      await replyOrPushFlex(
-        env, event,
-        recordMenuFlex('看不懂剛剛那句 🙏\n直接點下面就能記，或照範例打字（例如「水 20」）', '看不懂？點一下就能記'),
-        unknownReply()
-      );
+      // 看不懂不當死路：教打字 ＋ 這隻貓的一鍵捷徑，順手就能記
+      await guideUnknown(env, event, pet?.petId || '');
     }
   }
 }
@@ -1682,7 +1694,7 @@ async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId, ow
   if (query === 'recordMenu') {
     // 「快速記錄」：先教最快的打字（和「如何記錄」一致），再給這隻貓的一鍵捷徑；點一下就記好
     const shortcuts = await quickShortcuts(db, pet?.petId || '');
-    const items = [...shortcuts, qrPost('❓ 怎麼打字', 'action=howtype', '怎麼打字'), qrPost('其他狀況（吐/便…）', 'action=recmore', '其他狀況')];
+    const items = [qrPost('❓ 怎麼打字記錄', 'action=howtype', '怎麼打字記錄'), ...shortcuts, qrPost('其他狀況（吐/便…）', 'action=recmore', '其他狀況')];
     await replyOrPushQuick(env, event,
       '記錄超快，兩種都行 👇\n\n'
       + '① 直接打字（最快）：\n'
@@ -1791,5 +1803,5 @@ async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId, ow
     return;
   }
 
-  await replyOrPush(env, event, unknownReply());
+  await guideUnknown(env, event, pet?.petId || '');
 }
