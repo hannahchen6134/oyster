@@ -749,6 +749,8 @@
     .qp-btn:active { transform: translateY(1px); }
     .qp-btn.qp-word { font-size: 16px; }
     .qp-custom { grid-column: 1 / -1; min-height: 46px; font-family: var(--sans, inherit); font-size: 14px; font-weight: 600; color: var(--ink-soft); background: transparent; border-style: dashed; }
+    .ae-cur { font-size: 14px; color: var(--ink-soft); margin: 2px 2px 16px; text-align: center; line-height: 1.6; }
+    .ae-cur b { color: var(--brand); font-weight: 700; font-size: 16px; }
     .qbtn.qbtn-sub:hover { background: var(--brand-tint); filter: none; border-color: var(--brand); box-shadow: 0 2px 8px rgba(115, 73, 33, 0.12); }
     /* 今日累計 hero：一打開先看到的重點（水分/熱量對照目標） */
     .today-hero {
@@ -1944,6 +1946,45 @@
       modalSaveHandler = null;
       document.querySelector('.modal-actions').style.display = 'none';
       $('modalBackdrop').classList.add('open');
+    }
+
+    // 沒吃完/記錯數字：食物與喝水用一鍵快速改量，不用開整張表單
+    function openAmountEdit(log) {
+      const isWater = log.category === 'water';
+      const unit = isWater ? 'ml' : 'g';
+      const cur = isWater ? (Number(log.waterMl) || Number(log.amount) || 0) : (Number(log.amount) || 0);
+      const quick = isWater ? [10, 20, 30, 50, 80] : [5, 10, 15, 20, 30];
+      const name = log.category === 'food' ? `${esc(log.foodType || '')}${log.itemName ? ` ${esc(log.itemName)}` : ''}　` : '';
+      state.aeLog = log;
+      if (!openAmountEdit._bound) { $('modalForm').addEventListener('click', amountEditClick); openAmountEdit._bound = true; }
+      $('modalTitle').textContent = `改數量・${CATEGORY_LABEL[log.category] || (isWater ? '喝水' : '吃飯')}`;
+      $('modalForm').innerHTML = `
+        <div class="ae-cur">${name}原本 <b>${cur}</b> ${unit}${isWater ? '' : '（沒吃完就改成實際吃的克數）'}</div>
+        <div class="qp-grid">
+          ${quick.map((n) => `<button type="button" class="qp-btn" data-ae="${n}">${n}<small>${unit}</small></button>`).join('')}
+          <button type="button" class="qp-btn qp-custom" data-ae="custom">自訂數字／更多…</button>
+        </div>`;
+      modalSaveHandler = null;
+      document.querySelector('.modal-actions').style.display = 'none';
+      $('modalBackdrop').classList.add('open');
+    }
+    async function saveAmount(log, n) {
+      const body = log.category === 'water' ? { amount: n, waterMl: n } : { amount: n };
+      try {
+        await api(`logs/${log.logId}`, { method: 'PUT', body: JSON.stringify(body) });
+        closeModal();
+        toast(`已改為 ${n} ${log.category === 'water' ? 'ml' : 'g'} ✓`);
+        await loadDay();
+        if ($('recentFold') && $('recentFold').open) await loadRecent();
+      } catch (error) { toast(error.message || '修改失敗', true); }
+    }
+    function amountEditClick(event) {
+      const btn = event.target.closest('[data-ae]');
+      if (!btn) return;
+      const log = state.aeLog;
+      if (!log) return;
+      if (btn.dataset.ae === 'custom') { closeModal(); return openLogModal(log); }
+      saveAmount(log, Number(btn.dataset.ae));
     }
 
     function openLogModal(log, presetCategory) {
@@ -3402,12 +3443,14 @@
         const id = editBtn.dataset.edit;
         if (editBtn.dataset.recent) {
           const log = state.recentLogs.find((entry) => entry.logId === id);
+          if (log && (log.category === 'food' || log.category === 'water')) return openAmountEdit(log);
           state.meds = (await api(`meds?petId=${state.petId}`)).rows;
           state.foods = (await api('foods')).rows;
           return openLogModal(log);
         }
         if (!$('todayView').classList.contains('hidden') && editBtn.closest('#logList')) {
           const log = state.dayLogs.find((entry) => entry.logId === id);
+          if (log && (log.category === 'food' || log.category === 'water')) return openAmountEdit(log);
           state.meds = (await api(`meds?petId=${state.petId}`)).rows;
           state.foods = (await api('foods')).rows;
           return openLogModal(log);
