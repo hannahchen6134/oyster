@@ -499,6 +499,19 @@
     .dpill.p-dry   { background: #f4ebd4; color: #886722; }
     .dpill.p-kcal  { background: #ece7f3; color: #5a4a84; }
     .dpill.p-warn  { background: var(--seal-tint); color: var(--seal); font-weight: 700; }
+    /* 飲食與水分組成：分段長條＋列點，給醫生看一眼懂 */
+    .comp-block { margin-top: 4px; }
+    .comp-block + .comp-block { margin-top: 20px; }
+    .comp-h { font-size: 13.5px; font-weight: 700; color: var(--ink); margin-bottom: 9px; display: flex; justify-content: space-between; align-items: baseline; }
+    .comp-h small { font-weight: 500; color: var(--muted); font-size: 11.5px; }
+    .comp-bar { display: flex; height: 15px; border-radius: 999px; overflow: hidden; background: #EFE7D8; box-shadow: inset 0 1px 2px rgba(90,60,30,0.08); }
+    .comp-bar i { height: 100%; }
+    .comp-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 11px; }
+    .comp-item { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+    .comp-dot { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+    .comp-item b { color: var(--ink); font-weight: 700; }
+    .comp-item span { color: var(--muted); font-size: 12px; }
+    .comp-empty { padding: 20px 4px; text-align: center; color: var(--muted); font-size: 13px; }
     /* 給醫生的重點整理：白底、按時間列點，截圖友善 */
     .digest-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
     /* 範圍切換：一體成形的分段膠囊（字不折行，窄螢幕也不會變圓球） */
@@ -1126,6 +1139,23 @@
             </div>
             <div class="digest-card" id="digestCard"></div>
             <p class="muted" style="font-size:12px;margin:10px 2px 0">只列有狀況的日子，沒列出＝無特殊紀錄。截圖或按「複製文字」貼給醫生都可以。</p>
+          </div>
+        </details>
+        <details class="block fold" open>
+          <summary>
+            <span class="fold-title">飲食與水分組成</span>
+            <span class="fold-toggle">＋</span>
+          </summary>
+          <div class="fold-body">
+            <div class="digest-toolbar">
+              <div class="digest-seg" id="compRangeChips">
+                <button data-crange="7" type="button" class="active">7天</button>
+                <button data-crange="14" type="button">14天</button>
+                <button data-crange="30" type="button">30天</button>
+              </div>
+            </div>
+            <div id="compCard"></div>
+            <p class="muted" style="font-size:12px;margin:12px 2px 0">水分分「自己喝的」與「食物帶來的」；濕食含水量高，是重要的補水來源。截圖即可給醫生看。</p>
           </div>
         </details>
         <details class="block fold">
@@ -2412,8 +2442,60 @@
 
       renderTrendCharts(data.rows, fromDate, to);
       renderLabTrend();
+      state.trendRows = data.rows || [];
+      loadComposition();
       await loadDigest();
       await loadTable();
+    }
+
+    // ── 飲食與水分組成（給醫生看）：用已載入的近 30 天資料，依所選窗口加總 ──
+    function loadComposition() {
+      const days = state.compDays || 7;
+      const to = todayStr();
+      const from = shiftDate(to, -(days - 1));
+      const rows = (state.trendRows || []).filter((r) => r.date >= from && r.date <= to);
+      const el = $('compCard');
+      if (!el) return;
+      const sum = (f) => rows.reduce((t, r) => t + (Number(f(r)) || 0), 0);
+      const directWater = sum((r) => r.waterMl);
+      const foodWater = sum((r) => r.foodWaterMl);
+      const totalWater = directWater + foodWater;
+      const dry = sum((r) => r.dryFoodG);
+      const wetAsFed = sum((r) => (Number(r.wetFoodG) || 0) + (Number(r.foodWaterMl) || 0)); // 濕食實際餵食量＝固形＋水分
+      const other = sum((r) => r.otherFoodG);
+      const totalFood = dry + wetAsFed + other;
+      if (totalWater <= 0 && totalFood <= 0) {
+        el.innerHTML = `<div class="comp-empty">近 ${days} 天還沒有吃喝紀錄</div>`;
+        return;
+      }
+      const f1 = (v) => (Math.round((Number(v) || 0) * 10) / 10);
+      const pct = (v, tot) => (tot > 0 ? Math.round((v / tot) * 100) : 0);
+      const seg = (v, tot, color) => (v > 0 ? `<i style="width:${Math.max(2, (v / tot) * 100)}%;background:${color}"></i>` : '');
+      const item = (color, label, v, tot, unit) => `<span class="comp-item"><span class="comp-dot" style="background:${color}"></span>${label}　<b>${f1(v)}</b> ${unit}<span>（${pct(v, tot)}%）</span></span>`;
+      const WATER1 = '#2B7A66', WATER2 = '#8FB7A8';
+      const DRY = '#886722', WET = '#5C7031', OTHER = '#B0A188';
+      let html = `
+        <div class="comp-block">
+          <div class="comp-h">水分來源<small>合計 ${f1(totalWater)} ml</small></div>
+          <div class="comp-bar">${seg(directWater, totalWater, WATER1)}${seg(foodWater, totalWater, WATER2)}</div>
+          <div class="comp-legend">
+            ${item(WATER1, '自己喝的水', directWater, totalWater, 'ml')}
+            ${item(WATER2, '食物帶來的水', foodWater, totalWater, 'ml')}
+          </div>
+        </div>`;
+      if (totalFood > 0) {
+        html += `
+        <div class="comp-block">
+          <div class="comp-h">飲食組成<small>合計 ${f1(totalFood)} g</small></div>
+          <div class="comp-bar">${seg(dry, totalFood, DRY)}${seg(wetAsFed, totalFood, WET)}${seg(other, totalFood, OTHER)}</div>
+          <div class="comp-legend">
+            ${dry > 0 ? item(DRY, '乾糧', dry, totalFood, 'g') : ''}
+            ${wetAsFed > 0 ? item(WET, '濕食（罐頭/濕糧）', wetAsFed, totalFood, 'g') : ''}
+            ${other > 0 ? item(OTHER, '其他', other, totalFood, 'g') : ''}
+          </div>
+        </div>`;
+      }
+      el.innerHTML = html;
     }
 
     // 每日數字表：獨立範圍（30/60/90 天），可左右滑動
@@ -3245,6 +3327,13 @@
         document.querySelectorAll('#digestRangeChips [data-drange]').forEach((el) =>
           el.classList.toggle('active', el === drangeBtn));
         return loadDigest();
+      }
+      const crangeBtn = event.target.closest('#compRangeChips [data-crange]');
+      if (crangeBtn) {
+        state.compDays = Number(crangeBtn.dataset.crange) || 7;
+        document.querySelectorAll('#compRangeChips [data-crange]').forEach((el) =>
+          el.classList.toggle('active', el === crangeBtn));
+        return loadComposition();
       }
 
       const calCell = event.target.closest('.cal-cell[data-date]');
