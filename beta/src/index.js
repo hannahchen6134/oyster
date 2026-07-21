@@ -600,10 +600,11 @@ const qrMsg = (label, text) => ({ type: 'action', action: { type: 'message', lab
 const qrPost = (label, data, displayText) => ({ type: 'action', action: { type: 'postback', label: String(label).slice(0, 20), data, displayText: displayText || String(label) } });
 
 // 第一層：要記什麼（乾淨的純文字圓鈕，不塞 emoji）
+// 分類順序與網站「快速記一筆」完全一致：吃飯→喝水→用藥→嘔吐→大小便→精神→保健→備註
 function recordCategoryQuick() {
   return [
-    qrPost('喝水', 'action=rec&k=water', '喝水'),
     qrPost('吃飯', 'action=rec&k=food', '吃飯'),
+    qrPost('喝水', 'action=rec&k=water', '喝水'),
     qrPost('用藥', 'action=rec&k=med', '用藥'),
     qrPost('嘔吐', 'action=rec&k=vomit', '嘔吐'),
     qrPost('大小便', 'action=rec&k=stool', '大小便'),
@@ -615,7 +616,7 @@ function recordCategoryQuick() {
 }
 // 第二層：每一類的常用值（點一個就記好；「其他」才要打字）
 const RECORD_L2 = {
-  water: { prompt: '喝了多少 ml？點一下就記好', items: () => [...[10, 20, 30, 50].map((n) => qrMsg(String(n), `水 ${n}`)), qrPost('其他', 'action=rec&k=water_other', '其他數字')] },
+  water: { prompt: '喝了多少 ml？點一下就記好', items: () => [...[10, 20, 30, 50, 80].map((n) => qrMsg(String(n), `水 ${n}`)), qrPost('其他', 'action=rec&k=water_other', '其他數字')] },
   med: { prompt: '這次的藥？點一下就記好', items: () => [qrMsg('早·已吃', '藥 早 已吃'), qrMsg('晚·已吃', '藥 晚 已吃'), qrMsg('中午·已吃', '藥 中午 已吃'), qrMsg('漏餵沒吃到', '藥 未餵')] },
   food: { prompt: '吃哪一種？', items: () => [qrPost('罐頭', 'action=rec2&t=罐頭', '罐頭'), qrPost('乾糧', 'action=rec2&t=乾糧', '乾糧'), qrPost('零食', 'action=rec2&t=零食', '零食')] },
   vomit: { prompt: '吐了什麼？點一個，或自己打描述', items: () => [qrMsg('透明泡沫', '吐 透明泡沫'), qrMsg('黃色液體', '吐 黃色液體'), qrMsg('食物或毛', '吐 食物或毛'), qrMsg('只是吐了', '吐了')] },
@@ -624,7 +625,7 @@ const RECORD_L2 = {
   supplement: { prompt: '補充了什麼？點一個或自己打', items: () => [qrMsg('益生菌', '保健 益生菌'), qrMsg('化毛膏', '保健 化毛膏'), qrMsg('離胺酸', '保健 離胺酸')] }
 };
 function foodGramQuick(type) {
-  return [...[10, 15, 20, 30, 40].map((n) => qrMsg(String(n), `${type} ${n}`)), qrPost('其他克數', `action=rec2other&t=${type}`, '其他克數')];
+  return [...[5, 10, 15, 20, 30].map((n) => qrMsg(String(n), `${type} ${n}`)), qrPost('其他克數', `action=rec2other&t=${type}`, '其他克數')];
 }
 
 async function handlePostback(event, env, baseUrl) {
