@@ -1162,7 +1162,10 @@
       <section class="panel hidden" id="trendView">
         <details class="block fold" open>
           <summary>
-            <span class="fold-title">給醫生看<span class="fold-count" id="digestCount"></span></span>
+            <span class="fold-head">
+              <span class="fold-title">給醫生看<span class="fold-count" id="digestCount"></span></span>
+              <span class="fold-sub">回診重點・須注意的事件</span>
+            </span>
             <span class="fold-toggle">＋</span>
           </summary>
           <div class="fold-body">
@@ -1232,7 +1235,10 @@
         </details>
         <details class="block fold daycards-fold">
           <summary>
-            <span class="fold-title">近 30 天給醫生看<span class="fold-count" id="tableCount"></span></span>
+            <span class="fold-head">
+              <span class="fold-title">逐日明細<span class="fold-count" id="tableCount"></span></span>
+              <span class="fold-sub">每天一列的加總（近 30 天）</span>
+            </span>
             <span class="fold-toggle">＋</span>
           </summary>
           <div class="fold-body">
@@ -2697,7 +2703,7 @@
       const data = await api(`summary?petId=${state.petId}&from=${from}&to=${to}`);
       // 只列有紀錄的日子（沒紀錄的空日不佔版面），新到舊
       const rows = [...data.rows].reverse().filter((row) => Number(row.entryCount) > 0);
-      const tc = $('tableCount'); if (tc) tc.textContent = `（${rows.length} 天有紀錄）`;
+      const tc = $('tableCount'); if (tc) tc.textContent = `（${rows.length} 天）`;
       const list = $('dayCardList');
       if (!rows.length) {
         list.innerHTML = `<div class="hero-empty" style="border-radius:14px">近 ${state.tableDays} 天還沒有紀錄<span>記一筆吃飯、喝水或用藥就會開始統計。</span></div>`;
