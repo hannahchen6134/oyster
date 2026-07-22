@@ -16,6 +16,11 @@ function round1(value) {
 // 熱量一律用登記的原始克數計算（不用固形量）。
 export const DEFAULT_WET_WATER_RATIO = 0.8;
 
+// 「濕的」食物類型：單一真相來源。新增濕的類型只改這裡，摘要計算、估算、含水都自動涵蓋，
+// 避免「加了新類型卻漏改某一處」的低級錯誤。
+export const WET_FOOD_TYPES = ['罐頭', '濕食', '濕糧'];
+export const isWetFoodType = (foodType) => WET_FOOD_TYPES.includes(foodType);
+
 // 沒設精確公式時的「類型預設值」——用來估算，畫面一律標「估算」、並提醒可自訂精確值。
 // 業界典型密度，也貼近使用者常見品項；使用者在「設定→常吃的食物」填了精確值就會蓋掉。
 const TYPE_KCAL_DEFAULT = { '乾糧': 3.7, '罐頭': 0.9, '濕食': 1.0, '濕糧': 1.0 };
@@ -26,7 +31,7 @@ export function deriveFoodFields(grams, foodType, food) {
   const hasRealKcal = Number(food?.kcalPerGram) > 0;
   const defKcal = TYPE_KCAL_DEFAULT[foodType] || 0;
   const kcalPerG = hasRealKcal ? Number(food.kcalPerGram) : defKcal;
-  const isWet = foodType === '罐頭' || foodType === '濕食' || foodType === '濕糧';
+  const isWet = isWetFoodType(foodType);
   const ratioRaw = Number(food?.waterRatio);
   const ratio = ratioRaw > 0 ? ratioRaw : (TYPE_WATER_DEFAULT[foodType] ?? (isWet ? DEFAULT_WET_WATER_RATIO : 0));
   return {
@@ -87,8 +92,8 @@ export function computeDailySummary(logs) {
       case 'food': {
         const grams = toNumber(log.amount);
         if (log.foodType === '乾糧') summary.dryFoodG += grams;
-        else if (log.foodType === '罐頭' || log.foodType === '濕食') {
-          // 罐頭/濕食只計固形量（原始克數 − 水分）
+        else if (isWetFoodType(log.foodType)) {
+          // 罐頭/濕食/濕糧只計固形量（原始克數 − 水分）
           summary.wetFoodG += Math.max(0, grams - Math.min(toNumber(log.waterMl), grams));
         }
         else summary.otherFoodG += grams;

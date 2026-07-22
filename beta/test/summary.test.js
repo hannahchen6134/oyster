@@ -51,15 +51,17 @@ test('食物：乾濕分類、熱量與食物水分（罐頭/濕食只計固形�
   assert.equal(s.totalWaterMl, 132); // 喝水 50 + 食物 82
 });
 
-test('deriveFoodFields：罐頭未設定公式時預設 80% 水分、熱量 0（未計入）', () => {
+test('deriveFoodFields：罐頭未設定公式時預設 80% 水分、熱量用類型預設估算', () => {
   const d = deriveFoodFields(50, '罐頭', null);
   assert.equal(d.waterMl, 40);
-  assert.equal(d.kcal, 0);
-  // 有公式：熱量用原始克數，水分用品項比例
+  assert.equal(d.kcal, 45);          // 類型預設 0.9/g 估算（不再是 0）
+  assert.equal(d.estimated, true);   // 且標記為估算
+  // 有公式：熱量用原始克數，水分用品項比例，且不算估算
   const d2 = deriveFoodFields(50, '罐頭', { kcalPerGram: 1.2, waterRatio: 0.75 });
   assert.equal(d2.kcal, 60);
   assert.equal(d2.waterMl, 37.5);
-  // 乾糧未設定公式不套 80%
+  assert.equal(d2.estimated, false);
+  // 乾糧未設定公式不套 80% 水分
   const d3 = deriveFoodFields(40, '乾糧', null);
   assert.equal(d3.waterMl, 0);
 });

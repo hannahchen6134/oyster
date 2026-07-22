@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
+    "deploy": "npm test && wrangler deploy",
+    "deploy:notest": "wrangler deploy",
     "db:init": "wrangler d1 execute cat-care-beta --remote --file=./schema.sql",
     "db:init:local": "wrangler d1 execute cat-care-beta --local --file=./schema.sql",
-    "test": "node --test"
+    "test": "node --test test/*.test.js test/*.test.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.0.0"
