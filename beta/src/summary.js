@@ -16,15 +16,23 @@ function round1(value) {
 // 熱量一律用登記的原始克數計算（不用固形量）。
 export const DEFAULT_WET_WATER_RATIO = 0.8;
 
-// 「濕的」食物類型：單一真相來源。新增濕的類型只改這裡，摘要計算、估算、含水都自動涵蓋，
-// 避免「加了新類型卻漏改某一處」的低級錯誤。
+// ---------- 食物類型：單一真相來源 ----------
+// 新增/調整食物類型「只改這一段」，摘要計算、估算、含水、UI 都從這裡衍生，
+// 從結構上杜絕「加了新類型卻漏改某一處」的低級錯誤。（網站 index.html 另有平行常數，
+// 由 test/parity.test.mjs 自動比對，兩邊不一致就測試變紅。）
+export const FOOD_TYPES = ['乾糧', '罐頭', '濕糧', '濕食', '零食', '其他'];
+// 「濕的」食物類型（要扣固形量、預設含水）
 export const WET_FOOD_TYPES = ['罐頭', '濕食', '濕糧'];
 export const isWetFoodType = (foodType) => WET_FOOD_TYPES.includes(foodType);
 
 // 沒設精確公式時的「類型預設值」——用來估算，畫面一律標「估算」、並提醒可自訂精確值。
 // 業界典型密度，也貼近使用者常見品項；使用者在「設定→常吃的食物」填了精確值就會蓋掉。
-const TYPE_KCAL_DEFAULT = { '乾糧': 3.7, '罐頭': 0.9, '濕食': 1.0, '濕糧': 1.0 };
-const TYPE_WATER_DEFAULT = { '乾糧': 0, '罐頭': 0.8, '濕食': 0.75, '濕糧': 0.75 };
+// 零食/其他刻意不給預設（各家差太多，硬給反而誤導）→ 請使用者自己填。
+export const TYPE_KCAL_DEFAULT = { '乾糧': 3.7, '罐頭': 0.9, '濕食': 1.0, '濕糧': 1.0 };
+export const TYPE_WATER_DEFAULT = { '乾糧': 0, '罐頭': 0.8, '濕食': 0.75, '濕糧': 0.75 };
+// 「可估算」的類型＝有預設熱量的類型（乾糧/罐頭/濕糧/濕食）
+export const ESTIMABLE_FOOD_TYPES = Object.keys(TYPE_KCAL_DEFAULT);
+export const isEstimableType = (foodType) => Number(TYPE_KCAL_DEFAULT[foodType]) > 0;
 
 export function deriveFoodFields(grams, foodType, food) {
   const g = toNumber(grams);

@@ -4,6 +4,7 @@
 
 import { goalSection, recordPrompt } from './replies.js';
 import { BRAND, displayMedStatus } from './brand.js';
+import { isWetFoodType } from './summary.js';
 
 // 卡身：暖米白（和照護站網站同一個紙面世界，不用冷白）；標題：暖棕漸層
 const BODY_BG = '#FFFDF8';
@@ -272,7 +273,7 @@ export function recordFlexCompact({ pet, categoryKey, mainText, subText, summary
 // ②③ 打了品名卻對不到已建立的品項時：不默默記 0 熱量，先回這張卡讓使用者選正確品項（熱量才算得到）。
 // guessId＝模糊比對猜到最接近的品項 foodId，排最前面並標「最接近」。
 export function foodDisambigFlex({ pet, foodType, typedName, grams, options = [], guessId = '' }) {
-  const styleKey = foodType === '乾糧' ? 'dry' : (foodType === '罐頭' || foodType === '濕食') ? 'wet' : 'note';
+  const styleKey = foodType === '乾糧' ? 'dry' : isWetFoodType(foodType) ? 'wet' : 'note';
   const style = CATEGORY_STYLE[styleKey] || CATEGORY_STYLE.note;
   const g = Number(grams) || 0;
   const sorted = [...options].sort((a, b) => (b.foodId === guessId ? 1 : 0) - (a.foodId === guessId ? 1 : 0));

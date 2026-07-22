@@ -4,7 +4,7 @@
 // 其餘路徑 → 照護站網站（public/ 靜態資源）
 
 import { parseMessage, matchFood, guessFood, normalizeText } from './parser.js';
-import { deriveFoodFields } from './summary.js';
+import { deriveFoodFields, isWetFoodType, isEstimableType } from './summary.js';
 import { handleApi } from './api.js';
 import { verifyLineSignature, replyOrPush, replyOrPushQuick, replyOrPushFlex, replyMessages, pushText, pushMessages, getProfile, getAccessToken, checkAccessToken } from './line.js';
 import { hasAnyReminder, parseReminderSettings, buildReminderLines, reminderMessage, visitReminderMessage } from './reminders.js';
@@ -398,7 +398,7 @@ function birthdayFromAge(age) {
 //  - 熱量（每克 kcal）各產品差異大，絕不自動帶預設值；沒填就留 0，記錄時先不算熱量、之後在照護站補正確值。
 //  - 含水比例：罐頭/濕食用 80%（濕食含水的物理常數，可在照護站微調）；乾糧/其他不預設（0）。
 async function createGuidedFood(db, lineUserId, foodType, name, kcalIn) {
-  const isWet = foodType === '罐頭' || foodType === '濕食';
+  const isWet = isWetFoodType(foodType);
   const kcalPerGram = kcalIn > 0 ? kcalIn : 0;
   const waterRatio = isWet ? 0.8 : 0;
   const food = await createFoodItem(db, lineUserId, {
@@ -419,7 +419,7 @@ async function createGuidedFood(db, lineUserId, foodType, name, kcalIn) {
 function foodDoneCard(name, foodType, info) {
   const waterPct = Math.round(info.waterRatio * 100);
   const healedLine = info.healed > 0 ? `\n✓ 順便把過去 ${info.healed} 筆（含估算的）熱量補成精確值了。` : '';
-  const estimable = ['乾糧', '罐頭', '濕糧', '濕食'].includes(foodType);
+  const estimable = isEstimableType(foodType);
   const subtitle = info.needsKcal
     ? (estimable
         ? `${foodType}・含水 ${waterPct}%\n還沒填每克熱量，記錄時會先用「${foodType}」類型預設估算（畫面標 ≈）。到照護站「設定→常吃的食物」填精確每克熱量，就會變精確值、並自動補算過去的估算。`
