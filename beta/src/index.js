@@ -337,7 +337,17 @@ function stepMedCard(petName, step = '') {
   });
 }
 
-function stepFoodCard(step = '第 2 步・共 3 步', subtitle = '可以建好幾種，乾乾和罐罐都建更好用') {
+// 上手最小門檻：名字＋目前體重（給醫生看與每日喝水量目標都靠體重）。刻意不放「跳過」按鈕。
+function weightOnboardCard(petName, step = '第 2 步・共 3 步') {
+  return onboardCard({
+    step,
+    title: `${petName}現在幾公斤？`,
+    subtitle: '直接打數字就好，例如 4.2。體重是「給醫生看」和每日喝水量目標的基準，先記一次；之後在「今天」分頁隨時能再量再記。',
+    alt: `${petName}現在幾公斤？`
+  });
+}
+
+function stepFoodCard(step = '第 3 步・共 3 步', subtitle = '可以建好幾種，乾乾和罐罐都建更好用') {
   return onboardCard({
     step,
     title: '最常吃哪一種？',
@@ -351,7 +361,7 @@ function stepFoodCard(step = '第 2 步・共 3 步', subtitle = '可以建好�
   });
 }
 
-function medAskCard(petName, step = '第 3 步・共 3 步') {
+function medAskCard(petName, step = '選填') {
   return onboardCard({
     step,
     title: `${petName}有固定吃的保健品或藥嗎？`,
@@ -464,8 +474,9 @@ async function handlePending(env, event, { db, user, pet, pets, lineUserId, owne
       newPet = await createPet(db, ownerId, { petName: text });
       if (!pets.length) await updateUser(db, lineUserId, { defaultPetId: newPet.petId });
     }
-    await clear();
-    await replyOrPushFlex(env, event, stepFoodCard(), `已幫「${newPet.petName}」建立檔案！先建常吃的食物：輸入「設定罐頭」「設定乾糧」等`);
+    // 最小門檻：建檔後先問目前體重（必填），再進食物設定
+    await updateUser(db, lineUserId, { pendingAction: 'weight-onboard' });
+    await replyOrPushFlex(env, event, weightOnboardCard(newPet.petName), `已幫「${newPet.petName}」建立檔案！先告訴我${newPet.petName}現在幾公斤？直接打數字，例如 4.2`);
     return true;
   }
 
@@ -478,6 +489,16 @@ async function handlePending(env, event, { db, user, pet, pets, lineUserId, owne
       title: `已記下${pet.petName}的體重 ${m[1]} kg`,
       rows: [[menuCell('記年齡', '大約幾歲', '記年齡'), menuCell('完成', '開始使用', '完成設定')]]
     }), `已記下體重 ${m[1]} kg`);
+    return true;
+  }
+
+  // 上手最小門檻的體重：建檔後第一件事，記完就接著（可略過的）食物設定
+  if (pending === 'weight-onboard' && pet) {
+    const m = text.match(/^([0-9]+(?:\.[0-9]+)?)\s*(?:kg|公斤)?$/i);
+    if (!m) { await clear(); return false; }
+    await updatePetFields(db, pet.petId, { weightKg: Number(m[1]) });
+    await clear();
+    await replyOrPushFlex(env, event, stepFoodCard('第 3 步・共 3 步', `已記下 ${pet.petName} ${m[1]} kg！最常吃哪一種？建好記錄就自動算熱量和水分（也可先跳過，直接開始記）`), `已記下體重 ${m[1]} kg。接下來可建常吃的食物：輸入「設定罐頭」「設定乾糧」，或直接開始記錄`);
     return true;
   }
 
@@ -1118,7 +1139,9 @@ async function handleTextMessage(event, env, baseUrl) {
       }
       const newPet = await createPet(db, ownerId, { petName: intent.name });
       if (!pets.length) await updateUser(db, lineUserId, { defaultPetId: newPet.petId });
-      await replyOrPushFlex(env, event, stepFoodCard(), `已幫「${intent.name}」建立檔案！先建常吃的食物：輸入「設定罐頭」「設定乾糧」等`);
+      // 最小門檻：建檔後先問目前體重（必填），再進食物設定
+      await updateUser(db, lineUserId, { pendingAction: 'weight-onboard' });
+      await replyOrPushFlex(env, event, weightOnboardCard(newPet.petName), `已幫「${intent.name}」建立檔案！先告訴我${intent.name}現在幾公斤？直接打數字，例如 4.2`);
       return;
     }
 
