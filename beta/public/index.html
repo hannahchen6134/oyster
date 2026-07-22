@@ -536,8 +536,8 @@
     /* 回診重點：白底卡、標題＋逐項、紅旗一行；截圖友善 */
     .vh-title { font-size: 12.5px; font-weight: 700; letter-spacing: 0.1em; color: var(--brand); margin: 2px 0 8px; }
     .vh-body { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 2px 16px; }
-    /* 每列：窄標籤＋放大的主要數字＋灰色輔助說明，截圖給醫生一眼掃完 */
-    .vh-metric { display: flex; gap: 14px; align-items: baseline; padding: 12px 0; border-bottom: 1px solid var(--line-soft, #f0ebe0); }
+    /* 每列＝一條趨勢：窄標籤＋「變化量（放大）＋起訖」＋右側小趨勢線，截圖給醫生一眼看變化 */
+    .vh-metric { display: flex; gap: 12px; align-items: center; padding: 13px 0; border-bottom: 1px solid var(--line-soft, #f0ebe0); }
     .vh-metric:last-child { border-bottom: none; }
     .vh-mk { flex: none; width: 34px; font-size: 12.5px; font-weight: 700; color: var(--muted); letter-spacing: 0.06em; }
     .vh-mv { flex: 1; min-width: 0; }
@@ -546,6 +546,8 @@
     .vh-metric.warn .num { color: var(--seal); }
     .vh-metric.warn .num::after { content: ' ⚠'; font-size: 13px; }
     .vh-metric.muted .num { font-size: 14px; font-weight: 600; color: var(--muted); }
+    .vh-spark { flex: none; width: 78px; height: 24px; opacity: 0.9; }
+    .vh-note { margin-top: 9px; font-size: 11.5px; line-height: 1.6; color: var(--muted); }
     .vh-flags { margin: 0 0 10px; padding: 11px 14px; border-radius: var(--radius); font-size: 13px; line-height: 1.6; }
     .vh-flags.warn { background: #fbeee9; border: 1px solid rgba(191, 59, 32, 0.2); color: var(--seal); font-weight: 700; }
     .vh-flags.ok { background: rgba(115, 73, 33, 0.05); border: 1px solid var(--line); color: var(--ink-soft); font-weight: 600; }
@@ -2368,47 +2370,83 @@
         weight = { current: currentKg, count: 0 };
       }
       const perKg = (water && currentKg > 0) ? water.avg / currentKg : null;
-      return { days, from, to, recordedDays: rows.filter((r) => Number(r.entryCount) > 0).length, weight, water, perKg, kcal, target: Number(pet?.goalKcal) || 0, avgDry, avgWet, medDays, missed, vomitDays, currentKg, r0, petName: pet ? pet.petName : '貓貓' };
+      // 趨勢序列（給「回診重點」畫小趨勢線用）：體重＝每次量到的點；飲水/熱量＝每日值
+      const weightPairs = w.map((x) => ({ date: x.date, v: x.kg }));
+      const waterPairs = rows.map((r) => ({ date: r.date, v: Number(r.totalWaterMl) })).filter((x) => x.v > 0);
+      const kcalPairs = rows.map((r) => ({ date: r.date, v: Number(r.kcal) })).filter((x) => x.v > 0);
+      return { days, from, to, recordedDays: rows.filter((r) => Number(r.entryCount) > 0).length, weight, water, perKg, kcal, target: Number(pet?.goalKcal) || 0, avgDry, avgWet, medDays, missed, vomitDays, currentKg, r0, petName: pet ? pet.petName : '貓貓', weightPairs, waterPairs, kcalPairs };
+    }
+
+    // 趨勢摘要：頭尾各取約 1/3 平均當代表值（穩一點），算變化量與方向
+    function vhTrend(pairs) {
+      const pts = (pairs || []).filter((p) => p.v > 0);
+      if (!pts.length) return null;
+      const vals = pts.map((p) => p.v);
+      const n = vals.length;
+      const k = Math.max(1, Math.floor(n / 3));
+      const head = vals.slice(0, k), tail = vals.slice(n - k);
+      const first = head.reduce((a, b) => a + b, 0) / head.length;
+      const last = tail.reduce((a, b) => a + b, 0) / tail.length;
+      return { vals, n, first, last, delta: last - first, min: Math.min(...vals), max: Math.max(...vals) };
+    }
+    // 極簡趨勢線（inline SVG）：末點加圓點，給截圖用；單點時回空字串（由呼叫端改顯示文字）
+    function vhSpark(vals, color = 'var(--brand)') {
+      if (!vals || vals.length < 2) return '';
+      const w = 78, h = 24, pad = 3;
+      const min = Math.min(...vals), max = Math.max(...vals), range = (max - min) || 1;
+      const step = (w - 2 * pad) / (vals.length - 1);
+      const r1 = (x) => Math.round(x * 10) / 10;
+      const xy = vals.map((v, i) => [pad + i * step, pad + (h - 2 * pad) * (1 - (v - min) / range)]);
+      const pts = xy.map(([x, y]) => `${r1(x)},${r1(y)}`).join(' ');
+      const [lx, ly] = xy[xy.length - 1];
+      return `<svg class="vh-spark" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" preserveAspectRatio="none" aria-hidden="true">
+        <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+        <circle cx="${r1(lx)}" cy="${r1(ly)}" r="2.2" fill="${color}"/></svg>`;
     }
 
     function vhLabel(date) { return date ? `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}` : ''; }
-    // 每列拆成「主要數字 v」＋「輔助說明 sub」，讓醫生一眼看到重點；warn=true 時數字轉紅。
+    // 回診重點只留三條「趨勢」：體重、飲水、熱量——都以「變化」為主角（箭頭＋變化量＋小趨勢線）。
+    // 食物克數、用藥依從都拿掉（食物與熱量重複；漏藥已在紅旗）。誠實原則：喝水/熱量為家中概估，只給方向。
+    function vhArrow(d) { return d > 0 ? `↑${Math.abs(d)}` : d < 0 ? `↓${Math.abs(d)}` : '持平'; }
     function vetHighlightsRows(h) {
       const rows = [];
-      // 體重：現值大、趨勢箭頭在旁；掉太多（≥0.2kg）轉紅提醒
-      if (h.weight) {
-        const w = h.weight;
-        const losing = w.delta != null && w.delta <= -0.2;
-        const arrow = (w.delta == null || !w.count) ? '' : (w.delta > 0 ? `↑${w.delta}` : w.delta < 0 ? `↓${Math.abs(w.delta)}` : '持平');
-        rows.push({ k: '體重', v: `${w.current} kg`, sub: w.count ? `近${h.days}天 ${arrow} kg・量 ${w.count} 次` : '（僅一次紀錄）', warn: losing });
+      const seal = 'var(--seal)', brand = 'var(--brand)';
+
+      // 體重：掉 ≥0.2kg 轉紅。點就是每次量到的體重，最準。
+      const wt = vhTrend(h.weightPairs);
+      if (wt && wt.n >= 2) {
+        const d = h.r0(wt.delta, 2), losing = d <= -0.2;
+        rows.push({ k: '體重', spark: vhSpark(wt.vals, losing ? seal : brand), head: d === 0 ? '持平' : `${vhArrow(d)} kg`, sub: `${h.r0(wt.first, 2)} → ${h.r0(wt.last, 2)} kg・近${h.days}天量 ${wt.n} 次`, warn: losing, plain: `${h.r0(wt.first, 2)}→${h.r0(wt.last, 2)} kg（${d === 0 ? '持平' : vhArrow(d)}，近${h.days}天量${wt.n}次）` });
+      } else if (wt && wt.n === 1) {
+        rows.push({ k: '體重', head: `${h.r0(wt.last, 2)} kg`, sub: '只量到一次，多量幾次才看得出變化', muted: true, plain: `${h.r0(wt.last, 2)} kg（僅一次）` });
       } else {
-        rows.push({ k: '體重', v: '尚未記錄', sub: '在「今天」分頁可快速記一筆', muted: true });
+        rows.push({ k: '體重', head: '尚未記錄', sub: '在「今天」分頁可快速記一筆', muted: true, plain: '尚未記錄' });
       }
-      // 飲水：每日平均為主，每公斤與範圍為輔（腎貓最看每公斤）
-      if (h.water) {
-        rows.push({ k: '飲水', v: `${h.r0(h.water.avg)} ml/日`, sub: `${h.perKg ? `每公斤 ${h.r0(h.perKg, 1)} ml・` : ''}範圍 ${h.r0(h.water.min)}–${h.r0(h.water.max)}・${h.water.n} 天` });
+
+      // 飲水：跨過多飲門檻（每公斤 >100 ml/日）才轉紅，其餘中性。
+      const wa = vhTrend(h.waterPairs);
+      if (wa && wa.n >= 2) {
+        const d = h.r0(wa.delta);
+        const perKgLast = h.currentKg > 0 ? wa.last / h.currentKg : null;
+        const poly = perKgLast != null && perKgLast > 100;
+        const perKgTxt = perKgLast != null ? `・每公斤 ${h.r0(perKgLast, 1)} ml` : '';
+        rows.push({ k: '飲水', spark: vhSpark(wa.vals, poly ? seal : brand), head: d === 0 ? '持平' : `${vhArrow(d)} ml/日`, sub: `${h.r0(wa.first)} → ${h.r0(wa.last)} ml/日${perKgTxt}${poly ? '・偏多' : ''}`, warn: poly, plain: `${h.r0(wa.first)}→${h.r0(wa.last)} ml/日（${d === 0 ? '持平' : vhArrow(d)}${perKgTxt}）` });
+      } else if (wa && wa.n === 1) {
+        rows.push({ k: '飲水', head: `${h.r0(wa.last)} ml/日`, sub: '資料太少，看不出變化', muted: true, plain: `${h.r0(wa.last)} ml/日（資料少）` });
       } else {
-        rows.push({ k: '飲水', v: '尚未記錄', sub: '', muted: true });
+        rows.push({ k: '飲水', head: '尚未記錄', sub: '', muted: true, plain: '尚未記錄' });
       }
-      // 熱量：平均為主，和目標的差為輔
-      if (h.kcal) {
-        let sub = `${h.kcal.n} 天`;
-        if (h.target) { const diff = h.r0(h.kcal.avg - h.target); sub = `目標 ${h.target}（${diff >= 0 ? '+' : ''}${diff}）・${h.kcal.n} 天`; }
-        rows.push({ k: '熱量', v: `${h.r0(h.kcal.avg)} kcal/日`, sub });
+
+      // 熱量：下降超過 15% 轉紅（食慾下降的提醒）。是家中概估，只看方向。
+      const kc = vhTrend(h.kcalPairs);
+      if (kc && kc.n >= 2) {
+        const d = h.r0(kc.delta), dropping = kc.last < kc.first * 0.85;
+        const tgt = h.target ? `・目標 ${h.target}` : '';
+        rows.push({ k: '熱量', spark: vhSpark(kc.vals, dropping ? seal : brand), head: d === 0 ? '持平' : `${vhArrow(d)} kcal/日`, sub: `${h.r0(kc.first)} → ${h.r0(kc.last)} kcal/日${tgt}${dropping ? '・下降' : ''}`, warn: dropping, plain: `${h.r0(kc.first)}→${h.r0(kc.last)} kcal/日（${d === 0 ? '持平' : vhArrow(d)}${tgt}）` });
+      } else if (kc && kc.n === 1) {
+        rows.push({ k: '熱量', head: `${h.r0(kc.last)} kcal/日`, sub: '資料太少，看不出變化', muted: true, plain: `${h.r0(kc.last)} kcal/日（資料少）` });
       } else {
-        rows.push({ k: '熱量', v: '尚未記錄', sub: '', muted: true });
-      }
-      // 食物：乾濕分開
-      if (h.avgDry || h.avgWet) {
-        rows.push({ k: '食物', v: `乾 ${h.r0(h.avgDry, 1)} g・濕食固形 ${h.r0(h.avgWet, 1)} g`, sub: '每日平均' });
-      } else {
-        rows.push({ k: '食物', v: '尚未記錄', sub: '', muted: true });
-      }
-      // 用藥：給藥天數為主，漏藥轉紅
-      if (h.medDays) {
-        rows.push({ k: '用藥', v: `${h.medDays} 天有給藥`, sub: `近${h.days}天有記錄 ${h.recordedDays} 天${h.missed.length ? `・漏 ${h.missed.length} 天` : ''}`, warn: h.missed.length > 0 });
-      } else {
-        rows.push({ k: '用藥', v: '尚未記錄', sub: '', muted: true });
+        rows.push({ k: '熱量', head: '尚未記錄', sub: '', muted: true, plain: '尚未記錄' });
       }
       return rows;
     }
@@ -2422,16 +2460,18 @@
       const rows = vetHighlightsRows(h).map((r) =>
         `<div class="vh-metric${r.warn ? ' warn' : ''}${r.muted ? ' muted' : ''}">
           <span class="vh-mk">${esc(r.k)}</span>
-          <span class="vh-mv"><b class="num">${esc(r.v)}</b>${r.sub ? `<span class="sub">${esc(r.sub)}</span>` : ''}</span>
+          <span class="vh-mv"><b class="num">${esc(r.head)}</b>${r.sub ? `<span class="sub">${esc(r.sub)}</span>` : ''}</span>
+          ${r.spark || ''}
         </div>`).join('');
       const flags = vetFlagsText(h);
-      // 紅旗放最上面：醫生第一眼就看到有沒有異常
+      // 紅旗（嘔吐/漏藥）放最上面：醫生第一眼就看到有沒有事件
       const flagBox = flags.length
         ? `<div class="vh-flags warn">⚠ 近 ${h.days} 天須注意：${esc(flags.join('；'))}</div>`
         : `<div class="vh-flags ok">✓ 近 ${h.days} 天無嘔吐、無漏藥紀錄</div>`;
       return `<div class="vh-title">回診重點・近 ${h.days} 天</div>
         ${flagBox}
-        <div class="vh-body">${rows}</div>`;
+        <div class="vh-body">${rows}</div>
+        <div class="vh-note">體重看變化最重要；喝水與熱量為家中概估，供醫生參考趨勢方向。</div>`;
     }
 
     // 近 7 天摘要：同一份資料產生畫面排版與複製用純文字；沒有的值不顯示 0
@@ -2640,8 +2680,8 @@
       const name = pet ? pet.petName : '貓貓';
       const h = computeVetHighlights(state.digestDays);
       const lines = [`${name}｜回診摘要（${digestWhen(data.from)}〜${digestWhen(data.to)}）`, ''];
-      lines.push('【回診重點】');
-      for (const r of vetHighlightsRows(h)) lines.push(`${r.k}：${r.v}${r.sub ? `　${r.sub}` : ''}`);
+      lines.push('【回診重點・趨勢】');
+      for (const r of vetHighlightsRows(h)) lines.push(`${r.k}：${r.plain}`);
       const flags = vetFlagsText(h);
       lines.push(`紅旗：${flags.length ? flags.join('；') : '近期無嘔吐、無漏藥'}`);
       lines.push('', '【須注意的事件】');
