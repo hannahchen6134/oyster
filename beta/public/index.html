@@ -360,7 +360,7 @@
     .cal-head { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 16px; }
     .cal-title { font-family: var(--serif); font-size: 19px; font-weight: 600; min-width: 132px; text-align: center; letter-spacing: 0.06em; }
     /* 保留高度，載入時版面不跳、下方文字不會閃上來 */
-    .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 7px; min-height: 470px; align-content: start; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 7px; align-content: start; }
     .cal-dow {
       text-align: center; font-size: 11px; font-weight: 600; color: var(--muted);
       padding: 4px 0 6px; letter-spacing: 0.18em;
@@ -389,8 +389,9 @@
       width: 25px; height: 25px; display: inline-flex; align-items: center; justify-content: center;
       border-radius: 50%;
     }
-    .cal-cell.today .cal-daynum { background: var(--seal); color: #fff; box-shadow: 0 0 0 3px rgba(191, 59, 32, 0.15); }
-    .cal-cell.today { border-color: rgba(191, 59, 32, 0.35); }
+    /* 今天：溫和的鼠尾草綠圓底（不用朱紅，較柔和） */
+    .cal-cell.today .cal-daynum { background: #6f8f5a; color: #fff; box-shadow: 0 0 0 3px rgba(111, 143, 90, 0.18); }
+    .cal-cell.today { border-color: rgba(111, 143, 90, 0.4); }
     /* 有記錄的日子：暖色「填滿」感，讓整月一眼看出照顧得完不完整；沒記錄的日子維持淡色空格 */
     .cal-cell.has { background: linear-gradient(180deg, #FBF3E4, #F5EBD6); border-color: rgba(115, 73, 33, 0.24); }
     .cal-cell.warn { background: linear-gradient(180deg, #fef6f3, #fbeee9); border-color: rgba(191, 59, 32, 0.28); }
