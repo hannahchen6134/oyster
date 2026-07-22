@@ -405,10 +405,13 @@
     .cdot-vomit { background: var(--seal); }
     .cdot-stool { background: #A98657; }
     .cdot-visit { width: 7px; height: 7px; background: transparent; border: 1.6px solid var(--brand); }
+    .cal-intro { margin: 0 0 12px; font-size: 12.5px; line-height: 1.6; color: var(--muted); text-align: center; }
+    .cal-intro b { color: var(--brand); font-weight: 600; }
     .cal-legend {
-      display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center;
+      display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; justify-content: center;
       margin-top: 14px; font-size: 12px; color: var(--muted);
     }
+    .cal-legend-faint { opacity: 0.8; }
     .cal-legend .cdot { display: inline-block; margin-right: 5px; vertical-align: 1px; }
     .cal-legend .cal-mark { margin-right: 5px; vertical-align: 1px; }
     .cal-legend-wbar { display: inline-block; width: 26px; height: 5px; background: #EFE7D8; border-radius: 999px; margin-right: 5px; vertical-align: 1px; overflow: hidden; }
@@ -808,6 +811,10 @@
       opacity: 0; border: none; padding: 0; cursor: pointer;
     }
     .date-disp:focus-within { background: var(--brand-tint); }
+    /* 頂部「查看哪一天」列：擺在總結板正上方，讓「這是哪一天的數字、怎麼換天」一目了然 */
+    .viewing-day { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; flex-wrap: wrap; }
+    .viewing-day .vd-label { font-size: 12.5px; font-weight: 700; letter-spacing: 0.14em; color: var(--muted); }
+    .viewing-day .link-btn { margin-left: 2px; }
     /* 近 7 天摘要：畫面用結構化排版，複製才給純文字 */
     .vs-h {
       display: flex; align-items: center; gap: 12px; margin: 18px 0 4px;
@@ -1025,6 +1032,19 @@
 
       <!-- 今天：照護確認板 -->
       <section class="panel" id="todayView">
+        <!-- 查看哪一天：擺在總結板正上方，換天一目了然（點日期可挑任一天，例如回頭確認昨天） -->
+        <div class="viewing-day">
+          <span class="vd-label">查看</span>
+          <div class="date-nav">
+            <button id="dayPrevBtn" type="button" aria-label="前一天">‹</button>
+            <label class="date-disp">
+              <span id="dayPickerLabel"></span>
+              <input type="date" id="dayPicker" aria-label="選擇日期">
+            </label>
+            <button id="dayNextBtn" type="button" aria-label="後一天">›</button>
+          </div>
+          <button class="link-btn hidden" id="goTodayBtn" type="button">回到今天</button>
+        </div>
         <div class="block today-hero" id="todayHero" style="margin-top:0">
           <div id="todayProgress"></div>
         </div>
@@ -1043,15 +1063,6 @@
             <button class="qbtn qbtn-sub" data-quick="note" type="button"><span class="q-plus">＋</span>備註</button>
           </div>
           <div class="day-toolbar">
-            <div class="date-nav">
-              <button id="dayPrevBtn" type="button" aria-label="前一天">‹</button>
-              <label class="date-disp">
-                <span id="dayPickerLabel"></span>
-                <input type="date" id="dayPicker" aria-label="選擇日期">
-              </label>
-              <button id="dayNextBtn" type="button" aria-label="後一天">›</button>
-            </div>
-            <button class="link-btn" id="goTodayBtn" type="button">回到今天</button>
             <div class="spacer" style="flex:1"></div>
             <button class="btn btn-secondary btn-sm" id="addLogBtn" type="button">補登其他時間</button>
           </div>
@@ -1067,10 +1078,6 @@
           <div class="fold-body">
             <div id="confirmList"></div>
             <div class="save-state" id="saveState"></div>
-            <div style="display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-top:14px">
-              <span class="muted" style="flex:1;font-size:11.5px">複製交接卡＝把上面內容變成一段文字，可貼給家人朋友</span>
-              <button class="btn btn-secondary btn-sm" id="copyHandoffBtn" type="button">複製交接卡</button>
-            </div>
           </div>
         </details>
         <details class="block fold sec-logs">
@@ -1110,19 +1117,14 @@
           <div class="cal-title" id="calTitle"></div>
           <button class="btn btn-secondary btn-sm" id="calNextBtn" type="button">下月 ›</button>
         </div>
+        <p class="cal-intro">這個月的照護概覽：哪幾天有記錄、哪幾天要注意。<b>點任一天，看那天的完整數據。</b></p>
         <div class="cal-grid" id="calGrid"></div>
-        <details class="cal-legend-fold" id="calLegend" hidden>
-          <summary>
-            <span class="cal-legend-lite">紅點＝需注意&nbsp;·&nbsp;圈＝回診&nbsp;·&nbsp;點一天看明細</span>
-            <span class="cal-legend-more">圖例</span>
-          </summary>
-          <div class="cal-legend">
-            <span><span class="cal-rec" style="display:inline-block;vertical-align:1px"></span>＝這天有記錄</span>
-            <span><span class="cal-mark warn" style="position:static;display:inline-block"></span>需注意（吐／漏藥）</span>
-            <span><span class="cal-mark visit" style="position:static;display:inline-block"></span>回診</span>
-            <span>點任一天可看當天完整明細</span>
-          </div>
-        </details>
+        <div class="cal-legend" id="calLegend" hidden>
+          <span><span class="cal-rec" style="display:inline-block;vertical-align:1px"></span>有記錄</span>
+          <span><span class="cal-mark warn" style="position:static;display:inline-block"></span>需注意（吐／漏藥）</span>
+          <span><span class="cal-mark visit" style="position:static;display:inline-block"></span>回診</span>
+          <span class="cal-legend-faint">淡色數字＝這天沒記錄</span>
+        </div>
       </section>
 
       <!-- 回診 -->
@@ -1546,23 +1548,6 @@
         s.stoolNotes.length ? `便便：${s.stoolNotes.join('；')}` : '沒有便便備註'
       ];
       return parts.join('。') + '。';
-    }
-
-    // 今日交接卡(純文字,複製給家人朋友)
-    function buildHandoffText() {
-      const pet = currentPet();
-      const s = state.daySummary || {};
-      const info = confirmData(state.dayLogs || [], s);
-      const day = `${Number(state.date.slice(5, 7))}/${Number(state.date.slice(8, 10))}`;
-      const lines = [`${pet ? pet.petName : '貓貓'}｜今日照護交接卡｜${day}`];
-      for (const [label, value] of info.rows) {
-        lines.push(`${label}：${value || (label === '精神' ? '尚未紀錄' : '尚未看到紀錄')}`);
-      }
-      const noteLogs = (state.dayLogs || []).filter((l) => l.category === 'note');
-      if (noteLogs.length) lines.push(`備註：${noteLogs.map((l) => l.note).join('；')}`);
-      if (info.last) lines.push(`最近一筆：${describeLogFront(info.last)}`);
-      if (info.lastUpdated) lines.push(`最後更新：${tpeTime(info.lastUpdated)}`);
-      return lines.join('\n');
     }
 
     function vetLabel(vet) {
@@ -3533,8 +3518,6 @@
         toast('複製失敗，請長按文字手動複製', true);
       }
     }
-    $('copyHandoffBtn').addEventListener('click', () =>
-      copyText(buildHandoffText(), '已複製'));
     $('showAllLogsBtn').addEventListener('click', () => {
       state.showAllLogs = true;
       renderLogs(state.dayLogs || []);
