@@ -7,7 +7,8 @@ import {
   listFoods, getFood,
   insertLog, getLog, getLogsForDay, updateLog, softDeleteLog,
   recomputeDay, getSummaries, getSessionUser, getRecentLogsByPet,
-  resolveDataOwner, createCareInvite, listCareMembers, track, healFoodKcal
+  resolveDataOwner, createCareInvite, listCareMembers, track, healFoodKcal,
+  updatePetFields
 } from './db.js';
 import { computeDailySummary, deriveFoodFields } from './summary.js';
 import { matchFood } from './parser.js';
@@ -283,6 +284,10 @@ async function handleLogs(db, request, method, logId, lineUserId, actorId = line
     });
 
     const saved = await insertLog(db, log);
+    // 記體重時同步更新貓咪目前體重（每公斤喝水量、熱量目標都靠這個）
+    if (category === 'weight' && Number(saved.amount) > 0) {
+      await updatePetFields(db, petId, { weightKg: Number(saved.amount) });
+    }
     const summary = await recomputeDay(db, petId, eventDateTime.slice(0, 10));
     return jsonResponse({ ok: true, log: saved, summary });
   }
