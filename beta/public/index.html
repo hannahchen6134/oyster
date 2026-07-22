@@ -389,9 +389,9 @@
       width: 25px; height: 25px; display: inline-flex; align-items: center; justify-content: center;
       border-radius: 50%;
     }
-    /* 今天：溫和的鼠尾草綠圓底（不用朱紅，較柔和） */
-    .cal-cell.today .cal-daynum { background: #6f8f5a; color: #fff; box-shadow: 0 0 0 3px rgba(111, 143, 90, 0.18); }
-    .cal-cell.today { border-color: rgba(111, 143, 90, 0.4); }
+    /* 今天：優雅橄欖綠圓底（不用朱紅，柔和耐看） */
+    .cal-cell.today .cal-daynum { background: #6b7539; color: #fff; box-shadow: 0 0 0 3px rgba(107, 117, 57, 0.18); }
+    .cal-cell.today { border-color: rgba(107, 117, 57, 0.4); }
     /* 有記錄的日子：暖色「填滿」感，讓整月一眼看出照顧得完不完整；沒記錄的日子維持淡色空格 */
     .cal-cell.has { background: linear-gradient(180deg, #FBF3E4, #F5EBD6); border-color: rgba(115, 73, 33, 0.24); }
     .cal-cell.warn { background: linear-gradient(180deg, #fef6f3, #fbeee9); border-color: rgba(191, 59, 32, 0.28); }
@@ -864,12 +864,12 @@
     .login-notice b { font-weight: 600; color: var(--seal); }
     /* 只在 LINE 內顯示的「回 LINE 對話」：關掉 LIFF 視窗 */
     .back-to-line {
-      display: block; margin: 30px auto 0; padding: 10px 22px;
-      background: var(--sheet); border: 1px solid var(--line-strong); border-radius: 999px;
-      color: var(--brand); font-size: 13.5px; font-weight: 600; cursor: pointer;
+      display: block; margin: 30px auto 0; padding: 10px 24px;
+      background: var(--brand); border: 1px solid var(--brand); border-radius: 999px;
+      color: #fff; font-size: 13.5px; font-weight: 600; cursor: pointer;
       box-shadow: var(--shadow-soft);
     }
-    .back-to-line:hover { background: var(--brand-tint); border-color: var(--brand); }
+    .back-to-line:hover { background: #5f3b1a; border-color: #5f3b1a; }
     .disclaimer { margin: 18px auto 0; max-width: 560px; font-size: 11.5px; line-height: 1.7; color: var(--muted); text-align: center; }
     /* 免責聲明：平常只有一個極小的灰字連結，點了才展開條列 */
     .disclaimer-fold { margin: 14px auto 0; max-width: 520px; font-size: 11px; line-height: 1.7; color: var(--muted); }
