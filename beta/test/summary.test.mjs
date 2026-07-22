@@ -70,3 +70,23 @@ test('已刪除的紀錄不列入任何加總', () => {
   assert.equal(s.kcal, 79.8, '刪掉的濕糧不該算進熱量');
   assert.equal(s.wetFoodG, 0);
 });
+
+// 黃金回歸值：鎖住「已驗證正確」的加總公式，任何改動讓數字跑掉就立刻紅。
+// 乾糧＝原始克數；罐頭/濕糧＝固形量(克數−含水)；熱量＝各筆相加；總水分＝直接喝＋食物含水。
+test('黃金回歸：一個代表日的每日總結必須完全等於已知正確值', () => {
+  const logs = [
+    foodLog('乾糧', 20, 76, 0),      // 乾 20g、76 kcal
+    foodLog('罐頭', 30, 28.8, 24),   // 濕固形 30−24=6g、28.8 kcal、含水24
+    foodLog('濕糧', 20, 20, 15),     // 濕固形 20−15=5g、20 kcal、含水15
+    foodLog('零食', 5, 0, 0),        // 其他 5g、無熱量
+    waterLog(50)                     // 直接喝 50
+  ];
+  const s = computeDailySummary(logs);
+  assert.equal(s.dryFoodG, 20, '乾糧克數');
+  assert.equal(s.wetFoodG, 11, '濕的固形量 6+5');
+  assert.equal(s.otherFoodG, 5, '零食算其他');
+  assert.equal(Math.round(s.kcal * 10) / 10, 124.8, '熱量＝76+28.8+20');
+  assert.equal(s.foodWaterMl, 39, '食物含水 24+15');
+  assert.equal(s.totalWaterMl, 89, '總水分＝直接喝50＋食物含水39');
+  assert.equal(s.entryCount, 5);
+});
