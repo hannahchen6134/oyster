@@ -471,14 +471,10 @@
     /* 近 N 天給醫生看：每天一列，全部同一行（日期＋四項＋查看當天），像 CODEX。
        用滿整個螢幕寬度（跳出窄欄）＋精簡小膠囊，手機也塞得下一行。 */
     /* 這個摺疊區要讓整行卡片跳出窄欄用滿螢幕，需允許溢出（其他 fold 仍維持裁切） */
-    /* 這個摺疊區的卡片用滿螢幕寬，因此拿掉外層面板底色/邊框/陰影，避免露出多餘白板塊 */
-    .block.fold.daycards-fold { overflow: visible; background: transparent; border: none; box-shadow: none; padding: 0; margin-top: 18px; }
-    .daycards-fold > summary { padding-left: 2px; padding-right: 2px; }
-    .daycards-fold .fold-body { padding: 2px 2px 4px; }
-    /* 近 N 天給醫生看：CODEX 風格——每天一張卡，四個有標籤的彩色小膠囊＋筆數/腸胃狀態＋查看當天 */
-    /* 一個白底圓角面板，每天一列，用細分隔線隔開（不是各自的卡片底板）
-       這段表格資訊密，往兩側撐滿版面（抵銷外層 18px + fold 2px padding），把寬度留給四項數字 */
-    .daycards { display: flex; flex-direction: column; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; margin: 0 -22px; }
+    /* 逐日明細折疊卡：和其他折疊卡一致（白底圓角卡＋展開＋按鈕）；內層表格不再滿版外溢 */
+    .daycards-fold .fold-body { padding: 2px 14px 14px; }
+    /* 近 N 天：每天一列，用細分隔線隔開 */
+    .daycards { display: flex; flex-direction: column; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; margin: 0; }
     .dcard {
       display: flex; align-items: center; gap: 8px; cursor: pointer;
       padding: 12px 10px; border-top: 1px solid var(--line);
