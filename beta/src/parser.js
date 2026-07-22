@@ -15,7 +15,8 @@ const WATER_WORDS = new Set(['水', '喝水', '飲水', '喝', '喝了', '喝水
 const FOOD_TYPE_WORDS = [
   { type: '乾糧', words: ['乾糧', '飼料', '乾乾'] },
   { type: '罐頭', words: ['罐頭', '罐罐', '主食罐', '副食罐'] },
-  { type: '濕食', words: ['濕食', '濕糧', '鮮食', '餐包', '肉泥'] },
+  { type: '濕糧', words: ['濕糧'] },
+  { type: '濕食', words: ['濕食', '鮮食', '餐包', '肉泥'] },
   { type: '零食', words: ['零食', '點心'] },
   { type: '其他', words: ['其他'] }
 ];
@@ -184,7 +185,7 @@ export function parseMessage(rawText) {
   if (['記生日', '補生日', '記年齡', '補年齡'].includes(compact)) return { type: 'petFieldPrompt', field: 'birthday' };
   if (['補體重生日', '補體重年齡'].includes(compact)) return { type: 'petExtraMenu' };
   const foodPromptMatch = compact.match(/^設定(罐頭|乾糧|濕食|濕糧|零食)$/);
-  if (foodPromptMatch) return { type: 'foodSetupPrompt', foodType: foodPromptMatch[1] === '濕糧' ? '濕食' : foodPromptMatch[1] };
+  if (foodPromptMatch) return { type: 'foodSetupPrompt', foodType: foodPromptMatch[1] };
   if (['稍後再說', '先跳過', '跳過'].includes(compact)) return { type: 'skipStep' };
   if (compact === '完成設定') return { type: 'setupDone' };
 
@@ -196,7 +197,7 @@ export function parseMessage(rawText) {
   if (foodSetupMatch) {
     return {
       type: 'foodSetup',
-      foodType: foodSetupMatch[1] === '濕糧' ? '濕食' : foodSetupMatch[1],
+      foodType: foodSetupMatch[1],
       name: foodSetupMatch[2].trim(),
       kcalPerGram: foodSetupMatch[3] ? Number(foodSetupMatch[3]) : 0
     };

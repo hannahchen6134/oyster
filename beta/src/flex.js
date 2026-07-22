@@ -173,13 +173,13 @@ function bubble(altText, contents) {
 // ---------- 記錄確認卡 ----------
 export function recordFlex({ pet, categoryKey, mainText, subText, summary, date, logId, hints = [], title = '', tip = '', siteUrl = '', warnNoKcal = false, foodType = '', estimated = false, estKcalPerG = 0 }) {
   const style = CATEGORY_STYLE[categoryKey] || CATEGORY_STYLE.note;
-  // ① 誠實確認：食物沒算到熱量時，卡片不能長得跟正常的一樣——當場用朱紅醒目標示，讓使用者立刻看到、立刻修
+  // 零食/其他這種「沒辦法估」的類型：不假裝估算，也不用紅色錯誤——溫和請使用者填一次（包裝上有）
   const warnBox = warnNoKcal ? [{
-    type: 'box', layout: 'vertical', backgroundColor: C.sealTint, cornerRadius: '10px',
+    type: 'box', layout: 'vertical', backgroundColor: C.tint, cornerRadius: '10px',
     paddingAll: '12px', margin: 'md', spacing: 'xs',
     contents: [
-      text('⚠ 這一筆沒有算到熱量', { size: 'sm', weight: 'bold', color: C.seal, wrap: true }),
-      text('這個品項還沒設定「每克熱量」，先幫你把份量記下來了。設定公式後，這筆會自動補算回來。', { size: 'xxs', color: C.inkSoft, wrap: true })
+      text('這類要自己填熱量（包裝上有）', { size: 'sm', weight: 'bold', color: C.brand, wrap: true }),
+      text('零食／其他每家熱量差很多，沒辦法估。這筆先記份量了；填一次每克熱量，以後這個就會自動算。', { size: 'xxs', color: C.inkSoft, wrap: true })
     ]
   }] : [];
   // 熱量用「類型預設」估算時：溫和標示（不是錯，是待補），並提醒可設定精確值
@@ -223,9 +223,9 @@ export function recordFlex({ pet, categoryKey, mainText, subText, summary, date,
         { type: 'button', height: 'sm', style: 'link', color: C.brand,
           action: { type: 'postback', label: '🗑 刪除', data: `action=delAsk&logId=${logId}`, displayText: '刪除剛剛那筆' } }
       ] },
-      // ① 沒算到熱量時，把「設定熱量公式」擺成主要按鈕，讓修正就在眼前
-      ...(warnNoKcal ? [{ type: 'button', height: 'sm', style: 'primary', color: C.seal,
-        action: { type: 'message', label: '設定熱量公式', text: `設定${foodType || '罐頭'}` } }] : []),
+      // 零食/其他沒辦法估 → 「填這個的熱量」擺成主要按鈕（品牌色，非紅色警示）
+      ...(warnNoKcal ? [{ type: 'button', height: 'sm', style: 'primary', color: C.brand,
+        action: { type: 'message', label: '填這個的熱量', text: `設定${foodType || '零食'}` } }] : []),
       // 估算時：給「設定精確熱量」入口（品牌色，非警示）
       ...(estimated && !warnNoKcal ? [{ type: 'button', height: 'sm', style: 'primary', color: C.brand,
         action: { type: 'message', label: '設定精確熱量', text: `設定${foodType || '罐頭'}` } }] : []),

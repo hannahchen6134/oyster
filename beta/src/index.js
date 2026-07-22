@@ -419,8 +419,11 @@ async function createGuidedFood(db, lineUserId, foodType, name, kcalIn) {
 function foodDoneCard(name, foodType, info) {
   const waterPct = Math.round(info.waterRatio * 100);
   const healedLine = info.healed > 0 ? `\n✓ 順便把過去 ${info.healed} 筆（含估算的）熱量補成精確值了。` : '';
+  const estimable = ['乾糧', '罐頭', '濕糧', '濕食'].includes(foodType);
   const subtitle = info.needsKcal
-    ? `${foodType}・含水 ${waterPct}%\n還沒填每克熱量，記錄時會先用「${foodType}」類型預設估算（畫面標 ≈）。到照護站「設定→常吃的食物」填精確每克熱量，就會變精確值、並自動補算過去的估算。`
+    ? (estimable
+        ? `${foodType}・含水 ${waterPct}%\n還沒填每克熱量，記錄時會先用「${foodType}」類型預設估算（畫面標 ≈）。到照護站「設定→常吃的食物」填精確每克熱量，就會變精確值、並自動補算過去的估算。`
+        : `${foodType}・含水 ${waterPct}%\n這類（零食/其他）每家熱量差很多，沒辦法估。填一次每克熱量（包裝上通常有），以後這個就會自動算。`)
     : `${foodType}・每克 ${info.kcalPerGram} kcal・含水 ${waterPct}%${healedLine}`;
   return onboardCard({
     title: `已建立「${name}」`,
