@@ -1545,6 +1545,9 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
     const sameType = foods.filter((food) => !food.isDeleted && food.foodType === record.foodType);
     // 沒寫品名時，若該類型只建了一種品項就自動套用（例如乾糧只有一種 → 直接用它的公式）
     if (!matched && !record.itemName && sameType.length === 1) matched = sameType[0];
+    // 一則多筆（silent）沒辦法互動確認 → 用保守模糊比對自動對應最接近的同類型品項，
+    // 避免「皇冠 27 水 15」這種批次輸入安靜記成 0 熱量（卡片仍會顯示對應到的品名可核對）。
+    if (!matched && opts.silent && sameType.length >= 1) matched = guessFood(sameType, record.itemName, record.foodType);
     // ②③ 打了品名卻對不到、但這個類型有可選品項 → 先停下來問是哪一個，別默默記成 0 熱量。
     //     forceRaw＝使用者已在確認卡按「就先記著不算熱量」；silent＝一則多筆，不做互動式確認。
     if (!matched && !record.forceRaw && !opts.silent && sameType.length >= 1) {
@@ -1646,7 +1649,7 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
     try {
       const who = opts.caregiverName || '共同照護者';
       const notifySiteUrl = await siteLink(env, opts.baseUrl, lineUserId);
-      await pushMessages(env, lineUserId, [careNotifyFlex(who, pet.petName, description, savedLog.logId, notifySiteUrl)]);
+      await pushMessages(env, lineUserId, [careNotifyFlex(who, pet.petName, description, savedLog.logId, notifySiteUrl, summary)]);
     } catch (error) {
       console.error('care notify failed:', error.message);
       try { await pushText(env, lineUserId, `📝 ${opts.caregiverName || '共同照護者'} 記錄了 ${pet.petName}：${description}`); } catch (e2) { /* ignore */ }

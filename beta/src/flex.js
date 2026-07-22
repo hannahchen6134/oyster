@@ -514,12 +514,23 @@ export function careInviteFlex(code, membersCount = 0) {
 }
 
 // 共同照護·即時通知卡：幫手記了一筆，飼主看到就能當場刪錯或開站修改
-export function careNotifyFlex(who, petName, desc, logId, siteUrl) {
+export function careNotifyFlex(who, petName, desc, logId, siteUrl, summary = null) {
+  // 共同照護者記一筆 → 飼主即時收到，並看到「今日累積」一起加總（和記錄卡同一套三格數據）
+  const totals = summary ? [
+    { type: 'separator', margin: 'lg', color: SEPARATOR },
+    text('今日累積', { size: 'xs', color: C.muted, margin: 'lg', weight: 'bold' }),
+    statCellRow([
+      statCell('水分', fmt(summary.totalWaterMl), 'ml', STAT_ACCENT.water),
+      statCell('食物', fmt((Number(summary.dryFoodG) || 0) + (Number(summary.wetFoodG) || 0) + (Number(summary.otherFoodG) || 0)), 'g', STAT_ACCENT.food),
+      statCell('熱量', fmt(summary.kcal), 'kcal', STAT_ACCENT.kcal)
+    ])
+  ] : [];
   const body = {
     type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
     contents: [
       text(`📝 ${who} 記錄了 ${petName}`, { size: 'xs', color: C.muted }),
       text(desc, { size: 'md', weight: 'bold', color: C.ink, wrap: true, margin: 'md' }),
+      ...totals,
       text('記錯了嗎？可以直接刪除，或開照護站調整', { size: 'xxs', color: C.muted, margin: 'lg' })
     ]
   };
