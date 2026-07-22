@@ -157,9 +157,10 @@ export async function getFood(db, foodId) {
 }
 
 // 資料自癒（④）：設定或更新某品項的熱量公式後，回頭把「過去沒算到熱量」的紀錄補算回來。
-// 涵蓋兩種舊紀錄：(a) 已綁這個 foodId 但 kcal=0（當初建立時還沒填公式）；
-//                (b) 沒綁 foodId、但同類型且品名和這個品項完全相同、kcal=0（當初打的名字對不到才落空）。
-// 只動 kcal=0 的食物紀錄，不覆寫已經算好的資料；補完重算受影響那幾天的 daily_summary。
+// 設定/更新某品項的精確每克熱量後，回頭把它的舊紀錄升級成精確值。
+// 涵蓋：(a) 綁這個 foodId 的紀錄（當初 kcal=0，或用「類型預設估算」出來的值）；
+//       (b) 沒綁 foodId、但同類型且品名和這個品項完全相同的紀錄（當初打的名字對不到）。
+// 用精確公式重算，只在「數值有變」或「還沒綁到這個品項」時才更新（已精確的略過，冪等）。
 // 回傳 { healed, days } 讓呼叫端可提示使用者補了幾筆。
 export async function healFoodKcal(db, food) {
   if (!food || !(Number(food.kcalPerGram) > 0)) return { healed: 0, days: 0 };
@@ -167,7 +168,7 @@ export async function healFoodKcal(db, food) {
   const { results } = await db
     .prepare(
       `SELECT * FROM logs
-       WHERE isDeleted = 0 AND category = 'food' AND (kcal IS NULL OR kcal = 0)
+       WHERE isDeleted = 0 AND category = 'food'
          AND ( foodId = ?
                OR (COALESCE(foodId, '') = '' AND foodType = ? AND itemName = ? AND ? <> '') )`
     )
@@ -181,6 +182,9 @@ export async function healFoodKcal(db, food) {
   for (const log of logs) {
     const derived = deriveFoodFields(log.amount, food.foodType || log.foodType, food);
     if (!(derived.kcal > 0)) continue;
+    const kcalChanged = Math.abs(Number(log.kcal || 0) - derived.kcal) >= 0.05;
+    const needsBind = String(log.foodId || '') !== String(food.foodId);
+    if (!kcalChanged && !needsBind) continue; // 已經是精確值又綁好了 → 不動
     await db
       .prepare('UPDATE logs SET foodId = ?, itemName = ?, kcal = ?, waterMl = ?, updatedAt = ? WHERE logId = ?')
       .bind(food.foodId, name || String(log.itemName || ''), derived.kcal, derived.waterMl, nowIso(), log.logId)

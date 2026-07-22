@@ -16,14 +16,25 @@ function round1(value) {
 // 熱量一律用登記的原始克數計算（不用固形量）。
 export const DEFAULT_WET_WATER_RATIO = 0.8;
 
+// 沒設精確公式時的「類型預設值」——用來估算，畫面一律標「估算」、並提醒可自訂精確值。
+// 業界典型密度，也貼近使用者常見品項；使用者在「設定→常吃的食物」填了精確值就會蓋掉。
+const TYPE_KCAL_DEFAULT = { '乾糧': 3.7, '罐頭': 0.9, '濕食': 1.0, '濕糧': 1.0 };
+const TYPE_WATER_DEFAULT = { '乾糧': 0, '罐頭': 0.8, '濕食': 0.75, '濕糧': 0.75 };
+
 export function deriveFoodFields(grams, foodType, food) {
   const g = toNumber(grams);
-  const isWet = foodType === '罐頭' || foodType === '濕食';
+  const hasRealKcal = Number(food?.kcalPerGram) > 0;
+  const defKcal = TYPE_KCAL_DEFAULT[foodType] || 0;
+  const kcalPerG = hasRealKcal ? Number(food.kcalPerGram) : defKcal;
+  const isWet = foodType === '罐頭' || foodType === '濕食' || foodType === '濕糧';
   const ratioRaw = Number(food?.waterRatio);
-  const ratio = ratioRaw > 0 ? ratioRaw : (isWet ? DEFAULT_WET_WATER_RATIO : 0);
+  const ratio = ratioRaw > 0 ? ratioRaw : (TYPE_WATER_DEFAULT[foodType] ?? (isWet ? DEFAULT_WET_WATER_RATIO : 0));
   return {
-    kcal: round1(g * Number(food?.kcalPerGram || 0)),
-    waterMl: round1(g * ratio)
+    kcal: round1(g * kcalPerG),
+    waterMl: round1(g * ratio),
+    // 估算＝這一筆的熱量是用類型預設算的（品項本身還沒設精確每克熱量）
+    estimated: !hasRealKcal && defKcal > 0,
+    estKcalPerG: !hasRealKcal ? defKcal : 0
   };
 }
 

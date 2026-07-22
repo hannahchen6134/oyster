@@ -1829,10 +1829,20 @@
         box.textContent = `≈ ${kcal} kcal${water ? `　含水 ${water} ml` : ''}（${food.displayName}）`;
       } else {
         const others = alive.filter((f) => f.foodType === foodType).length;
-        box.className = 'food-kcal-preview warn';
-        box.textContent = others > 1
-          ? `「${foodType}」有多個品項，請在上面選一個，才能算熱量`
-          : `這個品項還沒設定熱量公式，熱量先不計入`;
+        const TYPE_DEF = { '乾糧': 3.7, '罐頭': 0.9, '濕食': 1.0, '濕糧': 1.0 };
+        const TYPE_WATER = { '乾糧': 0, '罐頭': 0.8, '濕食': 0.75, '濕糧': 0.75 };
+        if (others > 1) {
+          box.className = 'food-kcal-preview warn';
+          box.textContent = `「${foodType}」有多個品項，請在上面選一個，才能算精確熱量`;
+        } else if (TYPE_DEF[foodType]) {
+          const kcal = Math.round(grams * TYPE_DEF[foodType] * 10) / 10;
+          const water = Math.round(grams * (TYPE_WATER[foodType] || 0) * 10) / 10;
+          box.className = 'food-kcal-preview';
+          box.textContent = `≈ ${kcal} kcal${water ? `　含水 ${water} ml` : ''}（估算・設定品項每克熱量更準）`;
+        } else {
+          box.className = 'food-kcal-preview warn';
+          box.textContent = `這個類型沒有預設熱量，設定品項每克熱量才會計入`;
+        }
       }
     }
 
@@ -2623,7 +2633,9 @@
         ],
         render: (row) => ({
           title: `${row.displayName}（${row.foodType}）`,
-          sub: `${row.kcalPerGram} kcal/g｜水分 ${Math.round((row.waterRatio || 0) * 100)}%${Number(row.isPrescription) ? '｜處方' : ''}`
+          sub: Number(row.kcalPerGram) > 0
+            ? `${row.kcalPerGram} kcal/g｜水分 ${Math.round((row.waterRatio || 0) * 100)}%${Number(row.isPrescription) ? '｜處方' : ''}`
+            : `⚠ 熱量估算中・點我設定每克熱量更準｜水分 ${Math.round((row.waterRatio || 0) * 100)}%`
         })
       },
       meds: {
@@ -2877,7 +2889,7 @@
           ['水 20', '記喝水'],
           ['罐頭 30', '記吃飯（幾克）'],
           ['藥 早 已吃', '記餵藥']
-        ], '在 LINE 打字，或在「今天」頁點「快速記一筆」；送出後會顯示今天累計'],
+        ], '送出後會顯示今天累計。熱量沒設公式會先用類型預設「估算」（標 ≈）；到下方「常吃的食物」填每克熱量，就會變精確值、並自動補算過去的。'],
         ['s3', '3', '看狀況・給醫生', [
           ['今天', '看今天喝水／熱量／用藥／腸胃狀況'],
           ['回診摘要', '整理近況，回診頁按「複製給醫生」帶走']

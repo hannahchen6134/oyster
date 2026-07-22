@@ -418,9 +418,9 @@ async function createGuidedFood(db, lineUserId, foodType, name, kcalIn) {
 
 function foodDoneCard(name, foodType, info) {
   const waterPct = Math.round(info.waterRatio * 100);
-  const healedLine = info.healed > 0 ? `\n✓ 順便把過去 ${info.healed} 筆沒算到熱量的紀錄補算回來了。` : '';
+  const healedLine = info.healed > 0 ? `\n✓ 順便把過去 ${info.healed} 筆（含估算的）熱量補成精確值了。` : '';
   const subtitle = info.needsKcal
-    ? `${foodType}・含水 ${waterPct}%\n熱量還沒設定，記錄時先不算熱量。到照護站「設定→常吃的食物」填每克熱量後才會計算（不會自動亂帶數字）。`
+    ? `${foodType}・含水 ${waterPct}%\n還沒填每克熱量，記錄時會先用「${foodType}」類型預設估算（畫面標 ≈）。到照護站「設定→常吃的食物」填精確每克熱量，就會變精確值、並自動補算過去的估算。`
     : `${foodType}・每克 ${info.kcalPerGram} kcal・含水 ${waterPct}%${healedLine}`;
   return onboardCard({
     title: `已建立「${name}」`,
@@ -1500,7 +1500,9 @@ async function siteLink(env, baseUrl, lineUserId, go = '') {
 async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
   const db = env.DB;
   const hints = [];
-  let noKcal = false; // ① 這一筆食物是否「沒算到熱量」（要在確認卡當場標紅）
+  let noKcal = false; // 食物「完全沒有熱量可算」（零食/其他且沒設公式）→ 確認卡提示未計入
+  let estimated = false; // 食物熱量用「類型預設」估算（品項還沒設精確每克熱量）→ 確認卡標「估算」＋提醒可設定
+  let estKcalPerG = 0;
 
   // 事件時間：現在（台北）＋ dayOffset ＋ 指定時間
   let eventDateTime = taipeiNowDateTime();
@@ -1565,13 +1567,16 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
       log.kcal = derived.kcal;
       log.waterMl = derived.waterMl;
       description = `${record.foodType} ${matched.displayName} ${record.amount} g`;
-      // 品項有對到、但這個品項本身還沒填熱量公式 → 一樣要當場標紅（① 誠實確認）
-      if (!(derived.kcal > 0)) noKcal = true;
+      // 品項有對到、但還沒填精確每克熱量 → 用類型預設估算，畫面標「估算」＋提醒可設定
+      if (derived.estimated) { estimated = true; estKcalPerG = derived.estKcalPerG; }
+      else if (!(derived.kcal > 0)) noKcal = true; // 零食/其他這種沒有預設值的才維持「未計入」
     } else {
       const derived = deriveFoodFields(record.amount, record.foodType, null);
+      log.kcal = derived.kcal; // 用類型預設估算（不再留 0，畫面標「估算」）
       log.waterMl = derived.waterMl;
       description = `${record.foodType}${record.itemName ? ` ${record.itemName}` : ''} ${record.amount} g`;
-      noKcal = true; // ① 沒有可對應公式：先記份量，確認卡當場標紅、給設定按鈕
+      if (derived.estimated) { estimated = true; estKcalPerG = derived.estKcalPerG; }
+      else noKcal = true;
     }
   } else if (record.category === 'med') {
     const label = [record.medSlot, record.itemName].filter(Boolean).join(' ');
@@ -1601,7 +1606,7 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
 
   const mainText = description;
   const subParts = [];
-  if (log.kcal) subParts.push(`${log.kcal} kcal`);
+  if (log.kcal) subParts.push(`${estimated ? '≈' : ''}${log.kcal} kcal`);
   if (record.category === 'food' && log.waterMl) subParts.push(`含水 ${log.waterMl} ml`);
   if (addedWaterMl > 0) subParts.push(`另計加水 ${addedWaterMl} ml`);
   if (record.dayOffset || record.time) {
@@ -1690,7 +1695,8 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
     summary, date: eventDate,
     logId: savedLog?.logId || '',
     hints, tip, siteUrl: await siteLink(env, opts.baseUrl, lineUserId),
-    warnNoKcal: record.category === 'food' && noKcal, foodType: record.foodType || ''
+    warnNoKcal: record.category === 'food' && noKcal, foodType: record.foodType || '',
+    estimated: record.category === 'food' && estimated, estKcalPerG
   });
   await replyOrPushFlex(env, event, card, fallbackText);
   // 記錄是每天最高頻的互動：順手把專屬圖文選單保持在最新版（版本相符時只是一次快取讀取，不重建）

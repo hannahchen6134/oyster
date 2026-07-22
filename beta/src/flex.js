@@ -171,7 +171,7 @@ function bubble(altText, contents) {
 }
 
 // ---------- 記錄確認卡 ----------
-export function recordFlex({ pet, categoryKey, mainText, subText, summary, date, logId, hints = [], title = '', tip = '', siteUrl = '', warnNoKcal = false, foodType = '' }) {
+export function recordFlex({ pet, categoryKey, mainText, subText, summary, date, logId, hints = [], title = '', tip = '', siteUrl = '', warnNoKcal = false, foodType = '', estimated = false, estKcalPerG = 0 }) {
   const style = CATEGORY_STYLE[categoryKey] || CATEGORY_STYLE.note;
   // ① 誠實確認：食物沒算到熱量時，卡片不能長得跟正常的一樣——當場用朱紅醒目標示，讓使用者立刻看到、立刻修
   const warnBox = warnNoKcal ? [{
@@ -182,6 +182,15 @@ export function recordFlex({ pet, categoryKey, mainText, subText, summary, date,
       text('這個品項還沒設定「每克熱量」，先幫你把份量記下來了。設定公式後，這筆會自動補算回來。', { size: 'xxs', color: C.inkSoft, wrap: true })
     ]
   }] : [];
+  // 熱量用「類型預設」估算時：溫和標示（不是錯，是待補），並提醒可設定精確值
+  const estBox = estimated ? [{
+    type: 'box', layout: 'vertical', backgroundColor: C.tint, cornerRadius: '10px',
+    paddingAll: '12px', margin: 'md', spacing: 'xs',
+    contents: [
+      text(`≈ 熱量是估算的（${foodType || '食物'}每克約 ${estKcalPerG} kcal）`, { size: 'sm', weight: 'bold', color: C.brand, wrap: true }),
+      text('想更準，可以設定這個品項的精確每克熱量；設定後這筆會自動補算。', { size: 'xxs', color: C.inkSoft, wrap: true })
+    ]
+  }] : [];
   const body = {
     type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
     contents: [
@@ -189,6 +198,7 @@ export function recordFlex({ pet, categoryKey, mainText, subText, summary, date,
       text(mainText, { size: 'xl', weight: 'bold', color: C.ink, margin: 'md', wrap: true }),
       ...(subText ? [text(subText, { size: 'xs', color: C.muted, wrap: true, margin: 'sm' })] : []),
       ...warnBox,
+      ...estBox,
       { type: 'separator', margin: 'lg', color: SEPARATOR },
       text('今日累積', { size: 'xs', color: C.muted, margin: 'lg', weight: 'bold' }),
       statCellRow([
@@ -216,7 +226,10 @@ export function recordFlex({ pet, categoryKey, mainText, subText, summary, date,
       // ① 沒算到熱量時，把「設定熱量公式」擺成主要按鈕，讓修正就在眼前
       ...(warnNoKcal ? [{ type: 'button', height: 'sm', style: 'primary', color: C.seal,
         action: { type: 'message', label: '設定熱量公式', text: `設定${foodType || '罐頭'}` } }] : []),
-      { type: 'button', height: 'sm', style: warnNoKcal ? 'link' : 'primary', color: C.brand,
+      // 估算時：給「設定精確熱量」入口（品牌色，非警示）
+      ...(estimated && !warnNoKcal ? [{ type: 'button', height: 'sm', style: 'primary', color: C.brand,
+        action: { type: 'message', label: '設定精確熱量', text: `設定${foodType || '罐頭'}` } }] : []),
+      { type: 'button', height: 'sm', style: (warnNoKcal || estimated) ? 'link' : 'primary', color: C.brand,
         // 直接開網站（已烤入登入連結）；沒有 siteUrl 時退回舊的訊息觸發
         action: siteUrl
           ? { type: 'uri', label: '開啟照護站', uri: siteUrl }
@@ -471,7 +484,7 @@ export function onboardingCarousel(petName = '') {
       line(t2, '水 20', '喝水'),
       line(t2, '罐頭 30', '吃飯（罐頭幾克）'),
       line(t2, '藥 早 已吃', '餵藥'),
-      hintBox(t2, '送出後會跳一張卡，顯示今天累計多少')
+      hintBox(t2, '送出後會跳一張卡，顯示今天累計多少\n熱量沒設公式會先「估算」（標 ≈），到照護站設定每克熱量就變精確')
     ] }
   };
   const t3 = T.s3;
