@@ -1599,6 +1599,10 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
     description = `疫苗${record.note ? `：${record.note}` : ''}`;
   } else if (record.category === 'deworm') {
     description = `除蟲${record.note ? `：${record.note}` : ''}`;
+  } else if (record.category === 'weight') {
+    description = `體重 ${record.amount} kg`;
+    // 記一筆有日期的體重（趨勢用），同時把「目前體重」更新成最新值
+    try { await updatePetFields(db, pet.petId, { weightKg: record.amount }); } catch (error) { console.warn('sync weightKg failed:', error.message); }
   } else {
     description = `備註：${record.note}`;
   }

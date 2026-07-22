@@ -7,6 +7,16 @@ import { computeDailySummary, deriveFoodFields, WET_FOOD_TYPES } from '../src/su
 const foodLog = (foodType, amount, kcal, waterMl = 0) => ({ category: 'food', foodType, amount, kcal, waterMl });
 const waterLog = (amount) => ({ category: 'water', amount, waterMl: amount });
 const medLog = () => ({ category: 'med', medSlot: '早', medStatus: '已吃' });
+const weightLog = (kg) => ({ category: 'weight', amount: kg, unit: 'kg' });
+
+test('不變量：記體重不會改到食物、熱量、水分', () => {
+  const base = [foodLog('乾糧', 20, 76), waterLog(30)];
+  const before = computeDailySummary(base);
+  const after = computeDailySummary([...base, weightLog(4.2)]);
+  assert.equal(after.kcal, before.kcal);
+  assert.equal(after.dryFoodG, before.dryFoodG);
+  assert.equal(after.totalWaterMl, before.totalWaterMl);
+});
 
 test('deriveFoodFields：可估算類型有預設值、標 estimated', () => {
   for (const t of ['乾糧', '罐頭', '濕糧', '濕食']) {

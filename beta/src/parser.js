@@ -219,10 +219,10 @@ export function parseMessage(rawText) {
     return { type: 'medSlots', slots };
   }
 
-  // 貓咪基本資料（LINE 引導建檔）：體重 4.2、生日 2020-01-01
-  const weightMatch = text.match(/^體重\s*([0-9.]+)\s*(?:kg|公斤)?$/i);
+  // 體重：「體重 4.2」「記體重 4.2」→ 記一筆有日期的體重（給醫生看趨勢），並同步更新目前體重。
+  const weightMatch = text.match(/^(?:記|補)?體重\s*([0-9.]+)\s*(?:kg|公斤)?$/i);
   if (weightMatch) {
-    return { type: 'petField', field: 'weightKg', value: Number(weightMatch[1]) };
+    return { type: 'record', record: { category: 'weight', amount: Number(weightMatch[1]), unit: 'kg', itemName: '', foodType: '', addedWaterMl: 0, medStatus: '', medSlot: '', note: '', dayOffset: 0, time: '' } };
   }
   const ageMatch = text.match(/^年齡\s*(\d{1,2})\s*歲?$/);
   if (ageMatch) {

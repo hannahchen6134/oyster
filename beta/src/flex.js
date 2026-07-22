@@ -36,6 +36,7 @@ const CATEGORY_STYLE = {
   vomit: { label: '嘔吐', bg: C.sealTint, fg: C.seal },
   stool: { label: '便便', bg: C.soft, fg: C.inkSoft },
   mood: { label: '精神', bg: C.soft, fg: C.inkSoft },
+  weight: { label: '體重', bg: C.oliveTint, fg: C.olive },
   note: { label: '備註', bg: C.soft, fg: C.inkSoft }
 };
 
