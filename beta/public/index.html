@@ -887,21 +887,27 @@
     .onboard-step { display: flex; gap: 12px; padding: 12px 2px; border-bottom: 1px solid var(--line); font-size: 14.5px; }
     .onboard-step:last-child { border-bottom: none; }
     .onboard-step .num { font-family: var(--serif); color: var(--brand); font-weight: 700; }
-    /* 安心上手：輕盈版——一張卡內三步，小號碼徽章＋範例膠囊，用細線分隔，不硬塞彩色卡 */
-    .ob-step { padding: 16px 0; border-bottom: 1px solid var(--line); }
-    .ob-step:first-child { padding-top: 2px; }
-    .ob-step:last-child { border-bottom: none; padding-bottom: 2px; }
-    .ob-head { display: flex; align-items: center; gap: 10px; margin-bottom: 11px; }
-    .ob-num { flex: none; width: 26px; height: 26px; border-radius: 50%; font-family: var(--serif); font-weight: 700; font-size: 14px; display: flex; align-items: center; justify-content: center; }
-    .ob-head .t { font-size: 15.5px; font-weight: 700; color: var(--ink); letter-spacing: 0.02em; }
-    .ob-head .s { margin-left: auto; font-size: 10.5px; letter-spacing: 0.12em; color: var(--muted); font-weight: 600; }
-    .ob-line { display: flex; align-items: baseline; gap: 9px; font-size: 13.5px; line-height: 1.6; color: var(--ink-soft); padding-left: 36px; }
-    .ob-line + .ob-line { margin-top: 7px; }
-    .ob-eg { flex: none; font-family: var(--serif); font-weight: 700; font-size: 13px; padding: 2px 9px; border-radius: 7px; white-space: nowrap; }
-    .ob-hint { margin: 11px 0 0 36px; font-size: 12px; color: var(--muted); line-height: 1.6; }
+    /* 安心上手：一張卡內分步——號碼徽章＋標題一行，內容靠左對齊留白，細線分隔，乾淨不擠 */
+    .ob-step { padding: 20px 0; border-bottom: 1px solid var(--line); }
+    .ob-step:first-child { padding-top: 4px; }
+    .ob-step:last-child { border-bottom: none; padding-bottom: 4px; }
+    .ob-head { display: flex; align-items: center; gap: 11px; margin-bottom: 12px; }
+    .ob-num { flex: none; width: 27px; height: 27px; border-radius: 50%; font-family: var(--serif); font-weight: 700; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+    .ob-head .t { font-size: 16px; font-weight: 700; color: var(--ink); letter-spacing: 0.02em; }
+    .ob-body { padding-left: 38px; }
+    .ob-line { display: flex; align-items: baseline; gap: 10px; font-size: 13.5px; line-height: 1.5; color: var(--ink-soft); }
+    .ob-line + .ob-line { margin-top: 8px; }
+    .ob-eg { flex: none; font-family: var(--serif); font-weight: 700; font-size: 13px; padding: 3px 10px; border-radius: 7px; white-space: nowrap; }
+    .ob-hint { margin-top: 10px; font-size: 12px; color: var(--muted); line-height: 1.6; }
+    .ob-action { display: inline-flex; align-items: center; gap: 6px; padding: 9px 18px; margin-bottom: 2px;
+      background: var(--brand); color: #fff; border: none; border-radius: 999px; font-size: 13.5px; font-weight: 700;
+      cursor: pointer; box-shadow: var(--shadow-soft); }
+    .ob-action:hover { background: #5f3b1a; }
+    .ob-foot { font-size: 12.5px; margin-top: 18px; line-height: 1.7; text-align: center; color: var(--muted); }
     .ob-step.s1 .ob-num, .ob-step.s1 .ob-eg { background: #F3E7D6; color: #7A4E20; }
     .ob-step.s2 .ob-num, .ob-step.s2 .ob-eg { background: #F6EAD7; color: #8A5E1E; }
-    .ob-step.s3 .ob-num, .ob-step.s3 .ob-eg { background: #EDE3D6; color: #5A3617; }
+    .ob-step.s3 .ob-num, .ob-step.s3 .ob-eg { background: #EFE2CE; color: #7A5518; }
+    .ob-step.s4 .ob-num, .ob-step.s4 .ob-eg { background: #EDE3D6; color: #5A3617; }
     /* PDF 報告：用列印產生（另存為 PDF），畫面上不顯示 */
     #printReport { display: none; }
     @media print {
@@ -2891,34 +2897,32 @@
     // 喵爸媽安心上手：Step 1/2/3 彩色步驟卡（和 LINE 卡同步）
     function renderOnboarding() {
       const steps = [
-        ['s1', '1', '先告訴我你的貓', [
-          ['新增貓咪 蚵仔', '在 LINE 打這句（換成你家貓名），或到下方「貓咪資料」新增']
-        ], '之後你記的每一筆，都會自動記到牠身上'],
-        ['s2', '2', '記第一筆', [
-          ['水 20', '記喝水'],
-          ['罐頭 30', '記吃飯（幾克）'],
-          ['藥 早 已吃', '記餵藥']
-        ], '送出後會顯示今天累計。熱量沒設公式會先用類型預設「估算」（標 ≈）；到下方「常吃的食物」填每克熱量，就會變精確值、並自動補算過去的。'],
-        ['s3', '3', '看狀況・給醫生', [
-          ['今天', '看今天喝水／熱量／用藥／腸胃狀況'],
-          ['回診摘要', '整理近況，回診頁按「複製給醫生」帶走']
-        ], '記錯了到「每一筆紀錄」可編輯／刪除；找家人一起顧到「共同照護」']
+        { cls: 's1', n: '1', title: '建立你的貓',
+          chips: [['新增貓咪 蚵仔', '在 LINE 打（換成貓名）']],
+          hint: '也可以用下方「貓咪資料」新增' },
+        { cls: 's2', n: '2', title: '記一筆看看',
+          chips: [['水 20', '喝水'], ['罐頭 30', '吃飯'], ['藥 早 已吃', '餵藥']],
+          hint: '送出後馬上顯示今天累計' },
+        { cls: 's3', n: '3', title: '建立常吃的食物',
+          action: { key: 'foods', label: '去設定常吃的食物' },
+          hint: '把罐頭／乾糧／濕糧的每克熱量填一次，記錄才算得準；沒填會先用估算（標 ≈）。' },
+        { cls: 's4', n: '4', title: '看狀況・給醫生',
+          chips: [['今天', '看今天狀況'], ['回診摘要', '整理給醫生']],
+          hint: '記錯了在「每一筆紀錄」可改／刪' }
       ];
       $('settingsList').innerHTML = `
         <div class="block" style="margin-top:0">
-          ${steps.map(([cls, num, title, lines, hint]) => `
-            <div class="ob-step ${cls}">
-              <div class="ob-head">
-                <span class="ob-num">${num}</span>
-                <span class="t">${esc(title)}</span>
-                <span class="s">STEP ${num}</span>
+          ${steps.map((s) => `
+            <div class="ob-step ${s.cls}">
+              <div class="ob-head"><span class="ob-num">${s.n}</span><span class="t">${esc(s.title)}</span></div>
+              <div class="ob-body">
+                ${(s.chips || []).map(([eg, desc]) => `<div class="ob-line"><span class="ob-eg">${esc(eg)}</span><span>${esc(desc)}</span></div>`).join('')}
+                ${s.action ? `<button class="ob-action" data-settings="${s.action.key}" type="button">${esc(s.action.label)} ›</button>` : ''}
+                <div class="ob-hint">${esc(s.hint)}</div>
               </div>
-              ${lines.map(([eg, desc]) => `<div class="ob-line"><span class="ob-eg">${esc(eg)}</span><span>${esc(desc)}</span></div>`).join('')}
-              <div class="ob-hint">${esc(hint)}</div>
             </div>`).join('')}
         </div>
-        <div class="muted" style="font-size:12.5px;margin-top:14px;line-height:1.7;text-align:center">
-          連結過期了？回 LINE 打「照護站」拿新連結，<b>資料都不會消失</b>。</div>`;
+        <div class="ob-foot">連結過期了？回 LINE 打「照護站」拿新連結，<b>資料都不會消失</b>。</div>`;
     }
 
     // 設定選單：分組 + 每項一句話說明，一次只看一件事
