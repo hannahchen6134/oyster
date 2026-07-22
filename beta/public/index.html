@@ -116,6 +116,14 @@
     .food-kcal-preview:empty { display: none; }
     .food-kcal-preview.ok { color: var(--brand); }
     .food-kcal-preview.warn { color: var(--seal); font-weight: 500; }
+    /* 熱量輸入：照包裝填，單位自動換算 */
+    .kcal-input { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .kcal-input .kb-basis { flex: 0 0 auto; width: auto; }
+    .kcal-input .kb-val { flex: 1; min-width: 90px; }
+    .kcal-input .kb-serving { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 13px; }
+    .kcal-input .kb-serving[hidden] { display: none; }
+    .kcal-input .kb-serving-input { width: 90px; }
+    .kcal-help { margin: 6px 0 0; font-size: 11.5px; line-height: 1.6; color: var(--muted); }
     .care-row { display: flex; align-items: center; justify-content: space-between; padding: 13px 4px; border-bottom: 1px solid var(--line); }
     .care-row:last-child { border-bottom: none; }
     .care-who { display: flex; align-items: center; gap: 9px; }
@@ -2641,7 +2649,7 @@
           { name: 'brand', label: '品牌' },
           { name: 'productName', label: '品名' },
           { name: 'foodType', label: '類型', type: 'select', options: FOOD.TYPES },
-          { name: 'kcalPerGram', label: '熱量（kcal/g）', type: 'number', step: '0.01' },
+          { name: 'kcalPerGram', label: '熱量（照包裝填，不用自己換算）', type: 'kcalInput' },
           { name: 'waterRatio', label: '水分比例（0–1；罐頭/濕食沒填時預設 0.8，即 80% 水分 20% 固形）', type: 'number', step: '0.01' },
           { name: 'isPrescription', label: '處方食品', type: 'select', options: [['0', '否'], ['1', '是']] },
           { name: 'note', label: '備註', type: 'textarea' }
@@ -3144,6 +3152,20 @@
         return `<select name="${field.name}"><option value="">— 未指定 —</option>${state.vets.map((vet) =>
           `<option value="${esc(vet.vetId)}" ${val === vet.vetId ? 'selected' : ''}>${esc(vet.hospitalName)}${vet.doctorName ? '・' + esc(vet.doctorName) : ''}</option>`).join('')}</select>`;
       }
+      if (field.type === 'kcalInput') {
+        // 照包裝填，不用自己算 kcal/g：預設「每 100 克」（幾乎所有包裝都有）；只知道整罐大卡就選「每罐/每份」＋填罐重
+        const per100 = Number(val) > 0 ? Math.round(Number(val) * 100 * 10) / 10 : '';
+        return `<div class="kcal-input">
+            <select class="kb-basis">
+              <option value="100g">每 100 克</option>
+              <option value="serving">每罐／每份</option>
+              <option value="g">每克（進階）</option>
+            </select>
+            <input class="kb-val" type="number" step="0.1" inputmode="decimal" placeholder="大卡" value="${per100}">
+            <span class="kb-serving" hidden>÷&nbsp;<input class="kb-serving-input" type="number" step="0.1" inputmode="decimal" placeholder="克數"> g</span>
+          </div>
+          <p class="kcal-help">看包裝：「每 100 克 ○ 大卡」直接填 ○。<br>只知道整罐／整包大卡 → 選「每罐／每份」，再填該罐／包的克數。</p>`;
+      }
       const type = field.type || 'text';
       return `<input name="${field.name}" type="${type}" ${field.step ? `step="${field.step}"` : ''} value="${esc(val)}" ${field.required ? 'required' : ''}>`;
     }
@@ -3155,6 +3177,16 @@
       openModal(`${row ? '編輯' : '新增'}${spec.title}`, html, async (form) => {
         const body = {};
         for (const field of spec.fields) {
+          if (field.type === 'kcalInput') {
+            // 依「每100克/每罐/每克」把使用者填的值換算成 kcal/g 存起來（使用者不用自己算）
+            const basis = form.querySelector('.kb-basis')?.value || '100g';
+            const v = Number(form.querySelector('.kb-val')?.value || 0);
+            const sg = Number(form.querySelector('.kb-serving-input')?.value || 0);
+            let kpg = 0;
+            if (v > 0) kpg = basis === '100g' ? v / 100 : basis === 'g' ? v : (sg > 0 ? v / sg : 0);
+            body[field.name] = Math.round(kpg * 1000) / 1000;
+            continue;
+          }
           const el = form.querySelector(`[name="${field.name}"]`);
           body[field.name] = el.type === 'number' ? Number(el.value || 0) : el.value.trim();
           if (field.required && !body[field.name]) throw new Error(`請填寫「${field.label}」`);
@@ -3168,6 +3200,14 @@
         await loadSettings();
         if (resource === 'pets') await refreshPets();
       });
+      // 熱量欄：選「每罐／每份」才顯示「÷ 克數」輸入
+      const kbBasis = $('modalForm').querySelector('.kb-basis');
+      if (kbBasis) {
+        const wrap = $('modalForm').querySelector('.kb-serving');
+        const sync = () => { if (wrap) wrap.hidden = kbBasis.value !== 'serving'; };
+        kbBasis.addEventListener('change', sync);
+        sync();
+      }
     }
 
     // ---------- Modal ----------
