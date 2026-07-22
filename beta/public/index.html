@@ -391,9 +391,11 @@
     }
     .cal-cell.today .cal-daynum { background: var(--seal); color: #fff; box-shadow: 0 0 0 3px rgba(191, 59, 32, 0.15); }
     .cal-cell.today { border-color: rgba(191, 59, 32, 0.35); }
-    .cal-cell.warn { background: linear-gradient(180deg, #fef6f3, #fbeee9); border-color: rgba(191, 59, 32, 0.2); }
-    /* 水位條：填滿比例＝當天喝水占目標，一眼看夠不夠，不用數字 */
-    /* 有記錄的小圓點（低調），一眼看出哪幾天記了 */
+    /* 有記錄的日子：暖色「填滿」感，讓整月一眼看出照顧得完不完整；沒記錄的日子維持淡色空格 */
+    .cal-cell.has { background: linear-gradient(180deg, #FBF3E4, #F5EBD6); border-color: rgba(115, 73, 33, 0.24); }
+    .cal-cell.warn { background: linear-gradient(180deg, #fef6f3, #fbeee9); border-color: rgba(191, 59, 32, 0.28); }
+    /* 有記錄的小橫條（底部），比小圓點更明顯，一眼看出哪幾天記了 */
+    .cal-recbar { width: 16px; height: 4px; border-radius: 999px; margin-top: auto; background: rgba(122, 80, 36, 0.5); }
     .cal-rec { width: 5px; height: 5px; border-radius: 50%; margin-top: auto; background: rgba(115, 73, 33, 0.4); }
     /* 角落小標記：右上＝需注意(吐/漏藥)，左上＝回診 */
     .cal-mark { position: absolute; top: 6px; width: 7px; height: 7px; border-radius: 50%; }
@@ -1120,10 +1122,10 @@
         <p class="cal-intro">這個月的照護概覽：哪幾天有記錄、哪幾天要注意。<b>點任一天，看那天的完整數據。</b></p>
         <div class="cal-grid" id="calGrid"></div>
         <div class="cal-legend" id="calLegend" hidden>
-          <span><span class="cal-rec" style="display:inline-block;vertical-align:1px"></span>有記錄</span>
+          <span><span class="cal-recbar" style="display:inline-block;vertical-align:2px;margin-right:5px"></span>暖色格＝有記錄</span>
           <span><span class="cal-mark warn" style="position:static;display:inline-block"></span>需注意（吐／漏藥）</span>
           <span><span class="cal-mark visit" style="position:static;display:inline-block"></span>回診</span>
-          <span class="cal-legend-faint">淡色數字＝這天沒記錄</span>
+          <span class="cal-legend-faint">淡色空格＝這天沒記錄</span>
         </div>
       </section>
 
@@ -2047,11 +2049,11 @@
         const isVisit = visitDates.has(date);
         // 月曆只做「一眼概覽」：有記錄＝亮底、需注意＝右上紅點、回診＝左上圈；細節點進去看
         html += `
-          <div class="cal-cell ${date === today ? 'today' : ''} ${hasRecord ? '' : 'norec'} ${isWarn ? 'warn' : ''}" data-date="${date}">
+          <div class="cal-cell ${date === today ? 'today' : ''} ${hasRecord ? 'has' : 'norec'} ${isWarn ? 'warn' : ''}" data-date="${date}">
             ${isVisit ? '<span class="cal-mark visit" title="回診"></span>' : ''}
             ${isWarn ? '<span class="cal-mark warn" title="需注意"></span>' : ''}
             <div class="cal-daynum">${day}</div>
-            ${hasRecord && !isWarn ? '<span class="cal-rec" title="有記錄"></span>' : ''}
+            ${hasRecord && !isWarn ? `<span class="cal-recbar" title="有 ${row.entryCount} 筆記錄"></span>` : ''}
           </div>`;
       }
       $('calGrid').innerHTML = html;
