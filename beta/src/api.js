@@ -118,6 +118,20 @@ export async function handleApi(request, env, url) {
       return jsonResponse({ ok: true, rows });
     }
 
+    if (resource === 'weights' && method === 'GET') {
+      const petId = url.searchParams.get('petId') || '';
+      if (!(await assertPetOwner(db, petId, dataOwnerId))) return forbidden();
+      const { results } = await db
+        .prepare(
+          `SELECT substr(eventDateTime, 1, 10) date, amount, eventDateTime
+           FROM logs WHERE petId = ? AND category = 'weight' AND isDeleted = 0
+           ORDER BY eventDateTime`
+        )
+        .bind(petId)
+        .all();
+      return jsonResponse({ ok: true, rows: results || [] });
+    }
+
     if (resource === 'month' && method === 'GET') {
       const petId = url.searchParams.get('petId') || '';
       const month = url.searchParams.get('month') || '';

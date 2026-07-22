@@ -537,6 +537,20 @@
     .digest-seg button.active { background: var(--brand); color: #fff; }
     /* 複製：安靜的文字鈕，不搶截圖畫面 */
     .digest-copy { border: none; background: transparent; color: var(--brand); font-size: 12.5px; font-weight: 600; letter-spacing: 0.04em; padding: 6px 2px; white-space: nowrap; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--line-strong); }
+    /* 回診重點：白底卡、標題＋逐項、紅旗一行；截圖友善 */
+    .vh-title { font-size: 12.5px; font-weight: 700; letter-spacing: 0.1em; color: var(--brand); margin: 2px 0 8px; }
+    .vh-body { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 4px 14px; }
+    .vh-row { display: flex; gap: 12px; align-items: baseline; padding: 9px 0; border-bottom: 1px solid var(--line-soft, #f0ebe0); font-size: 13.5px; line-height: 1.55; }
+    .vh-row:last-child { border-bottom: none; }
+    .vh-k { flex: none; width: 40px; font-weight: 700; color: var(--ink); }
+    .vh-v { flex: 1; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+    .vh-flags { margin-top: 10px; padding: 10px 14px; border-radius: var(--radius); font-size: 13px; line-height: 1.6; }
+    .vh-flags.warn { background: #fbeee9; border: 1px solid rgba(191, 59, 32, 0.2); color: var(--seal); font-weight: 600; }
+    .vh-flags.ok { background: rgba(115, 73, 33, 0.05); border: 1px solid var(--line); color: var(--muted); }
+    .vh-addw { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 12.5px; color: var(--muted); flex-wrap: wrap; }
+    .vh-addw .vh-w-input { width: 90px; padding: 7px 10px; }
+    .vh-addw .vh-w-save { padding: 7px 14px; border: 1px solid var(--brand); background: var(--brand); color: #fff; border-radius: 999px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+    .vh-sub-title { font-size: 12.5px; font-weight: 700; letter-spacing: 0.08em; color: var(--brand); margin: 20px 0 8px; }
     .digest-card { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 4px 14px; }
     .digest-row { display: flex; gap: 8px; align-items: baseline; padding: 9px 0; border-bottom: 1px solid var(--line-soft, #f0ebe0); font-size: 13.5px; line-height: 1.6; }
     .digest-row:last-child { border-bottom: none; }
@@ -1148,7 +1162,7 @@
       <section class="panel hidden" id="trendView">
         <details class="block fold" open>
           <summary>
-            <span class="fold-title">給醫生的注意事項<span class="fold-count" id="digestCount"></span></span>
+            <span class="fold-title">給醫生看<span class="fold-count" id="digestCount"></span></span>
             <span class="fold-toggle">＋</span>
           </summary>
           <div class="fold-body">
@@ -1160,8 +1174,10 @@
               </div>
               <button class="digest-copy" id="digestCopyBtn" type="button">複製文字</button>
             </div>
+            <div id="vetHighlights"></div>
+            <div class="vh-sub-title">須注意的事件</div>
             <div class="digest-card" id="digestCard"></div>
-            <p class="muted" style="font-size:12px;margin:10px 2px 0">只列有狀況的日子，沒列出＝無特殊紀錄。截圖或按「複製文字」貼給醫生都可以。</p>
+            <p class="muted" style="font-size:12px;margin:10px 2px 0">重點在上、事件在下。只列有狀況的日子，沒列出＝無特殊紀錄。截圖或按「複製文字」貼給醫生都可以。</p>
           </div>
         </details>
         <details class="block fold" open>
@@ -2288,6 +2304,92 @@
       if (rows.length) boxContainer.appendChild(labChart(rows));
     }
 
+    // ── 回診重點：醫生一眼要看的（體重趨勢、飲水平均＋每公斤、熱量平均 vs 目標、用藥依從、紅旗）──
+    // 原則：只把資料整理成好判讀的樣子（平均/範圍/每公斤/趨勢），不做「正常/異常」的醫療判斷。
+    function computeVetHighlights(days) {
+      const to = todayStr();
+      const from = shiftDate(to, -(days - 1));
+      const rows = (state.trendRows || []).filter((r) => r.date >= from && r.date <= to);
+      const pet = currentPet();
+      const r0 = (n, d = 0) => { const m = Math.pow(10, d); return Math.round(Number(n) * m) / m; };
+      const stat = (pick) => {
+        const vals = rows.map(pick).map(Number).filter((v) => v > 0);
+        if (!vals.length) return null;
+        const sum = vals.reduce((a, b) => a + b, 0);
+        return { avg: sum / vals.length, min: Math.min(...vals), max: Math.max(...vals), n: vals.length };
+      };
+      const water = stat((r) => r.totalWaterMl);
+      const kcal = stat((r) => r.kcal);
+      const foodDay = rows.filter((r) => ((r.dryFoodG || 0) + (r.wetFoodG || 0) + (r.otherFoodG || 0)) > 0);
+      const avgDry = foodDay.length ? foodDay.reduce((a, r) => a + (Number(r.dryFoodG) || 0), 0) / foodDay.length : 0;
+      const avgWet = foodDay.length ? foodDay.reduce((a, r) => a + (Number(r.wetFoodG) || 0), 0) / foodDay.length : 0;
+
+      let medDays = 0; const missed = [];
+      for (const r of rows) {
+        let meds = []; try { meds = Array.isArray(r.medJson) ? r.medJson : JSON.parse(r.medJson || '[]'); } catch (e) { /* ignore */ }
+        if (meds.length) medDays += 1;
+        if (meds.some((m) => m.status && m.status !== '已吃')) missed.push(r.date);
+      }
+      const vomitDays = rows.filter((r) => Number(r.vomitCount) > 0).map((r) => ({ date: r.date, count: r.vomitCount }));
+
+      const w = (state.weights || []).map((x) => ({ date: x.date, kg: Number(x.amount) })).filter((x) => x.kg > 0);
+      const currentKg = w.length ? w[w.length - 1].kg : (Number(pet?.weightKg) || 0);
+      let weight = null;
+      if (w.length) {
+        const wIn = w.filter((x) => x.date >= from);
+        const base = wIn.length ? wIn[0] : w[0];
+        weight = { current: currentKg, currentDate: w[w.length - 1].date, first: base.kg, firstDate: base.date, delta: r0(currentKg - base.kg, 2), count: w.length };
+      } else if (currentKg > 0) {
+        weight = { current: currentKg, count: 0 };
+      }
+      const perKg = (water && currentKg > 0) ? water.avg / currentKg : null;
+      return { days, from, to, recordedDays: rows.filter((r) => Number(r.entryCount) > 0).length, weight, water, perKg, kcal, target: Number(pet?.goalKcal) || 0, avgDry, avgWet, medDays, missed, vomitDays, currentKg, r0, petName: pet ? pet.petName : '貓貓' };
+    }
+
+    function vhLabel(date) { return date ? `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}` : ''; }
+    function vhWeightText(h) {
+      if (!h.weight) return '尚未記錄';
+      const w = h.weight;
+      if (!w.count || w.delta == null) return `${w.current} kg`;
+      const arrow = w.delta > 0 ? `↑${w.delta}` : w.delta < 0 ? `↓${Math.abs(w.delta)}` : '持平';
+      return `${w.current} kg（近${h.days}天 ${arrow} kg・量${w.count}次）`;
+    }
+    function vetHighlightsRows(h) {
+      const rows = [];
+      rows.push(['體重', vhWeightText(h)]);
+      rows.push(['飲水', h.water
+        ? `平均 ${h.r0(h.water.avg)} ml/日${h.perKg ? `・每公斤 ${h.r0(h.perKg, 1)} ml` : ''}（範圍 ${h.r0(h.water.min)}–${h.r0(h.water.max)}・${h.water.n}天）`
+        : '尚未記錄']);
+      rows.push(['熱量', h.kcal
+        ? `平均 ${h.r0(h.kcal.avg)} kcal/日${h.target ? `（目標 ${h.target}）` : ''}（${h.kcal.n}天）`
+        : '尚未記錄']);
+      rows.push(['食物', (h.avgDry || h.avgWet) ? `平均 乾 ${h.r0(h.avgDry, 1)} g・濕食固形 ${h.r0(h.avgWet, 1)} g /日` : '尚未記錄']);
+      rows.push(['用藥', h.medDays ? `${h.medDays} 天有給藥（近${h.days}天有記錄 ${h.recordedDays} 天）${h.missed.length ? `・⚠ 漏 ${h.missed.length} 天` : ''}` : '尚未記錄']);
+      return rows;
+    }
+    function vetFlagsText(h) {
+      const parts = [];
+      if (h.vomitDays.length) parts.push(`嘔吐 ${h.vomitDays.length} 天（${h.vomitDays.map((v) => `${vhLabel(v.date)}×${v.count}`).join('、')}）`);
+      if (h.missed.length) parts.push(`漏藥 ${h.missed.length} 天（${h.missed.map(vhLabel).join('、')}）`);
+      return parts;
+    }
+    function vetHighlightsHtml(h) {
+      const rows = vetHighlightsRows(h).map(([k, v]) =>
+        `<div class="vh-row"><span class="vh-k">${esc(k)}</span><span class="vh-v">${esc(v)}</span></div>`).join('');
+      const flags = vetFlagsText(h);
+      const flagBox = flags.length
+        ? `<div class="vh-flags warn">⚠ ${esc(flags.join('；'))}</div>`
+        : `<div class="vh-flags ok">近 ${h.days} 天無嘔吐、無漏藥紀錄</div>`;
+      return `<div class="vh-title">回診重點・近 ${h.days} 天</div>
+        <div class="vh-body">${rows}</div>
+        ${flagBox}
+        <div class="vh-addw">
+          <span>更新體重：</span>
+          <input class="vh-w-input" type="number" step="0.1" inputmode="decimal" placeholder="kg">
+          <button class="vh-w-save" type="button">記一筆</button>
+        </div>`;
+    }
+
     // 近 7 天摘要：同一份資料產生畫面排版與複製用純文字；沒有的值不顯示 0
     function buildVisitSummary(rows, from, to, todaySummary) {
       const pet = currentPet();
@@ -2466,6 +2568,9 @@
       state.digestDays = state.digestDays || 14;
       const data = await api(`highlights?petId=${state.petId}&days=${state.digestDays}`);
       state.digestData = data;
+      // 回診重點（體重/飲水/熱量/用藥/紅旗）——和注意事項共用同一個天數
+      const vh = $('vetHighlights');
+      if (vh) vh.innerHTML = vetHighlightsHtml(computeVetHighlights(state.digestDays));
       const items = digestItems(data);
       const dc = $('digestCount');
       if (dc) dc.textContent = items.length ? `（${items.length} 筆）` : '';
@@ -2488,9 +2593,18 @@
       if (!data) return '';
       const items = digestItems(data);
       const pet = (state.pets || []).find((p) => p.petId === state.petId);
-      const head = `${pet ? pet.petName : '貓貓'}｜須注意事項（${digestWhen(data.from)}〜${digestWhen(data.to)}）`;
-      if (!items.length) return `${head}\n這段期間沒有特殊狀況`;
-      return [head, ...items.map((it) => `${digestWhen(it.date)}${it.time ? ` ${it.time}` : ''}　${it.label}：${it.text}`)].join('\n');
+      const name = pet ? pet.petName : '貓貓';
+      const h = computeVetHighlights(state.digestDays);
+      const lines = [`${name}｜回診摘要（${digestWhen(data.from)}〜${digestWhen(data.to)}）`, ''];
+      lines.push('【回診重點】');
+      for (const [k, v] of vetHighlightsRows(h)) lines.push(`${k}：${v}`);
+      const flags = vetFlagsText(h);
+      lines.push(`紅旗：${flags.length ? flags.join('；') : '近期無嘔吐、無漏藥'}`);
+      lines.push('', '【須注意的事件】');
+      if (!items.length) lines.push('這段期間沒有特殊狀況');
+      else for (const it of items) lines.push(`${digestWhen(it.date)}${it.time ? ` ${it.time}` : ''}　${it.label}：${it.text}`);
+      lines.push('', '提醒：以上為飼主日常照護紀錄整理，供醫生參考，不含醫療診斷。');
+      return lines.join('\n');
     }
 
     async function loadTrend() {
@@ -2498,16 +2612,18 @@
       const to = todayStr();
       const fromDate = new Date(Date.now() - 29 * 86400000).toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
       const from7 = shiftDate(to, -(state.visitRange - 1));
-      const [data, dayData, vetsData, visitsData, labsData] = await Promise.all([
+      const [data, dayData, vetsData, visitsData, labsData, weightsData] = await Promise.all([
         api(`summary?petId=${state.petId}&from=${fromDate}&to=${to}`),
         api(`day?petId=${state.petId}&date=${to}`),
         api('vets'),
         api(`visits?petId=${state.petId}`),
-        api(`labs?petId=${state.petId}`)
+        api(`labs?petId=${state.petId}`),
+        api(`weights?petId=${state.petId}`)
       ]);
       state.vets = vetsData.rows;
       state.visits = visitsData.rows;
       state.labs = labsData.rows;
+      state.weights = weightsData.rows || [];
 
       renderDayVisits();
       const latestLab = latestLabInfo();
@@ -3395,6 +3511,19 @@
       if (tab) {
         if (tab.dataset.tab === 'settings') state.settingsTab = '';
         return switchTab(tab.dataset.tab);
+      }
+
+      if (event.target.closest('.vh-w-save')) {
+        const input = $('vetHighlights').querySelector('.vh-w-input');
+        const kg = Number(input?.value || 0);
+        if (!(kg > 0)) return toast('請輸入體重（kg）', true);
+        const now = new Date().toLocaleTimeString('en-GB', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit' });
+        try {
+          await api('logs', { method: 'POST', body: JSON.stringify({ petId: state.petId, category: 'weight', amount: kg, unit: 'kg', eventDateTime: `${todayStr()} ${now}` }) });
+          toast(`已記體重 ${kg} kg`);
+          await loadTrend();
+        } catch (error) { toast(error.message, true); }
+        return;
       }
 
       if (event.target.closest('[data-goto-goal]')) {
