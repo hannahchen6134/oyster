@@ -200,8 +200,15 @@ test('matchFood：忽略已刪除的食物', () => {
   assert.equal(matchFood(foods, '希爾斯', '乾糧'), null);
 });
 
-test('引導建檔：體重與生日', () => {
-  assert.deepEqual(parseMessage('體重 4.2'), { type: 'petField', field: 'weightKg', value: 4.2 });
+test('體重：記一筆有日期的體重（趨勢用），不是只改欄位', () => {
+  const r = parseMessage('體重 4.2');
+  assert.equal(r.type, 'record');
+  assert.equal(r.record.category, 'weight');
+  assert.equal(r.record.amount, 4.2);
+  assert.equal(parseMessage('記體重 4.5').record.amount, 4.5); // 「記體重 N」也可
+});
+
+test('引導建檔：生日', () => {
   assert.deepEqual(parseMessage('生日 2020/1/5'), { type: 'petField', field: 'birthday', value: '2020-01-05' });
   assert.equal(parseMessage('生日 亂打').value, '');
 });
