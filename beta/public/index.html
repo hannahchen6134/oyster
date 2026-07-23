@@ -1229,7 +1229,7 @@
             <span class="fold-toggle">＋</span>
           </summary>
           <div class="fold-body">
-            <p class="scroll-hint" style="text-align:left;margin:0 2px 10px">每一天一列，先看加總；點任何一天可看當日細節。</p>
+            <p class="scroll-hint" style="text-align:left;margin:0 2px 10px">每一天一列，先看加總；點任何一天可看當日細節。<br>水＝當日總水分（喝的＋食物含水）・罐/乾＝實際餵的克數。</p>
             <div class="range-chips" id="tableRangeChips">
               <button data-trange="30" type="button" class="active">30 天</button>
               <button data-trange="60" type="button">60 天</button>
@@ -1523,14 +1523,16 @@
       const foodLogs = logs.filter((l) => l.category === 'food');
       const medLogs = logs.filter((l) => l.category === 'med');
       const moodLogs = logs.filter((l) => l.category === 'mood');
-      const totalFood = (s.dryFoodG || 0) + (s.wetFoodG || 0) + (s.otherFoodG || 0);
+      // 食物量一律用「餵的克數」（＝你輸入/可編輯的數字）：濕食＝固形＋含水還原成餵食量
+      const wetFed = (s.wetFoodG || 0) + (s.foodWaterMl || 0);
+      const totalFood = (s.dryFoodG || 0) + wetFed + (s.otherFoodG || 0);
       const last = logs.length ? logs[logs.length - 1] : null;
       const lastUpdated = logs.length
         ? logs.reduce((max, l) => (l.updatedAt > max ? l.updatedAt : max), logs[0].updatedAt)
         : '';
       const noFormula = foodLogs.filter((l) => !(Number(l.kcal) > 0)).length;
       const foodText = foodLogs.length
-        ? `已紀錄 ${foodLogs.length} 筆，共 ${fmt(totalFood)} g${s.wetFoodG > 0 ? '（罐頭以固形量計）' : ''}${noFormula ? `・${noFormula} 筆未設定公式，熱量未計入` : ''}`
+        ? `已紀錄 ${foodLogs.length} 筆，共 ${fmt(totalFood)} g${noFormula ? `・${noFormula} 筆未設定公式，熱量未計入` : ''}`
         : '';
       const suppLogs = logs.filter((l) => l.category === 'supplement');
       const excreteParts = [];
@@ -1539,7 +1541,7 @@
       return {
         rows: [
           ['吃飯', foodText],
-          ['喝水', s.waterMl > 0 ? `已紀錄 ${fmt(s.waterMl)} ml${s.foodWaterMl ? `（含食物水分共 ${fmt(s.totalWaterMl)} ml）` : ''}` : ''],
+          ['喝水', s.waterMl > 0 ? `自己喝 ${fmt(s.waterMl)} ml${s.foodWaterMl ? `，連同食物含水共 ${fmt(s.totalWaterMl)} ml` : ''}` : ''],
           ['用藥', medLogs.length ? `今天已紀錄 ${medLogs.length} 次` : ''],
           ['營養補充', suppLogs.length ? `已紀錄 ${suppLogs.length} 次` : ''],
           ['腸胃狀況如何', s.vomitCount > 0 ? `今天有紀錄嘔吐 ${s.vomitCount} 次` : ''],
@@ -2749,7 +2751,7 @@
           <div class="dcard-date">${esc(row.date.slice(5).replace('-', '/'))}</div>
           <div class="dcard-pills">
             <span class="dpill p-water">水 <b>${f1(row.totalWaterMl)}</b></span>
-            <span class="dpill p-wet">罐 <b>${f1(row.wetFoodG)}</b></span>
+            <span class="dpill p-wet">罐 <b>${f1((Number(row.wetFoodG) || 0) + (Number(row.foodWaterMl) || 0))}</b></span>
             <span class="dpill p-dry">乾 <b>${f1(row.dryFoodG)}</b></span>
             <span class="dpill p-kcal"><b>${f1(row.kcal)}</b> kcal</span>
             ${specials.length ? `<span class="dspecials">${specials.join('')}</span>` : ''}
