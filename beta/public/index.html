@@ -685,24 +685,28 @@
     .login-hint b { color: var(--brand); font-weight: 600; }
     /* LIFF 自動登入過場：優雅的咖啡色漸層光環 spinner，不閃手動登入表單 */
     .liff-wait { display: none; margin-top: 36px; flex-direction: column; align-items: center; gap: 17px; }
-    .liff-spin-wrap { position: relative; width: 56px; height: 56px; display: grid; place-items: center; }
-    /* 後方柔光呼吸暈 */
-    .liff-spin-wrap::before {
-      content: ''; position: absolute; inset: -12px; border-radius: 50%;
-      background: radial-gradient(circle, rgba(200, 150, 90, 0.22), transparent 68%);
-      animation: liffHalo 1.9s ease-in-out infinite;
+    /* 一隻小貓從左小跑到右、循環：跑道＋地面淡影 */
+    .liff-run { position: relative; width: 100%; max-width: 250px; height: 50px; }
+    .liff-run::after {
+      content: ''; position: absolute; left: 8%; right: 8%; bottom: 6px; height: 2px; border-radius: 2px;
+      background: linear-gradient(90deg, transparent, rgba(115, 73, 33, 0.16), transparent);
     }
-    /* 圓潤貓咪頭：輕輕上下晃動（像小小點頭），後方柔光暈呼吸 */
-    .liff-cat {
-      position: relative; width: 50px; height: 50px; color: var(--brand);
-      filter: drop-shadow(0 3px 6px rgba(115, 73, 33, 0.22));
-      transform-origin: 50% 62%; animation: liffBob 1.15s ease-in-out infinite;
+    .liff-runner { position: absolute; bottom: 6px; left: -60px; width: 56px; height: 40px; color: var(--brand); animation: liffRun 2.7s cubic-bezier(.37,0,.63,1) infinite; }
+    @keyframes liffRun { 0% { left: -60px } 100% { left: calc(100% + 6px) } }
+    /* 小跑步：全身上下彈跳、腳交替擺、尾巴左右甩 */
+    .liff-runcat { display: block; width: 100%; height: 100%; filter: drop-shadow(0 3px 5px rgba(115, 73, 33, 0.22)); transform-origin: 50% 92%; animation: liffHop .34s ease-in-out infinite; }
+    @keyframes liffHop { 0%, 100% { transform: translateY(0) scaleY(1) } 50% { transform: translateY(-5px) scaleY(1.05) } }
+    .liff-runcat .leg { transform-box: fill-box; transform-origin: 50% 8%; }
+    .liff-runcat .leg-back { animation: liffLegB .34s ease-in-out infinite; }
+    .liff-runcat .leg-front { animation: liffLegF .34s ease-in-out infinite; }
+    @keyframes liffLegB { 0%, 100% { transform: rotate(-20deg) } 50% { transform: rotate(20deg) } }
+    @keyframes liffLegF { 0%, 100% { transform: rotate(20deg) } 50% { transform: rotate(-20deg) } }
+    .liff-runcat .cat-tail { transform-box: fill-box; transform-origin: 90% 90%; animation: liffTail .5s ease-in-out infinite alternate; }
+    @keyframes liffTail { from { transform: rotate(-10deg) } to { transform: rotate(14deg) } }
+    @media (prefers-reduced-motion: reduce) {
+      .liff-runner, .liff-runcat, .liff-runcat .leg, .liff-runcat .cat-tail { animation: none; }
+      .liff-runner { left: 50%; margin-left: -28px; }
     }
-    @keyframes liffBob {
-      0%, 100% { transform: translateY(0) scale(1) rotate(-4deg); }
-      50% { transform: translateY(-5px) scale(1.05) rotate(4deg); }
-    }
-    @keyframes liffHalo { 0%, 100% { transform: scale(0.85); opacity: 0.4 } 50% { transform: scale(1.12); opacity: 0.9 } }
     .liff-wait-text { color: var(--ink-soft); font-size: 14.5px; font-weight: 600; letter-spacing: 0.14em; }
     .liff-wait-text::after { content: '…'; animation: liffDots 1.4s ease-in-out infinite; }
     .liff-wait-sub { color: var(--muted); font-size: 12px; letter-spacing: 0.05em; margin-top: -6px; }
@@ -1018,17 +1022,32 @@
         </div>
         <p class="login-hint">手機用戶：在官方 LINE 選單點 <b>喵喵照護站</b>，點連結就進來。</p>
         <div class="liff-wait">
-          <div class="liff-spin-wrap" aria-hidden="true">
-            <svg class="liff-cat" viewBox="0 0 48 48" fill="none">
-              <g fill="currentColor" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round">
-                <path d="M14 17 L11 6 L22 13 Z"/>
-                <path d="M34 17 L37 6 L26 13 Z"/>
-              </g>
-              <circle cx="24" cy="28" r="13" fill="currentColor"/>
-              <path d="M18 27 q1.7 1.9 3.4 0" stroke="#FBF7F0" stroke-width="1.8" stroke-linecap="round"/>
-              <path d="M26.6 27 q1.7 1.9 3.4 0" stroke="#FBF7F0" stroke-width="1.8" stroke-linecap="round"/>
-              <path d="M22.7 31 q1.3 1.1 2.6 0" stroke="#FBF7F0" stroke-width="1.6" stroke-linecap="round"/>
-            </svg>
+          <div class="liff-run" aria-hidden="true">
+            <div class="liff-runner">
+              <svg class="liff-runcat" viewBox="0 0 62 44" fill="none">
+                <!-- 尾巴 -->
+                <path class="cat-tail" d="M11 22 q-8 -2 -5 -12 q1.5 -4.5 6.5 -2.5" stroke="currentColor" stroke-width="5" stroke-linecap="round" fill="none"/>
+                <!-- 後腳 -->
+                <g class="leg leg-back" stroke="currentColor" stroke-width="5" stroke-linecap="round">
+                  <line x1="19" y1="30" x2="19" y2="39"/>
+                  <line x1="26" y1="30" x2="26" y2="39"/>
+                </g>
+                <!-- 前腳 -->
+                <g class="leg leg-front" stroke="currentColor" stroke-width="5" stroke-linecap="round">
+                  <line x1="37" y1="30" x2="37" y2="39"/>
+                  <line x1="44" y1="30" x2="44" y2="39"/>
+                </g>
+                <!-- 身體 -->
+                <ellipse cx="28" cy="21" rx="18" ry="11" fill="currentColor"/>
+                <!-- 頭 -->
+                <circle cx="47" cy="16" r="9.5" fill="currentColor"/>
+                <!-- 耳朵 -->
+                <path d="M40 10 L39 1.5 L47 6.5 Z" fill="currentColor"/>
+                <path d="M51 7 L57.5 2 L56.5 11 Z" fill="currentColor"/>
+                <!-- 瞇眼笑 -->
+                <path d="M45.4 15 q1.9 2 3.8 0" stroke="#FBF7F0" stroke-width="1.7" stroke-linecap="round"/>
+              </svg>
+            </div>
           </div>
           <div class="liff-wait-text">正在為你開啟照護站</div>
           <div class="liff-wait-sub">第一次進入需要幾秒，請稍候</div>
