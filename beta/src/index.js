@@ -1783,8 +1783,8 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
 // 建好就存進 app_kv 快取；只有連結失效才重建。全程 try/catch，不影響任何回覆。
 // 選單設計版本：改了選單圖片或區塊配置就把這個數字 +1，
 // 現有使用者的快取版本不符就會強制重建，改版才推得到所有人。
-// v5：新選單圖＋按鈕送出詞（記一筆／今日記錄／給醫生看／怎麼記／記錄回顧），與標籤一致。
-const RICHMENU_VERSION = 5;
+// v6：更新選單圖（更深色版，使用者指定）。按鈕送出詞與標籤維持一致。
+const RICHMENU_VERSION = 6;
 
 async function ensurePersonalRichMenu(env, baseUrl, lineUserId) {
   const db = env.DB;
