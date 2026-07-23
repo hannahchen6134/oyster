@@ -1805,13 +1805,14 @@ async function ensurePersonalRichMenu(env, baseUrl, lineUserId) {
   const menu = {
     size: { width: W, height: H }, selected: true, name: `owner-${lineUserId.slice(-8)}`, chatBarText: '選單',
     // v4 重排：上排＝每天要做的（留對話），下排＝查看與前往
+    // 送出的字＝選單標籤（自動回覆一致）：記一筆／今日記錄／給醫生看／怎麼記
     areas: [
-      cell(0, 0, send('快速記錄')),               // 記一筆
-      cell(1, 0, send('今天')),                    // 看今天
-      cell(2, 0, send('回診')),                    // 給醫生看（回診重點整理，可複製）
+      cell(0, 0, send('記一筆')),                  // 記一筆 → 快速記錄選單
+      cell(1, 0, send('今日記錄')),                // 今日記錄 → 今天總結
+      cell(2, 0, send('給醫生看')),                // 給醫生看 → 回診重點
       cell(0, 1, { type: 'uri', uri: site }),      // 喵喵照護站（網站）
-      cell(1, 1, send('怎麼記')),                  // 說明／怎麼記（跳出可點範例卡；月曆改到網站分頁）
-      cell(2, 1, { type: 'uri', uri: trendSite })  // 飲食回顧（網站，近 30 天）
+      cell(1, 1, send('怎麼記')),                  // 說明／怎麼記 → 可點範例卡
+      cell(2, 1, { type: 'uri', uri: trendSite })  // 記錄回顧（網站，近 30 天）
     ]
   };
   const lineApi = async (url, options) => {

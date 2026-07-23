@@ -166,6 +166,13 @@ test('驗收：查詢指令', () => {
   assert.deepEqual(parseMessage('說明'), { type: 'query', query: 'help' });
 });
 
+test('圖文選單標籤＝送出詞，都對得上動作（自動回覆一致）', () => {
+  assert.deepEqual(parseMessage('記一筆'), { type: 'query', query: 'recordMenu' });
+  assert.deepEqual(parseMessage('今日記錄'), { type: 'query', query: 'today' });
+  assert.deepEqual(parseMessage('給醫生看'), { type: 'query', query: 'visit' });
+  assert.deepEqual(parseMessage('怎麼記'), { type: 'exampleMenu' });
+});
+
 test('新增貓咪 蚵仔（含舊寫法相容）', () => {
   assert.deepEqual(parseMessage('新增貓咪 蚵仔'), { type: 'addPet', name: '蚵仔' });
   assert.deepEqual(parseMessage('新增貓貓 蚵仔'), { type: 'addPet', name: '蚵仔' });
