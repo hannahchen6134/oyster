@@ -3167,6 +3167,7 @@
               </div>
             </div>`).join('')}
         </div>
+        <div style="text-align:center;margin-top:18px"><button class="btn btn-secondary btn-sm" id="replayTourBtn" type="button">🔦 重看聚光燈導覽</button></div>
         <div class="ob-foot">連結過期了？回 LINE 打「照護站」拿新連結，<b>資料都不會消失</b>。</div>`;
     }
 
@@ -3740,6 +3741,14 @@
       // 今天分頁的「＋記一筆」：點開才展開記錄選項（收成一顆，不佔第一頁版面）
       if (event.target.closest('#recordEntryBtn')) {
         return openRecordSheet();
+      }
+
+      // 設定裡「重看聚光燈導覽」：清旗標、切回今天再重播
+      if (event.target.closest('#replayTourBtn')) {
+        localStorage.removeItem(TOUR_KEY);
+        switchTab('today');
+        setTimeout(startTour, 400);
+        return;
       }
 
       const quickBtn = event.target.closest('[data-quick]');

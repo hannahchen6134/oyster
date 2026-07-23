@@ -213,6 +213,21 @@ test('引導建檔：生日', () => {
   assert.equal(parseMessage('生日 亂打').value, '');
 });
 
+test('改 54 → 改最後一筆數量（fixLast）', () => {
+  const r = parseMessage('改 54');
+  assert.equal(r.type, 'fixLast');
+  assert.equal(r.mode, 'set');
+  assert.equal(r.amount, 54);
+});
+
+test('改 皇家罐頭 24 → 指定品名改食物（fixMatch，不限最後一筆）', () => {
+  const r = parseMessage('改 皇家罐頭 24');
+  assert.equal(r.type, 'fixMatch');
+  assert.equal(r.query, '皇家罐頭');
+  assert.equal(r.amount, 24);
+  assert.equal(parseMessage('改 罐頭 30').query, '罐頭');
+});
+
 test('引導建檔：食物與餵藥時段', () => {
   assert.deepEqual(parseMessage('設定罐頭 主食罐 1.1'), { type: 'foodSetup', foodType: '罐頭', name: '主食罐', kcalPerGram: 1.1 });
   assert.deepEqual(parseMessage('設定乾糧 腎處方'), { type: 'foodSetup', foodType: '乾糧', name: '腎處方', kcalPerGram: 0 });

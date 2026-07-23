@@ -1336,6 +1336,11 @@ async function handleTextMessage(event, env, baseUrl) {
       return;
     }
 
+    case 'fixMatch': {
+      await handleFixMatch(env, event, pet, intent, lineUserId);
+      return;
+    }
+
     case 'deleteLast': {
       await handleDeleteLast(env, event, ownerId, lineUserId);
       return;
@@ -1406,7 +1411,7 @@ async function handleTextMessage(event, env, baseUrl) {
     }
 
     case 'fixHint': {
-      await replyOrPush(env, event, '修正上一筆：\n改 54（改數量）\n剩 20（沒吃完扣掉）\n刪除（整筆刪掉）');
+      await replyOrPush(env, event, '要修正紀錄：\n改 54（改最後一筆）\n改 皇家罐頭 24（指定品名改）\n剩 20（沒吃完扣掉）\n刪除（整筆刪掉）');
       return;
     }
 
@@ -1490,6 +1495,38 @@ async function handleFixLast(env, event, lineUserId, intent, actorId = lineUserI
     title: `✓ 已更新・${cardPet?.petName || '貓貓'}`
   });
   await replyOrPushFlex(env, event, card, fallbackText);
+}
+
+// 「改 皇家罐頭 24」：找最近一筆符合品名/類型的食物，改它的克數（連帶重算熱量/含水）
+async function handleFixMatch(env, event, pet, intent, actorId) {
+  const db = env.DB;
+  if (!pet) { await replyOrPush(env, event, '找不到可以修改的紀錄，\n先記一筆吧！'); return; }
+  const q = intent.query;
+  const recent = (await getRecentLogsByPet(db, pet.petId, 30)) || [];
+  const foods = recent.filter((l) => l.category === 'food' && !l.isDeleted);
+  // 先比品名，再比類型；取最近一筆
+  let match = foods.find((l) => l.itemName && (l.itemName.includes(q) || q.includes(l.itemName)));
+  if (!match) match = foods.find((l) => l.foodType && (l.foodType.includes(q) || q.includes(l.foodType)));
+  if (!match) {
+    await replyOrPush(env, event, `找不到「${q}」的食物紀錄可以改。\n・想改最後一筆：直接打「改 ${intent.amount}」\n・或到照護站點那筆改`);
+    return;
+  }
+  const food = match.foodId ? await getFood(db, match.foodId) : null;
+  const derived = deriveFoodFields(intent.amount, match.foodType, food);
+  const updated = await updateLog(db, match.logId, { amount: intent.amount, kcal: derived.kcal, waterMl: derived.waterMl }, actorId);
+  const eventDate = String(updated.eventDateTime).slice(0, 10);
+  const summary = await recomputeDay(db, updated.petId, eventDate);
+  const cardPet = await getPet(db, updated.petId);
+  const subParts = [];
+  if (updated.kcal) subParts.push(`${updated.kcal} kcal`);
+  if (updated.waterMl) subParts.push(`含水 ${updated.waterMl} ml`);
+  const card = recordFlex({
+    pet: cardPet, categoryKey: updated.foodType === '乾糧' ? 'dry' : 'wet',
+    mainText: describeLog(updated), subText: subParts.join('・'),
+    summary, date: eventDate, logId: updated.logId,
+    title: `✓ 已更新・${cardPet?.petName || '貓貓'}`
+  });
+  await replyOrPushFlex(env, event, card, recordReply(describeLog(updated), cardPet, summary, [], eventDate));
 }
 
 // 「刪除」：刪掉最近一筆

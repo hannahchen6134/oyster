@@ -250,6 +250,11 @@ export function parseMessage(rawText) {
   if (editFix) {
     return { type: 'fixLast', mode: 'set', amount: Number(editFix[1]) };
   }
+  // 「改 皇家罐頭 24」：指定品名/類型，改最近一筆符合的食物（不限於最後一筆）
+  const editMatch = compact.match(/^(?:改成?|修改|更正)(.+?)(\d+(?:\.\d+)?)(?:g|克|公克|ml|毫升|cc)?$/i);
+  if (editMatch) {
+    return { type: 'fixMatch', query: editMatch[1].trim(), amount: Number(editMatch[2]) };
+  }
   if (['記錯', '記錯了', '打錯', '打錯了', '輸入錯誤', '修改'].includes(compact)) {
     return { type: 'fixHint' };
   }
