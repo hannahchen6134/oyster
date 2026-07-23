@@ -496,11 +496,13 @@
     .dcard-date { flex: none; white-space: nowrap; font-size: 12px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; letter-spacing: .01em; }
     /* 固定欄位的 grid：每列的水/罐/乾/kcal 各佔固定欄寬 → 每天的數值上下對齊；
        最右保留特殊欄（吐/漏藥/疫苗/除蟲），沒有時留空、欄位不跑掉 */
-    /* 膠囊隨內容長度，換行不截斷；數字取整數（詳細小數點進到當日明細才看） */
-    .dcard-pills { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
-    .dpill { font-size: 11px; padding: 3px 10px; border-radius: 999px; white-space: nowrap; line-height: 1.6; }
+    /* 水/罐/乾/kcal 四顆等寬平分一列、填滿不留空隙、永不換行（數字取整數）；
+       吐/漏藥等特殊膠囊有才顯示，換到下一行、不擠壓主資料 */
+    .dcard-pills { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; align-items: center; }
+    .dpill { min-width: 0; text-align: center; font-size: 10.5px; padding: 3px 4px; border-radius: 999px; white-space: nowrap; line-height: 1.6; }
     .dpill b { font-weight: 800; margin: 0 1px; font-variant-numeric: tabular-nums; }
-    .dspecials { display: contents; }
+    .dspecials { grid-column: 1 / -1; display: flex; gap: 4px; margin-top: 4px; }
+    .dspecials .dpill { padding: 3px 10px; }
     /* 分色：水＝湖水綠、罐＝草綠、乾＝麥色、kcal＝藕紫；特殊＝朱紅一色 */
     .dpill.p-water { background: #e5f2ec; color: #2b7a66; }
     .dpill.p-wet   { background: #ebf1dd; color: #5c7031; }
@@ -2736,7 +2738,7 @@
             <span class="dpill p-wet">罐 <b>${f1(row.wetFoodG)}</b></span>
             <span class="dpill p-dry">乾 <b>${f1(row.dryFoodG)}</b></span>
             <span class="dpill p-kcal"><b>${f1(row.kcal)}</b> kcal</span>
-            <span class="dspecials">${specials.join('')}</span>
+            ${specials.length ? `<span class="dspecials">${specials.join('')}</span>` : ''}
           </div>
         </div>`;
       }
