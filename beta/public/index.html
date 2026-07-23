@@ -639,6 +639,10 @@
     .chart-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px; }
     .chart-title { font-size: 11.5px; font-weight: 600; letter-spacing: 0.14em; color: var(--ink-soft); }
     .chart-latest { font-size: 13px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+    .chart-head-right { display: inline-flex; align-items: center; gap: 10px; }
+    .chart-add { border: 1px solid var(--brand); background: var(--brand-tint); color: var(--brand); font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 999px; cursor: pointer; white-space: nowrap; }
+    .chart-add:hover { background: var(--brand); color: #fff; }
+    .chart-empty { border: 1px dashed var(--line-strong); border-radius: var(--radius); padding: 20px 14px; text-align: center; color: var(--muted); font-size: 13px; line-height: 1.6; }
     .chart-wrap { position: relative; }
     .chart-wrap svg { display: block; width: 100%; height: auto; }
     .chart-tip {
@@ -1984,6 +1988,8 @@
         toast('已記錄 ✓');
         await loadDay();
         if ($('recentFold') && $('recentFold').open) await loadRecent();
+        // 在「回顧」分頁就地記錄（例如趨勢圖上的記體重）→ 刷新趨勢圖與回診重點
+        if ($('trendView') && !$('trendView').classList.contains('hidden')) await loadTrend();
       } catch (error) { toast(error.message || '記錄失敗', true); }
     }
     function quickPadClick(event) {
@@ -2144,15 +2150,32 @@
 
     // ---------- 近30天 ----------
     // 單軸折線小圖（水分與熱量單位不同，各畫一張，不做雙軸）
-    function lineChart({ title, unit, color, dates, values }) {
+    function lineChart({ title, unit, color, dates, values, sparse = false, decimals = 0, yFrom = 'zero', headerExtra = '', emptyHint = '' }) {
       const W = 640, H = 120, padL = 34, padR = 10, padT = 12, padB = 20;
       const innerW = W - padL - padR, innerH = H - padT - padB;
       const nums = values.filter((v) => v != null);
-      const maxRaw = Math.max(1, ...nums) * 1.12;
-      const step = Math.pow(10, Math.floor(Math.log10(maxRaw / 2)));
-      const yMax = Math.ceil(maxRaw / step) * step;
+      const nf = (v) => decimals > 0 ? Number(v).toFixed(decimals) : fmtInt(v);
+      // 沒有資料：顯示空狀態＋（若有）記錄按鈕，不畫空圖
+      if (!nums.length) {
+        const empty = document.createElement('div');
+        empty.className = 'chart-block';
+        empty.innerHTML = `<div class="chart-head"><span class="chart-title">${esc(title)}（${esc(unit)}）</span><span class="chart-head-right">${headerExtra}</span></div>
+          <div class="chart-empty">${esc(emptyHint || '尚未有紀錄')}</div>`;
+        return empty;
+      }
+      // 體重等窄幅資料用 min–max 貼合軸（才看得出變化）；其餘從 0 起算
+      let yMin = 0, yMax;
+      if (yFrom === 'auto') {
+        const lo = Math.min(...nums), hi = Math.max(...nums);
+        const pad = ((hi - lo) || Math.max(0.2, hi * 0.04)) * 0.35;
+        yMin = Math.max(0, lo - pad); yMax = hi + pad;
+      } else {
+        const maxRaw = Math.max(1, ...nums) * 1.12;
+        const step = Math.pow(10, Math.floor(Math.log10(maxRaw / 2)));
+        yMax = Math.ceil(maxRaw / step) * step;
+      }
       const x = (i) => padL + (dates.length === 1 ? innerW / 2 : (i / (dates.length - 1)) * innerW);
-      const y = (v) => padT + innerH - (v / yMax) * innerH;
+      const y = (v) => padT + innerH - ((v - yMin) / (yMax - yMin)) * innerH;
       const gradId = `grad-${Math.random().toString(36).slice(2, 8)}`;
       const defs = `<defs><linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0" stop-color="${color}" stop-opacity="0.16"></stop>
@@ -2160,26 +2183,38 @@
       </linearGradient></defs>`;
 
       let paths = '';
-      let run = [];
-      const flush = () => {
-        if (run.length > 1) {
-          const d = run.map(([px, py], idx) => `${idx ? 'L' : 'M'}${px.toFixed(1)},${py.toFixed(1)}`).join('');
-          const base = `L${run[run.length - 1][0].toFixed(1)},${(padT + innerH).toFixed(1)}L${run[0][0].toFixed(1)},${(padT + innerH).toFixed(1)}Z`;
-          paths += `<path d="${d}${base}" fill="url(#${gradId})" stroke="none"></path>`;
+      if (sparse) {
+        // 稀疏量測點（體重）：把所有非空點連成一條線並點出各點，不做面積填色
+        const pts = [];
+        values.forEach((v, i) => { if (v != null) pts.push([x(i), y(v)]); });
+        if (pts.length > 1) {
+          const d = pts.map(([px, py], idx) => `${idx ? 'L' : 'M'}${px.toFixed(1)},${py.toFixed(1)}`).join('');
           paths += `<path d="${d}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path>`;
-        } else if (run.length === 1) {
-          paths += `<circle cx="${run[0][0].toFixed(1)}" cy="${run[0][1].toFixed(1)}" r="2.5" fill="${color}"></circle>`;
         }
-        run = [];
-      };
-      values.forEach((v, i) => { if (v == null) flush(); else run.push([x(i), y(v)]); });
-      flush();
+        pts.forEach(([px, py]) => { paths += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="2.5" fill="${color}"></circle>`; });
+      } else {
+        let run = [];
+        const flush = () => {
+          if (run.length > 1) {
+            const d = run.map(([px, py], idx) => `${idx ? 'L' : 'M'}${px.toFixed(1)},${py.toFixed(1)}`).join('');
+            const base = `L${run[run.length - 1][0].toFixed(1)},${(padT + innerH).toFixed(1)}L${run[0][0].toFixed(1)},${(padT + innerH).toFixed(1)}Z`;
+            paths += `<path d="${d}${base}" fill="url(#${gradId})" stroke="none"></path>`;
+            paths += `<path d="${d}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path>`;
+          } else if (run.length === 1) {
+            paths += `<circle cx="${run[0][0].toFixed(1)}" cy="${run[0][1].toFixed(1)}" r="2.5" fill="${color}"></circle>`;
+          }
+          run = [];
+        };
+        values.forEach((v, i) => { if (v == null) flush(); else run.push([x(i), y(v)]); });
+        flush();
+      }
 
       let grid = '';
-      for (const ratio of [0.5, 1]) {
-        const gy = y(yMax * ratio);
+      const gridVals = yFrom === 'auto' ? [yMin, (yMin + yMax) / 2, yMax] : [yMax * 0.5, yMax];
+      for (const gv of gridVals) {
+        const gy = y(gv);
         grid += `<line x1="${padL}" y1="${gy}" x2="${W - padR}" y2="${gy}" stroke="var(--line)" stroke-width="1" stroke-dasharray="2 5"></line>`;
-        grid += `<text x="${padL - 6}" y="${gy + 3.5}" text-anchor="end" font-size="10" fill="var(--muted)">${fmtInt(yMax * ratio)}</text>`;
+        grid += `<text x="${padL - 6}" y="${gy + 3.5}" text-anchor="end" font-size="10" fill="var(--muted)">${nf(gv)}</text>`;
       }
       grid += `<line x1="${padL}" y1="${padT + innerH}" x2="${W - padR}" y2="${padT + innerH}" stroke="var(--line-strong)" stroke-width="1"></line>`;
       let ticks = '';
@@ -2199,8 +2234,8 @@
       block.className = 'chart-block';
       block.innerHTML = `
         <div class="chart-head">
-          <span class="chart-title">${esc(title)}（${esc(unit)}／日）</span>
-          <span class="chart-latest">最近 ${fmtInt(latest)} ${esc(unit)}</span>
+          <span class="chart-title">${esc(title)}（${esc(unit)}${sparse ? '' : '／日'}）</span>
+          <span class="chart-head-right"><span class="chart-latest">最近 ${nf(latest)} ${esc(unit)}</span>${headerExtra}</span>
         </div>
         <div class="chart-wrap">
           <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(title)}近30天趨勢">
@@ -2232,7 +2267,7 @@
         const py = (y(values[best]) / H) * rect.height;
         cross.setAttribute('x1', x(best)); cross.setAttribute('x2', x(best)); cross.setAttribute('opacity', 1);
         crossDot.setAttribute('cx', x(best)); crossDot.setAttribute('cy', y(values[best])); crossDot.setAttribute('opacity', 1);
-        tip.textContent = `${dates[best].slice(5).replace('-', '/')}　${fmt(values[best])} ${unit}`;
+        tip.textContent = `${dates[best].slice(5).replace('-', '/')}　${nf(values[best])} ${unit}`;
         tip.style.left = `${px}px`; tip.style.top = `${py}px`; tip.style.opacity = 1;
       });
       return block;
@@ -2248,6 +2283,15 @@
       });
       const container = $('trendCharts');
       container.innerHTML = '';
+      // 體重放最上面：稀疏量測點連線、min–max 軸才看得出變化；標題列附「＋記體重」
+      const wmap = new Map((state.weights || []).map((w) => [w.date, Number(w.amount)]).filter(([, v]) => v > 0));
+      const wValues = dates.map((d) => (wmap.has(d) ? wmap.get(d) : null));
+      container.appendChild(lineChart({
+        title: '體重', unit: 'kg', color: '#734921', dates, values: wValues,
+        sparse: true, decimals: 2, yFrom: 'auto',
+        headerExtra: '<button type="button" class="chart-add" data-quick-weight="1">＋記體重</button>',
+        emptyHint: '還沒有體重紀錄，點右上角「＋記體重」加第一筆（之後就會畫出變化）'
+      }));
       if (!rows.length) return;
       container.appendChild(lineChart({ title: '總水分', unit: 'ml', color: '#1e7a52', dates, values: series((row) => row.totalWaterMl) }));
       container.appendChild(lineChart({ title: '熱量', unit: 'kcal', color: '#b3703f', dates, values: series((row) => row.kcal) }));
@@ -3581,6 +3625,11 @@
         state.foods = (await api('foods')).rows;
         state.meds = (await api(`meds?petId=${state.petId}`)).rows;
         return openQuickPad(quickBtn.dataset.quick);
+      }
+
+      // 趨勢圖上的「＋記體重」：就地記一筆體重，記完會回頭刷新趨勢圖
+      if (event.target.closest('[data-quick-weight]')) {
+        return openQuickPad('weight');
       }
 
       const editBtn = event.target.closest('[data-edit]');
