@@ -1778,7 +1778,7 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
 // 建好就存進 app_kv 快取；只有連結失效才重建。全程 try/catch，不影響任何回覆。
 // 選單設計版本：改了選單圖片或區塊配置就把這個數字 +1，
 // 現有使用者的快取版本不符就會強制重建，改版才推得到所有人。
-const RICHMENU_VERSION = 4;
+const RICHMENU_VERSION = 5;
 
 async function ensurePersonalRichMenu(env, baseUrl, lineUserId) {
   const db = env.DB;
@@ -1808,7 +1808,7 @@ async function ensurePersonalRichMenu(env, baseUrl, lineUserId) {
       cell(1, 0, send('今天')),                    // 看今天
       cell(2, 0, send('回診')),                    // 給醫生看（回診重點整理，可複製）
       cell(0, 1, { type: 'uri', uri: site }),      // 喵喵照護站（網站）
-      cell(1, 1, send('月曆')),                    // 照護月曆
+      cell(1, 1, send('怎麼記')),                  // 說明／怎麼記（跳出可點範例卡；月曆改到網站分頁）
       cell(2, 1, { type: 'uri', uri: trendSite })  // 飲食回顧（網站，近 30 天）
     ]
   };
