@@ -732,6 +732,18 @@
     /* 快速新增(手機大按鈕)：要一眼看得出是按鈕。
        minmax(0,1fr)＋min-width:0＋clamp 字級：格子縮得下去，字自動變小，任何字級設定都不會把按鈕擠出卡片 */
     .quick-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+    /* 收成一顆「＋記一筆」：網站以檢視為主，記錄收成單顆主按鈕，點開才展開選項 */
+    .record-entry {
+      width: 100%; min-height: 52px; border: 1px solid rgba(74, 48, 22, 0.24); border-radius: var(--radius);
+      background: linear-gradient(180deg, #855A34 0%, #6E4A28 100%); color: #F6EDDF;
+      font-size: 15.5px; font-weight: 600; letter-spacing: 0.1em;
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      box-shadow: 0 1px 1px rgba(60, 40, 20, 0.10), 0 6px 18px rgba(122, 76, 34, 0.13);
+      cursor: pointer; transition: filter .16s, box-shadow .16s, transform .06s;
+    }
+    .record-entry .q-plus { color: #EBD3B0; font-weight: 400; font-size: 0.9em; }
+    .record-entry:hover { filter: brightness(1.06); box-shadow: 0 1px 1px rgba(60, 40, 20, 0.10), 0 8px 22px rgba(122, 76, 34, 0.20); }
+    .record-entry:active { transform: translateY(1px); filter: brightness(0.96); }
     .qbtn {
       display: inline-flex; align-items: center; justify-content: center; gap: 5px;
       min-width: 0; min-height: 50px; padding: 0 4px; border: 1px solid rgba(74, 48, 22, 0.24); border-radius: var(--radius);
@@ -1072,24 +1084,7 @@
           <div id="todayProgress"></div>
         </div>
         <div class="block">
-          <div class="section-head">
-            <h2>快速記一筆</h2>
-          </div>
-          <div class="quick-grid">
-            <button class="qbtn" data-quick="food" type="button"><span class="q-plus">＋</span>吃飯</button>
-            <button class="qbtn" data-quick="water" type="button"><span class="q-plus">＋</span>喝水</button>
-            <button class="qbtn" data-quick="med" type="button"><span class="q-plus">＋</span>用藥</button>
-            <button class="qbtn qbtn-sub" data-quick="vomit" type="button"><span class="q-plus">＋</span>嘔吐</button>
-            <button class="qbtn qbtn-sub" data-quick="stool" type="button"><span class="q-plus">＋</span>大小便</button>
-            <button class="qbtn qbtn-sub" data-quick="mood" type="button"><span class="q-plus">＋</span>精神</button>
-            <button class="qbtn qbtn-sub" data-quick="supplement" type="button"><span class="q-plus">＋</span>保健</button>
-            <button class="qbtn qbtn-sub" data-quick="weight" type="button"><span class="q-plus">＋</span>體重</button>
-            <button class="qbtn qbtn-sub" data-quick="note" type="button"><span class="q-plus">＋</span>備註</button>
-          </div>
-          <div class="day-toolbar">
-            <div class="spacer" style="flex:1"></div>
-            <button class="btn btn-secondary btn-sm" id="addLogBtn" type="button">補登其他時間</button>
-          </div>
+          <button class="record-entry" id="recordEntryBtn" type="button"><span class="q-plus">＋</span> 記一筆</button>
         </div>
         <details class="block fold sec-confirm">
           <summary>
@@ -2013,6 +2008,25 @@
         return quickRecordDirect({ category: 'food', foodType: btn.dataset.type, amount: g, unit: 'g' });
       }
       if (act === 'record') { try { quickRecordDirect(JSON.parse(btn.dataset.payload)); } catch (e) { /* ignore */ } }
+    }
+    // 「＋記一筆」點開的選項表：和原本的快速格子一樣，只是收進彈窗
+    const QUICK_ENTRY_GRID = `
+      <button class="qbtn" data-quick="food" type="button"><span class="q-plus">＋</span>吃飯</button>
+      <button class="qbtn" data-quick="water" type="button"><span class="q-plus">＋</span>喝水</button>
+      <button class="qbtn" data-quick="med" type="button"><span class="q-plus">＋</span>用藥</button>
+      <button class="qbtn qbtn-sub" data-quick="vomit" type="button"><span class="q-plus">＋</span>嘔吐</button>
+      <button class="qbtn qbtn-sub" data-quick="stool" type="button"><span class="q-plus">＋</span>大小便</button>
+      <button class="qbtn qbtn-sub" data-quick="mood" type="button"><span class="q-plus">＋</span>精神</button>
+      <button class="qbtn qbtn-sub" data-quick="supplement" type="button"><span class="q-plus">＋</span>保健</button>
+      <button class="qbtn qbtn-sub" data-quick="weight" type="button"><span class="q-plus">＋</span>體重</button>
+      <button class="qbtn qbtn-sub" data-quick="note" type="button"><span class="q-plus">＋</span>備註</button>`;
+    function openRecordSheet() {
+      $('modalTitle').textContent = '記一筆';
+      $('modalForm').innerHTML = `<div class="quick-grid">${QUICK_ENTRY_GRID}</div>
+        <div class="day-toolbar" style="margin-top:16px;justify-content:center"><button class="btn btn-secondary btn-sm" data-add-log="1" type="button">補登其他時間</button></div>`;
+      modalSaveHandler = null;
+      document.querySelector('.modal-actions').style.display = 'none';
+      $('modalBackdrop').classList.add('open');
     }
     function openQuickPad(category) {
       if (!QUICK_PAD[category]) return openLogModal(null, category); // 需要打字的（備註）走完整表單
@@ -3622,11 +3636,23 @@
         return switchTab('settings');
       }
 
+      // 今天分頁的「＋記一筆」：點開才展開記錄選項（收成一顆，不佔第一頁版面）
+      if (event.target.closest('#recordEntryBtn')) {
+        return openRecordSheet();
+      }
+
       const quickBtn = event.target.closest('[data-quick]');
       if (quickBtn) {
         state.foods = (await api('foods')).rows;
         state.meds = (await api(`meds?petId=${state.petId}`)).rows;
         return openQuickPad(quickBtn.dataset.quick);
+      }
+
+      // 記一筆彈窗裡的「補登其他時間」→ 開完整表單
+      if (event.target.closest('[data-add-log]')) {
+        state.foods = (await api('foods')).rows;
+        state.meds = (await api(`meds?petId=${state.petId}`)).rows;
+        return openLogModal(null);
       }
 
       // 趨勢圖上的「＋記體重」：就地記一筆體重，記完會回頭刷新趨勢圖
@@ -3720,11 +3746,6 @@
     });
     $('recentFold').addEventListener('toggle', (event) => {
       if (event.target.open) loadRecent();
-    });
-    $('addLogBtn').addEventListener('click', async () => {
-      state.foods = (await api('foods')).rows;
-      state.meds = (await api(`meds?petId=${state.petId}`)).rows;
-      openLogModal(null);
     });
     $('addVisitBtn').addEventListener('click', () => openDayVisitModal(null));
     $('digestCopyBtn').addEventListener('click', async () => {
