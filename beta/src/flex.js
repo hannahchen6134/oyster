@@ -1146,7 +1146,7 @@ export function recentFlex(petName, items) {
 }
 
 // ---------- 照護提醒卡 ----------
-export function reminderFlex(pet, lines) {
+export function reminderFlex(pet, lines, title) {
   const items = [];
   for (const line of lines) {
     const [main, ...subs] = String(line).split('\n');
@@ -1180,8 +1180,8 @@ export function reminderFlex(pet, lines) {
     ]
   };
   return bubble(
-    `照護提醒（${pet.petName}）${lines.length} 項`,
-    { type: 'bubble', size: 'mega', header: header(`照護提醒・${pet.petName}`), body, footer }
+    title || `照護提醒（${pet.petName}）${lines.length} 項`,
+    { type: 'bubble', size: 'mega', header: header(title || `照護提醒・${pet.petName}`), body, footer }
   );
 }
 

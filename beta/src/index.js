@@ -246,9 +246,9 @@ async function runDailyReminders(env) {
         }
         if (digestLines.length) {
           const digestPet = ownerPets.length === 1 ? ownerPets[0] : { petName: '今日照護' };
-          // 放在最前面，當作當晚主訊息
-          messages.unshift(reminderFlex(digestPet, ['今日彙整', ...digestLines]));
-          textFallbacks.unshift(`【今日彙整】\n${digestLines.join('\n')}`);
+          // 放在最前面，當作當晚主訊息；標題直接用「今日照護提醒」，body 不再放「今日彙整」字樣
+          messages.unshift(reminderFlex(digestPet, digestLines, '今日照護提醒'));
+          textFallbacks.unshift(`今日照護提醒\n${digestLines.join('\n')}`);
         }
       }
 
@@ -1056,6 +1056,10 @@ async function handleTextMessage(event, env, baseUrl) {
     await replyOrPush(env, event, gateText());
     return;
   }
+
+  // 任何一則訊息都順手確認專屬選單是最新版（版本相符時只是一次快取讀取、很便宜；
+  // 版本不符才會重建＝改版後使用者一互動就換到新選單，不必特地做某個動作）
+  try { await ensurePersonalRichMenu(env, baseUrl, lineUserId); } catch (error) { console.error('richmenu ensure failed:', error.message); }
 
   // 電腦登入：在電腦網站輸入這組碼即可登入（免把手機連結複製過去）
   if (['電腦登入', '電腦', '網頁登入', '網站登入', '登入碼', '用電腦', '電腦版'].includes(text)) {
