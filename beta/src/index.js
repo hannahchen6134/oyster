@@ -342,12 +342,12 @@ function weightOnboardCard(petName, step = '第 2 步・共 3 步') {
   return onboardCard({
     step,
     title: `${petName}現在幾公斤？`,
-    subtitle: '直接打數字就好，例如 4.2。體重是「給醫生看」和每日喝水量目標的基準，先記一次；之後在「今天」分頁隨時能再量再記。',
+    subtitle: '直接打數字，例如 4.2（之後隨時能再量再記）',
     alt: `${petName}現在幾公斤？`
   });
 }
 
-function stepFoodCard(step = '第 3 步・共 3 步', subtitle = '可以建好幾種，乾乾和罐罐都建更好用') {
+function stepFoodCard(step = '第 3 步・共 3 步', subtitle = '建了記錄就自動算熱量（乾乾、罐罐都可）') {
   return onboardCard({
     step,
     title: '最常吃哪一種？',
@@ -377,11 +377,11 @@ function medAskCard(petName, step = '選填') {
 function doneCard(petName) {
   return onboardCard({
     title: '都準備好了',
-    subtitle: `現在試試看：直接打「水 60」，就幫${petName}記下第一筆`,
+    subtitle: `現在幫${petName}記第一筆——點「快速紀錄」用按鈕就好，不用打字`,
     rows: [
-      [menuCell('照著打打看', '不會打？點這裡', '範例', true)],
-      [menuCell('快速紀錄', '點按鈕記錄', '紀錄'), menuCell('今日確認', '看今天狀況', '今天')],
-      [menuCell('補充貓咪資料', '晶片・疾病・疫苗', '補資料'), menuCell('開啟照護站', '月曆・回診・設定', '照護站')]
+      [menuCell('快速紀錄', '點按鈕記，不用打字', '紀錄', true)],
+      [menuCell('怎麼記？看範例', '想打字更快看這', '怎麼記'), menuCell('今日確認', '看今天狀況', '今天')],
+      [menuCell('補充貓咪資料', '晶片・疾病・疫苗', '補資料'), menuCell('開啟照護站', '回診・回顧・設定', '照護站')]
     ],
     hint: '晶片、疾病、疫苗、醫院醫生等詳細資料，點「補充貓咪資料」直接到設定頁填',
     alt: '都準備好了！'
@@ -1146,7 +1146,7 @@ async function handleTextMessage(event, env, baseUrl) {
     }
 
     case 'exampleMenu': {
-      await replyOrPushFlex(env, event, exampleCard(), '照著打打看：\n水 60（記喝水）\n罐頭 30（記食物）\n藥 早 已吃\n吐了');
+      await replyOrPushFlex(env, event, exampleCard(), '怎麼記：\n水 60（記喝水）\n罐頭 30（記食物）\n藥 早 已吃\n吐了');
       return;
     }
 
@@ -1732,10 +1732,11 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
     ? (record.foodType === '乾糧' ? 'dry' : 'wet')
     : record.category;
 
+  const fixName = record.category === 'food' ? (log.itemName || record.foodType || '罐頭') : '';
   let tip = record.category === 'water'
-    ? '記錯了？直接輸入「改 25」'
+    ? '記錯？直接打「改 25」改這筆'
     : record.category === 'food'
-      ? '記錯輸入「改 54」・沒吃完輸入「剩 20」'
+      ? `記錯？打「改 25」或「改 ${fixName} 25」・沒吃完「剩 20」`
       : '';
   if (opts.fromButton) {
     const amt = record.amount;
@@ -1778,7 +1779,8 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
 // 建好就存進 app_kv 快取；只有連結失效才重建。全程 try/catch，不影響任何回覆。
 // 選單設計版本：改了選單圖片或區塊配置就把這個數字 +1，
 // 現有使用者的快取版本不符就會強制重建，改版才推得到所有人。
-const RICHMENU_VERSION = 5;
+// ⚠ 新選單圖（月曆格→「說明／怎麼記」）就緒後，把這個改成 5 再部署，才會連同新圖一起推。
+const RICHMENU_VERSION = 4;
 
 async function ensurePersonalRichMenu(env, baseUrl, lineUserId) {
   const db = env.DB;

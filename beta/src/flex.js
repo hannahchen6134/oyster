@@ -710,7 +710,7 @@ export function exampleCard() {
         action: { type: 'message', label: '改用按鈕', text: '按鈕記錄' } }
     ]
   };
-  return bubble('照著打打看：水 60、罐頭 30、藥 早 已吃、水20 乾糧4 藥早已吃',
+  return bubble('怎麼記：水 60、罐頭 30、藥 早 已吃、水20 乾糧4 藥早已吃',
     { type: 'bubble', size: 'mega', header: header('怎麼記？打字最快'), body, footer });
 }
 
@@ -880,9 +880,9 @@ export function menuFlex() {
     contents: [
       text(BRAND.tagline, { size: 'xs', color: C.muted, align: 'center', wrap: true }),
       row([menuCell(BRAND.onboarding, '第一次使用看這裡', '安心上手')]),
-      row([menuCell('照著打打看', '點一句就記', '範例'), menuCell('如何記餵藥', '藥的記法', '如何記餵藥')]),
+      row([menuCell('怎麼記？看範例', '點一句就記', '怎麼記'), menuCell('如何記餵藥', '藥的記法', '如何記餵藥')]),
       row([menuCell('今日照護確認', '看今天狀況', '今天'), menuCell('回診摘要', '近 7 天整理', '回診摘要')]),
-      row([menuCell('開啟照護站', '月曆・血檢・設定', '照護站', true)])
+      row([menuCell('開啟照護站', '回診・血檢・設定', '照護站', true)])
     ]
   };
   return bubble('使用說明選單', { type: 'bubble', size: 'mega', header: header('想做什麼？'), body });
