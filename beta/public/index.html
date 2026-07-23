@@ -638,6 +638,31 @@
     .loading { opacity: 0.55; pointer-events: none; }
     .hidden { display: none !important; }
 
+    /* 首次進站聚光燈導覽：圈選目標＋脈動圈＋說明氣泡 */
+    .tour-ring {
+      position: fixed; z-index: 9998; border-radius: 12px; pointer-events: none;
+      border: 2.5px solid #FBF7F0; box-shadow: 0 0 0 9999px rgba(30, 24, 16, 0.55);
+    }
+    .tour-ring::after {
+      content: ''; position: absolute; inset: -4px; border-radius: 15px;
+      border: 2px solid var(--brand); animation: tourPulse 1.6s ease-out infinite;
+    }
+    @keyframes tourPulse { 0% { transform: scale(1); opacity: 0.85 } 100% { transform: scale(1.18); opacity: 0 } }
+    .tour-bubble {
+      position: fixed; z-index: 9999; max-width: 288px;
+      background: linear-gradient(180deg, #fffefb, #f8f2e6);
+      border: 1px solid rgba(115, 73, 33, 0.2); border-radius: 14px; padding: 15px 16px;
+      box-shadow: 0 12px 34px rgba(58, 42, 24, 0.28);
+      font-size: 14px; line-height: 1.65; color: var(--ink-soft);
+      animation: tourPop 0.22s ease-out;
+    }
+    @keyframes tourPop { from { opacity: 0; transform: translateY(6px) scale(0.98) } to { opacity: 1; transform: none } }
+    .tour-bubble .tour-text b { color: var(--brand); font-weight: 700; }
+    .tour-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 13px; }
+    .tour-skip { border: none; background: transparent; color: var(--muted); font-size: 13px; cursor: pointer; padding: 6px 4px; }
+    .tour-next { border: none; background: var(--brand); color: #fff; font-size: 13.5px; font-weight: 600; border-radius: 999px; padding: 8px 17px; cursor: pointer; }
+    .tour-next:hover { filter: brightness(1.06); }
+
     /* 趨勢圖 */
     .chart-block { margin-bottom: 22px; }
     .chart-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px; }
@@ -1432,6 +1457,62 @@
       if (tab === 'calendar') loadCalendar();
       if (tab === 'trend') { trackEvent('review_open', true); loadTrend(); }
       if (tab === 'settings') loadSettings();
+    }
+
+    // ===== 首次進站聚光燈導覽：帶新用戶去設定「常吃的食物」=====
+    const TOUR_KEY = 'tourFood_done_v1';
+    let tourReposition = () => {};
+    function foodNeedsSetup() {
+      const foods = (state.foods || []).filter((f) => !f.isDeleted);
+      return !foods.some((f) => Number(f.kcalPerGram) > 0); // 沒品項、或全都沒填每克熱量 → 值得引導
+    }
+    function maybeStartTour() {
+      if (localStorage.getItem(TOUR_KEY)) return;
+      if (!foodNeedsSetup()) { localStorage.setItem(TOUR_KEY, '1'); return; } // 已設定就別打擾
+      setTimeout(startTour, 600);
+    }
+    function endTour() {
+      document.querySelectorAll('.tour-ring, .tour-bubble').forEach((el) => el.remove());
+      window.removeEventListener('resize', tourReposition);
+      localStorage.setItem(TOUR_KEY, '1');
+    }
+    function tourShow(target, opts) {
+      document.querySelectorAll('.tour-ring, .tour-bubble').forEach((el) => el.remove());
+      if (!target) return endTour();
+      try { target.scrollIntoView({ block: 'center' }); } catch (e) { /* ignore */ }
+      const ring = document.createElement('div'); ring.className = 'tour-ring';
+      const bubble = document.createElement('div'); bubble.className = 'tour-bubble';
+      bubble.innerHTML = `<div class="tour-text">${opts.text}</div>
+        <div class="tour-actions"><button type="button" class="tour-skip">略過導覽</button>
+        <button type="button" class="tour-next">${esc(opts.primary)}</button></div>`;
+      document.body.append(ring, bubble);
+      const place = () => {
+        const r = target.getBoundingClientRect(); const pad = 8;
+        ring.style.left = `${r.left - pad}px`; ring.style.top = `${r.top - pad}px`;
+        ring.style.width = `${r.width + pad * 2}px`; ring.style.height = `${r.height + pad * 2}px`;
+        const bw = Math.min(288, window.innerWidth - 32); bubble.style.width = `${bw}px`;
+        bubble.style.left = `${Math.max(16, Math.min(r.left + r.width / 2 - bw / 2, window.innerWidth - bw - 16))}px`;
+        const bh = bubble.offsetHeight || 130;
+        bubble.style.top = `${(r.bottom + bh + 20 < window.innerHeight) ? r.bottom + 14 : Math.max(16, r.top - bh - 14)}px`;
+      };
+      place(); tourReposition = place; window.addEventListener('resize', tourReposition);
+      bubble.querySelector('.tour-next').onclick = opts.onPrimary;
+      bubble.querySelector('.tour-skip').onclick = endTour;
+    }
+    function startTour() {
+      tourShow(document.querySelector('.tabs [data-tab="settings"]'), {
+        text: '先花 30 秒設定<b>常吃的食物</b>，之後每次記錄就會自動幫你算熱量與水分。',
+        primary: '帶我去設定 →',
+        onPrimary: () => { state.settingsTab = 'foods'; switchTab('settings'); setTimeout(tourStepAdd, 480); }
+      });
+    }
+    function tourStepAdd() {
+      const addBtn = $('settingsAddBtn');
+      tourShow(addBtn, {
+        text: '點「<b>＋ 新增</b>」把常吃的乾乾／罐罐建起來，填上每克熱量（包裝上通常有），熱量就會準。',
+        primary: '好，開始新增',
+        onPrimary: () => { endTour(); if (addBtn) addBtn.click(); }
+      });
     }
 
     // ---------- 今日明細 ----------
@@ -3544,6 +3625,7 @@
         return;
       }
       await loadDay();
+      maybeStartTour(); // 第一次進站、且食物還沒設定 → 聚光燈帶去設定食物
     }
 
     document.addEventListener('click', async (event) => {
