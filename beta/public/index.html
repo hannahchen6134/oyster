@@ -649,6 +649,12 @@
     .modal h2 { padding-top: 4px; font-family: var(--serif); font-size: 20px; }
     .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
     .field { margin-bottom: 13px; }
+    .adv-fold { margin: 4px 0 6px; border-top: 1px solid var(--line); padding-top: 12px; }
+    .adv-fold > summary { cursor: pointer; font-size: 13px; color: var(--muted); list-style: none; padding: 2px 0; }
+    .adv-fold > summary::-webkit-details-marker { display: none; }
+    .adv-fold > summary::before { content: '▸ '; }
+    .adv-fold[open] > summary::before { content: '▾ '; }
+    .adv-fold[open] > summary { margin-bottom: 10px; }
     .toast {
       position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%);
       background: #3a2a18; color: #fff; padding: 9px 18px; border-radius: 999px;
@@ -2950,16 +2956,14 @@
       },
       foods: {
         title: '食物',
-        hint: '每個品項填每克熱量與水分比例；熱量用原始克數計算，罐頭/濕食沒填比例時預設 80% 水分、20% 固形。',
+        hint: '填「名稱＋類型＋熱量」就能用；在 LINE 打這個名字就會對應到它。水分比例收在進階裡，通常不用改。',
         fields: [
-          { name: 'displayName', label: '顯示名稱（LINE 輸入比對用）', required: true },
-          { name: 'brand', label: '品牌' },
-          { name: 'productName', label: '品名' },
+          { name: 'displayName', label: '食物名稱（在 LINE 打這個名字就能記）', required: true },
           { name: 'foodType', label: '類型', type: 'select', options: FOOD.TYPES },
           { name: 'kcalPerGram', label: '熱量（照包裝填，不用自己換算）', type: 'kcalInput' },
-          { name: 'waterRatio', label: '水分比例（0–1；罐頭/濕食沒填時預設 0.8，即 80% 水分 20% 固形）', type: 'number', step: '0.01' },
           { name: 'isPrescription', label: '處方食品', type: 'select', options: [['0', '否'], ['1', '是']] },
-          { name: 'note', label: '備註', type: 'textarea' }
+          { name: 'note', label: '備註（選填）', type: 'textarea' },
+          { name: 'waterRatio', label: '水分比例（0–1；留空就用類型預設，例如罐頭 0.8）', type: 'number', step: '0.01', advanced: true }
         ],
         render: (row) => ({
           title: `${row.displayName}（${row.foodType}）`,
@@ -3480,8 +3484,15 @@
 
     function openSettingsModal(row) {
       const spec = SETTINGS_SPEC[state.settingsTab];
-      const html = spec.fields.map((field) =>
-        `<div class="field"><label>${esc(field.label)}</label>${settingsFieldHtml(field, row?.[field.name])}</div>`).join('');
+      const fieldHtml = (field) =>
+        `<div class="field"><label>${esc(field.label)}</label>${settingsFieldHtml(field, row?.[field.name])}</div>`;
+      // 一般欄位照常顯示；標了 advanced 的收進「進階設定」摺疊區（仍在表單內，儲存照樣讀得到）
+      const normal = spec.fields.filter((field) => !field.advanced);
+      const advanced = spec.fields.filter((field) => field.advanced);
+      let html = normal.map(fieldHtml).join('');
+      if (advanced.length) {
+        html += `<details class="adv-fold"><summary>進階設定（通常不用打開）</summary>${advanced.map(fieldHtml).join('')}</details>`;
+      }
       openModal(`${row ? '編輯' : '新增'}${spec.title}`, html, async (form) => {
         const body = {};
         for (const field of spec.fields) {
