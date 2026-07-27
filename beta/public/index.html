@@ -1530,7 +1530,27 @@
       bubble.querySelector('.tour-next').onclick = opts.onPrimary;
       bubble.querySelector('.tour-skip').onclick = endTour;
     }
+    // 第 1 步：開場歡迎（置中，不圈任何元素）
     function startTour() {
+      document.querySelectorAll('.tour-ring, .tour-bubble').forEach((el) => el.remove());
+      const bubble = document.createElement('div');
+      bubble.className = 'tour-bubble';
+      bubble.innerHTML = `<div class="tour-text"><b>歡迎來到喵喵照護站</b><br>花 30 秒帶你上手：之後每天記錄，系統就會自動幫你算熱量與水分，回診時一鍵整理給醫生看。</div>
+        <div class="tour-actions"><button type="button" class="tour-skip">略過導覽</button>
+        <button type="button" class="tour-next">開始 →</button></div>`;
+      document.body.append(bubble);
+      const place = () => {
+        const bw = Math.min(300, window.innerWidth - 32);
+        bubble.style.width = `${bw}px`;
+        bubble.style.left = `${(window.innerWidth - bw) / 2}px`;
+        bubble.style.top = `${Math.max(40, window.innerHeight / 2 - (bubble.offsetHeight || 150) / 2)}px`;
+      };
+      place(); tourReposition = place; window.addEventListener('resize', tourReposition);
+      bubble.querySelector('.tour-next').onclick = tourStepSettings;
+      bubble.querySelector('.tour-skip').onclick = endTour;
+    }
+    // 第 2 步：圈「設定」分頁
+    function tourStepSettings() {
       tourShow(document.querySelector('.tabs [data-tab="settings"]'), {
         text: '先花 30 秒設定<b>常吃的食物</b>，之後每次記錄就會自動幫你算熱量與水分。',
         primary: '帶我去設定 →',
