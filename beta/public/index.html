@@ -3971,12 +3971,16 @@
       let dataUrl = '';
       let failMsg = '';
       try {
-        const opts = { backgroundColor: '#efe9dd', pixelRatio: 2, style: { margin: '0' } };
+        // skipFonts：不要去抓 Google 字型內嵌（那步在受限瀏覽器會卡死逾時）；
+        // 頁面已載入的字型仍會用，最差退回系統中文字型也清楚
+        const opts = { backgroundColor: '#efe9dd', pixelRatio: 2, style: { margin: '0' }, skipFonts: true };
+        // 每一次算圖都套逾時，避免任何一步（含暖身）卡死讓按鈕永遠回不來
+        const withTimeout = (p, ms) => Promise.race([
+          p, new Promise((_, reject) => setTimeout(() => reject(new Error(`逾時 ${ms / 1000} 秒`)), ms))
+        ]);
         // LINE 內建瀏覽器：第一次算圖常空白／失敗，先暖身一次（忽略結果與錯誤）再正式產生
-        try { await window.htmlToImage.toPng(view, opts); } catch (warmErr) { /* 暖身失敗不當錯誤 */ }
-        // 逾時保險：萬一卡住也不會讓按鈕永遠停在「產生中」
-        const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('逾時 25 秒')), 25000));
-        dataUrl = await Promise.race([window.htmlToImage.toPng(view, opts), timeout]);
+        try { await withTimeout(window.htmlToImage.toPng(view, opts), 12000); } catch (warmErr) { /* 暖身失敗不當錯誤 */ }
+        dataUrl = await withTimeout(window.htmlToImage.toPng(view, opts), 20000);
       } catch (error) {
         failMsg = (error && error.message) ? error.message : String(error);
       } finally {
