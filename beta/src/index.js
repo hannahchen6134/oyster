@@ -808,7 +808,13 @@ async function quickShortcuts(db, petId) {
       ).bind(petId).all();
       for (const r of results || []) {
         if (r.category === 'water' && r.amt > 0) cmds.push(`水 ${r.amt}`);
-        else if (r.category === 'food' && r.foodType && r.amt > 0) cmds.push(`${r.foodType}${r.itemName ? ` ${r.itemName}` : ''} ${r.amt}`);
+        else if (r.category === 'food' && r.foodType && r.amt > 0) {
+          // 品名若已含類型（例：類型「乾糧」＋品名「希爾斯乾糧」）→ 去掉重複的類型字，
+          // 指令才乾淨（「乾糧 希爾斯 5」而非「乾糧 希爾斯乾糧 5」）且仍能被解析比對到品項
+          let name = String(r.itemName || '');
+          if (name.includes(r.foodType)) name = name.split(r.foodType).join('').trim();
+          cmds.push(`${r.foodType}${name ? ` ${name}` : ''} ${r.amt}`);
+        }
         else if (r.category === 'med') cmds.push(`藥 ${[r.medSlot, r.medStatus || '已吃'].filter(Boolean).join(' ')}`.trim());
       }
     } catch (error) { /* 查不到就用預設 */ }
