@@ -535,6 +535,19 @@
     .digest-seg button.active { background: var(--brand); color: #fff; }
     /* 複製：安靜的文字鈕，不搶截圖畫面 */
     .digest-copy { border: none; background: transparent; color: var(--brand); font-size: 12.5px; font-weight: 600; letter-spacing: 0.04em; padding: 6px 2px; white-space: nowrap; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--line-strong); }
+    /* 存成圖片給醫生：置頂按鈕＋一句說明 */
+    .report-actions { margin-bottom: 14px; }
+    #reportSaveBtn { width: 100%; }
+    .report-hint { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 8px 2px 0; text-align: center; }
+    /* 截圖用標題（平常隱藏，產生圖片時才插入） */
+    .cap-header { display: none; padding: 2px 2px 14px; }
+    .cap-title { font-size: 18px; font-weight: 700; color: var(--brand); }
+    .cap-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    /* 產生圖片中：隱藏互動控制與操作說明，只留報告內容 */
+    .capturing .cap-hide, .capturing .fold-toggle, .capturing #addVisitBtn,
+    .capturing #labItemSelect { display: none !important; }
+    .capturing .cap-header { display: block !important; }
+    .capturing summary { pointer-events: none; }
     /* 回診重點：只列須注意事件；漏藥補一條紅旗（截圖給醫生用） */
     .vh-flags { margin: 0 0 10px; padding: 11px 14px; border-radius: var(--radius); font-size: 13px; line-height: 1.6; }
     .vh-flags.warn { background: #fbeee9; border: 1px solid rgba(191, 59, 32, 0.2); color: var(--seal); font-weight: 700; }
@@ -1193,6 +1206,10 @@
 
       <!-- 回診 -->
       <section class="panel hidden" id="trendView">
+        <div class="report-actions cap-hide">
+          <button class="btn btn-primary" id="reportSaveBtn" type="button">📷 存成圖片給醫生</button>
+          <p class="report-hint">存成一張圖到相簿，看診時直接給醫生看，不用登入、不會截歪。</p>
+        </div>
         <details class="block fold" open>
           <summary>
             <span class="fold-head">
@@ -1212,7 +1229,7 @@
             </div>
             <div id="vetHighlights"></div>
             <div class="digest-card" id="digestCard"></div>
-            <p class="muted" style="font-size:12px;margin:10px 2px 0">只列有狀況的日子，沒列出＝無特殊事件。截圖或按「複製文字」貼給醫生都可以。</p>
+            <p class="muted cap-hide" style="font-size:12px;margin:10px 2px 0">只列有狀況的日子，沒列出＝無特殊事件。截圖或按「複製文字」貼給醫生都可以。</p>
           </div>
         </details>
         <details class="block fold" open>
@@ -1229,7 +1246,7 @@
               </div>
             </div>
             <div id="compCard"></div>
-            <p class="muted" style="font-size:12px;margin:14px 2px 0">濕食＝罐頭與濕糧（含水量高，是重要補水來源）。水分分「自己喝的」與「食物帶來的」；截圖即可給醫生看。</p>
+            <p class="muted cap-hide" style="font-size:12px;margin:14px 2px 0">濕食＝罐頭與濕糧（含水量高，是重要補水來源）。水分分「自己喝的」與「食物帶來的」；截圖即可給醫生看。</p>
           </div>
         </details>
         <details class="block fold">
@@ -1331,6 +1348,8 @@
   <div class="toast" id="toast"></div>
   <div id="printReport" aria-hidden="true"></div>
 
+  <!-- 存成圖片給醫生：同源本地檔，執行時不連外 -->
+  <script src="/html-to-image.js"></script>
   <script>
     'use strict';
     const TOKEN_KEY = 'cat-care-beta-token';
@@ -3888,6 +3907,64 @@
         await navigator.clipboard.writeText(text);
         toast('已複製，貼上就能傳給醫生');
       } catch (error) { toast('複製失敗，請改用截圖', true); }
+    });
+    // 存成圖片給醫生：把「回診」整頁（所有摺疊都展開、隱藏操作鈕）轉成一張圖，
+    // 手機用分享面板存進相簿／傳出去；電腦則直接下載。診間打開圖片就能給醫生看。
+    $('reportSaveBtn').addEventListener('click', async () => {
+      const view = $('trendView');
+      const btn = $('reportSaveBtn');
+      if (!window.htmlToImage) { toast('圖片功能還在載入，請稍等一下再按', true); return; }
+      const petName = ($('petTitle').textContent || '貓咪').trim();
+      const today = todayStr();
+      const orig = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = '產生圖片中…';
+      // 展開所有（非隱藏的）摺疊區，記住原本開闔狀態，截完還原
+      const folds = Array.from(view.querySelectorAll('details')).filter((d) => !d.classList.contains('hidden'));
+      const wasOpen = folds.map((d) => d.open);
+      folds.forEach((d) => { d.open = true; });
+      // 插入截圖標題（貓咪名字＋產生日期）
+      const header = document.createElement('div');
+      header.className = 'cap-header';
+      header.innerHTML = `<div class="cap-title">${esc(petName)}・照護紀錄</div>`
+        + `<div class="cap-sub">產生日期 ${esc(today)}　·　來源：喵喵照護站</div>`;
+      view.prepend(header);
+      view.classList.add('capturing');
+      // 讓瀏覽器先完成版面重排，圖表才不會被截到一半
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      try {
+        const opts = { backgroundColor: '#efe9dd', pixelRatio: 2, style: { margin: '0' } };
+        // iOS 首次呼叫偶爾空白 → 先暖身一次再正式產生
+        await window.htmlToImage.toPng(view, opts);
+        const dataUrl = await window.htmlToImage.toPng(view, opts);
+        const fileName = `${petName}_照護紀錄_${today}.png`;
+        const blob = await (await fetch(dataUrl)).blob();
+        const file = new File([blob], fileName, { type: 'image/png' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({ files: [file] });
+          } catch (shareErr) {
+            if (shareErr && shareErr.name === 'AbortError') { /* 使用者自己取消，不當錯誤 */ }
+            else throw shareErr;
+          }
+        } else {
+          const a = document.createElement('a');
+          a.href = dataUrl;
+          a.download = fileName;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          toast('已存成圖片，打開相簿就能給醫生看');
+        }
+      } catch (error) {
+        toast('產生圖片失敗，可改用手機截圖', true);
+      } finally {
+        view.classList.remove('capturing');
+        header.remove();
+        folds.forEach((d, i) => { d.open = wasOpen[i]; });
+        btn.disabled = false;
+        btn.textContent = orig;
+      }
     });
     $('calPrevBtn').addEventListener('click', () => {
       const [year, month] = state.calMonth.split('-').map(Number);
