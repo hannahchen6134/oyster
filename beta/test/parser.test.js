@@ -235,6 +235,13 @@ test('改 皇家罐頭 24 → 指定品名改食物（fixMatch，不限最後一
   assert.equal(parseMessage('改 罐頭 30').query, '罐頭');
 });
 
+test('新增食物分類：生食／生肉可辨識', () => {
+  assert.equal(parseMessage('生食 30').record.foodType, '生食');
+  assert.equal(parseMessage('生食 30').record.amount, 30);
+  assert.equal(parseMessage('生肉 25').record.foodType, '生食');
+  assert.deepEqual(parseMessage('設定生食 主食生食 1.5'), { type: 'foodSetup', foodType: '生食', name: '主食生食', kcalPerGram: 1.5 });
+});
+
 test('引導建檔：食物與餵藥時段', () => {
   assert.deepEqual(parseMessage('設定罐頭 主食罐 1.1'), { type: 'foodSetup', foodType: '罐頭', name: '主食罐', kcalPerGram: 1.1 });
   assert.deepEqual(parseMessage('設定乾糧 腎處方'), { type: 'foodSetup', foodType: '乾糧', name: '腎處方', kcalPerGram: 0 });

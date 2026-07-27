@@ -812,13 +812,7 @@ async function quickShortcuts(db, petId) {
       ).bind(petId).all();
       for (const r of results || []) {
         if (r.category === 'water' && r.amt > 0) cmds.push(`水 ${r.amt}`);
-        else if (r.category === 'food' && r.foodType && r.amt > 0) {
-          // 品名若已含類型（例：類型「乾糧」＋品名「希爾斯乾糧」）→ 去掉重複的類型字，
-          // 指令才乾淨（「乾糧 希爾斯 5」而非「乾糧 希爾斯乾糧 5」）且仍能被解析比對到品項
-          let name = String(r.itemName || '');
-          if (name.includes(r.foodType)) name = name.split(r.foodType).join('').trim();
-          cmds.push(`${r.foodType}${name ? ` ${name}` : ''} ${r.amt}`);
-        }
+        else if (r.category === 'food' && r.foodType && r.amt > 0) cmds.push(foodShortcutCmd(r.foodType, r.itemName, r.amt));
         else if (r.category === 'med') cmds.push(`藥 ${[r.medSlot, r.medStatus || '已吃'].filter(Boolean).join(' ')}`.trim());
       }
     } catch (error) { /* 查不到就用預設 */ }
@@ -1549,7 +1543,14 @@ async function handleTextMessage(event, env, baseUrl) {
 }
 
 // 食物顯示：品名已含類型（如「希爾斯罐頭」）就不再前綴類型，避免「罐頭 希爾斯罐頭」重複
-function foodLabel(foodType, itemName) {
+// 一鍵捷徑的食物指令：品名若已含類型就去掉重複的類型字（「乾糧 希爾斯 5」而非「乾糧 希爾斯乾糧 5」），
+// 但保留類型前綴讓 parser 仍能解析比對到品項。
+export function foodShortcutCmd(foodType, itemName, amt) {
+  let name = String(itemName || '');
+  if (foodType && name.includes(foodType)) name = name.split(foodType).join('').trim();
+  return `${foodType}${name ? ` ${name}` : ''} ${amt}`;
+}
+export function foodLabel(foodType, itemName) {
   const t = String(foodType || '').trim();
   const n = String(itemName || '').trim();
   if (!n) return t;
@@ -1559,7 +1560,7 @@ function foodLabel(foodType, itemName) {
 
 // 沒指定早/晚時，依「這筆的時間」自動歸到最接近的餵藥時段（早≈8、中午≈13、晚≈20 點）。
 // 使用者有明講時段就不呼叫這個（明確優先）；沒設定餵藥時段則回空字串。
-function autoMedSlot(pet, eventDateTime) {
+export function autoMedSlot(pet, eventDateTime) {
   let slots = [];
   try { slots = JSON.parse(pet?.goalMedSlots || '[]'); } catch (error) { slots = []; }
   slots = Array.isArray(slots) ? slots.filter(Boolean) : [];
