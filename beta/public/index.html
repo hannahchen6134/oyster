@@ -540,6 +540,15 @@
     #reportSaveBtn { width: 100%; }
     .report-hint { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 8px 2px 0; text-align: center; }
     /* 截圖用標題（平常隱藏，產生圖片時才插入） */
+    /* 產生好的報告圖：全螢幕顯示，長按即可存到相簿 */
+    .imgbox { position: fixed; inset: 0; z-index: 90; background: rgba(20, 16, 12, 0.86); display: flex; flex-direction: column; }
+    .imgbox-bar { flex: 0 0 auto; display: flex; gap: 8px; align-items: center; padding: 12px 14px; }
+    .imgbox-hint { flex: 1; color: #fff; font-size: 12.5px; line-height: 1.5; }
+    .imgbox-btn { flex: 0 0 auto; font-size: 13px; font-weight: 600; padding: 8px 14px; border-radius: 999px; border: none; cursor: pointer; }
+    .imgbox-share { background: var(--brand-tint); color: var(--brand); }
+    .imgbox-close { background: rgba(255, 255, 255, 0.16); color: #fff; }
+    .imgbox-scroll { flex: 1; overflow: auto; -webkit-overflow-scrolling: touch; padding: 0 12px 18px; }
+    .imgbox-scroll img { display: block; width: 100%; max-width: 460px; margin: 0 auto; border-radius: 10px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3); }
     .cap-header { display: none; padding: 2px 2px 14px; }
     .cap-title { font-size: 18px; font-weight: 700; color: var(--brand); }
     .cap-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
@@ -3909,7 +3918,8 @@
       } catch (error) { toast('複製失敗，請改用截圖', true); }
     });
     // 存成圖片給醫生：把「回診」整頁（所有摺疊都展開、隱藏操作鈕）轉成一張圖，
-    // 手機用分享面板存進相簿／傳出去；電腦則直接下載。診間打開圖片就能給醫生看。
+    // 然後把圖直接顯示在畫面上讓使用者「長按儲存」——這招在 LINE 內建瀏覽器也有效，
+    // 不倚賴 a[download]（內建瀏覽器常擋下載）也不倚賴檔案分享（多數 webview 不支援）。
     $('reportSaveBtn').addEventListener('click', async () => {
       const view = $('trendView');
       const btn = $('reportSaveBtn');
@@ -3932,30 +3942,12 @@
       view.classList.add('capturing');
       // 讓瀏覽器先完成版面重排，圖表才不會被截到一半
       await new Promise((resolve) => setTimeout(resolve, 60));
+      let dataUrl = '';
       try {
-        const opts = { backgroundColor: '#efe9dd', pixelRatio: 2, style: { margin: '0' } };
-        // iOS 首次呼叫偶爾空白 → 先暖身一次再正式產生
-        await window.htmlToImage.toPng(view, opts);
-        const dataUrl = await window.htmlToImage.toPng(view, opts);
-        const fileName = `${petName}_照護紀錄_${today}.png`;
-        const blob = await (await fetch(dataUrl)).blob();
-        const file = new File([blob], fileName, { type: 'image/png' });
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          try {
-            await navigator.share({ files: [file] });
-          } catch (shareErr) {
-            if (shareErr && shareErr.name === 'AbortError') { /* 使用者自己取消，不當錯誤 */ }
-            else throw shareErr;
-          }
-        } else {
-          const a = document.createElement('a');
-          a.href = dataUrl;
-          a.download = fileName;
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          toast('已存成圖片，打開相簿就能給醫生看');
-        }
+        const opts = { backgroundColor: '#efe9dd', pixelRatio: 2, style: { margin: '0' }, cacheBust: true };
+        // 加逾時保險：萬一算圖卡住也不會讓按鈕永遠消失
+        const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 20000));
+        dataUrl = await Promise.race([window.htmlToImage.toPng(view, opts), timeout]);
       } catch (error) {
         toast('產生圖片失敗，可改用手機截圖', true);
       } finally {
@@ -3965,7 +3957,39 @@
         btn.disabled = false;
         btn.textContent = orig;
       }
+      if (dataUrl) showReportImage(dataUrl, `${petName}_照護紀錄_${today}.png`);
     });
+    // 顯示產生好的報告圖：長按可儲存（全平台通用）；另備一顆「分享／存圖」用新的一次點擊觸發，
+    // 讓支援的手機能叫出系統分享面板（新手勢才不會被瀏覽器擋掉）。
+    function showReportImage(dataUrl, fileName) {
+      const box = document.createElement('div');
+      box.className = 'imgbox';
+      box.innerHTML = `
+        <div class="imgbox-bar">
+          <div class="imgbox-hint">長按下面的圖片 → 「儲存到相簿」，看診時打開給醫生看</div>
+          <button class="imgbox-btn imgbox-share" type="button">分享／存圖</button>
+          <button class="imgbox-btn imgbox-close" type="button">關閉</button>
+        </div>
+        <div class="imgbox-scroll"><img alt="照護紀錄" src="${dataUrl}"></div>`;
+      document.body.appendChild(box);
+      box.querySelector('.imgbox-close').onclick = () => box.remove();
+      box.querySelector('.imgbox-share').onclick = async () => {
+        try {
+          const blob = await (await fetch(dataUrl)).blob();
+          const file = new File([blob], fileName, { type: 'image/png' });
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({ files: [file] });
+          } else {
+            const a = document.createElement('a');
+            a.href = dataUrl; a.download = fileName;
+            document.body.appendChild(a); a.click(); a.remove();
+            toast('若沒有跳出下載，請改用長按圖片儲存');
+          }
+        } catch (error) {
+          if (!(error && error.name === 'AbortError')) toast('請改用長按圖片儲存', true);
+        }
+      };
+    }
     $('calPrevBtn').addEventListener('click', () => {
       const [year, month] = state.calMonth.split('-').map(Number);
       const date = new Date(year, month - 2, 1);
