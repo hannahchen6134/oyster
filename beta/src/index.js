@@ -170,6 +170,7 @@ export default {
         const { results } = await db.prepare(
           `SELECT u.lineUserId, u.displayName, u.betaAccess,
                   (SELECT COUNT(*) FROM logs l WHERE l.lineUserId = u.lineUserId AND l.isDeleted = 0 AND l.source IN ('line','web')) recs,
+                  (SELECT COUNT(DISTINCT substr(eventDateTime,1,10)) FROM logs l WHERE l.lineUserId = u.lineUserId AND l.isDeleted = 0 AND l.source IN ('line','web')) days,
                   (SELECT MAX(substr(eventDateTime,1,10)) FROM logs l WHERE l.lineUserId = u.lineUserId AND l.isDeleted = 0 AND l.source IN ('line','web')) lastDay,
                   (SELECT GROUP_CONCAT(petName, '、') FROM pets p WHERE p.ownerLineUserId = u.lineUserId AND p.isDeleted = 0) pets
            FROM users u
@@ -180,6 +181,21 @@ export default {
         const mask = (id) => '…' + String(id).slice(-6);
         const onCount = rows.filter((r) => Number(r.betaAccess) === 1).length;
         const activeCount = rows.filter((r) => r.lastDay && r.lastDay >= d7).length;
+        // 併入留存數據（原本的 /admin/metrics 內容），一頁看完
+        const recordedCount = rows.filter((r) => Number(r.recs) > 0).length;
+        const retained2d = rows.filter((r) => Number(r.days) >= 2).length;
+        const retained7d = rows.filter((r) => Number(r.days) >= 7).length;
+        const totalRecords = rows.reduce((t, r) => t + (Number(r.recs) || 0), 0);
+        const stat = (n, label) => `<div class="stat"><div class="stat-n">${n}</div><div class="stat-l">${label}</div></div>`;
+        const statsBar = `<div class="stats">
+          ${stat(rows.length, '總人數')}
+          ${stat(onCount, '已開通')}
+          ${stat(recordedCount, '有記錄')}
+          ${stat(activeCount, '近7天活躍')}
+          ${stat(retained2d, '回訪≥2天')}
+          ${stat(retained7d, '回訪≥7天')}
+          ${stat(totalRecords, '總筆數')}
+        </div>`;
         const cards = rows.map((r) => {
           const on = Number(r.betaAccess) === 1;
           const label = esc(r.displayName) || mask(r.lineUserId);
@@ -218,9 +234,16 @@ export default {
   .btn-on{background:#734921;color:#fff}
   .empty{color:#6b6e63;font-size:14px;text-align:center;padding:40px 0}
   .foot{font-size:11.5px;color:#9a9d90;margin-top:16px;line-height:1.7}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px}
+  .stat{background:#fff;border:1px solid #e2e0d6;border-radius:12px;padding:10px 6px;text-align:center;box-shadow:0 4px 12px rgba(115,73,33,.05)}
+  .stat-n{font-size:20px;font-weight:700;color:#734921;line-height:1.1}
+  .stat-l{font-size:11px;color:#6b6e63;margin-top:3px}
+  .sec-title{font-size:13px;font-weight:700;color:#734921;margin:4px 2px 10px}
 </style></head><body>
   <h1>🐾 測試者管理</h1>
-  <div class="sub">共 ${rows.length} 人 · 已開通 ${onCount} · 近 7 天活躍 ${activeCount}　（點「關閉」＝停用；只動存取權，看不到任何健康紀錄）</div>
+  <div class="sub">一頁看完：上方是留存數據，下方可開通／關閉測試者。只動存取權，看不到任何健康紀錄。</div>
+  ${statsBar}
+  <div class="sec-title">測試者名單</div>
   ${cards || '<div class="empty">還沒有任何使用者</div>'}
   <div class="foot">網址含金鑰，請勿外流。停用後對方在 LINE 會被擋在門檻外、看不到任何內容，但資料保留；重新「開通」即可恢復。</div>
 </body></html>`;
