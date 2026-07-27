@@ -1895,7 +1895,7 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
 // 選單設計版本：改了選單圖片或區塊配置就把這個數字 +1，
 // 現有使用者的快取版本不符就會強制重建，改版才推得到所有人。
 // v6：更新選單圖（更深色版，使用者指定）。按鈕送出詞與標籤維持一致。
-const RICHMENU_VERSION = 6;
+const RICHMENU_VERSION = 7;
 
 async function ensurePersonalRichMenu(env, baseUrl, lineUserId) {
   const db = env.DB;
