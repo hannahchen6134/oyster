@@ -366,7 +366,9 @@ export function todayFlex({ pet, date, summary, dateLabel, siteUrl = '' }) {
         statCell('食物', fmt(totalFood), 'g', STAT_ACCENT.food),
         statCell('熱量', fmt(summary.kcal), 'kcal', STAT_ACCENT.kcal)
       ]),
-      statRow('💊 藥', medValue),
+      // 藥：有設定早/晚時段的貓，交給下方「今日目標」顯示（早/晚 ✓）＝不重複；
+      // 沒設時段的貓才在這裡用膠囊列顯示，避免完全看不到用藥狀況
+      ...(parseGoalSlots(pet).length ? [] : [statRow('💊 藥', medValue)]),
       ...(gutParts.length ? [statRow('🩺 腸胃', gutParts.join('・'))] : []),
       ...(careParts.length ? [statRow('💉 處置', careParts.join('・'))] : []),
       ...goalContents(pet, summary, date)
