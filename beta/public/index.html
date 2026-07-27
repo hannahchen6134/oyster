@@ -3677,7 +3677,13 @@
         return;
       }
       await loadDay();
-      maybeStartTour(); // 第一次進站、且食物還沒設定 → 聚光燈帶去設定食物
+      // 網址帶 ?tour=1 或 #tour：強制重播第一次導覽（自己測試／示範用，不受「看過」與「已設定食物」限制）
+      if (location.hash === '#tour' || new URLSearchParams(location.search).has('tour')) {
+        localStorage.removeItem(TOUR_KEY);
+        setTimeout(startTour, 700);
+      } else {
+        maybeStartTour(); // 第一次進站、且食物還沒設定 → 聚光燈帶去設定食物
+      }
     }
 
     document.addEventListener('click', async (event) => {
