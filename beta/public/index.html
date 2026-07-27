@@ -3218,7 +3218,7 @@
               </div>
             </div>`).join('')}
         </div>
-        <div style="text-align:center;margin-top:18px"><button class="btn btn-secondary btn-sm" id="replayTourBtn" type="button">🔦 重看聚光燈導覽</button></div>
+        <div style="text-align:center;margin-top:18px"><button class="btn btn-secondary btn-sm" id="replayTourBtn" type="button">重看網站使用導覽</button></div>
         <div class="ob-foot">連結過期了？回 LINE 打「照護站」拿新連結，<b>資料都不會消失</b>。</div>`;
     }
 
@@ -3949,15 +3949,16 @@
       // 讓瀏覽器先完成版面重排，圖表才不會被截到一半
       await new Promise((resolve) => setTimeout(resolve, 60));
       let dataUrl = '';
+      let failMsg = '';
       try {
         const opts = { backgroundColor: '#efe9dd', pixelRatio: 2, style: { margin: '0' } };
         // LINE 內建瀏覽器：第一次算圖常空白／失敗，先暖身一次（忽略結果與錯誤）再正式產生
         try { await window.htmlToImage.toPng(view, opts); } catch (warmErr) { /* 暖身失敗不當錯誤 */ }
         // 逾時保險：萬一卡住也不會讓按鈕永遠停在「產生中」
-        const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 25000));
+        const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('逾時 25 秒')), 25000));
         dataUrl = await Promise.race([window.htmlToImage.toPng(view, opts), timeout]);
       } catch (error) {
-        toast('產生圖片失敗，可改用手機截圖', true);
+        failMsg = (error && error.message) ? error.message : String(error);
       } finally {
         view.classList.remove('capturing');
         header.remove();
@@ -3965,7 +3966,15 @@
         btn.disabled = false;
         btn.textContent = orig;
       }
-      if (dataUrl) showReportImage(dataUrl, `${petName}_照護紀錄_${today}.png`);
+      // 診斷用：把真正的結果直接跳出來，才知道死在哪一步
+      if (dataUrl && dataUrl.length > 100) {
+        try { showReportImage(dataUrl, `${petName}_照護紀錄_${today}.png`); }
+        catch (e) { alert('圖片產生成功，但顯示時出錯：' + (e && e.message ? e.message : e)); }
+      } else if (failMsg) {
+        alert('產生圖片失敗：' + failMsg + '\n\n（可先用手機截圖給醫生，我會依這個訊息修正）');
+      } else {
+        alert('這個瀏覽器產出的圖片是空白的，可能不支援。請改用一般瀏覽器（Safari／Chrome）開，或先用手機截圖。');
+      }
     });
     // 顯示產生好的報告圖：長按可儲存（全平台通用）；另備一顆「分享／存圖」用新的一次點擊觸發，
     // 讓支援的手機能叫出系統分享面板（新手勢才不會被瀏覽器擋掉）。
