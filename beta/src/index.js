@@ -150,6 +150,85 @@ export default {
         return jsonResponse({ ok: false, error: error.message }, 500);
       }
     }
+    // 測試者管理小網頁：手機開網址、點按鈕就能開通/關閉某位測試者（只碰存取權旗標，讀不到任何健康紀錄）
+    if (url.pathname === '/admin/testers') {
+      const key = String(env.ADMIN_KEY || '');
+      if (key.length < 8 || url.searchParams.get('key') !== key) {
+        return new Response('403 Forbidden', { status: 403, headers: { 'content-type': 'text/plain; charset=utf-8' } });
+      }
+      const db = env.DB;
+      // 切換某人存取權 → 改完導回名單（用 302，避免重新整理又觸發一次）
+      const toggleUser = url.searchParams.get('user');
+      if (toggleUser) {
+        const access = url.searchParams.get('access') === '1' ? 1 : 0;
+        try { await updateUser(db, toggleUser, { betaAccess: access }); } catch (error) { /* 找不到就當沒事 */ }
+        return new Response(null, { status: 302, headers: { location: `/admin/testers?key=${encodeURIComponent(key)}` } });
+      }
+      try {
+        const today = taipeiToday();
+        const d7 = addDays(today, -6);
+        const { results } = await db.prepare(
+          `SELECT u.lineUserId, u.displayName, u.betaAccess,
+                  (SELECT COUNT(*) FROM logs l WHERE l.lineUserId = u.lineUserId AND l.isDeleted = 0 AND l.source IN ('line','web')) recs,
+                  (SELECT MAX(substr(eventDateTime,1,10)) FROM logs l WHERE l.lineUserId = u.lineUserId AND l.isDeleted = 0 AND l.source IN ('line','web')) lastDay,
+                  (SELECT GROUP_CONCAT(petName, '、') FROM pets p WHERE p.ownerLineUserId = u.lineUserId AND p.isDeleted = 0) pets
+           FROM users u
+           ORDER BY u.betaAccess DESC, recs DESC`
+        ).all();
+        const rows = results || [];
+        const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+        const mask = (id) => '…' + String(id).slice(-6);
+        const onCount = rows.filter((r) => Number(r.betaAccess) === 1).length;
+        const activeCount = rows.filter((r) => r.lastDay && r.lastDay >= d7).length;
+        const cards = rows.map((r) => {
+          const on = Number(r.betaAccess) === 1;
+          const label = esc(r.displayName) || mask(r.lineUserId);
+          const href = `/admin/testers?key=${encodeURIComponent(key)}&user=${encodeURIComponent(r.lineUserId)}&access=${on ? 0 : 1}`;
+          const confirmMsg = `確定要${on ? '關閉' : '開通'}「${label}」嗎？`;
+          return `<div class="row${on ? '' : ' off'}">
+            <div class="info">
+              <div class="name">${esc(r.displayName) || '（未命名）'} <span class="uid">${mask(r.lineUserId)}</span></div>
+              <div class="meta">${r.pets ? '🐈 ' + esc(r.pets) + ' · ' : ''}記錄 ${Number(r.recs) || 0} 筆 · 最後活躍 ${esc(r.lastDay) || '—'}</div>
+            </div>
+            <div class="act">
+              <span class="badge ${on ? 'b-on' : 'b-off'}">${on ? '已開通' : '已關閉'}</span>
+              <a class="btn ${on ? 'btn-off' : 'btn-on'}" href="${href}" onclick="return confirm('${confirmMsg}')">${on ? '關閉' : '開通'}</a>
+            </div>
+          </div>`;
+        }).join('');
+        const html = `<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">
+<title>測試者管理</title><style>
+  :root{--brand:#734921}
+  *{box-sizing:border-box;margin:0}
+  body{font-family:-apple-system,"PingFang TC","Noto Sans TC",sans-serif;background:#efe9dd;color:#1b1d1a;padding:18px;max-width:560px;margin:0 auto}
+  h1{font-size:19px;color:#734921;margin-bottom:4px}
+  .sub{font-size:12.5px;color:#6b6e63;margin-bottom:16px}
+  .row{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #e2e0d6;border-radius:14px;padding:13px 14px;margin-bottom:9px;box-shadow:0 4px 12px rgba(115,73,33,.05)}
+  .row.off{opacity:.62}
+  .info{flex:1;min-width:0}
+  .name{font-size:15px;font-weight:600}
+  .uid{font-size:11px;color:#a0a396;font-weight:400;margin-left:4px}
+  .meta{font-size:12px;color:#6b6e63;margin-top:3px}
+  .act{display:flex;flex-direction:column;align-items:flex-end;gap:7px;flex:0 0 auto}
+  .badge{font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:999px}
+  .b-on{background:#e5efe2;color:#3f7a3a}.b-off{background:#eee;color:#8a8a82}
+  .btn{display:inline-block;font-size:13px;font-weight:600;padding:7px 16px;border-radius:999px;text-decoration:none;-webkit-tap-highlight-color:transparent}
+  .btn-off{background:#fdecec;color:#c0392b;border:1px solid #f2c9c4}
+  .btn-on{background:#734921;color:#fff}
+  .empty{color:#6b6e63;font-size:14px;text-align:center;padding:40px 0}
+  .foot{font-size:11.5px;color:#9a9d90;margin-top:16px;line-height:1.7}
+</style></head><body>
+  <h1>🐾 測試者管理</h1>
+  <div class="sub">共 ${rows.length} 人 · 已開通 ${onCount} · 近 7 天活躍 ${activeCount}　（點「關閉」＝停用；只動存取權，看不到任何健康紀錄）</div>
+  ${cards || '<div class="empty">還沒有任何使用者</div>'}
+  <div class="foot">網址含金鑰，請勿外流。停用後對方在 LINE 會被擋在門檻外、看不到任何內容，但資料保留；重新「開通」即可恢復。</div>
+</body></html>`;
+        return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
+      } catch (error) {
+        return new Response('error: ' + error.message, { status: 500, headers: { 'content-type': 'text/plain; charset=utf-8' } });
+      }
+    }
     // 照護站不進搜尋引擎：靠 index.html 的 <meta name="robots"> 與 /robots.txt（靜態資源由平台直接回應，Worker 不介入）
     return env.ASSETS.fetch(request);
   },
