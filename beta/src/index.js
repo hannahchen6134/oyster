@@ -116,7 +116,7 @@ export default {
     }
     // 行為追蹤儀表板（唯讀彙總；用固定金鑰保護）——結束「靠感覺」，用數據看留存/活化
     if (url.pathname === '/admin/metrics') {
-      if (url.searchParams.get('key') !== '4a3ae43160203892faab0cb3') return jsonResponse({ ok: false }, 403);
+      if (String(env.ADMIN_KEY || '').length < 8 || url.searchParams.get('key') !== env.ADMIN_KEY) return jsonResponse({ ok: false }, 403);
       try {
         const db = env.DB;
         const today = taipeiToday();
@@ -1436,10 +1436,19 @@ async function handleTextMessage(event, env, baseUrl) {
   }
 }
 
+// 食物顯示：品名已含類型（如「希爾斯罐頭」）就不再前綴類型，避免「罐頭 希爾斯罐頭」重複
+function foodLabel(foodType, itemName) {
+  const t = String(foodType || '').trim();
+  const n = String(itemName || '').trim();
+  if (!n) return t;
+  if (!t) return n;
+  return n.includes(t) ? n : `${t} ${n}`;
+}
+
 // 上一筆的簡短描述（修正/刪除回覆用）
 function describeLog(log) {
   if (log.category === 'water') return `水 ${log.amount} ml`;
-  if (log.category === 'food') return `${log.foodType}${log.itemName ? ` ${log.itemName}` : ''} ${log.amount} g`;
+  if (log.category === 'food') return `${foodLabel(log.foodType, log.itemName)} ${log.amount} g`;
   if (log.category === 'med') {
     const label = [log.medSlot, log.itemName].filter(Boolean).join(' ');
     return `藥${label ? ` ${label}` : ''} ${log.medStatus}`;
@@ -1633,7 +1642,7 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
       const derived = deriveFoodFields(record.amount, record.foodType, matched);
       log.kcal = derived.kcal;
       log.waterMl = derived.waterMl;
-      description = `${record.foodType} ${matched.displayName} ${record.amount} g`;
+      description = `${foodLabel(record.foodType, matched.displayName)} ${record.amount} g`;
       // 品項有對到、但還沒填精確每克熱量 → 用類型預設估算，畫面標「估算」＋提醒可設定
       if (derived.estimated) { estimated = true; estKcalPerG = derived.estKcalPerG; }
       else if (!(derived.kcal > 0)) noKcal = true; // 零食/其他這種沒有預設值的才維持「未計入」
@@ -1641,7 +1650,7 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
       const derived = deriveFoodFields(record.amount, record.foodType, null);
       log.kcal = derived.kcal; // 用類型預設估算（不再留 0，畫面標「估算」）
       log.waterMl = derived.waterMl;
-      description = `${record.foodType}${record.itemName ? ` ${record.itemName}` : ''} ${record.amount} g`;
+      description = `${foodLabel(record.foodType, record.itemName)} ${record.amount} g`;
       if (derived.estimated) { estimated = true; estKcalPerG = derived.estKcalPerG; }
       else noKcal = true;
     }
