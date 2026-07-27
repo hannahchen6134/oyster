@@ -1156,7 +1156,7 @@
         <details class="block fold sec-confirm">
           <summary>
             <span class="fold-head">
-              <span class="fold-title" id="confirmTitle">今日照護確認</span>
+              <span class="fold-title" id="confirmTitle">今日喵喵狀況總覽</span>
               <span class="fold-sub">水分・熱量・用藥・腸胃，今天一次確認</span>
             </span>
             <span class="fold-toggle">＋</span>
@@ -1169,7 +1169,7 @@
         <details class="block fold sec-logs">
           <summary>
             <span class="fold-head">
-              <span class="fold-title">每一筆紀錄<span class="fold-count" id="logCount"></span></span>
+              <span class="fold-title">今日每筆紀錄<span class="fold-count" id="logCount"></span></span>
               <span class="fold-sub">今天記的每一筆，可編輯或刪除</span>
             </span>
             <span class="fold-toggle">＋</span>
@@ -1203,7 +1203,7 @@
           <div class="cal-title" id="calTitle"></div>
           <button class="btn btn-secondary btn-sm" id="calNextBtn" type="button">下月 ›</button>
         </div>
-        <p class="cal-intro">這個月的照護概覽：哪幾天有記錄、哪幾天要注意。<b>點任一天，看那天的完整數據。</b></p>
+        <p class="cal-intro"><b>點入任一天，看當天的完整數據。</b></p>
         <div class="cal-grid" id="calGrid"></div>
         <div class="cal-legend" id="calLegend" hidden>
           <span><span class="cal-recbar" style="display:inline-block;vertical-align:2px;margin-right:5px"></span>暖色格＝有記錄</span>
@@ -1300,7 +1300,6 @@
             <span class="fold-toggle">＋</span>
           </summary>
           <div class="fold-body">
-            <p class="scroll-hint" style="text-align:left;margin:0 2px 10px">每一天一列，先看加總；點任何一天可看當日細節。<br>水＝當日總水分（喝的＋食物含水）・罐/乾＝實際餵的克數。</p>
             <div class="range-chips" id="tableRangeChips">
               <button data-trange="30" type="button" class="active">30 天</button>
               <button data-trange="60" type="button">60 天</button>
@@ -1590,7 +1589,7 @@
       $('goTodayBtn').classList.toggle('hidden', state.date === todayStr());
       const isToday = state.date === todayStr();
       $('pageMode').textContent = isToday ? '今天的照護確認' : `${Number(state.date.slice(5, 7))}月${Number(state.date.slice(8, 10))}日的照護紀錄`;
-      $('confirmTitle').textContent = isToday ? '今日照護確認' : '當日照護確認';
+      $('confirmTitle').textContent = isToday ? '今日喵喵狀況總覽' : '當日喵喵狀況總覽';
       const data = await api(`day?petId=${state.petId}&date=${state.date}`);
       state.dayLogs = data.logs;
       state.daySummary = data.summary;
@@ -3224,7 +3223,7 @@
           hint: '把罐頭／乾糧／濕糧的每克熱量填一次，記錄才算得準；沒填會先用估算（標 ≈）。' },
         { cls: 's4', n: '4', title: '看狀況・給醫生',
           chips: [['今天', '看今天狀況'], ['回診摘要', '整理給醫生']],
-          hint: '記錯了在「每一筆紀錄」可改／刪' }
+          hint: '記錯了在「今日每筆紀錄」可改／刪' }
       ];
       $('settingsList').innerHTML = `
         <div class="block" style="margin-top:0">
