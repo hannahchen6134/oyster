@@ -1445,6 +1445,24 @@ function foodLabel(foodType, itemName) {
   return n.includes(t) ? n : `${t} ${n}`;
 }
 
+// 沒指定早/晚時，依「這筆的時間」自動歸到最接近的餵藥時段（早≈8、中午≈13、晚≈20 點）。
+// 使用者有明講時段就不呼叫這個（明確優先）；沒設定餵藥時段則回空字串。
+function autoMedSlot(pet, eventDateTime) {
+  let slots = [];
+  try { slots = JSON.parse(pet?.goalMedSlots || '[]'); } catch (error) { slots = []; }
+  slots = Array.isArray(slots) ? slots.filter(Boolean) : [];
+  if (!slots.length) return '';
+  const hour = Number(String(eventDateTime).slice(11, 13));
+  const h = Number.isFinite(hour) ? hour : 12;
+  const rep = { 早: 8, 中午: 13, 中: 13, 晚: 20 };
+  let best = slots[0], bestDiff = Infinity;
+  for (const s of slots) {
+    const diff = Math.abs((rep[s] ?? 12) - h);
+    if (diff < bestDiff) { bestDiff = diff; best = s; }
+  }
+  return best;
+}
+
 // 上一筆的簡短描述（修正/刪除回覆用）
 function describeLog(log) {
   if (log.category === 'water') return `水 ${log.amount} ml`;
@@ -1655,7 +1673,12 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
       else noKcal = true;
     }
   } else if (record.category === 'med') {
-    const label = [record.medSlot, record.itemName].filter(Boolean).join(' ');
+    // 沒帶早/晚 → 依這筆的時間自動歸到最接近的餵藥時段（有講就聽使用者的）
+    if (!log.medSlot && log.medStatus) {
+      const auto = autoMedSlot(pet, eventDateTime);
+      if (auto) log.medSlot = auto;
+    }
+    const label = [log.medSlot, record.itemName].filter(Boolean).join(' ');
     description = `藥${label ? ` ${label}` : ''} ${record.medStatus}`;
   } else if (record.category === 'vomit') {
     description = `嘔吐${record.note ? `：${record.note}` : ''}`;

@@ -154,7 +154,7 @@ function goalContents(pet, summary, date, showEncourage = true) {
   if (goalKcal > 0) contents.push(progressBar(`熱量 ${fmt(summary.kcal)} / ${fmt(goalKcal)} kcal`, summary.kcal, goalKcal));
   if (slots.length) {
     const doneSlots = new Set((summary.meds || []).filter((m) => m.status === '已吃').map((m) => m.slot));
-    const parts = slots.map((slot) => `${slot} ${doneSlots.has(slot) ? '✓' : '—'}`).join('　');
+    const parts = slots.map((slot) => `${slot} ${doneSlots.has(slot) ? '✓' : '未記'}`).join('　');
     contents.push(statRow('藥', parts));
   }
   // 鼓勵語只在今日卡出現，記錄卡不重複（showEncourage=false）
