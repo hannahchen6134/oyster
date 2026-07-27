@@ -16,7 +16,7 @@ import {
   listFoods, getFood, insertLog, getLog, getLastLogByUser, softDeleteLog, updateLog,
   recomputeDay, getRecentSummaries,
   upcomingVisits, listVetsByOwner, createSession,
-  appKvGet, appKvSet, getSessionUser, track, healFoodKcal,
+  appKvGet, appKvSet, claimMessageOnce, purgeOldSeenMessages, getSessionUser, track, healFoodKcal,
   resolveDataOwner, createCareInvite, redeemCareInvite, listCareMembers, listCareCircle,
   createLoginCode, redeemLoginCode
 } from './db.js';
@@ -261,6 +261,8 @@ export default {
     ctx.waitUntil(
       getAccessToken(env).catch((error) => console.error('cron token warm-up failed:', error.message))
     );
+    // 清掉 2 天前的訊息冪等紀錄，避免 app_kv 無限成長
+    ctx.waitUntil(purgeOldSeenMessages(env.DB, `${addDays(taipeiToday(), -2)}T00:00:00.000Z`));
     ctx.waitUntil(runDailyReminders(env));
   }
 };
@@ -406,7 +408,9 @@ async function processWebhookEvents(events, env, baseUrl) {
       if (event.type === 'follow') {
         await handleFollow(event, env);
       } else if (event.type === 'message' && event.message?.type === 'text') {
+        // 兩層去重：同實例用記憶體快速擋；跨實例／LINE 重送用資料庫原子認領（避免回兩次）
         if (isDuplicateMessage(event.message.id)) continue;
+        if (!(await claimMessageOnce(env.DB, event.message.id))) continue;
         await handleTextMessage(event, env, baseUrl);
       } else if (event.type === 'postback') {
         await handlePostback(event, env, baseUrl);

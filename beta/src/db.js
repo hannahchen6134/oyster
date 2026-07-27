@@ -237,6 +237,28 @@ export async function appKvSet(db, key, value) {
     .run();
 }
 
+// 訊息冪等：第一次看到某 message.id → 原子性寫入並回 true（該處理）；
+// 重送或打到其他 Worker 實例再看到同一則 → INSERT OR IGNORE 不會寫入、回 false（跳過，不重複回覆）。
+export async function claimMessageOnce(db, messageId) {
+  if (!messageId) return true;
+  try {
+    const res = await db
+      .prepare('INSERT OR IGNORE INTO app_kv (k, v, updatedAt) VALUES (?, ?, ?)')
+      .bind(`msg:${messageId}`, '1', nowIso())
+      .run();
+    return (res.meta?.changes || 0) > 0;
+  } catch (error) {
+    return true; // 資料庫出錯時寧可正常回覆，也不要卡住
+  }
+}
+
+// 清掉舊的訊息冪等紀錄（每晚 cron 呼叫），避免 app_kv 無限成長
+export async function purgeOldSeenMessages(db, olderThanIso) {
+  try {
+    await db.prepare(`DELETE FROM app_kv WHERE k LIKE 'msg:%' AND updatedAt < ?`).bind(olderThanIso).run();
+  } catch (error) { /* 清理失敗不影響主流程 */ }
+}
+
 // ---------- logs ----------
 
 export async function insertLog(db, log) {
