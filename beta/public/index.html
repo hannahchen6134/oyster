@@ -3944,9 +3944,11 @@
       await new Promise((resolve) => setTimeout(resolve, 60));
       let dataUrl = '';
       try {
-        const opts = { backgroundColor: '#efe9dd', pixelRatio: 2, style: { margin: '0' }, cacheBust: true };
-        // 加逾時保險：萬一算圖卡住也不會讓按鈕永遠消失
-        const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 20000));
+        const opts = { backgroundColor: '#efe9dd', pixelRatio: 2, style: { margin: '0' } };
+        // LINE 內建瀏覽器：第一次算圖常空白／失敗，先暖身一次（忽略結果與錯誤）再正式產生
+        try { await window.htmlToImage.toPng(view, opts); } catch (warmErr) { /* 暖身失敗不當錯誤 */ }
+        // 逾時保險：萬一卡住也不會讓按鈕永遠停在「產生中」
+        const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 25000));
         dataUrl = await Promise.race([window.htmlToImage.toPng(view, opts), timeout]);
       } catch (error) {
         toast('產生圖片失敗，可改用手機截圖', true);
