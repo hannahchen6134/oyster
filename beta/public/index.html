@@ -718,7 +718,7 @@
     .login-wrap { min-height: calc(100vh - 150px); display: flex; align-items: center; justify-content: center; }
     .login-card {
       position: relative;
-      max-width: 420px; width: 100%; text-align: center; padding: 42px 32px 32px;
+      max-width: 384px; width: 100%; text-align: center; padding: 42px 32px 32px;
       background: linear-gradient(180deg, #fffdf8 0%, var(--sheet-soft) 100%);
       border: 1px solid rgba(115, 73, 33, 0.12);
       border-radius: var(--radius-lg);
@@ -730,7 +730,7 @@
       content: ''; position: absolute; top: 0; left: 0; right: 0; height: 6px;
       background: linear-gradient(90deg, #8a5a2c 0%, var(--brand) 45%, #5a3617 100%);
     }
-    .login-card { padding: 48px 34px 36px; }
+    .login-card { padding: 46px 32px 34px; }
     .login-card .eyebrow { font-size: 10.5px; letter-spacing: 0.34em; opacity: 0.9; }
     .login-card h1 { font-size: 27px; font-weight: 600; margin-top: 16px; letter-spacing: 0.18em; }
     .login-tagline { color: var(--muted); font-size: 13px; letter-spacing: 0.06em; margin-top: 14px; }
@@ -739,14 +739,14 @@
     /* LIFF 自動登入過場：優雅的咖啡色漸層光環 spinner，不閃手動登入表單 */
     .liff-wait { display: none; margin-top: 40px; flex-direction: column; align-items: center; gap: 20px; }
     /* 貓掌腳印一顆顆「踩」出來、亮著的那波往右移動（不用透明度漸隱，用踩下↔抬起的縮放） */
-    .liff-run { position: relative; width: 100%; max-width: 250px; height: 50px; }
-    .liff-paw { position: absolute; width: 21px; height: 21px; color: var(--brand);
-      filter: drop-shadow(0 1.5px 2.5px rgba(115, 73, 33, 0.16)); }
-    /* 左右交錯、上下小 zigzag，像真的貓往右走（尺寸縮小、間距些微更近） */
+    .liff-run { position: relative; width: 100%; max-width: 230px; height: 46px; }
+    .liff-paw { position: absolute; width: 18px; height: 18px; color: var(--brand);
+      filter: drop-shadow(0 1px 2px rgba(115, 73, 33, 0.15)); }
+    /* 左右交錯、上下小 zigzag，像真的貓往右走（更秀氣） */
     .liff-paw.p1 { left: 8%;  bottom: 3px;  transform: rotate(-12deg); }
-    .liff-paw.p2 { left: 25%; bottom: 21px; transform: rotate(10deg);  }
+    .liff-paw.p2 { left: 25%; bottom: 18px; transform: rotate(10deg);  }
     .liff-paw.p3 { left: 42%; bottom: 3px;  transform: rotate(-12deg); }
-    .liff-paw.p4 { left: 59%; bottom: 21px; transform: rotate(10deg);  }
+    .liff-paw.p4 { left: 59%; bottom: 18px; transform: rotate(10deg);  }
     .liff-paw.p5 { left: 76%; bottom: 3px;  transform: rotate(-12deg); }
     /* 縮放做「踩下去→停→抬起」；靠 delay 讓亮的一波由左往右掃 */
     .liff-paw svg { display: block; width: 100%; height: 100%; transform-origin: 50% 60%;
@@ -1240,11 +1240,10 @@
                 <button data-drange="14" type="button" class="active">14天</button>
                 <button data-drange="30" type="button">30天</button>
               </div>
-              <button class="digest-copy" id="digestCopyBtn" type="button">複製文字</button>
             </div>
             <div id="vetHighlights"></div>
             <div class="digest-card" id="digestCard"></div>
-            <p class="muted cap-hide" style="font-size:12px;margin:10px 2px 0">只列有狀況的日子，沒列出＝無特殊事件。截圖或按「複製文字」貼給醫生都可以。</p>
+            <p class="muted cap-hide" style="font-size:12px;margin:10px 2px 0">只列有狀況的日子，沒列出＝無特殊事件。用上方「存成圖片給醫生」就能整理成一張圖。</p>
           </div>
         </details>
         <details class="block fold" open>
@@ -3945,14 +3944,6 @@
       if (event.target.open) loadRecent();
     });
     $('addVisitBtn').addEventListener('click', () => openDayVisitModal(null));
-    $('digestCopyBtn').addEventListener('click', async () => {
-      const text = digestPlainText();
-      if (!text) return;
-      try {
-        await navigator.clipboard.writeText(text);
-        toast('已複製，貼上就能傳給醫生');
-      } catch (error) { toast('複製失敗，請改用截圖', true); }
-    });
     // 存成圖片給醫生：把「回診」整頁（所有摺疊都展開、隱藏操作鈕）轉成一張圖，
     // 然後把圖直接顯示在畫面上讓使用者「長按儲存」——這招在 LINE 內建瀏覽器也有效，
     // 不倚賴 a[download]（內建瀏覽器常擋下載）也不倚賴檔案分享（多數 webview 不支援）。
@@ -4031,13 +4022,11 @@
           if (navigator.canShare && navigator.canShare({ files: [file] })) {
             await navigator.share({ files: [file] });
           } else {
-            const a = document.createElement('a');
-            a.href = dataUrl; a.download = fileName;
-            document.body.appendChild(a); a.click(); a.remove();
-            toast('若沒有跳出下載，請改用長按圖片儲存');
+            // LINE 等內建瀏覽器不支援檔案分享、也擋下載 → 用 alert（會蓋過燈箱，一定看得到）教最通用的長按
+            alert('這個瀏覽器無法直接分享。\n請「長按上面的圖片 →　儲存到相簿」。\n（電腦版可對圖片按右鍵另存圖片）');
           }
         } catch (error) {
-          if (!(error && error.name === 'AbortError')) toast('請改用長按圖片儲存', true);
+          if (!(error && error.name === 'AbortError')) alert('請改用「長按圖片 →　儲存到相簿」。');
         }
       };
     }
