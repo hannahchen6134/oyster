@@ -122,8 +122,12 @@ export default {
       const id = url.pathname.slice('/shot/'.length);
       const row = await getReportShot(env.DB, id);
       if (!row || !row.png) return new Response('not found', { status: 404 });
-      const bin = Uint8Array.from(atob(row.png), (c) => c.charCodeAt(0));
-      return new Response(bin, { headers: { 'content-type': 'image/png', 'cache-control': 'private, max-age=3600', 'x-robots-tag': 'noindex' } });
+      try {
+        const bin = Uint8Array.from(atob(row.png), (c) => c.charCodeAt(0));
+        return new Response(bin, { headers: { 'content-type': 'image/png', 'cache-control': 'private, max-age=3600', 'x-robots-tag': 'noindex' } });
+      } catch (error) {
+        return new Response('bad image', { status: 404 });
+      }
     }
     if (url.pathname === '/healthz') {
       return jsonResponse({ ok: true, service: 'cat-care-beta', now: new Date().toISOString() });
