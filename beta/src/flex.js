@@ -883,7 +883,7 @@ export function menuFlex() {
       text(BRAND.tagline, { size: 'xs', color: C.muted, align: 'center', wrap: true }),
       row([menuCell(BRAND.onboarding, '第一次使用看這裡', '安心上手')]),
       row([menuCell('怎麼記？看範例', '點一句就記', '怎麼記'), menuCell('如何記餵藥', '藥的記法', '如何記餵藥')]),
-      row([menuCell('今日照護確認', '看今天狀況', '今天'), menuCell('給醫生看', '近 7 天整理', '給醫生看')]),
+      row([menuCell('今日記錄', '看今天狀況', '今天'), menuCell('給醫生看', '近 7 天整理', '給醫生看')]),
       row([menuCell('開啟照護站', '回診・血檢・設定', '照護站', true)])
     ]
   };

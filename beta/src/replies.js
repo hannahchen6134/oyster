@@ -52,7 +52,7 @@ export function summaryBlock(summary) {
 }
 
 // 單筆記錄的輕量回覆：一行確認＋最相關的當日累積（不再每筆都跳大卡）
-// 完整狀態改由「今日確認」卡呈現，避免聊天室被洗版。
+// 完整狀態改由「今日記錄」卡呈現，避免聊天室被洗版。
 export function lightRecordReply(description, category, summary, isToday = true) {
   const day = isToday ? '今日' : '當日';
   const lines = [`✓ 已記　${description}`];
@@ -61,7 +61,7 @@ export function lightRecordReply(description, category, summary, isToday = true)
   } else if (category === 'food') {
     lines.push(`${day}熱量 ${formatNumber(summary.kcal)} kcal・水分 ${formatNumber(summary.totalWaterMl)} ml`);
   }
-  // 藥／嘔吐／便便等：只確認，不附累積（想看整體點「今日確認」）
+  // 藥／嘔吐／便便等：只確認，不附累積（想看整體點「今日記錄」）
   return lines.join('\n');
 }
 
@@ -284,7 +284,7 @@ export function welcomeText() {
     '罐頭 30',
     '藥 早 已吃',
     '',
-    '輸入「今天」看今日確認，',
+    '輸入「今天」看今日記錄，',
     '「照護站」開網站，',
     '「安心上手」看小教學。',
     '',
@@ -402,7 +402,7 @@ export function onboardingText() {
     '2. 記一筆看看',
     '　水 20 或 罐頭 30g',
     '3. 輸入「今天」',
-    '　看今日照護確認',
+    '　看今日記錄',
     '4. 輸入「給醫生看」',
     '　整理給醫生看',
     '',

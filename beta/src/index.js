@@ -464,7 +464,7 @@ function stepMedCard(petName, step = '') {
   return onboardCard({
     step,
     title: `${petName}每天需要餵藥嗎？`,
-    subtitle: '選了之後，今日確認和晚上提醒都會幫你看著',
+    subtitle: '選了之後，今日記錄和晚上提醒都會幫你看著',
     rows: [
       [menuCell('早', '一天一次', '餵藥時段 早'), menuCell('早晚', '一天兩次', '餵藥時段 早晚')],
       [menuCell('早中晚', '一天三次', '餵藥時段 早中晚'), menuCell('只有晚上', '一天一次', '餵藥時段 晚')],
@@ -517,7 +517,7 @@ function doneCard(petName) {
     subtitle: `現在幫${petName}記第一筆——點「快速紀錄」用按鈕就好，不用打字`,
     rows: [
       [menuCell('快速紀錄', '點按鈕記，不用打字', '紀錄', true)],
-      [menuCell('怎麼記？看範例', '想打字更快看這', '怎麼記'), menuCell('今日確認', '看今天狀況', '今天')],
+      [menuCell('怎麼記？看範例', '想打字更快看這', '怎麼記'), menuCell('今日記錄', '看今天狀況', '今天')],
       [menuCell('補充貓咪資料', '晶片・疾病・疫苗', '補資料'), menuCell('開啟照護站', '回診・回顧・設定', '照護站')]
     ],
     hint: '晶片、疾病、疫苗、醫院醫生等詳細資料，點「補充貓咪資料」直接到設定頁填',
@@ -684,7 +684,7 @@ async function handlePending(env, event, { db, user, pet, pets, lineUserId, owne
     await clear();
     await replyOrPushFlex(env, event, onboardCard({
       title: `「${text}」多久吃一次？`,
-      subtitle: '選了之後，今日確認和晚上提醒都會幫你看著',
+      subtitle: '選了之後，今日記錄和晚上提醒都會幫你看著',
       rows: [
         [menuCell('早', '一天一次', '餵藥時段 早'), menuCell('早晚', '一天兩次', '餵藥時段 早晚')],
         [menuCell('早中晚', '一天三次', '餵藥時段 早中晚'), menuCell('只有晚上', '一天一次', '餵藥時段 晚')]
