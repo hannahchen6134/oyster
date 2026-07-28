@@ -1,4 +1,4 @@
-import { BRAND, displayMedStatus } from './brand.js';
+import { BRAND, displayMedStatus, displayMedSlot } from './brand.js';
 // LINE 回覆文字格式（喵喵照護安心管家）
 // 排版原則：每行盡量不超過 12 個全形字，大字體手機也不折行；
 // 日期用「7月10日」格式，避免被 LINE 自動轉成日期連結。
@@ -117,7 +117,7 @@ export function goalSection(pet, summary, date) {
     (summary.meds || []).filter((med) => med.status === '已吃').map((med) => med.slot).filter(Boolean)
   );
   const missingSlots = slots.filter((slot) => !doneSlots.has(slot));
-  if (missingSlots.length) gaps.push(`${missingSlots.join('、')}的藥還沒餵`);
+  if (missingSlots.length) gaps.push(`${missingSlots.map(displayMedSlot).join('、')}的藥還沒餵`);
 
   const lines = ['── 今日目標 ──'];
   if (gaps.length) {

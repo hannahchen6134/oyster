@@ -12,3 +12,10 @@ export const BRAND = {
 export function displayMedStatus(status) {
   return status === '漏餵' ? '未餵' : String(status || '');
 }
+
+// 藥物時段：資料層保留「早／晚」，顯示成完整口語（早上／晚上），中午不變
+export function displayMedSlot(slot) {
+  if (slot === '早') return '早上';
+  if (slot === '晚') return '晚上';
+  return String(slot || '');
+}

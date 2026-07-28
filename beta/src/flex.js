@@ -1161,7 +1161,7 @@ export function reminderFlex(pet, lines, title) {
     contents: [
       ...items,
       { type: 'separator', margin: 'lg', color: SEPARATOR },
-      text('做了但忘了記的話，補記一下就好；有不放心的狀況請諮詢獸醫師。',
+      text('如果忘了記可以補記；有不放心的狀況請諮詢獸醫師。',
         { size: 'xs', color: C.muted, wrap: true, margin: 'lg' })
     ]
   };

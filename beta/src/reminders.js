@@ -2,6 +2,8 @@
 // 每晚由 Cron Trigger 檢查當天狀況，有需要才推播。
 // 規則全部可由飼主在照護站「設定 → 提醒」開關。
 
+import { displayMedSlot } from './brand.js';
+
 export function parseReminderSettings(pet) {
   try {
     const settings = JSON.parse(pet?.reminderJson || '{}');
@@ -59,7 +61,7 @@ export function buildReminderLines(pet, rows) {
       try { meds = JSON.parse(today.medJson || '[]'); } catch (error) { /* ignore */ }
       const doneSlots = new Set(meds.filter((med) => med.status === '已吃').map((med) => med.slot));
       const missing = goalSlots.filter((slot) => !doneSlots.has(slot));
-      if (missing.length) lines.push(`${missing.join('、')}的藥還沒記錄`);
+      if (missing.length) lines.push(`${missing.map(displayMedSlot).join('、')}的藥還沒記錄`);
     } else {
       // 沒設目標時：平常有餵藥習慣（近 7 天有 4 天以上）但今天沒有任何用藥紀錄
       const medDays = recorded.filter((row) => row.medTakenCount > 0 || row.medIssueCount > 0).length;
@@ -116,8 +118,7 @@ export function reminderMessage(pet, lines) {
     `🔔 照護提醒（${pet.petName}）`,
     ...lines.map((line) => `・${line}`),
     '',
-    '做了但忘了記的話，',
-    '補記一下就好；',
+    '如果忘了記可以補記；',
     '有不放心的狀況請諮詢獸醫師。'
   ].join('\n');
 }
