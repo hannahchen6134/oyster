@@ -16,7 +16,7 @@ import {
   listFoods, getFood, insertLog, getLog, getLastLogByUser, softDeleteLog, updateLog,
   recomputeDay, getRecentSummaries,
   upcomingVisits, listVetsByOwner, createSession,
-  appKvGet, appKvSet, claimMessageOnce, purgeOldSeenMessages, getSessionUser, track, healFoodKcal,
+  appKvGet, appKvSet, claimMessageOnce, purgeOldSeenMessages, saveReportShot, getReportShot, purgeOldShots, getSessionUser, track, healFoodKcal,
   resolveDataOwner, createCareInvite, redeemCareInvite, listCareMembers, listCareCircle,
   createLoginCode, redeemLoginCode
 } from './db.js';
@@ -99,6 +99,31 @@ export default {
     }
     if (url.pathname.startsWith('/api/')) {
       return handleApi(request, env, url);
+    }
+    // 報告截圖：POST 存 PNG（要登入）→ 回一個「真圖片」網址；GET 用長亂數 id 取圖，
+    // 讓 LINE 內建瀏覽器能用「長按圖片 → 儲存到相簿」（data 網址在部分瀏覽器無法長按存）。
+    if (url.pathname === '/shot' && request.method === 'POST') {
+      const token = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
+      const owner = await getSessionUser(env.DB, token);
+      if (!owner) return jsonResponse({ ok: false, message: '請先登入' }, 401);
+      let body;
+      try { body = await request.json(); } catch (error) { return jsonResponse({ ok: false }, 400); }
+      const dataUrl = String(body?.png || '');
+      const b64 = dataUrl.includes('base64,') ? dataUrl.split('base64,')[1] : '';
+      if (!b64 || b64.length > 2_600_000) return jsonResponse({ ok: false, message: '圖片無效或過大' }, 400);
+      try {
+        const id = await saveReportShot(env.DB, owner, b64);
+        return jsonResponse({ ok: true, url: `/shot/${id}` });
+      } catch (error) {
+        return jsonResponse({ ok: false, message: error.message }, 500);
+      }
+    }
+    if (url.pathname.startsWith('/shot/') && request.method === 'GET') {
+      const id = url.pathname.slice('/shot/'.length);
+      const row = await getReportShot(env.DB, id);
+      if (!row || !row.png) return new Response('not found', { status: 404 });
+      const bin = Uint8Array.from(atob(row.png), (c) => c.charCodeAt(0));
+      return new Response(bin, { headers: { 'content-type': 'image/png', 'cache-control': 'private, max-age=3600', 'x-robots-tag': 'noindex' } });
     }
     if (url.pathname === '/healthz') {
       return jsonResponse({ ok: true, service: 'cat-care-beta', now: new Date().toISOString() });
@@ -263,6 +288,8 @@ export default {
     );
     // 清掉 2 天前的訊息冪等紀錄，避免 app_kv 無限成長
     ctx.waitUntil(purgeOldSeenMessages(env.DB, `${addDays(taipeiToday(), -2)}T00:00:00.000Z`));
+    // 清掉 1 天前的報告截圖暫存（存圖是即時用途，不需長期保留）
+    ctx.waitUntil(purgeOldShots(env.DB, `${addDays(taipeiToday(), -1)}T00:00:00.000Z`));
     ctx.waitUntil(runDailyReminders(env));
   }
 };
@@ -829,7 +856,7 @@ async function guideUnknown(env, event, petId) {
     qrPost('其他狀況（吐/便…）', 'action=recmore', '其他狀況')
   ];
   await replyOrPushQuick(env, event,
-    '咦？這句我還看不懂 🙏\n\n'
+    '咦？這句我看不懂 🙏\n\n'
     + '記錄可以直接打字 👇\n'
     + '· 喝水 → 水 20\n'
     + '· 吃飯 → 罐頭 30／乾糧 5\n'

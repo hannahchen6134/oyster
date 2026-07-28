@@ -259,6 +259,30 @@ export async function purgeOldSeenMessages(db, olderThanIso) {
   } catch (error) { /* 清理失敗不影響主流程 */ }
 }
 
+// 報告截圖暫存：把即時算好的 PNG 存起來，讓 LINE 內建瀏覽器能以「真圖片」長按儲存。
+// id 是長亂數（能力憑證），短期有效、每晚清掉。
+async function ensureShotTable(db) {
+  await db.prepare(
+    `CREATE TABLE IF NOT EXISTS report_shots (id TEXT PRIMARY KEY, ownerLineUserId TEXT NOT NULL DEFAULT '', png TEXT NOT NULL, createdAt TEXT NOT NULL)`
+  ).run();
+}
+export async function saveReportShot(db, ownerLineUserId, base64png) {
+  await ensureShotTable(db);
+  const id = `${newToken()}${newToken()}`; // 更長的亂數，難以被猜到
+  await db.prepare('INSERT INTO report_shots (id, ownerLineUserId, png, createdAt) VALUES (?, ?, ?, ?)')
+    .bind(id, String(ownerLineUserId || ''), String(base64png || ''), nowIso())
+    .run();
+  return id;
+}
+export async function getReportShot(db, id) {
+  try {
+    return await db.prepare('SELECT png FROM report_shots WHERE id = ?').bind(String(id || '')).first();
+  } catch (error) { return null; }
+}
+export async function purgeOldShots(db, olderThanIso) {
+  try { await db.prepare('DELETE FROM report_shots WHERE createdAt < ?').bind(olderThanIso).run(); } catch (error) { /* ignore */ }
+}
+
 // ---------- logs ----------
 
 export async function insertLog(db, log) {

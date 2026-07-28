@@ -3997,7 +3997,19 @@
       }
       // 診斷用：把真正的結果直接跳出來，才知道死在哪一步
       if (dataUrl && dataUrl.length > 100) {
-        try { showReportImage(dataUrl, `${petName}_照護紀錄_${today}.png`); }
+        // 把 PNG 上傳成「真圖片網址」，LINE 內建瀏覽器才能長按儲存（data 網址常無法長按存）；
+        // 上傳失敗就退回直接用 data 網址（至少畫面看得到）。
+        let imgSrc = dataUrl;
+        try {
+          const resp = await fetch('/shot', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + state.token },
+            body: JSON.stringify({ png: dataUrl })
+          });
+          const j = await resp.json();
+          if (j && j.ok && j.url) imgSrc = j.url;
+        } catch (e) { /* 上傳失敗就用 dataURL */ }
+        try { showReportImage(imgSrc, `${petName}_照護紀錄_${today}.png`); }
         catch (e) { alert('圖片產生成功，但顯示時出錯：' + (e && e.message ? e.message : e)); }
       } else if (failMsg) {
         alert('產生圖片失敗：' + failMsg + '\n\n（可先用手機截圖給醫生，我會依這個訊息修正）');
