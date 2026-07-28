@@ -53,9 +53,8 @@ test('罐罐同義詞', () => {
   assert.equal(intent.record.foodType, '罐頭');
 });
 
-// TODO（既有、非本次改動）：目前 parser 把「罐頭 X 水 Y」記成兩筆（食物＋喝水），
-// 而非單筆「罐頭＋加水」。待決定加水語法後修 parser 再取消 todo。
-test('罐頭加水：先抽加水量、再抓克數，品名可比對', { todo: '罐頭+水 目前記成兩筆，待決定加水語法' }, () => {
+// 「食物 ... 水 N」＝食物＋泡食物加的水，合成單筆（addedWaterMl），不拆成兩筆。
+test('罐頭加水：先抽加水量、再抓克數，品名可比對', () => {
   const intent = parseMessage('罐頭 皇家 13g 水 10');
   assert.equal(intent.record.foodType, '罐頭');
   assert.equal(intent.record.amount, 13);            // 食物克數 = 13（不是加的水 10）
@@ -65,14 +64,14 @@ test('罐頭加水：先抽加水量、再抓克數，品名可比對', { todo: 
   assert.equal(matchFood(foods, intent.record.itemName, intent.record.foodType).foodId, 'x');
 });
 
-test('罐頭加水：克數沒帶單位也不會被加水覆蓋（嚴格）', { todo: '罐頭+水 目前記成兩筆，待決定加水語法' }, () => {
+test('罐頭加水：克數沒帶單位也不會被加水覆蓋（嚴格）', () => {
   const intent = parseMessage('罐頭 皇家 13 水 10');
   assert.equal(intent.record.amount, 13);            // 先移除「水 10」→ 剩下唯一數字 13
   assert.equal(intent.record.addedWaterMl, 10);
   assert.equal(intent.record.itemName, '皇家');
 });
 
-test('罐頭加水：小數克數＋較大加水量', { todo: '罐頭+水 目前記成兩筆，待決定加水語法' }, () => {
+test('罐頭加水：小數克數＋較大加水量', () => {
   const intent = parseMessage('罐頭 皇家 14.8g 水 28');
   assert.equal(intent.record.amount, 14.8);
   assert.equal(intent.record.addedWaterMl, 28);

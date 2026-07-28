@@ -333,14 +333,22 @@ function splitSegments(tokens) {
   const segments = [];
   let current = [];
   let currentIsMed = false;
+  let currentIsFood = false;
   for (const token of tokens) {
     const medStatusInMed = currentIsMed && Boolean(matchWordList(token.toLowerCase(), MED_STATUS_WORDS));
-    if (isSegmentHead(token) && current.length && !medStatusInMed) {
+    // 食物段落裡的「水/加水/泡水…」是「泡食物加的水」，不另起新段
+    // （交給 parseFoodExtras 抽成 addedWaterMl，合成單筆「食物＋加水」，而非拆成兩筆）
+    const waterInFood = currentIsFood && FOOD_WATER_WORDS.has(token);
+    if (isSegmentHead(token) && current.length && !medStatusInMed && !waterInFood) {
       segments.push(current);
       current = [token];
       currentIsMed = MED_WORDS.has(token);
+      currentIsFood = Boolean(matchWordList(token, FOOD_TYPE_WORDS));
     } else {
-      if (!current.length) currentIsMed = MED_WORDS.has(token);
+      if (!current.length) {
+        currentIsMed = MED_WORDS.has(token);
+        currentIsFood = Boolean(matchWordList(token, FOOD_TYPE_WORDS));
+      }
       current.push(token);
     }
   }

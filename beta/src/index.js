@@ -850,7 +850,7 @@ async function welcomeMsg(db, lineUserId, ownerId) {
 const RECORD_L2 = {
   water: { prompt: '喝了多少 ml？點一下就記好', items: () => [...[10, 20, 30, 50, 80].map((n) => qrMsg(String(n), `水 ${n}`)), qrPost('其他', 'action=rec&k=water_other', '其他數字')] },
   med: { prompt: '這次的藥？點一下就記好', items: () => [qrMsg('早·已吃', '藥 早 已吃'), qrMsg('晚·已吃', '藥 晚 已吃'), qrMsg('中午·已吃', '藥 中午 已吃'), qrMsg('漏餵沒吃到', '藥 未餵')] },
-  food: { prompt: '吃哪一種？', items: () => [qrPost('罐頭', 'action=rec2&t=罐頭', '罐頭'), qrPost('乾糧', 'action=rec2&t=乾糧', '乾糧'), qrPost('零食', 'action=rec2&t=零食', '零食')] },
+  food: { prompt: '吃哪一種？', items: () => [qrPost('罐頭', 'action=rec2&t=罐頭', '罐頭'), qrPost('乾糧', 'action=rec2&t=乾糧', '乾糧'), qrPost('濕食', 'action=rec2&t=濕食', '濕食'), qrPost('生食', 'action=rec2&t=生食', '生食'), qrPost('零食', 'action=rec2&t=零食', '零食')] },
   vomit: { prompt: '吐了什麼？點一個，或自己打描述', items: () => [qrMsg('透明泡沫', '吐 透明泡沫'), qrMsg('黃色液體', '吐 黃色液體'), qrMsg('食物或毛', '吐 食物或毛'), qrMsg('只是吐了', '吐了')] },
   stool: { prompt: '大小便情況？點一個就好', items: () => [qrMsg('正常便', '大便 正常'), qrMsg('軟便', '軟便'), qrMsg('拉肚子', '拉肚子'), qrMsg('尿尿正常', '尿尿 正常')] },
   mood: { prompt: '今天精神如何？', items: () => [qrMsg('活力好', '精神 活力好'), qrMsg('普通', '精神 普通'), qrMsg('懶懶的', '精神 懶懶的'), qrMsg('沒精神', '精神 沒精神')] },

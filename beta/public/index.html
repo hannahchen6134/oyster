@@ -2093,7 +2093,7 @@
     const QUICK_PAD = {
       water: { title: '喝水', kind: 'values', unit: 'ml', values: [10, 20, 30, 50, 80], payload: (n) => ({ category: 'water', amount: n, unit: 'ml', waterMl: n }) },
       med: { title: '用藥', kind: 'opts', opts: [['早·已吃', { category: 'med', medSlot: '早', medStatus: '已吃' }], ['晚·已吃', { category: 'med', medSlot: '晚', medStatus: '已吃' }], ['中午·已吃', { category: 'med', medSlot: '中午', medStatus: '已吃' }], ['漏餵沒吃到', { category: 'med', medStatus: '漏餵' }]] },
-      food: { title: '吃飯', kind: 'food', types: ['罐頭', '乾糧', '零食'] },
+      food: { title: '吃飯', kind: 'food', types: ['罐頭', '乾糧', '濕食', '生食', '零食'] },
       vomit: { title: '嘔吐', kind: 'chips', chips: [['透明泡沫', { category: 'vomit', note: '透明泡沫' }], ['黃色液體', { category: 'vomit', note: '黃色液體' }], ['食物或毛', { category: 'vomit', note: '食物或毛' }], ['只是吐了', { category: 'vomit', note: '' }]] },
       stool: { title: '大小便', kind: 'chips', chips: [['正常便', { category: 'stool', note: '正常' }], ['軟便', { category: 'stool', note: '軟便' }], ['拉肚子', { category: 'stool', note: '拉肚子' }], ['尿尿正常', { category: 'urine', note: '正常' }]] },
       mood: { title: '精神', kind: 'chips', chips: [['活力好', { category: 'mood', note: '活力好' }], ['普通', { category: 'mood', note: '普通' }], ['懶懶的', { category: 'mood', note: '懶懶的' }], ['沒精神', { category: 'mood', note: '沒精神' }]] },
