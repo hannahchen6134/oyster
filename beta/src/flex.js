@@ -395,7 +395,7 @@ export function websiteFlex(url) {
     type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
     contents: [
       text('點下方按鈕直接登入', { size: 'md', weight: 'bold', color: '#3F2B18', align: 'center' }),
-      text('月曆・回診摘要・血檢趨勢\n每一筆紀錄都能修改補登', { size: 'xs', color: C.muted, wrap: true, align: 'center', margin: 'md' }),
+      text('月曆・給醫生看・血檢趨勢\n每一筆紀錄都能修改補登', { size: 'xs', color: C.muted, wrap: true, align: 'center', margin: 'md' }),
       { type: 'separator', margin: 'xl', color: SEPARATOR },
       text('連結會隨使用自動延長效期；就算過期，輸入「照護站」拿新連結，資料都不會消失。請勿轉傳給別人。', { size: 'xxs', color: C.muted, wrap: true, margin: 'lg' })
     ]
@@ -497,12 +497,12 @@ export function onboardingCarousel(petName = '') {
     body: { type: 'box', layout: 'vertical', paddingAll: '16px', backgroundColor: t3.body, contents: [
       text('這兩句最常用，點了帶進輸入框送出即可', { size: 'xxs', color: C.muted, wrap: true }),
       line(t3, '今天', '看今天喝水／熱量／用藥／腸胃'),
-      line(t3, '回診摘要', '整理近況給醫生看'),
+      line(t3, '給醫生看', '整理近況給醫生看'),
       hintBox(t3, '記錯了打「改 30」或「刪除」・找家人一起顧打「邀請」')
     ] }
   };
   return bubble(
-    '喵爸媽安心上手：① 新增貓咪 ② 記第一筆（水 20／罐頭 30／藥 早 已吃）③ 打「今天」看狀況、「回診摘要」給醫生',
+    '喵爸媽安心上手：① 新增貓咪 ② 記第一筆（水 20／罐頭 30／藥 早 已吃）③ 打「今天」看狀況、「給醫生看」給醫生',
     { type: 'carousel', contents: [b1, b2, b3] }
   );
 }
@@ -883,7 +883,7 @@ export function menuFlex() {
       text(BRAND.tagline, { size: 'xs', color: C.muted, align: 'center', wrap: true }),
       row([menuCell(BRAND.onboarding, '第一次使用看這裡', '安心上手')]),
       row([menuCell('怎麼記？看範例', '點一句就記', '怎麼記'), menuCell('如何記餵藥', '藥的記法', '如何記餵藥')]),
-      row([menuCell('今日照護確認', '看今天狀況', '今天'), menuCell('回診摘要', '近 7 天整理', '回診摘要')]),
+      row([menuCell('今日照護確認', '看今天狀況', '今天'), menuCell('給醫生看', '近 7 天整理', '給醫生看')]),
       row([menuCell('開啟照護站', '回診・血檢・設定', '照護站', true)])
     ]
   };
@@ -1201,7 +1201,7 @@ export function visitReminderFlex(pet, visits, vetsById, dateLabel) {
   }
   contents.push(
     { type: 'separator', margin: 'lg', color: SEPARATOR },
-    text('回診前可先看「回診摘要」，或到照護站的「回診」頁一鍵複製給醫生',
+    text('回診前可先看「給醫生看」，或到照護站的「回診」頁一鍵複製給醫生',
       { size: 'xs', color: C.muted, wrap: true, margin: 'lg' })
   );
   const body = { type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG, contents };
@@ -1209,7 +1209,7 @@ export function visitReminderFlex(pet, visits, vetsById, dateLabel) {
     type: 'box', layout: 'horizontal', spacing: 'sm', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
     contents: [
       { type: 'button', height: 'sm', style: 'link', color: C.brand,
-        action: { type: 'message', label: '回診摘要', text: '回診摘要' } },
+        action: { type: 'message', label: '給醫生看', text: '給醫生看' } },
       { type: 'button', height: 'sm', style: 'primary', color: C.brand,
         action: { type: 'message', label: '開啟照護站', text: '照護站' } }
     ]
