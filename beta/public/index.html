@@ -549,6 +549,11 @@
     .imgbox-close { background: rgba(255, 255, 255, 0.16); color: #fff; }
     .imgbox-scroll { flex: 1; overflow: auto; -webkit-overflow-scrolling: touch; padding: 0 12px 18px; }
     .imgbox-scroll img { display: block; width: 100%; max-width: 460px; margin: 0 auto; border-radius: 10px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3); }
+    .imgbox-loadwrap { margin: auto; text-align: center; color: #fff; padding: 20px; }
+    .imgbox-spin { width: 38px; height: 38px; border: 3px solid rgba(255, 255, 255, 0.25); border-top-color: #fff; border-radius: 50%; margin: 0 auto 16px; animation: imgboxspin 0.8s linear infinite; }
+    @keyframes imgboxspin { to { transform: rotate(360deg); } }
+    .imgbox-loadtext { font-size: 14px; line-height: 1.8; }
+    .imgbox-loadtext span { font-size: 12px; opacity: 0.7; }
     .cap-header { display: none; padding: 2px 2px 14px; }
     .cap-title { font-size: 18px; font-weight: 700; color: var(--brand); }
     .cap-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
@@ -3960,6 +3965,7 @@
       const orig = btn.textContent;
       btn.disabled = true;
       btn.textContent = '產生圖片中…';
+      const loading = showLoadingOverlay(); // 一按就有全螢幕回饋，蓋住按鈕消失的空檔
       // 展開所有（非隱藏的）摺疊區，記住原本開闔狀態，截完還原
       const folds = Array.from(view.querySelectorAll('details')).filter((d) => !d.classList.contains('hidden'));
       const wasOpen = folds.map((d) => d.open);
@@ -3976,15 +3982,12 @@
       let dataUrl = '';
       let failMsg = '';
       try {
-        // skipFonts：不要去抓 Google 字型內嵌（那步在受限瀏覽器會卡死逾時）；
-        // 頁面已載入的字型仍會用，最差退回系統中文字型也清楚
-        const opts = { backgroundColor: '#efe9dd', pixelRatio: 2, style: { margin: '0' }, skipFonts: true };
-        // 每一次算圖都套逾時，避免任何一步（含暖身）卡死讓按鈕永遠回不來
+        // skipFonts：不抓 Google 字型內嵌（那步在受限瀏覽器會卡死）；pixelRatio 1.5＝夠清楚又快
+        const opts = { backgroundColor: '#efe9dd', pixelRatio: 1.5, style: { margin: '0' }, skipFonts: true };
         const withTimeout = (p, ms) => Promise.race([
           p, new Promise((_, reject) => setTimeout(() => reject(new Error(`逾時 ${ms / 1000} 秒`)), ms))
         ]);
-        // LINE 內建瀏覽器：第一次算圖常空白／失敗，先暖身一次（忽略結果與錯誤）再正式產生
-        try { await withTimeout(window.htmlToImage.toPng(view, opts), 12000); } catch (warmErr) { /* 暖身失敗不當錯誤 */ }
+        // 單次算圖（不再暖身多算一次）＋逾時保險，明顯更快
         dataUrl = await withTimeout(window.htmlToImage.toPng(view, opts), 20000);
       } catch (error) {
         failMsg = (error && error.message) ? error.message : String(error);
@@ -4009,14 +4012,25 @@
           const j = await resp.json();
           if (j && j.ok && j.url) imgSrc = j.url;
         } catch (e) { /* 上傳失敗就用 dataURL */ }
+        loading.remove();
         try { showReportImage(imgSrc, `${petName}_照護紀錄_${today}.png`); }
         catch (e) { alert('圖片產生成功，但顯示時出錯：' + (e && e.message ? e.message : e)); }
       } else if (failMsg) {
+        loading.remove();
         alert('產生圖片失敗：' + failMsg + '\n\n（可先用手機截圖給醫生，我會依這個訊息修正）');
       } else {
+        loading.remove();
         alert('這個瀏覽器產出的圖片是空白的，可能不支援。請改用一般瀏覽器（Safari／Chrome）開，或先用手機截圖。');
       }
     });
+    // 「產生中…」全螢幕轉圈：一按就給回饋，算圖＋上傳期間都顯示
+    function showLoadingOverlay() {
+      const box = document.createElement('div');
+      box.className = 'imgbox';
+      box.innerHTML = `<div class="imgbox-loadwrap"><div class="imgbox-spin"></div><div class="imgbox-loadtext">正在產生給醫生看的報告圖…<br><span>約需幾秒，請稍候</span></div></div>`;
+      document.body.appendChild(box);
+      return box;
+    }
     // 顯示產生好的報告圖：長按可儲存（全平台通用）；另備一顆「分享／存圖」用新的一次點擊觸發，
     // 讓支援的手機能叫出系統分享面板（新手勢才不會被瀏覽器擋掉）。
     function showReportImage(dataUrl, fileName) {
