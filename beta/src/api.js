@@ -284,6 +284,18 @@ async function handleLogs(db, request, method, logId, lineUserId, actorId = line
     });
 
     const saved = await insertLog(db, log);
+    // 食物另外加的水（例：泡罐頭的水）→ 另記一筆喝水，計入當日補水（比照 LINE）
+    const addedWaterMl = category === 'food' ? Number(body.addedWaterMl || 0) : 0;
+    if (addedWaterMl > 0) {
+      await insertLog(db, {
+        lineUserId, petId, eventDateTime,
+        category: 'water', itemName: '', foodType: '', foodId: '',
+        amount: addedWaterMl, unit: 'ml', waterMl: addedWaterMl, kcal: 0,
+        medStatus: '', medSlot: '', doseText: '', medForm: '', beforeMeal: '',
+        note: '罐頭加水',
+        recordedBy: actorId, isBackfilled: log.isBackfilled, source: 'web', updatedBy: actorId
+      });
+    }
     // 記體重時同步更新貓咪目前體重（每公斤喝水量、熱量目標都靠這個）
     if (category === 'weight' && Number(saved.amount) > 0) {
       await updatePetFields(db, petId, { weightKg: Number(saved.amount) });

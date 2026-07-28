@@ -1949,6 +1949,7 @@
             </div>
             <div class="field"><label>克數（g）</label><input type="number" name="foodAmount" min="0" step="0.5" value="${category === 'food' ? esc(log?.amount ?? '') : ''}"></div>
           </div>
+          ${!log ? `<div class="field"><label>加水（ml，泡罐頭加的水，選填）</label><input type="number" name="addedWaterFood" min="0" step="1" placeholder="沒加水就留空，會另計入今天喝水"></div>` : ''}
           ${state.foods.length ? `<div class="field"><label>食物品項（選了會自動算熱量與水分）</label>
             <select name="foodId"><option value="">— 不指定 —</option>${foodOptions}</select>
           </div>` : '<input type="hidden" name="foodId" value="">'}
@@ -2074,6 +2075,7 @@
         body.foodType = get('foodType');
         body.foodId = get('foodId');
         if (!body.foodId) body.itemName = get('itemNameFood').trim();
+        body.addedWaterMl = Number(get('addedWaterFood') || 0); // 泡罐頭的水 → 後端會另記一筆喝水
         if (!body.amount) throw new Error('請填食物克數');
       }
       if (category === 'med') {
