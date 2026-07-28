@@ -626,9 +626,8 @@ export function welcomeFlex() {
   const body = {
     type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
     contents: [
-      text(BRAND.tagline, { size: 'xs', color: C.muted, align: 'center', wrap: true }),
-      text('每天忙碌又放不下貓貓？\n交給我陪你一起記。', { size: 'sm', weight: 'bold', color: '#3F2B18', wrap: true, margin: 'lg', align: 'center' }),
-      text('像聊天一樣打字就記好，\n回診時一鍵整理給醫生看。', { size: 'sm', color: C.inkSoft, wrap: true, margin: 'sm', align: 'center' }),
+      text(BRAND.tagline, { size: 'md', weight: 'bold', color: '#3F2B18', wrap: true, align: 'center' }),
+      text('像聊天一樣打字就記好，\n回診時一鍵整理給醫生看。', { size: 'sm', color: C.inkSoft, wrap: true, margin: 'md', align: 'center' }),
       { type: 'box', layout: 'horizontal', margin: 'xl', contents: [menuCell('幫貓貓建檔', '3 個小問題・30 秒', '幫貓貓建檔', true)] },
       { type: 'box', layout: 'horizontal', margin: 'md', contents: [menuCell('先看看怎麼用', '安心上手小教學', '安心上手')] }
     ]
