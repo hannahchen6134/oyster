@@ -77,11 +77,11 @@ function parseGoalSlots(pet) {
 }
 
 const ENCOURAGE_PROGRESS = [
-  '細心記錄，守護貓貓健康'
+  '感謝有你細心紀錄，守護貓貓健康'
 ];
 
 const ENCOURAGE_DONE = [
-  '細心記錄，守護貓貓健康'
+  '感謝有你細心紀錄，守護貓貓健康'
 ];
 
 function pickLine(pool, seed, name) {
