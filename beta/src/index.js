@@ -1237,7 +1237,10 @@ async function handleTextMessage(event, env, baseUrl) {
       if (user.defaultPetId !== switchTarget.petId) {
         await updateUser(db, lineUserId, { defaultPetId: switchTarget.petId });
       }
-      await replyOrPush(env, event, `✓ 已切換，接下來都記給「${switchTarget.petName}」🐈\n現在打「水 20」「罐頭 30」就會記到牠。`);
+      // 明確告訴使用者「怎麼切回去」：把其他貓的名字列出來當切換方法（切換是持續生效的，別讓人忘了切回）
+      const others = pets.filter((p) => p.petId !== switchTarget.petId).map((p) => p.petName).filter(Boolean);
+      const backHint = others.length ? `\n\n👉 想換回其他貓，打名字就好：${others.join('、')}` : '';
+      await replyOrPush(env, event, `✓ 已切換，接下來都記給「${switchTarget.petName}」🐈\n現在打「水 20」「罐頭 30」就會記到牠。${backHint}`);
       return;
     }
     pet = switchTarget; // 單貓：維持原本「看今天」行為
