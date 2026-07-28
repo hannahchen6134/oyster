@@ -77,17 +77,11 @@ function parseGoalSlots(pet) {
 }
 
 const ENCOURAGE_PROGRESS = [
-  '慢慢來，今天還有時間，{name}有你照顧很安心',
-  '記下來就不會漏，你做得很好',
-  '一步一步來，{name}的健康有你把關',
-  '別擔心，照這個節奏就對了'
+  '細心記錄，守護貓貓健康'
 ];
 
 const ENCOURAGE_DONE = [
-  '今日目標全部達成！{name}有你真幸福',
-  '太棒了，今天的照顧滿分！',
-  '全部完成～給自己一個讚，也給{name}一個摸摸',
-  '目標達成！安心睡個好覺吧'
+  '細心記錄，守護貓貓健康'
 ];
 
 function pickLine(pool, seed, name) {

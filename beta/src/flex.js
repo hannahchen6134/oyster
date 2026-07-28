@@ -1169,7 +1169,7 @@ export function reminderFlex(pet, lines, title) {
     type: 'box', layout: 'horizontal', spacing: 'sm', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
     contents: [
       { type: 'button', height: 'sm', style: 'link', color: C.brand,
-        action: { type: 'message', label: '看今天', text: '今天' } },
+        action: { type: 'message', label: '看今日記錄', text: '看今日記錄' } },
       { type: 'button', height: 'sm', style: 'primary', color: C.brand,
         action: { type: 'message', label: '開啟照護站', text: '照護站' } }
     ]
