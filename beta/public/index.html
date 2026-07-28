@@ -1115,6 +1115,7 @@
             <li>Beta 測試版・紀錄輔助工具，不提供醫療診斷、治療建議或緊急判斷。</li>
             <li>所有數字為飼主自行記錄，可能因輸入而有誤，提供給獸醫師前請自行核對。</li>
             <li>貓咪出現明顯不適，請直接聯繫獸醫。</li>
+            <li>紀錄正常不代表貓咪完全健康——會吃會喝也可能生病。請定期回診，以獸醫判斷為準。</li>
           </ul>
         </details>
       </div>
@@ -1345,6 +1346,7 @@
           <li>Beta 測試版・紀錄輔助工具，不提供醫療診斷、治療建議或緊急判斷。</li>
           <li>所有數字為飼主自行記錄，可能因輸入而有誤，提供給獸醫師前請自行核對。</li>
           <li>貓咪出現明顯不適，請直接聯繫獸醫。</li>
+            <li>紀錄正常不代表貓咪完全健康——會吃會喝也可能生病。請定期回診，以獸醫判斷為準。</li>
           <li>照護資料只用於本服務的紀錄與摘要，請勿將專屬連結轉傳給不相關的人。</li>
         </ul>
       </details>
@@ -3976,6 +3978,11 @@
       header.innerHTML = `<div class="cap-title">${esc(petName)}・照護紀錄</div>`
         + `<div class="cap-sub">產生日期 ${esc(today)}　·　來源：喵喵照護站</div>`;
       view.prepend(header);
+      // 圖片底部免責（給醫生看的圖也帶著，避免被當成精確醫療數據）
+      const capFooter = document.createElement('div');
+      capFooter.className = 'cap-header';
+      capFooter.innerHTML = `<div class="cap-sub">※ 飼主自行記錄，可能有誤差，僅供醫生參考。紀錄正常不代表貓咪完全健康，請以獸醫判斷為準。</div>`;
+      view.appendChild(capFooter);
       view.classList.add('capturing');
       // 讓瀏覽器先完成版面重排，圖表才不會被截到一半
       await new Promise((resolve) => setTimeout(resolve, 60));
@@ -3997,6 +4004,7 @@
       } finally {
         view.classList.remove('capturing');
         header.remove();
+        capFooter.remove();
         folds.forEach((d, i) => { d.open = wasOpen[i]; });
         btn.disabled = false;
         btn.textContent = orig;
