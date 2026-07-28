@@ -632,7 +632,7 @@ export function welcomeFlex() {
       { type: 'box', layout: 'horizontal', margin: 'md', contents: [menuCell('先看看怎麼用', '安心上手小教學', '安心上手')] }
     ]
   };
-  return bubble(`歡迎加入${BRAND.name}！點「幫貓貓建檔」開始`, { type: 'bubble', size: 'mega', header: header('歡迎回家'), body });
+  return bubble(`歡迎加入${BRAND.name}！點「幫貓貓建檔」開始`, { type: 'bubble', size: 'mega', header: header('歡迎加入'), body });
 }
 
 // ---------- 說明選單卡 ----------
