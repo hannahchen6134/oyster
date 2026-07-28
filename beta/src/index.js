@@ -2155,5 +2155,24 @@ async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId, ow
     return;
   }
 
+  // 「所見即可打」救援：所有指令都沒中時，最後用食物清單比對「名字＋數量」，
+  // 讓使用者照卡片顯示的品名（例如「皇家罐頭 27」，不是「罐頭 皇家」）也能記進去。
+  const foodGuess = text.match(/^(.{2,20}?)\s+(\d+(?:\.\d+)?)\s*(?:g|克|公克)?$/);
+  if (foodGuess) {
+    const name = foodGuess[1].trim();
+    const amount = Number(foodGuess[2]);
+    if (name && amount > 0) {
+      const foods = await listFoods(db, ownerId);
+      const food = matchFood(foods, name, '');
+      if (food) {
+        await handleRecord(env, event, pet, {
+          category: 'food', foodType: food.foodType, itemName: food.displayName,
+          amount, unit: 'g', addedWaterMl: 0, medStatus: '', medSlot: '', note: '', dayOffset: 0, time: ''
+        }, ownerId, { actorId: lineUserId, caregiverName, baseUrl });
+        return;
+      }
+    }
+  }
+
   await guideUnknown(env, event, pet?.petId || '');
 }
