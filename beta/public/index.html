@@ -3987,7 +3987,10 @@
         const withTimeout = (p, ms) => Promise.race([
           p, new Promise((_, reject) => setTimeout(() => reject(new Error(`逾時 ${ms / 1000} 秒`)), ms))
         ]);
-        // 單次算圖（不再暖身多算一次）＋逾時保險，明顯更快
+        // iOS Safari 第一次算圖常空白 → 只有 iOS 才先暖身一次（Android 保持單次、較快）
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+          || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        if (isIOS) { try { await withTimeout(window.htmlToImage.toPng(view, opts), 12000); } catch (warmErr) { /* 暖身失敗不當錯誤 */ } }
         dataUrl = await withTimeout(window.htmlToImage.toPng(view, opts), 20000);
       } catch (error) {
         failMsg = (error && error.message) ? error.message : String(error);
