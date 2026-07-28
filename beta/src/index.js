@@ -132,9 +132,9 @@ export default {
     if (url.pathname === '/healthz') {
       return jsonResponse({ ok: true, service: 'cat-care-beta', now: new Date().toISOString() });
     }
-    // 權杖健康檢查（不外洩權杖本身），用 INVITE_CODE 保護
+    // 權杖健康檢查（不外洩權杖本身），用 ADMIN_KEY 保護（不可用測試者也有的邀請碼）
     if (url.pathname === '/admin/line-token') {
-      if (url.searchParams.get('key') !== String(env.INVITE_CODE || '\u0000')) {
+      if (String(env.ADMIN_KEY || '').length < 8 || url.searchParams.get('key') !== env.ADMIN_KEY) {
         return jsonResponse({ ok: false }, 403);
       }
       try {
