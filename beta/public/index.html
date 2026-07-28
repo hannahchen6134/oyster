@@ -1949,7 +1949,7 @@
             </div>
             <div class="field"><label>克數（g）</label><input type="number" name="foodAmount" min="0" step="0.5" value="${category === 'food' ? esc(log?.amount ?? '') : ''}"></div>
           </div>
-          ${!log ? `<div class="field"><label>加水（ml，泡罐頭加的水，選填）</label><input type="number" name="addedWaterFood" min="0" step="1" placeholder="沒加水就留空，會另計入今天喝水"></div>` : ''}
+          <div class="field"><label>加水（ml，泡罐頭的水，選填）</label><input type="number" name="addedWaterFood" min="0" step="1" placeholder="${log ? '留空＝不改動；輸入數字＝設定加水；0＝移除' : '沒加水就留空，會另計入今天喝水'}"></div>
           ${state.foods.length ? `<div class="field"><label>食物品項（選了會自動算熱量與水分）</label>
             <select name="foodId"><option value="">— 不指定 —</option>${foodOptions}</select>
           </div>` : '<input type="hidden" name="foodId" value="">'}
@@ -1966,7 +1966,7 @@
           </div>
         </div>
         <div class="field"><label>備註 / 描述</label><textarea name="note">${esc(log?.note ?? '')}</textarea></div>
-        <details class="more-fold" ${isQuick ? '' : 'open'}>
+        <details class="more-fold" ${isEdit ? 'open' : ''}>
           <summary class="more-summary">更多選項（時間${category === 'med' ? '、藥名、劑量' : category === 'food' ? '、自訂品名' : ''}…）</summary>
           <div class="more-body">
             <div class="grid grid-2">
@@ -2075,7 +2075,9 @@
         body.foodType = get('foodType');
         body.foodId = get('foodId');
         if (!body.foodId) body.itemName = get('itemNameFood').trim();
-        body.addedWaterMl = Number(get('addedWaterFood') || 0); // 泡罐頭的水 → 後端會另記一筆喝水
+        // 加水：填了才送（空白＝不變更；新增時空白＝沒加水）。後端會同步「罐頭加水」那筆喝水。
+        const awRaw = get('addedWaterFood');
+        if (String(awRaw).trim() !== '') body.addedWaterMl = Number(awRaw) || 0;
         if (!body.amount) throw new Error('請填食物克數');
       }
       if (category === 'med') {

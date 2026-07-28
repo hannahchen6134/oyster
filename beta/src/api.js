@@ -318,6 +318,25 @@ async function handleLogs(db, request, method, logId, lineUserId, actorId = line
     const merged = await applyDerivedFields(db, { ...existing, ...body });
     const updated = await updateLog(db, logId, merged, actorId);
 
+    // 編輯食物時同步「泡罐頭的水」那筆喝水（addedWaterMl 有帶才動；>0 更新/新建、=0 移除）
+    if (existing.category === 'food' && 'addedWaterMl' in body) {
+      const aw = Number(body.addedWaterMl || 0);
+      const linked = await db.prepare(
+        `SELECT * FROM logs WHERE petId = ? AND category = 'water' AND note = '罐頭加水' AND isDeleted = 0 AND eventDateTime = ? LIMIT 1`
+      ).bind(existing.petId, existing.eventDateTime).first();
+      if (aw > 0) {
+        if (linked) await updateLog(db, linked.logId, { amount: aw, waterMl: aw, eventDateTime: updated.eventDateTime }, actorId);
+        else await insertLog(db, {
+          lineUserId: existing.lineUserId, petId: existing.petId, eventDateTime: updated.eventDateTime,
+          category: 'water', itemName: '', foodType: '', foodId: '', amount: aw, unit: 'ml', waterMl: aw, kcal: 0,
+          medStatus: '', medSlot: '', doseText: '', medForm: '', beforeMeal: '', note: '罐頭加水',
+          recordedBy: actorId, isBackfilled: updated.isBackfilled, source: 'web', updatedBy: actorId
+        });
+      } else if (linked) {
+        await softDeleteLog(db, linked.logId, actorId);
+      }
+    }
+
     const oldDate = String(existing.eventDateTime).slice(0, 10);
     const newDate = String(updated.eventDateTime).slice(0, 10);
     const summary = await recomputeDay(db, existing.petId, newDate);
