@@ -1850,15 +1850,16 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
     description = `備註：${record.note}`;
   }
 
-  // 罐頭另外加水：主文字標注，並在下方另計一筆喝水，讓當天總水分正確
+  // 罐頭另外加水：不塞進主文字（會讓品名那行太長），改在下方獨立一行顯示；並另計一筆喝水，讓當天總水分正確
   const addedWaterMl = record.category === 'food' ? Number(record.addedWaterMl) || 0 : 0;
-  if (addedWaterMl > 0) description += `（另加水 ${addedWaterMl} ml）`;
 
   const mainText = description;
   const subParts = [];
-  if (log.kcal) subParts.push(`${estimated ? '≈' : ''}${log.kcal} kcal`);
-  if (record.category === 'food' && log.waterMl) subParts.push(`含水 ${log.waterMl} ml`);
-  if (addedWaterMl > 0) subParts.push(`另計加水 ${addedWaterMl} ml`);
+  const infoParts = [];
+  if (log.kcal) infoParts.push(`${estimated ? '≈' : ''}${log.kcal} kcal`);
+  if (record.category === 'food' && log.waterMl) infoParts.push(`含水 ${log.waterMl} ml`);
+  if (infoParts.length) subParts.push(infoParts.join('・'));
+  if (addedWaterMl > 0) subParts.push(`另外加水 ${addedWaterMl} ml`); // 獨立一行
   if (record.dayOffset || record.time) {
     const eventDay = eventDateTime.slice(0, 10);
     const stamp = `記在 ${Number(eventDay.slice(5, 7))}月${Number(eventDay.slice(8, 10))}日 ${eventDateTime.slice(11)}`;
@@ -1939,7 +1940,7 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
   const fallbackText = recordReply(description, pet, summary, hints, eventDate);
   const card = recordFlex({
     pet, categoryKey, mainText,
-    subText: subParts.join('・'),
+    subText: subParts.join('\n'),
     summary, date: eventDate,
     logId: savedLog?.logId || '',
     hints, tip, siteUrl: await siteLink(env, opts.baseUrl, lineUserId),
