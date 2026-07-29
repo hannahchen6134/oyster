@@ -857,6 +857,17 @@ async function defaultPetId(db, lineUserId, ownerId) {
     return pet?.petId || '';
   } catch (error) { return ''; }
 }
+// 多貓且此人「還沒明確選過要記哪一隻」時＝true：記錄前先問，避免默默記到第一隻（尤其是剛加入的共同照護者）
+function needsCatPick(user, pets) {
+  return pets.length >= 2 && !(user?.defaultPetId && pets.some((p) => p.petId === user.defaultPetId));
+}
+async function askWhichCat(env, event, pets) {
+  const items = pets.slice(0, 12).map((p) => qrMsg(p.petName, p.petName));
+  const names = pets.map((p) => p.petName).filter(Boolean).join('、');
+  await replyOrPushQuick(env, event,
+    `你要記錄哪隻貓貓的資料呢?\n家裡有：${names}\n先選一隻（選好後這筆再打一次就好）🐈`,
+    items);
+}
 // progressive disclosure：紀錄很少＝還在學，才顯示「怎麼打字記錄」教學鈕；上手後自動收起
 async function isBeginner(db, petId) {
   if (!petId) return true;
@@ -1198,7 +1209,12 @@ async function handleTextMessage(event, env, baseUrl) {
     if (result.ok) {
       await track(db, lineUserId, 'invite_redeemed');
       if (!isBetaAllowed(user)) await updateUser(db, lineUserId, { betaAccess: 1 });
-      await replyOrPush(env, event, '✓ 加入成功！接下來你在這裡打「水 20」「罐頭 30」就會記進對方的貓咪，也能打「照護站」開網站看完整資料 🐈');
+      const joinedPets = await listPets(db, result.ownerLineUserId);
+      const joinedNames = joinedPets.map((p) => p.petName).filter(Boolean).join('、');
+      const joinMsg = joinedPets.length >= 2
+        ? `✓ 加入成功！你的登記顯示有 ${joinedPets.length} 隻貓貓：${joinedNames}，請打名字先選要記哪隻貓貓的資料哦～\n選好後打「水 20」「罐頭 30」就會記給牠，也能打「照護站」看完整資料 🐈`
+        : '✓ 加入成功！接下來你在這裡打「水 20」「罐頭 30」就會記進對方的貓咪，也能打「照護站」開網站看完整資料 🐈';
+      await replyOrPush(env, event, joinMsg);
       try { await ensurePersonalRichMenu(env, baseUrl, lineUserId); } catch (error) { console.error('personal richmenu failed:', error.message); }
       return;
     }
@@ -1266,11 +1282,12 @@ async function handleTextMessage(event, env, baseUrl) {
   //  - 名字前綴（如「冠關 水 20」）→ 只有這一則記給那隻，不改預設
   let pet = await resolveDefaultPet(db, user, pets);
   let switchTarget = null;
+  let explicitPet = false; // 這則有沒有「明確指定貓」（打名字前綴），有的話就不用再問要記哪隻
   for (const candidate of pets) {
     const names = [candidate.petName, `@${candidate.petName}`];
     if (names.includes(text)) { switchTarget = candidate; break; }
     const pfx = names.find((n) => text.startsWith(`${n} `));
-    if (pfx) { pet = candidate; text = text.slice(pfx.length).trim(); break; }
+    if (pfx) { pet = candidate; explicitPet = true; text = text.slice(pfx.length).trim(); break; }
   }
   if (switchTarget) {
     if (pets.length > 1) {
@@ -1478,6 +1495,7 @@ async function handleTextMessage(event, env, baseUrl) {
     }
 
     case 'record': {
+      if (!explicitPet && needsCatPick(user, pets)) { await askWhichCat(env, event, pets); return; }
       if (!pet) {
         pet = await createPet(db, ownerId, { petName: '貓貓' });
         await updateUser(db, lineUserId, { defaultPetId: pet.petId });
@@ -1487,6 +1505,7 @@ async function handleTextMessage(event, env, baseUrl) {
     }
 
     case 'multiRecord': {
+      if (!explicitPet && needsCatPick(user, pets)) { await askWhichCat(env, event, pets); return; }
       if (!pet) {
         pet = await createPet(db, ownerId, { petName: '貓貓' });
         await updateUser(db, lineUserId, { defaultPetId: pet.petId });
