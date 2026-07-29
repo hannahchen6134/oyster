@@ -3417,23 +3417,37 @@
           const shareMsg = buildShareMsg(r.code);
           $('careInviteBox').innerHTML = `
             <div class="block" style="margin-top:12px;background:var(--brand-tint);border-color:transparent">
-              <p style="margin:0 0 10px;font-size:13px">把下面這整段傳給對方就好：</p>
+              <p style="margin:0 0 10px;font-size:13px">這段邀請傳給朋友就好：</p>
               <div class="care-copy-row">
                 <span class="care-copy-text" id="careShareMsg">${esc(shareMsg)}</span>
-                <button class="btn btn-primary btn-sm care-copy-btn" id="careCopyMsgBtn" type="button">複製</button>
               </div>
-              <p class="muted" style="margin:14px 0 6px;font-size:12px">官方 LINE 連結（可單獨複製）：</p>
-              <div class="care-copy-row">
-                <span class="care-copy-text" id="careLineUrl">${esc(lineUrl)}</span>
-                <button class="btn btn-secondary btn-sm care-copy-btn" id="careCopyUrlBtn" type="button">複製</button>
-              </div>
-              <p class="muted" style="margin:14px 0 6px;font-size:12px">邀請碼（可單獨複製）：</p>
-              <div class="care-copy-row">
-                <span class="care-copy-text care-copy-cmd" id="careJoinCmd">${esc(r.code)}</span>
-                <button class="btn btn-secondary btn-sm care-copy-btn" id="careCopyCmdBtn" type="button">複製</button>
-              </div>
+              <button class="btn btn-primary" id="careShareMsgBtn" type="button" style="width:100%;margin-top:12px">分享給朋友</button>
+              <button class="btn btn-secondary btn-sm" id="careCopyMsgBtn" type="button" style="width:100%;margin-top:8px">複製整段文字</button>
+              <details style="margin-top:12px">
+                <summary class="muted" style="font-size:12px;cursor:pointer">需要分開複製 LINE 連結／邀請碼？</summary>
+                <div style="margin-top:10px">
+                  <p class="muted" style="margin:0 0 6px;font-size:12px">官方 LINE 連結：</p>
+                  <div class="care-copy-row">
+                    <span class="care-copy-text" id="careLineUrl">${esc(lineUrl)}</span>
+                    <button class="btn btn-secondary btn-sm care-copy-btn" id="careCopyUrlBtn" type="button">複製</button>
+                  </div>
+                  <p class="muted" style="margin:12px 0 6px;font-size:12px">邀請碼：</p>
+                  <div class="care-copy-row">
+                    <span class="care-copy-text care-copy-cmd" id="careJoinCmd">${esc(r.code)}</span>
+                    <button class="btn btn-secondary btn-sm care-copy-btn" id="careCopyCmdBtn" type="button">複製</button>
+                  </div>
+                </div>
+              </details>
             </div>`;
-          $('careCopyMsgBtn').addEventListener('click', () => copyText(shareMsg, '已複製'));
+          $('careShareMsgBtn').addEventListener('click', async () => {
+            // 一鍵叫出手機分享面板（可直接選 LINE 好友送出）；不支援就退回開 LINE 分享頁
+            if (navigator.share) {
+              try { await navigator.share({ text: shareMsg }); return; }
+              catch (err) { if (err && err.name === 'AbortError') return; }
+            }
+            window.open('https://line.me/R/share?text=' + encodeURIComponent(shareMsg), '_blank');
+          });
+          $('careCopyMsgBtn').addEventListener('click', () => copyText(shareMsg, '已複製整段'));
           $('careCopyUrlBtn').addEventListener('click', () => copyText(lineUrl, '已複製'));
           $('careCopyCmdBtn').addEventListener('click', () => copyText(r.code, '已複製'));
         } catch (error) { toast('產生失敗，請再試一次', true); }
