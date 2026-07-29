@@ -716,6 +716,16 @@
     .chart-head-right { display: inline-flex; align-items: center; gap: 10px; }
     .chart-add { border: 1px solid var(--brand); background: var(--brand-tint); color: var(--brand); font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 999px; cursor: pointer; white-space: nowrap; }
     .chart-add:hover { background: var(--brand); color: #fff; }
+    /* 趨勢方向徽章：中性色（不用紅綠，避免暗示正常/異常），只表方向與幅度 */
+    .delta { font-size: 11.5px; font-weight: 700; color: var(--ink-soft); background: var(--brand-tint); border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
+    /* 血檢最近一次一覽 */
+    #labLatestGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+    .lab-cell { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 10px 11px; }
+    .lab-nm { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+    .lab-val { font-size: 19px; font-weight: 700; color: var(--brand); margin-top: 3px; }
+    .lab-unit { font-size: 11px; color: var(--muted); font-weight: 500; margin-left: 3px; }
+    .lab-meta { font-size: 11px; color: var(--muted); margin-top: 4px; display: flex; align-items: center; gap: 6px; }
+    .lab-meta .delta { font-size: 10.5px; padding: 1px 7px; }
     .chart-empty { border: 1px dashed var(--line-strong); border-radius: var(--radius); padding: 20px 14px; text-align: center; color: var(--muted); font-size: 13px; line-height: 1.6; }
     .chart-wrap { position: relative; }
     .chart-wrap svg { display: block; width: 100%; height: auto; }
@@ -1267,6 +1277,36 @@
           <button class="btn btn-primary" id="reportSaveBtn" type="button">📷 存成圖片給醫生</button>
           <p class="report-hint">截圖到相簿，方便給醫生看</p>
         </div>
+        <details class="block fold" open id="trendFold">
+          <summary>
+            <span class="fold-head">
+              <span class="fold-title">體重・飲水・熱量趨勢</span>
+              <span class="fold-sub">醫生最看重的變化：體重、喝水、食慾（近 30 天）</span>
+            </span>
+            <span class="fold-toggle">＋</span>
+          </summary>
+          <div class="fold-body"><div id="trendCharts"></div></div>
+        </details>
+        <details class="block fold hidden" id="labTrendBlock" open>
+          <summary>
+            <span class="fold-head">
+              <span class="fold-title">血檢趨勢<span class="fold-count" id="labCount"></span></span>
+              <span class="fold-sub">最近一次數值與變化，給醫生對照</span>
+            </span>
+            <span class="fold-toggle">＋</span>
+          </summary>
+          <div class="fold-body">
+            <div id="labLatestGrid"></div>
+            <div class="lab-single cap-hide">
+              <div style="display:flex;justify-content:flex-end;margin:14px 0 8px">
+                <select id="labItemSelect" style="width:auto" aria-label="選擇血檢項目"></select>
+              </div>
+              <p class="muted" id="labLatestLine" style="margin:0 0 8px;font-size:13px"></p>
+              <div id="labChartBox"></div>
+            </div>
+            <p class="muted" style="font-size:12px;margin:10px 0 0">數值可提供醫生參考，高低請以你的醫生判讀為準。輸入與編輯在「設定 → 血檢紀錄」。</p>
+          </div>
+        </details>
         <details class="block fold" open>
           <summary>
             <span class="fold-head">
@@ -1316,27 +1356,6 @@
             </div>
             <div class="grid" id="dayVisitList" style="gap:10px"></div>
           </div>
-        </details>
-        <details class="block fold hidden" id="labTrendBlock">
-          <summary>
-            <span class="fold-title">血檢紀錄<span class="fold-count" id="labCount"></span></span>
-            <span class="fold-toggle">＋</span>
-          </summary>
-          <div class="fold-body">
-            <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
-              <select id="labItemSelect" style="width:auto" aria-label="選擇血檢項目"></select>
-            </div>
-            <p class="muted" id="labLatestLine" style="margin:0 0 8px;font-size:13px"></p>
-            <div id="labChartBox"></div>
-            <p class="muted" style="font-size:12px;margin:8px 0 0">數值可提供醫生參考，高低請以你的醫生判讀為準。輸入與編輯在「設定 → 血檢紀錄」。</p>
-          </div>
-        </details>
-        <details class="block fold">
-          <summary>
-            <span class="fold-title">近 30 天趨勢<span class="fold-count">水分・熱量</span></span>
-            <span class="fold-toggle">＋</span>
-          </summary>
-          <div class="fold-body"><div id="trendCharts"></div></div>
         </details>
         <details class="block fold daycards-fold">
           <summary>
@@ -2577,6 +2596,24 @@
       return block;
     }
 
+    // 趨勢方向徽章（vs 前一段）：只呈現變化方向與幅度，不判斷好壞（顏色中性，不用紅綠）
+    function deltaBadge(values, sparse) {
+      const nums = values.filter((v) => v != null);
+      if (nums.length < 2) return '';
+      let prev, curr;
+      if (sparse) {
+        curr = nums[nums.length - 1]; prev = nums[nums.length - 2];
+      } else {
+        const last = nums.slice(-7), before = nums.slice(-14, -7);
+        if (!before.length) return '';
+        const avg = (a) => a.reduce((t, x) => t + x, 0) / a.length;
+        curr = avg(last); prev = avg(before);
+      }
+      if (!(prev > 0)) return '';
+      const pct = Math.round(((curr - prev) / prev) * 100);
+      if (pct === 0) return '<span class="delta">→ 持平</span>';
+      return `<span class="delta">${pct > 0 ? '↑' : '↓'} ${Math.abs(pct)}%</span>`;
+    }
     function renderTrendCharts(rows, fromDate, to) {
       const byDate = new Map(rows.map((row) => [row.date, row]));
       const dates = [];
@@ -2587,18 +2624,20 @@
       });
       const container = $('trendCharts');
       container.innerHTML = '';
-      // 體重放最上面：稀疏量測點連線、min–max 軸才看得出變化；標題列附「＋記體重」
+      // 體重放最上面：稀疏量測點連線、min–max 軸才看得出變化；標題列附趨勢徽章＋「＋記體重」
       const wmap = new Map((state.weights || []).map((w) => [w.date, Number(w.amount)]).filter(([, v]) => v > 0));
       const wValues = dates.map((d) => (wmap.has(d) ? wmap.get(d) : null));
       container.appendChild(lineChart({
         title: '體重', unit: 'kg', color: '#734921', dates, values: wValues,
         sparse: true, decimals: 2, yFrom: 'auto',
-        headerExtra: '<button type="button" class="chart-add" data-quick-weight="1">＋記體重</button>',
+        headerExtra: `${deltaBadge(wValues, true)}<button type="button" class="chart-add" data-quick-weight="1">＋記體重</button>`,
         emptyHint: '還沒有體重紀錄，點右上角「＋記體重」加第一筆（之後就會畫出變化）'
       }));
       if (!rows.length) return;
-      container.appendChild(lineChart({ title: '總水分', unit: 'ml', color: '#1e7a52', dates, values: series((row) => row.totalWaterMl) }));
-      container.appendChild(lineChart({ title: '熱量', unit: 'kcal', color: '#b3703f', dates, values: series((row) => row.kcal) }));
+      const waterVals = series((row) => row.totalWaterMl);
+      const kcalVals = series((row) => row.kcal);
+      container.appendChild(lineChart({ title: '總水分', unit: 'ml', color: '#1e7a52', dates, values: waterVals, headerExtra: deltaBadge(waterVals, false) }));
+      container.appendChild(lineChart({ title: '熱量', unit: 'kcal', color: '#b3703f', dates, values: kcalVals, headerExtra: deltaBadge(kcalVals, false) }));
     }
 
     // 血檢趨勢：稀疏的檢驗點連線（不畫參考範圍，判讀交給醫生）
@@ -2661,6 +2700,26 @@
       return box;
     }
 
+    // 血檢「最近一次一覽」：每個項目的最新值＋日期＋vs 上次的方向（給醫生一眼對照）
+    function renderLabLatestGrid() {
+      const el = $('labLatestGrid'); if (!el) return;
+      const itemNames = [...new Set(state.labs.map((row) => row.itemName))];
+      el.innerHTML = itemNames.map((name) => {
+        const rows = state.labs.filter((r) => r.itemName === name).sort((a, b) => a.testDate.localeCompare(b.testDate));
+        const latest = rows[rows.length - 1];
+        const prev = rows[rows.length - 2];
+        let badge = '';
+        if (prev && Number(prev.value) > 0) {
+          const pct = Math.round(((Number(latest.value) - Number(prev.value)) / Number(prev.value)) * 100);
+          badge = pct === 0 ? '<span class="delta">→</span>' : `<span class="delta">${pct > 0 ? '↑' : '↓'} ${Math.abs(pct)}%</span>`;
+        }
+        return `<div class="lab-cell">
+          <div class="lab-nm">${esc(name)}</div>
+          <div class="lab-val">${esc(fmt(latest.value))}<span class="lab-unit">${esc(latest.unit || '')}</span></div>
+          <div class="lab-meta">${esc(mdLabel(latest.testDate))} ${badge}</div>
+        </div>`;
+      }).join('');
+    }
     function renderLabTrend() {
       const block = $('labTrendBlock');
       const itemNames = [...new Set(state.labs.map((row) => row.itemName))];
@@ -2669,6 +2728,7 @@
         return;
       }
       block.classList.remove('hidden');
+      renderLabLatestGrid();
       const dates = new Set(state.labs.map((row) => row.testDate));
       const labc = $('labCount'); if (labc) labc.textContent = `（${dates.size} 份）`;
       const select = $('labItemSelect');
