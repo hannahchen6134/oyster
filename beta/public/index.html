@@ -573,6 +573,10 @@
     .capturing .cap-hide, .capturing .fold-toggle, .capturing #addVisitBtn,
     .capturing #labItemSelect { display: none !important; }
     .capturing .cap-gone { display: none !important; }   /* 截圖時隱藏沒資料的整個區塊（例如無看診紀錄） */
+    /* 截圖時把 30 天長表縮到近 ~14 列，報告變短才能用高解析度、不模糊（完整明細螢幕上仍在） */
+    .capturing #dayCardList > *:nth-child(n+16) { display: none !important; }
+    .cap-only { display: none; }
+    .capturing .cap-only { display: block !important; }
     .capturing .cap-header { display: block !important; }
     .capturing summary { pointer-events: none; }
     /* 截圖時給報告左右留白，內容才不會貼邊（畫面上靠外層容器 padding，截 #trendView 會失去） */
@@ -1369,12 +1373,13 @@
             <span class="fold-toggle">＋</span>
           </summary>
           <div class="fold-body">
-            <div class="range-chips" id="tableRangeChips">
+            <div class="range-chips cap-hide" id="tableRangeChips">
               <button data-trange="30" type="button" class="active">30 天</button>
               <button data-trange="60" type="button">60 天</button>
               <button data-trange="90" type="button">90 天</button>
             </div>
             <div class="daycards" id="dayCardList"></div>
+            <p class="cap-only muted" style="font-size:11.5px;margin:10px 2px 0">※ 圖片僅列近 14 天，完整明細請看照護站。</p>
           </div>
         </details>
       </section>
@@ -4238,7 +4243,8 @@
         // 報告很長時，手機瀏覽器的畫布高度有上限，太高會把下半截（看診紀錄、明細）截成空白。
         // 依實際高度動態調整 pixelRatio：越長就用越低的倍率，確保整份都畫得出來。
         const tall = view.scrollHeight || 0;
-        const pr = tall > 3600 ? 1 : (tall > 2400 ? 1.25 : 1.5);
+        // 表格截短後報告變矮 → 大多落在高解析度區間；只有極長才降倍率保住「不空白」
+        const pr = tall > 4200 ? 1 : (tall > 2900 ? 1.5 : 2);
         // skipFonts：不抓 Google 字型內嵌（那步在受限瀏覽器會卡死）
         // 明確帶入寬高：部分瀏覽器對很長的內容不指定尺寸會把下半截算成空白
         const opts = { backgroundColor: '#efe9dd', pixelRatio: pr, style: { margin: '0' }, skipFonts: true, width: view.scrollWidth || undefined, height: tall || undefined };
