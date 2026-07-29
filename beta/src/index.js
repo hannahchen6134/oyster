@@ -470,12 +470,14 @@ async function handleWebhook(request, env, url, ctx) {
 async function processWebhookEvents(events, env, baseUrl) {
   for (const event of events) {
     try {
+      // 事件級去重：LINE 重送（含按鈕 postback）帶同一個 webhookEventId，原子認領確保每個事件只處理一次，
+      // 避免重送把「按按鈕」重播成好幾次、或回覆兩次。
+      if (event.webhookEventId && !(await claimMessageOnce(env.DB, `evt:${event.webhookEventId}`))) continue;
       if (event.type === 'follow') {
         await handleFollow(event, env);
       } else if (event.type === 'message' && event.message?.type === 'text') {
-        // 兩層去重：同實例用記憶體快速擋；跨實例／LINE 重送用資料庫原子認領（避免回兩次）
+        // 同實例再加一層記憶體快速擋（同一批次內重複）
         if (isDuplicateMessage(event.message.id)) continue;
-        if (!(await claimMessageOnce(env.DB, event.message.id))) continue;
         await handleTextMessage(event, env, baseUrl);
       } else if (event.type === 'postback') {
         await handlePostback(event, env, baseUrl);
