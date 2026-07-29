@@ -891,6 +891,14 @@
     .ae-calc-minus { flex: none; padding-bottom: 10px; font-size: 20px; font-weight: 700; color: var(--muted); }
     .ae-calc-result { text-align: center; font-size: 14px; color: var(--ink-soft); margin: 12px 0; }
     .ae-calc-result b { color: var(--brand); font-weight: 700; font-size: 18px; }
+    /* 改時間：平常收起，需要時展開改日期＋時間（半夜的餐記到隔天可修正） */
+    .ae-time { margin-top: 10px; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+    .ae-time > summary { list-style: none; cursor: pointer; font-size: 13px; color: var(--brand); padding: 11px 14px; display: flex; align-items: center; gap: 7px; background: var(--brand-tint); }
+    .ae-time > summary::-webkit-details-marker { display: none; }
+    .ae-time > summary::before { content: '▸'; font-size: 11px; color: var(--muted); transition: transform .2s; }
+    .ae-time[open] > summary::before { transform: rotate(90deg); }
+    .ae-time-body { padding: 14px; background: var(--sheet); display: flex; gap: 8px; }
+    .ae-time-body input { flex: 1; min-width: 0; padding: 11px; border: 1px solid var(--line-strong); border-radius: 10px; font-size: 15px; }
     .qbtn.qbtn-sub:hover { background: var(--brand-tint); filter: none; border-color: var(--brand); box-shadow: 0 2px 8px rgba(115, 73, 33, 0.12); }
     /* 今日累計 hero：一打開先看到的重點（水分/熱量對照目標） */
     .today-hero {
@@ -2244,6 +2252,15 @@
       const unit = isWater ? 'ml' : 'g';
       const cur = isWater ? (Number(log.waterMl) || Number(log.amount) || 0) : (Number(log.amount) || 0);
       const name = log.category === 'food' ? `${esc(foodLabel(log.foodType, log.itemName))}　` : '';
+      // 改時間：常見情境是半夜餵食被記到隔天，直接在這裡改日期＋時間（跨天會自動把兩天的總量都重算）
+      const _dt = String(log.eventDateTime || '');
+      const timeBlock = `<details class="ae-time">
+        <summary>🕑 改時間（例如半夜的餐記到隔天）</summary>
+        <div class="ae-time-body">
+          <input class="ae-edit-date" type="date" value="${esc(_dt.slice(0, 10))}">
+          <input class="ae-edit-time" type="time" value="${esc(_dt.slice(11, 16))}">
+        </div>
+      </details>`;
       state.aeLog = log;
       if (!openAmountEdit._bound) {
         $('modalForm').addEventListener('click', amountEditClick);
@@ -2256,7 +2273,8 @@
         ? `<div class="qp-grid">
             ${[10, 20, 30, 50, 80].map((n) => `<button type="button" class="qp-btn" data-ae="${n}">${n}<small>ml</small></button>`).join('')}
             <button type="button" class="qp-btn qp-custom" data-ae="custom">自訂數字／更多…</button>
-          </div>`
+          </div>
+          ${timeBlock}`
         : `<div class="ae-adjust">
             <button type="button" class="ae-step" data-ae-step="-1" aria-label="減 1">−</button>
             <input class="qp-w-input qp-ae-input" type="number" step="0.1" inputmode="decimal" value="${cur || ''}" placeholder="克數">
@@ -2274,6 +2292,7 @@
               <button type="button" class="qp-btn" data-ae="calcFill" style="width:100%">填入克數</button>
             </div>
           </details>
+          ${timeBlock}
           <button type="button" class="qp-btn qp-w-save" data-ae="save" style="margin-top:12px;width:100%">改成這個</button>
           <button type="button" class="qp-btn qp-custom" data-ae="custom" style="margin-top:8px">更多欄位…</button>`;
       $('modalForm').innerHTML = `
@@ -2285,10 +2304,18 @@
     }
     async function saveAmount(log, n) {
       const body = log.category === 'water' ? { amount: n, waterMl: n } : { amount: n };
+      // 若在「改時間」動了日期/時間就一起送出（跨天由後端重算兩天總量）
+      const dEl = $('modalForm').querySelector('.ae-edit-date');
+      const tEl = $('modalForm').querySelector('.ae-edit-time');
+      if (dEl && tEl && dEl.value && tEl.value) {
+        const newDt = `${dEl.value} ${tEl.value}`;
+        const origDt = `${String(log.eventDateTime || '').slice(0, 10)} ${String(log.eventDateTime || '').slice(11, 16)}`;
+        if (newDt !== origDt) body.eventDateTime = newDt;
+      }
       try {
         await api(`logs/${log.logId}`, { method: 'PUT', body: JSON.stringify(body) });
         closeModal();
-        toast(`已改為 ${n} ${log.category === 'water' ? 'ml' : 'g'} ✓`);
+        toast(body.eventDateTime ? '已更新時間與數量 ✓' : `已改為 ${n} ${log.category === 'water' ? 'ml' : 'g'} ✓`);
         await loadDay();
         if ($('recentFold') && $('recentFold').open) await loadRecent();
       } catch (error) { toast(error.message || '修改失敗', true); }
