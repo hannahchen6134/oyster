@@ -3375,10 +3375,32 @@
         btn.disabled = true; btn.textContent = '產生中…';
         try {
           const r = await api('export', { method: 'POST', body: JSON.stringify({ petId: state.petId }) });
-          if (r && r.url) {
-            toast(`已產生 ${r.count} 筆紀錄，開始下載`);
-            window.location.href = r.url;
-          } else { toast('匯出失敗，請再試一次', true); }
+          if (!r || !r.url) { toast('匯出失敗，請再試一次', true); }
+          else {
+            // 不自動跳轉（LINE 內看不到進度、找不到檔案）；改成明確的下載連結＋說明＋系統分享
+            const old = $('exportResult'); if (old) old.remove();
+            const box = document.createElement('div');
+            box.id = 'exportResult';
+            box.className = 'block set-card';
+            box.style.marginTop = '12px';
+            box.innerHTML = `
+              <p style="margin:0 0 10px;font-weight:700">✓ 已整理好 ${r.count} 筆紀錄</p>
+              <a class="btn btn-primary" href="${r.url}" target="_blank" rel="noopener" download="${esc(r.filename || 'export.csv')}" style="width:100%;display:block;text-align:center;text-decoration:none">下載 CSV 檔</a>
+              <button class="btn btn-secondary btn-sm" id="exportShareBtn" type="button" style="width:100%;margin-top:10px">分享／存到其他 App</button>
+              <p class="muted" style="margin:12px 0 0;font-size:12px;line-height:1.7">檔案會存到手機的「下載」資料夾。<br>在 LINE 裡若點了沒反應，點右上「⋮」→「用其他瀏覽器開啟」，再下載一次就好。</p>`;
+            $('exportBtn').closest('.set-card').after(box);
+            // 系統分享面板：讓你自己選存到哪（雲端／檔案／傳給人），最不會「找不到檔案」
+            $('exportShareBtn').addEventListener('click', async () => {
+              try {
+                const resp = await fetch(r.url);
+                const blob = await resp.blob();
+                const file = new File([blob], r.filename || 'export.csv', { type: 'text/csv' });
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                  await navigator.share({ files: [file], title: '喵喵照護紀錄' });
+                } else { toast('這支瀏覽器不支援分享，請用上面的「下載 CSV 檔」', true); }
+              } catch (err) { if (!(err && err.name === 'AbortError')) toast('分享沒成功，請用上面的「下載 CSV 檔」', true); }
+            });
+          }
         } catch (e) { toast(e.message || '匯出失敗，請再試一次', true); }
         btn.disabled = false; btn.textContent = '匯出資料（CSV）';
       });
