@@ -230,32 +230,46 @@ export default {
         const retained2d = rows.filter((r) => Number(r.days) >= 2).length;
         const retained7d = rows.filter((r) => Number(r.days) >= 7).length;
         const totalRecords = rows.reduce((t, r) => t + (Number(r.recs) || 0), 0);
+        // 依「實際使用情況」自動分類：活躍使用者／用過但沉寂／只加入還沒用
+        const classify = (r) => {
+          const recs = Number(r.recs) || 0;
+          if (recs === 0) return { key: 'joined', label: '只加入・還沒用', cls: 'b-joined' };
+          if (r.lastDay && r.lastDay >= d7) return { key: 'active', label: '使用者・活躍', cls: 'b-active' };
+          return { key: 'dormant', label: '用過・近期沒動', cls: 'b-dormant' };
+        };
+        const joinedCount = rows.filter((r) => Number(r.recs) === 0).length;
         const stat = (n, label) => `<div class="stat"><div class="stat-n">${n}</div><div class="stat-l">${label}</div></div>`;
         const statsBar = `<div class="stats">
           ${stat(rows.length, '總人數')}
           ${stat(onCount, '已開通')}
-          ${stat(recordedCount, '有記錄')}
-          ${stat(activeCount, '近7天活躍')}
+          ${stat(activeCount, '使用者·活躍')}
+          ${stat(joinedCount, '只加入·未用')}
           ${stat(retained2d, '回訪≥2天')}
           ${stat(retained7d, '回訪≥7天')}
           ${stat(totalRecords, '總筆數')}
         </div>`;
-        const cards = rows.map((r) => {
+        const cardHtml = (r, c) => {
           const on = Number(r.betaAccess) === 1;
           const label = esc(r.displayName) || mask(r.lineUserId);
           const href = `/admin/testers?key=${encodeURIComponent(key)}&user=${encodeURIComponent(r.lineUserId)}&access=${on ? 0 : 1}`;
           const confirmMsg = `確定要${on ? '關閉' : '開通'}「${label}」嗎？`;
           return `<div class="row${on ? '' : ' off'}">
             <div class="info">
-              <div class="name">${esc(r.displayName) || '（未命名）'} <span class="uid">${mask(r.lineUserId)}</span></div>
-              <div class="meta">${r.pets ? '🐈 ' + esc(r.pets) + ' · ' : ''}記錄 ${Number(r.recs) || 0} 筆 · 最後活躍 ${esc(r.lastDay) || '—'}</div>
+              <div class="name">${esc(r.displayName) || '（未命名）'} <span class="tag ${c.cls}">${c.label}</span></div>
+              <div class="meta">${r.pets ? '🐈 ' + esc(r.pets) + ' · ' : ''}記錄 ${Number(r.recs) || 0} 筆 · 最後活躍 ${esc(r.lastDay) || '—'} · ${mask(r.lineUserId)}</div>
             </div>
             <div class="act">
               <span class="badge ${on ? 'b-on' : 'b-off'}">${on ? '已開通' : '已關閉'}</span>
               <a class="btn ${on ? 'btn-off' : 'btn-on'}" href="${href}" onclick="return confirm('${confirmMsg}')">${on ? '關閉' : '開通'}</a>
             </div>
           </div>`;
-        }).join('');
+        };
+        const groups = { active: [], dormant: [], joined: [] };
+        rows.forEach((r) => { const c = classify(r); groups[c.key].push(cardHtml(r, c)); });
+        const section = (title, arr) => arr.length ? `<div class="sec-title">${title}（${arr.length}）</div>${arr.join('')}` : '';
+        const cards = section('🟢 使用者・活躍（近 7 天有記錄）', groups.active)
+          + section('🟡 用過・近期沒動', groups.dormant)
+          + section('⚪ 只加入・還沒用', groups.joined);
         const html = `<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">
 <title>測試者管理</title><style>
@@ -273,6 +287,10 @@ export default {
   .act{display:flex;flex-direction:column;align-items:flex-end;gap:7px;flex:0 0 auto}
   .badge{font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:999px}
   .b-on{background:#e5efe2;color:#3f7a3a}.b-off{background:#eee;color:#8a8a82}
+  .tag{font-size:10px;font-weight:600;padding:1px 7px;border-radius:999px;margin-left:6px;white-space:nowrap;vertical-align:middle}
+  .b-active{background:#e5efe2;color:#3f7a3a}
+  .b-dormant{background:#fbf0d8;color:#9a6a1e}
+  .b-joined{background:#eee;color:#8a8a82}
   .btn{display:inline-block;font-size:13px;font-weight:600;padding:7px 16px;border-radius:999px;text-decoration:none;-webkit-tap-highlight-color:transparent}
   .btn-off{background:#fdecec;color:#c0392b;border:1px solid #f2c9c4}
   .btn-on{background:#734921;color:#fff}
@@ -285,9 +303,8 @@ export default {
   .sec-title{font-size:13px;font-weight:700;color:#734921;margin:4px 2px 10px}
 </style></head><body>
   <h1>🐾 測試者管理</h1>
-  <div class="sub">一頁看完：上方是留存數據，下方可開通／關閉測試者。只動存取權，看不到任何健康紀錄。</div>
+  <div class="sub">依實際使用情況自動分類：有在記錄的是「使用者」，只加入沒動的另外分開。只動存取權，看不到任何健康紀錄。</div>
   ${statsBar}
-  <div class="sec-title">測試者名單</div>
   ${cards || '<div class="empty">還沒有任何使用者</div>'}
   <div class="foot">網址含金鑰，請勿外流。停用後對方在 LINE 會被擋在門檻外、看不到任何內容，但資料保留；重新「開通」即可恢復。</div>
 </body></html>`;
