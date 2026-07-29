@@ -336,7 +336,7 @@
     /* 三個折疊區改用「說明副標」區隔，左色條維持統一棕色，避免顏色太花 */
     .fold .fold-toggle {
       width: 27px; height: 27px; border-radius: 50%; flex: none;
-      border: 1px solid rgba(115, 73, 33, 0.22); color: rgba(115, 73, 33, 0.42);
+      border: 1px solid rgba(115, 73, 33, 0.16); color: rgba(115, 73, 33, 0.32);
       display: flex; align-items: center; justify-content: center;
       font-size: 0; /* 隱藏原本的「＋」字元，改用下方細緻箭頭 */
       transition: background 0.22s ease, border-color 0.22s ease;
@@ -875,6 +875,22 @@
     .ae-step:active { transform: translateY(1px); }
     .ae-cur { font-size: 14px; color: var(--ink-soft); margin: 2px 2px 16px; text-align: center; line-height: 1.6; }
     .ae-cur b { color: var(--brand); font-weight: 700; font-size: 16px; }
+    /* 秤重相減小工具：平常收起，需要時才展開；白話兩格相減，不用懂計算機 */
+    .ae-calc { margin-top: 12px; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+    .ae-calc > summary {
+      list-style: none; cursor: pointer; font-size: 13px; color: var(--brand);
+      padding: 11px 14px; display: flex; align-items: center; gap: 7px; background: var(--brand-tint);
+    }
+    .ae-calc > summary::-webkit-details-marker { display: none; }
+    .ae-calc > summary::before { content: '▸'; font-size: 11px; color: var(--muted); transition: transform .2s; }
+    .ae-calc[open] > summary::before { transform: rotate(90deg); }
+    .ae-calc-body { padding: 14px; background: var(--sheet); }
+    .ae-calc-row { display: flex; align-items: flex-end; gap: 8px; }
+    .ae-calc-row label { flex: 1; display: flex; flex-direction: column; gap: 5px; font-size: 11.5px; color: var(--muted); }
+    .ae-calc-row input { width: 100%; text-align: center; }
+    .ae-calc-minus { flex: none; padding-bottom: 10px; font-size: 20px; font-weight: 700; color: var(--muted); }
+    .ae-calc-result { text-align: center; font-size: 14px; color: var(--ink-soft); margin: 12px 0; }
+    .ae-calc-result b { color: var(--brand); font-weight: 700; font-size: 18px; }
     .qbtn.qbtn-sub:hover { background: var(--brand-tint); filter: none; border-color: var(--brand); box-shadow: 0 2px 8px rgba(115, 73, 33, 0.12); }
     /* 今日累計 hero：一打開先看到的重點（水分/熱量對照目標） */
     .today-hero {
@@ -1211,7 +1227,7 @@
             <span class="fold-toggle">＋</span>
           </summary>
           <div class="fold-body">
-            <p class="muted" style="font-size:12px;margin:0 0 10px">不分哪一天，把最近記的每一筆依時間由新到舊列出來，方便睡前掃一眼、抓出記錯的數字。每筆都能「編輯」或「刪除」。重要數字請核對後再參考。</p>
+            <p class="muted" style="font-size:12px;margin:0 0 10px">每筆可「編輯」或「刪除」；重要數字請核對後再參考。</p>
             <div class="grid" id="recentList" style="gap:0"></div>
           </div>
         </details>
@@ -2229,7 +2245,11 @@
       const cur = isWater ? (Number(log.waterMl) || Number(log.amount) || 0) : (Number(log.amount) || 0);
       const name = log.category === 'food' ? `${esc(foodLabel(log.foodType, log.itemName))}　` : '';
       state.aeLog = log;
-      if (!openAmountEdit._bound) { $('modalForm').addEventListener('click', amountEditClick); openAmountEdit._bound = true; }
+      if (!openAmountEdit._bound) {
+        $('modalForm').addEventListener('click', amountEditClick);
+        $('modalForm').addEventListener('input', (e) => { if (e.target.closest('.ae-calc')) updateAeCalc(); });
+        openAmountEdit._bound = true;
+      }
       $('modalTitle').textContent = `改數量・${CATEGORY_LABEL[log.category] || (isWater ? '喝水' : '吃飯')}`;
       // 喝水多為估量→保留整數快捷；食物克數難整數→直接輸入＋（−／＋）微調（預設帶目前值）
       const body = isWater
@@ -2242,6 +2262,18 @@
             <input class="qp-w-input qp-ae-input" type="number" step="0.1" inputmode="decimal" value="${cur || ''}" placeholder="克數">
             <button type="button" class="ae-step" data-ae-step="1" aria-label="加 1">＋</button>
           </div>
+          <details class="ae-calc">
+            <summary>以秤重相減計算</summary>
+            <div class="ae-calc-body">
+              <div class="ae-calc-row">
+                <label>總重<input class="ae-calc-total" type="number" step="0.1" inputmode="decimal" placeholder="g"></label>
+                <span class="ae-calc-minus">−</span>
+                <label>原本空的重量<input class="ae-calc-tare" type="number" step="0.1" inputmode="decimal" placeholder="g"></label>
+              </div>
+              <div class="ae-calc-result">＝ <b class="ae-calc-out">—</b> g</div>
+              <button type="button" class="qp-btn" data-ae="calcFill" style="width:100%">填入克數</button>
+            </div>
+          </details>
           <button type="button" class="qp-btn qp-w-save" data-ae="save" style="margin-top:12px;width:100%">改成這個</button>
           <button type="button" class="qp-btn qp-custom" data-ae="custom" style="margin-top:8px">更多欄位…</button>`;
       $('modalForm').innerHTML = `
@@ -2261,6 +2293,16 @@
         if ($('recentFold') && $('recentFold').open) await loadRecent();
       } catch (error) { toast(error.message || '修改失敗', true); }
     }
+    // 秤重相減：總重 − 原本空的重量 = 實際吃的克數；即時顯示結果
+    function updateAeCalc() {
+      const form = $('modalForm');
+      const total = Number(form.querySelector('.ae-calc-total')?.value);
+      const tare = Number(form.querySelector('.ae-calc-tare')?.value);
+      const out = form.querySelector('.ae-calc-out');
+      if (!out) return;
+      const result = Math.round((total - tare) * 10) / 10;
+      out.textContent = (total > 0 && result > 0) ? result : '—';
+    }
     function amountEditClick(event) {
       // − / ＋ 微調：直接改輸入框數字，不送出（可連點加減計算）
       const step = event.target.closest('[data-ae-step]');
@@ -2277,6 +2319,18 @@
       const log = state.aeLog;
       if (!log) return;
       if (btn.dataset.ae === 'custom') { closeModal(); return openLogModal(log); }
+      if (btn.dataset.ae === 'calcFill') {
+        const form = $('modalForm');
+        const total = Number(form.querySelector('.ae-calc-total')?.value);
+        const tare = Number(form.querySelector('.ae-calc-tare')?.value);
+        const result = Math.round((total - tare) * 10) / 10;
+        if (!(total > 0) || !(result > 0)) return toast('請先填總重和原本空的重量', true);
+        const input = form.querySelector('.qp-ae-input');
+        if (input) input.value = result;
+        const det = form.querySelector('.ae-calc'); if (det) det.open = false;
+        toast(`算出 ${result} g，已填入`);
+        return;
+      }
       if (btn.dataset.ae === 'save') {
         const input = $('modalForm').querySelector('.qp-ae-input');
         const n = Number(input?.value || 0);

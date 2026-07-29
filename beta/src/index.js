@@ -1915,12 +1915,9 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
     ? (record.foodType === '乾糧' ? 'dry' : 'wet')
     : record.category;
 
-  const fixName = record.category === 'food' ? (log.itemName || record.foodType || '罐頭') : '';
-  let tip = record.category === 'water'
-    ? '記錯？直接打「改 25」改這筆'
-    : record.category === 'food'
-      ? `記錯？打「改 25」或「改 ${fixName} 25」・沒吃完「剩 20」`
-      : '';
+  let tip = ['water', 'food'].includes(record.category)
+    ? '記錯了？點下面「改數量」就能改'
+    : '';
   if (opts.fromButton) {
     const amt = record.amount;
     const shortcut = record.category === 'water' ? `水 ${amt}`

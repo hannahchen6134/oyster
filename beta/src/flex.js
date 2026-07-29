@@ -196,8 +196,9 @@ export function recordFlex({ pet, categoryKey, mainText, subText, summary, date,
   const body = {
     type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
     contents: [
-      { type: 'box', layout: 'horizontal', contents: [tag(style.label, style)] },
-      text(mainText, { size: 'xl', weight: 'bold', color: C.ink, margin: 'md', wrap: true }),
+      // 食物（乾糧/罐頭）品名已含類型，不再重複顯示類型膠囊；其他類別（喝水/藥…）保留
+      ...(['dry', 'wet'].includes(categoryKey) ? [] : [{ type: 'box', layout: 'horizontal', contents: [tag(style.label, style)] }]),
+      text(mainText, { size: 'xl', weight: 'bold', color: C.ink, margin: ['dry', 'wet'].includes(categoryKey) ? 'none' : 'md', wrap: true }),
       ...(subText ? [text(subText, { size: 'xs', color: C.muted, wrap: true, margin: 'sm' })] : []),
       ...warnBox,
       ...estBox,
