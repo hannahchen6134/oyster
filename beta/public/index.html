@@ -3337,6 +3337,9 @@
       ['一起照護', [
         ['care', '共同照護', '邀請家人・幫手一起記錄，重點即時通知']
       ]],
+      ['你的資料', [
+        ['export', '匯出資料（CSV）', '紀錄帶得走，繼續守護貓貓']
+      ]],
       ['使用說明', [
         ['onboarding', '喵爸媽安心上手', '3 步驟，快速上手']
       ]]
@@ -3357,6 +3360,28 @@
         <div style="text-align:center;margin-top:26px">
           <button class="link-btn" id="logoutBtn" type="button">登出照護站</button>
         </div>`;
+    }
+
+    function renderExportPage() {
+      const list = $('settingsList');
+      list.innerHTML = `
+        <div class="block set-card">
+          <p style="margin:0 0 6px;font-weight:700">紀錄帶得走，繼續守護貓貓</p>
+          <p class="muted" style="margin:0 0 16px;font-size:13px;line-height:1.7">把這隻貓目前的所有紀錄匯出成一份 CSV，用 Excel／Google 試算表就能打開。換醫院、想自己備份都不怕——你的紀錄永遠是你的。</p>
+          <button class="btn btn-primary" id="exportBtn" type="button" style="width:100%">匯出資料（CSV）</button>
+        </div>`;
+      $('exportBtn').addEventListener('click', async () => {
+        const btn = $('exportBtn');
+        btn.disabled = true; btn.textContent = '產生中…';
+        try {
+          const r = await api('export', { method: 'POST', body: JSON.stringify({ petId: state.petId }) });
+          if (r && r.url) {
+            toast(`已產生 ${r.count} 筆紀錄，開始下載`);
+            window.location.href = r.url;
+          } else { toast('匯出失敗，請再試一次', true); }
+        } catch (e) { toast(e.message || '匯出失敗，請再試一次', true); }
+        btn.disabled = false; btn.textContent = '匯出資料（CSV）';
+      });
     }
 
     async function renderCarePage() {
@@ -3415,15 +3440,21 @@
           const r = await api('care/invite', { method: 'POST' });
           const lineUrl = LINE_ADD;
           const shareMsg = buildShareMsg(r.code);
+          // 有分享面板就以「分享給朋友」為主（直接送出），複製退成小連結；沒有分享面板就只給複製
+          const hasShare = !!navigator.share;
+          const primaryBtn = hasShare
+            ? `<button class="btn btn-primary" id="careShareMsgBtn" type="button" style="width:100%;margin-top:12px">分享給朋友</button>
+               <p class="muted" style="text-align:center;font-size:12px;margin:10px 0 0">直接選一位 LINE 好友送出<br><a href="#" id="careCopyMsgLink" style="color:var(--brand)">或複製文字，自己貼上</a></p>`
+            : `<button class="btn btn-primary" id="careCopyMsgBtn" type="button" style="width:100%;margin-top:12px">複製整段文字</button>
+               <p class="muted" style="text-align:center;font-size:12px;margin:10px 0 0">複製後貼到你和朋友的聊天室</p>`;
           $('careInviteBox').innerHTML = `
             <div class="block" style="margin-top:12px;background:var(--brand-tint);border-color:transparent">
               <p style="margin:0 0 10px;font-size:13px">這段邀請傳給朋友就好：</p>
               <div class="care-copy-row">
                 <span class="care-copy-text" id="careShareMsg">${esc(shareMsg)}</span>
               </div>
-              <button class="btn btn-primary" id="careShareMsgBtn" type="button" style="width:100%;margin-top:12px">分享給朋友</button>
-              <button class="btn btn-secondary btn-sm" id="careCopyMsgBtn" type="button" style="width:100%;margin-top:8px">複製整段文字</button>
-              <details style="margin-top:12px">
+              ${primaryBtn}
+              <details style="margin-top:14px">
                 <summary class="muted" style="font-size:12px;cursor:pointer">需要分開複製 LINE 連結／邀請碼？</summary>
                 <div style="margin-top:10px">
                   <p class="muted" style="margin:0 0 6px;font-size:12px">官方 LINE 連結：</p>
@@ -3439,15 +3470,17 @@
                 </div>
               </details>
             </div>`;
-          $('careShareMsgBtn').addEventListener('click', async () => {
-            // 一鍵叫出手機分享面板（可直接選 LINE 好友送出）；不支援就退回開 LINE 分享頁
-            if (navigator.share) {
-              try { await navigator.share({ text: shareMsg }); return; }
-              catch (err) { if (err && err.name === 'AbortError') return; }
-            }
+          const shareEl = $('careShareMsgBtn');
+          if (shareEl) shareEl.addEventListener('click', async () => {
+            // 叫出手機分享面板（可直接選 LINE 好友送出）；不支援就退回開 LINE 分享頁
+            try { await navigator.share({ text: shareMsg }); return; }
+            catch (err) { if (err && err.name === 'AbortError') return; }
             window.open('https://line.me/R/share?text=' + encodeURIComponent(shareMsg), '_blank');
           });
-          $('careCopyMsgBtn').addEventListener('click', () => copyText(shareMsg, '已複製整段'));
+          const copyBtnEl = $('careCopyMsgBtn');
+          if (copyBtnEl) copyBtnEl.addEventListener('click', () => copyText(shareMsg, '已複製整段'));
+          const copyLinkEl = $('careCopyMsgLink');
+          if (copyLinkEl) copyLinkEl.addEventListener('click', (e) => { e.preventDefault(); copyText(shareMsg, '已複製整段'); });
           $('careCopyUrlBtn').addEventListener('click', () => copyText(lineUrl, '已複製'));
           $('careCopyCmdBtn').addEventListener('click', () => copyText(r.code, '已複製'));
         } catch (error) { toast('產生失敗，請再試一次', true); }
@@ -3478,6 +3511,13 @@
         $('settingsHint').textContent = '邀請家人或幫手，一起記錄同一批貓咪。';
         $('settingsAddBtn').classList.add('hidden');
         await renderCarePage();
+        return;
+      }
+
+      if (state.settingsTab === 'export') {
+        $('settingsHint').textContent = '把這隻貓的所有紀錄存成一份 CSV。';
+        $('settingsAddBtn').classList.add('hidden');
+        renderExportPage();
         return;
       }
 

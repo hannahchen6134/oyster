@@ -16,7 +16,7 @@ import {
   listFoods, getFood, insertLog, getLog, getLastLogByUser, softDeleteLog, updateLog,
   recomputeDay, getRecentSummaries,
   upcomingVisits, listVetsByOwner, createSession,
-  appKvGet, appKvSet, claimMessageOnce, purgeOldSeenMessages, saveReportShot, getReportShot, purgeOldShots, getSessionUser, track, healFoodKcal,
+  appKvGet, appKvSet, claimMessageOnce, purgeOldSeenMessages, saveReportShot, getReportShot, purgeOldShots, getDataExport, purgeOldExports, getSessionUser, track, healFoodKcal,
   resolveDataOwner, createCareInvite, redeemCareInvite, listCareMembers, listCareCircle,
   createLoginCode, redeemLoginCode
 } from './db.js';
@@ -128,6 +128,21 @@ export default {
       } catch (error) {
         return new Response('bad image', { status: 404 });
       }
+    }
+    // 資料匯出 CSV：長亂數能力憑證網址（GET 直接下載，LINE 內建瀏覽器也能存）。
+    if (url.pathname.startsWith('/export/') && request.method === 'GET') {
+      const id = url.pathname.slice('/export/'.length);
+      const row = await getDataExport(env.DB, id);
+      if (!row || row.csv === undefined || row.csv === null) return new Response('not found', { status: 404 });
+      const filename = String(row.filename || 'export.csv');
+      return new Response(row.csv, {
+        headers: {
+          'content-type': 'text/csv; charset=utf-8',
+          'content-disposition': `attachment; filename="export.csv"; filename*=UTF-8''${encodeURIComponent(filename)}`,
+          'cache-control': 'private, no-store',
+          'x-robots-tag': 'noindex'
+        }
+      });
     }
     if (url.pathname === '/healthz') {
       return jsonResponse({ ok: true, service: 'cat-care-beta', now: new Date().toISOString() });
@@ -294,6 +309,8 @@ export default {
     ctx.waitUntil(purgeOldSeenMessages(env.DB, `${addDays(taipeiToday(), -2)}T00:00:00.000Z`));
     // 清掉 1 天前的報告截圖暫存（存圖是即時用途，不需長期保留）
     ctx.waitUntil(purgeOldShots(env.DB, `${addDays(taipeiToday(), -1)}T00:00:00.000Z`));
+    // 清掉 1 天前的匯出 CSV 暫存（下載完即可清）
+    ctx.waitUntil(purgeOldExports(env.DB, `${addDays(taipeiToday(), -1)}T00:00:00.000Z`));
     ctx.waitUntil(runDailyReminders(env));
   }
 };

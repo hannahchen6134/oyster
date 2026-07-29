@@ -283,6 +283,38 @@ export async function purgeOldShots(db, olderThanIso) {
   try { await db.prepare('DELETE FROM report_shots WHERE createdAt < ?').bind(olderThanIso).run(); } catch (error) { /* ignore */ }
 }
 
+// ---------- 資料匯出（CSV）：同樣用長亂數能力憑證、短期有效、每晚清 ----------
+async function ensureExportTable(db) {
+  await db.prepare(
+    `CREATE TABLE IF NOT EXISTS data_exports (id TEXT PRIMARY KEY, ownerLineUserId TEXT NOT NULL DEFAULT '', filename TEXT NOT NULL DEFAULT '', csv TEXT NOT NULL, createdAt TEXT NOT NULL)`
+  ).run();
+}
+export async function saveDataExport(db, ownerLineUserId, filename, csv) {
+  await ensureExportTable(db);
+  const id = `${newToken()}${newToken()}`;
+  await db.prepare('INSERT INTO data_exports (id, ownerLineUserId, filename, csv, createdAt) VALUES (?, ?, ?, ?, ?)')
+    .bind(id, String(ownerLineUserId || ''), String(filename || 'export.csv'), String(csv || ''), nowIso())
+    .run();
+  return id;
+}
+export async function getDataExport(db, id) {
+  try {
+    return await db.prepare('SELECT filename, csv FROM data_exports WHERE id = ?').bind(String(id || '')).first();
+  } catch (error) { return null; }
+}
+export async function purgeOldExports(db, olderThanIso) {
+  try { await db.prepare('DELETE FROM data_exports WHERE createdAt < ?').bind(olderThanIso).run(); } catch (error) { /* ignore */ }
+}
+
+// 匯出用：某隻貓的全部未刪除紀錄（由舊到新）
+export async function getAllLogsForPet(db, petId) {
+  const { results } = await db
+    .prepare('SELECT * FROM logs WHERE petId = ? AND isDeleted = 0 ORDER BY eventDateTime, createdAt')
+    .bind(petId)
+    .all();
+  return results || [];
+}
+
 // ---------- logs ----------
 
 export async function insertLog(db, log) {

@@ -8,8 +8,9 @@ import {
   insertLog, getLog, getLogsForDay, updateLog, softDeleteLog,
   recomputeDay, getSummaries, getSessionUser, getRecentLogsByPet,
   resolveDataOwner, createCareInvite, listCareMembers, track, healFoodKcal,
-  updatePetFields
+  updatePetFields, getAllLogsForPet, saveDataExport
 } from './db.js';
+import { displayMedStatus, displayMedSlot } from './brand.js';
 import { computeDailySummary, deriveFoodFields } from './summary.js';
 import { matchFood } from './parser.js';
 import { jsonResponse, newId, nowIso, isValidDate, isValidDateTime, taipeiNowDateTime, taipeiToday } from './util.js';
@@ -180,6 +181,19 @@ export async function handleApi(request, env, url) {
       return jsonResponse({ ok: true, from, to: today, logs: logs || [] });
     }
 
+    if (resource === 'export' && method === 'POST') {
+      const body = await request.json().catch(() => ({}));
+      const petId = String(body.petId || '');
+      if (!(await assertPetOwner(db, petId, dataOwnerId))) return forbidden();
+      const pet = await getPet(db, petId);
+      const logs = await getAllLogsForPet(db, petId);
+      const csv = buildLogsCsv(logs);
+      const safeName = String(pet?.petName || '貓咪').replace(/[\\/:*?"<>|\s]/g, '_');
+      const filename = `喵喵照護紀錄_${safeName}_${taipeiToday()}.csv`;
+      const id = await saveDataExport(db, dataOwnerId, filename, csv);
+      return jsonResponse({ ok: true, url: `/export/${id}`, filename, count: logs.length });
+    }
+
     if (resource === 'logs') {
       return handleLogs(db, request, method, resourceId, dataOwnerId, lineUserId);
     }
@@ -205,6 +219,47 @@ export async function handleApi(request, env, url) {
 
 function forbidden() {
   return jsonResponse({ ok: false, message: '沒有權限存取這筆資料' }, 403);
+}
+
+// ---------- 資料匯出：把某隻貓的紀錄轉成 CSV（試算表打得開）----------
+const EXPORT_CATEGORY_LABEL = {
+  water: '喝水', food: '吃飯', med: '用藥', vomit: '嘔吐',
+  stool: '大便', urine: '尿尿', supplement: '營養補充', mood: '精神',
+  weight: '體重', note: '備註'
+};
+function csvCell(value) {
+  const s = value === null || value === undefined ? '' : String(value);
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+function exportFoodName(foodType, itemName) {
+  const t = String(foodType || '').trim();
+  const n = String(itemName || '').trim();
+  if (!n) return t;
+  if (!t) return n;
+  return n.includes(t) ? n : `${t} ${n}`;
+}
+function buildLogsCsv(logs) {
+  const headers = ['日期', '時間', '類別', '品項', '數量', '單位', '熱量(kcal)', '水分(ml)', '藥物狀態', '時段', '備註'];
+  const lines = [headers.map(csvCell).join(',')];
+  for (const log of logs) {
+    const dt = String(log.eventDateTime || '');
+    const item = log.category === 'food' ? exportFoodName(log.foodType, log.itemName) : (log.itemName || '');
+    lines.push([
+      dt.slice(0, 10),
+      dt.slice(11, 16),
+      EXPORT_CATEGORY_LABEL[log.category] || log.category || '',
+      item,
+      log.amount ?? '',
+      log.unit || '',
+      log.kcal ?? '',
+      log.waterMl ?? '',
+      displayMedStatus(log.medStatus),
+      displayMedSlot(log.medSlot),
+      log.note || ''
+    ].map(csvCell).join(','));
+  }
+  // 加 BOM，Excel 開啟中文才不會亂碼
+  return '﻿' + lines.join('\r\n');
 }
 
 // ---------- 共同照護（邀請碼、成員清單、移除）----------
