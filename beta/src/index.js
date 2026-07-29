@@ -266,6 +266,44 @@ export default {
         const cards = section('🟢 使用者・活躍（近 7 天有記錄）', groups.active)
           + section('🟡 用過・近期沒動', groups.dormant)
           + section('⚪ 只加入・還沒用', groups.joined);
+
+        // ---- 功能使用量測 ----
+        // 最常記什麼：記錄類別分佈（含 LINE 與網站）
+        const catRes = await db.prepare(
+          `SELECT category, COUNT(*) c FROM logs WHERE isDeleted = 0 AND source IN ('line','web') GROUP BY category ORDER BY c DESC`
+        ).all();
+        const CAT_LABEL = { water: '喝水', food: '吃飯', med: '用藥', vomit: '嘔吐', stool: '大便', urine: '尿尿', supplement: '營養補充', mood: '精神', weight: '體重', note: '備註' };
+        const catMax = Math.max(1, ...(catRes.results || []).map((r) => Number(r.c)));
+        const ubar = (label, val, max) => `<div class="ubar"><span class="ul">${esc(label)}</span><span class="ut"><span class="uf" style="width:${Math.round((val / max) * 100)}%"></span></span><span class="uv">${val}</span></div>`;
+        const catBar = (catRes.results || []).filter((r) => r.category).map((r) => ubar(CAT_LABEL[r.category] || r.category, Number(r.c), catMax)).join('') || '<div class="mini">還沒有紀錄</div>';
+        // 功能開啟次數（events）
+        let evRows = [];
+        try { evRows = (await db.prepare('SELECT event, COUNT(*) c FROM events GROUP BY event').all()).results || []; } catch (e) { /* 尚無 events 表 */ }
+        const EV_LABEL = { website_open: '開網站', review_open: '看回顧', calendar_open: '看月曆', report_save: '存給醫生的圖', export: '匯出資料', care_open: '開共同照護', onboarding_view: '看上手教學', menu_record: '用選單記錄' };
+        const evMap = new Map(evRows.map((r) => [r.event, Number(r.c)]));
+        const evMax = Math.max(1, ...Object.keys(EV_LABEL).map((k) => evMap.get(k) || 0));
+        const evBar = Object.entries(EV_LABEL).filter(([k]) => evMap.get(k)).sort((a, b) => (evMap.get(b[0]) || 0) - (evMap.get(a[0]) || 0)).map(([k, lb]) => ubar(lb, evMap.get(k) || 0, evMax)).join('') || '<div class="mini">還沒有資料</div>';
+        // 共同照護
+        const careRes = await db.prepare("SELECT ownerLineUserId, COUNT(*) c FROM care_members WHERE status = 'accepted' GROUP BY ownerLineUserId").all();
+        const careOwners = new Map((careRes.results || []).map((r) => [r.ownerLineUserId, Number(r.c)]));
+        const memberTotal = [...careOwners.values()].reduce((a, b) => a + b, 0);
+        const inviteCreated = evMap.get('invite_created') || 0;
+        const petOwners = rows.filter((r) => r.pets);
+        const helperOwners = petOwners.filter((r) => careOwners.has(r.lineUserId));
+        const soloOwners = petOwners.filter((r) => !careOwners.has(r.lineUserId));
+        const avgDays = (arr) => arr.length ? (arr.reduce((t, r) => t + (Number(r.days) || 0), 0) / arr.length) : 0;
+        const usageSections = `
+          <div class="sec-title">最常記什麼</div>
+          <div class="ucard">${catBar}</div>
+          <div class="sec-title">功能使用次數</div>
+          <div class="ucard">${evBar}</div>
+          <div class="sec-title">共同照護</div>
+          <div class="stats" style="margin-bottom:8px">
+            ${stat(inviteCreated, '產生邀請碼')}
+            ${stat(memberTotal, '加入的幫手')}
+            ${stat(helperOwners.length, '有幫手家庭')}
+          </div>
+          <div class="mini">有幫手家庭平均記錄 ${avgDays(helperOwners).toFixed(1)} 天　·　單獨顧 ${avgDays(soloOwners).toFixed(1)} 天</div>`;
         const html = `<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">
 <title>測試者管理</title><style>
@@ -298,11 +336,19 @@ export default {
   .stat-l{font-size:11px;color:#6b6e63;margin-top:3px}
   .mini{font-size:11.5px;color:#9a9d90;text-align:center;margin-bottom:18px}
   .sec-title{font-size:13px;font-weight:700;color:#734921;margin:18px 2px 9px}
+  .ucard{background:#fff;border:1px solid #e2e0d6;border-radius:14px;padding:12px 14px;box-shadow:0 4px 12px rgba(115,73,33,.05)}
+  .ubar{display:flex;align-items:center;gap:10px;padding:5px 0;font-size:13px}
+  .ubar .ul{flex:0 0 82px;color:#3a3d34}
+  .ubar .ut{flex:1;height:8px;background:#f0ece2;border-radius:999px;overflow:hidden}
+  .ubar .uf{display:block;height:100%;background:linear-gradient(90deg,#b98a4e,#734921);border-radius:999px}
+  .ubar .uv{flex:0 0 auto;font-weight:700;color:#734921;min-width:30px;text-align:right}
   @media(max-width:420px){.stats{grid-template-columns:repeat(2,1fr)}}
 </style></head><body>
   <h1>🐾 測試者管理</h1>
-  <div class="sub">依實際使用情況自動分類：有在記錄的是「使用者」，只加入沒動的另外分開。只動存取權，看不到任何健康紀錄。</div>
+  <div class="sub">留存數據、功能使用、共同照護一頁看完。下方可開通／關閉。只動存取權，看不到任何健康紀錄內容。</div>
   ${statsBar}
+  ${usageSections}
+  <div class="sec-title">測試者名單</div>
   ${cards || '<div class="empty">還沒有任何使用者</div>'}
   <div class="foot">網址含金鑰，請勿外流。停用後對方在 LINE 會被擋在門檻外、看不到任何內容，但資料保留；重新「開通」即可恢復。</div>
 </body></html>`;
@@ -1261,6 +1307,7 @@ async function handleTextMessage(event, env, baseUrl) {
        '邀請家人', '邀請人', '加入人', '怎麼加入人', '加家人', '新增照顧者', '共同照顧', '一起照顧'].includes(text)
       || /加入.*一起照/.test(text) || /怎麼.*加入.*人/.test(text)) {
     const code = await createCareInvite(db, ownerId);
+    await track(db, lineUserId, 'invite_created');
     const members = await listCareMembers(db, ownerId);
     const shareMsg = `一起照顧貓咪吧 🐈\n加入官方 LINE：\n${LINE_ADD_URL}\n加入後打這組邀請碼：\n${code}\n（7 天內有效，直接把整段訊息貼給管家也可以）`;
     // 兩則：①可長按轉傳的整段邀請文 ②邀請碼卡（📋 一鍵複製）

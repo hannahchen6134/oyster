@@ -1532,7 +1532,7 @@
       if (tab === 'trend') $('pageMode').textContent = '紀錄回顧・回診摘要';
       if (tab === 'settings') $('pageMode').textContent = '設定';
       if (tab === 'today') loadDay();
-      if (tab === 'calendar') loadCalendar();
+      if (tab === 'calendar') { trackEvent('calendar_open', true); loadCalendar(); }
       if (tab === 'trend') { trackEvent('review_open', true); loadTrend(); }
       if (tab === 'settings') loadSettings();
     }
@@ -3409,6 +3409,7 @@
           <button class="btn btn-primary" id="exportBtn" type="button" style="width:100%">匯出資料（CSV）</button>
         </div>`;
       $('exportBtn').addEventListener('click', async () => {
+        trackEvent('export');
         const btn = $('exportBtn');
         btn.disabled = true; btn.textContent = '產生中…';
         try {
@@ -3445,6 +3446,7 @@
     }
 
     async function renderCarePage() {
+      trackEvent('care_open', true);
       const list = $('settingsList');
       list.innerHTML = '<div class="empty">載入中…</div>';
       let data;
@@ -4134,6 +4136,7 @@
     // 然後把圖直接顯示在畫面上讓使用者「長按儲存」——這招在 LINE 內建瀏覽器也有效，
     // 不倚賴 a[download]（內建瀏覽器常擋下載）也不倚賴檔案分享（多數 webview 不支援）。
     $('reportSaveBtn').addEventListener('click', async () => {
+      trackEvent('report_save');
       const view = $('trendView');
       const btn = $('reportSaveBtn');
       if (!window.htmlToImage) { toast('圖片功能還在載入，請稍等一下再按', true); return; }

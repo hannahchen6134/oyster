@@ -266,6 +266,7 @@ function buildLogsCsv(logs) {
 async function handleCare(db, url, method, resourceId, ownerId, actorId) {
   if (resourceId === 'invite' && method === 'POST') {
     const code = await createCareInvite(db, ownerId);
+    try { await track(db, ownerId, 'invite_created'); } catch (e) { /* ignore */ }
     return jsonResponse({ ok: true, code });
   }
   if (resourceId === 'members' && method === 'GET') {
