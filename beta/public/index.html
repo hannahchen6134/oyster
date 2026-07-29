@@ -4230,13 +4230,18 @@
       capFooter.innerHTML = `<div class="cap-sub">※ 飼主自行記錄，可能有誤差，僅供醫生參考。紀錄正常不代表貓咪完全健康，請以獸醫判斷為準。</div>`;
       view.appendChild(capFooter);
       view.classList.add('capturing');
-      // 讓瀏覽器先完成版面重排，圖表才不會被截到一半
-      await new Promise((resolve) => setTimeout(resolve, 60));
+      // 讓瀏覽器先完成版面重排（展開多個摺疊區＋圖表），圖才不會被截到一半
+      await new Promise((resolve) => setTimeout(resolve, 200));
       let dataUrl = '';
       let failMsg = '';
       try {
-        // skipFonts：不抓 Google 字型內嵌（那步在受限瀏覽器會卡死）；pixelRatio 1.5＝夠清楚又快
-        const opts = { backgroundColor: '#efe9dd', pixelRatio: 1.5, style: { margin: '0' }, skipFonts: true };
+        // 報告很長時，手機瀏覽器的畫布高度有上限，太高會把下半截（看診紀錄、明細）截成空白。
+        // 依實際高度動態調整 pixelRatio：越長就用越低的倍率，確保整份都畫得出來。
+        const tall = view.scrollHeight || 0;
+        const pr = tall > 3600 ? 1 : (tall > 2400 ? 1.25 : 1.5);
+        // skipFonts：不抓 Google 字型內嵌（那步在受限瀏覽器會卡死）
+        // 明確帶入寬高：部分瀏覽器對很長的內容不指定尺寸會把下半截算成空白
+        const opts = { backgroundColor: '#efe9dd', pixelRatio: pr, style: { margin: '0' }, skipFonts: true, width: view.scrollWidth || undefined, height: tall || undefined };
         const withTimeout = (p, ms) => Promise.race([
           p, new Promise((_, reject) => setTimeout(() => reject(new Error(`逾時 ${ms / 1000} 秒`)), ms))
         ]);
