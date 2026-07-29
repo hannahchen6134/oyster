@@ -239,33 +239,29 @@ export default {
         };
         const joinedCount = rows.filter((r) => Number(r.recs) === 0).length;
         const stat = (n, label) => `<div class="stat"><div class="stat-n">${n}</div><div class="stat-l">${label}</div></div>`;
+        // 只留 4 個最重要的數字，其餘（開通數、回訪）收成一行小字
         const statsBar = `<div class="stats">
           ${stat(rows.length, '總人數')}
-          ${stat(onCount, '已開通')}
-          ${stat(activeCount, '使用者·活躍')}
-          ${stat(joinedCount, '只加入·未用')}
-          ${stat(retained2d, '回訪≥2天')}
-          ${stat(retained7d, '回訪≥7天')}
+          ${stat(activeCount, '活躍使用者')}
+          ${stat(joinedCount, '只加入沒用')}
           ${stat(totalRecords, '總筆數')}
-        </div>`;
-        const cardHtml = (r, c) => {
+        </div>
+        <div class="mini">已開通 ${onCount} · 回訪 ≥2天 ${retained2d} · ≥7天 ${retained7d}</div>`;
+        const cardHtml = (r) => {
           const on = Number(r.betaAccess) === 1;
           const label = esc(r.displayName) || mask(r.lineUserId);
           const href = `/admin/testers?key=${encodeURIComponent(key)}&user=${encodeURIComponent(r.lineUserId)}&access=${on ? 0 : 1}`;
           const confirmMsg = `確定要${on ? '關閉' : '開通'}「${label}」嗎？`;
           return `<div class="row${on ? '' : ' off'}">
             <div class="info">
-              <div class="name">${esc(r.displayName) || '（未命名）'} <span class="tag ${c.cls}">${c.label}</span></div>
-              <div class="meta">${r.pets ? '🐈 ' + esc(r.pets) + ' · ' : ''}記錄 ${Number(r.recs) || 0} 筆 · 最後活躍 ${esc(r.lastDay) || '—'} · ${mask(r.lineUserId)}</div>
+              <div class="name">${esc(r.displayName) || '（未命名）'}</div>
+              <div class="meta">${r.pets ? '🐈 ' + esc(r.pets) + ' · ' : ''}${Number(r.recs) || 0} 筆 · ${esc(r.lastDay) || '—'}</div>
             </div>
-            <div class="act">
-              <span class="badge ${on ? 'b-on' : 'b-off'}">${on ? '已開通' : '已關閉'}</span>
-              <a class="btn ${on ? 'btn-off' : 'btn-on'}" href="${href}" onclick="return confirm('${confirmMsg}')">${on ? '關閉' : '開通'}</a>
-            </div>
+            <a class="btn ${on ? 'btn-off' : 'btn-on'}" href="${href}" onclick="return confirm('${confirmMsg}')">${on ? '關閉' : '開通'}</a>
           </div>`;
         };
         const groups = { active: [], dormant: [], joined: [] };
-        rows.forEach((r) => { const c = classify(r); groups[c.key].push(cardHtml(r, c)); });
+        rows.forEach((r) => { groups[classify(r).key].push(cardHtml(r)); });
         const section = (title, arr) => arr.length ? `<div class="sec-title">${title}（${arr.length}）</div>${arr.join('')}` : '';
         const cards = section('🟢 使用者・活躍（近 7 天有記錄）', groups.active)
           + section('🟡 用過・近期沒動', groups.dormant)
@@ -296,11 +292,13 @@ export default {
   .btn-on{background:#734921;color:#fff}
   .empty{color:#6b6e63;font-size:14px;text-align:center;padding:40px 0}
   .foot{font-size:11.5px;color:#9a9d90;margin-top:16px;line-height:1.7}
-  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px}
-  .stat{background:#fff;border:1px solid #e2e0d6;border-radius:12px;padding:10px 6px;text-align:center;box-shadow:0 4px 12px rgba(115,73,33,.05)}
-  .stat-n{font-size:20px;font-weight:700;color:#734921;line-height:1.1}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px}
+  .stat{background:#fff;border:1px solid #e2e0d6;border-radius:12px;padding:11px 6px;text-align:center;box-shadow:0 4px 12px rgba(115,73,33,.05)}
+  .stat-n{font-size:21px;font-weight:700;color:#734921;line-height:1.1}
   .stat-l{font-size:11px;color:#6b6e63;margin-top:3px}
-  .sec-title{font-size:13px;font-weight:700;color:#734921;margin:4px 2px 10px}
+  .mini{font-size:11.5px;color:#9a9d90;text-align:center;margin-bottom:18px}
+  .sec-title{font-size:13px;font-weight:700;color:#734921;margin:18px 2px 9px}
+  @media(max-width:420px){.stats{grid-template-columns:repeat(2,1fr)}}
 </style></head><body>
   <h1>🐾 測試者管理</h1>
   <div class="sub">依實際使用情況自動分類：有在記錄的是「使用者」，只加入沒動的另外分開。只動存取權，看不到任何健康紀錄。</div>
