@@ -2292,14 +2292,14 @@
             <button type="button" class="ae-step" data-ae-step="1" aria-label="加 1">＋</button>
           </div>
           <details class="ae-calc">
-            <summary>以秤重相減計算</summary>
+            <summary>沒吃完？算實際吃了多少</summary>
             <div class="ae-calc-body">
               <div class="ae-calc-row">
-                <label>總重<input class="ae-calc-total" type="number" step="0.1" inputmode="decimal" placeholder="g"></label>
+                <label>原本放的<input class="ae-calc-total" type="number" step="0.1" inputmode="decimal" value="${cur || ''}"></label>
                 <span class="ae-calc-minus">−</span>
-                <label>原本空的重量<input class="ae-calc-tare" type="number" step="0.1" inputmode="decimal" placeholder="g"></label>
+                <label>還剩下<input class="ae-calc-tare" type="number" step="0.1" inputmode="decimal" placeholder="g"></label>
               </div>
-              <div class="ae-calc-result">＝ <b class="ae-calc-out">—</b> g</div>
+              <div class="ae-calc-result">＝ 實際吃 <b class="ae-calc-out">—</b> g</div>
               <button type="button" class="qp-btn" data-ae="calcFill" style="width:100%">填入克數</button>
             </div>
           </details>
@@ -2331,15 +2331,16 @@
         if ($('recentFold') && $('recentFold').open) await loadRecent();
       } catch (error) { toast(error.message || '修改失敗', true); }
     }
-    // 秤重相減：總重 − 原本空的重量 = 實際吃的克數；即時顯示結果
+    // 原本放的 − 還剩下 = 實際吃；兩格都有填才顯示結果（「原本放的」預帶原始克數，通常只要填剩下的）
     function updateAeCalc() {
       const form = $('modalForm');
-      const total = Number(form.querySelector('.ae-calc-total')?.value);
-      const tare = Number(form.querySelector('.ae-calc-tare')?.value);
+      const totalEl = form.querySelector('.ae-calc-total');
+      const tareEl = form.querySelector('.ae-calc-tare');
       const out = form.querySelector('.ae-calc-out');
       if (!out) return;
-      const result = Math.round((total - tare) * 10) / 10;
-      out.textContent = (total > 0 && result > 0) ? result : '—';
+      const bothFilled = totalEl && tareEl && totalEl.value !== '' && tareEl.value !== '';
+      const result = Math.round((Number(totalEl.value) - Number(tareEl.value)) * 10) / 10;
+      out.textContent = (bothFilled && result >= 0) ? result : '—';
     }
     function amountEditClick(event) {
       // − / ＋ 微調：直接改輸入框數字，不送出（可連點加減計算）
