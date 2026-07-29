@@ -173,7 +173,7 @@ function bubble(altText, contents) {
 }
 
 // ---------- 記錄確認卡 ----------
-export function recordFlex({ pet, categoryKey, mainText, subText, summary, date, logId, hints = [], title = '', tip = '', siteUrl = '', warnNoKcal = false, foodType = '', estimated = false, estKcalPerG = 0 }) {
+export function recordFlex({ pet, categoryKey, mainText, subText, summary, date, logId, hints = [], title = '', tip = '', siteUrl = '', warnNoKcal = false, foodType = '', estimated = false, estKcalPerG = 0, addedWaterMl = 0 }) {
   const style = CATEGORY_STYLE[categoryKey] || CATEGORY_STYLE.note;
   // 零食/其他這種「沒辦法估」的類型：不假裝估算，也不用紅色錯誤——溫和請使用者填一次（包裝上有）
   const warnBox = warnNoKcal ? [{
@@ -199,6 +199,8 @@ export function recordFlex({ pet, categoryKey, mainText, subText, summary, date,
       // 食物（乾糧/罐頭）品名已含類型，不再重複顯示類型膠囊；其他類別（喝水/藥…）保留
       ...(['dry', 'wet'].includes(categoryKey) ? [] : [{ type: 'box', layout: 'horizontal', contents: [tag(style.label, style)] }]),
       text(mainText, { size: 'xl', weight: 'bold', color: C.ink, margin: ['dry', 'wet'].includes(categoryKey) ? 'none' : 'md', wrap: true }),
+      // 另外加的水＝和食物同層級的攝取量，用粗體＋水色獨立一行，方便一眼確認有算進今日水分
+      ...(addedWaterMl > 0 ? [text(`＋ 另外加水 ${addedWaterMl} ml`, { size: 'lg', weight: 'bold', color: STAT_ACCENT.water, margin: 'sm', wrap: true })] : []),
       ...(subText ? [text(subText, { size: 'xs', color: C.muted, wrap: true, margin: 'sm' })] : []),
       ...warnBox,
       ...estBox,

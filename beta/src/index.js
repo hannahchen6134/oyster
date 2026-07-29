@@ -1959,7 +1959,7 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
   if (log.kcal) infoParts.push(`${estimated ? '≈' : ''}${log.kcal} kcal`);
   if (record.category === 'food' && log.waterMl) infoParts.push(`含水 ${log.waterMl} ml`);
   if (infoParts.length) subParts.push(infoParts.join('・'));
-  if (addedWaterMl > 0) subParts.push(`另外加水 ${addedWaterMl} ml`); // 獨立一行
+  // 另外加水改由卡片渲染成「粗體、水色」的獨立一行（與食物同層級，方便對照有沒有算進去），不放進灰色小字
   if (record.dayOffset || record.time) {
     const eventDay = eventDateTime.slice(0, 10);
     const stamp = `記在 ${Number(eventDay.slice(5, 7))}月${Number(eventDay.slice(8, 10))}日 ${eventDateTime.slice(11)}`;
@@ -2041,6 +2041,7 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
   const card = recordFlex({
     pet, categoryKey, mainText,
     subText: subParts.join('\n'),
+    addedWaterMl,
     summary, date: eventDate,
     logId: savedLog?.logId || '',
     hints, tip, siteUrl: await siteLink(env, opts.baseUrl, lineUserId),
