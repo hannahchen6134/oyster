@@ -572,7 +572,7 @@
     /* 產生圖片中：隱藏互動控制與操作說明，只留報告內容 */
     .capturing .cap-hide, .capturing .fold-toggle, .capturing #addVisitBtn,
     .capturing #labItemSelect { display: none !important; }
-    .capturing .cap-gone { display: none !important; }   /* 截圖時隱藏沒資料的整個區塊（例如無看診紀錄） */
+    .capturing .cap-gone { display: none !important; }
     .cap-only { display: none; }
     .capturing .cap-only { display: block !important; }
     /* 截圖＝一張專業 A4 報告：白底、加寬、圖表三欄卡、長明細表分兩欄 → 資料全留、頁面變矮、高解析度不模糊 */
@@ -1357,18 +1357,6 @@
             <p class="muted cap-hide" style="font-size:12px;margin:14px 2px 0">濕食＝罐頭與濕糧（含水量高，是重要補水來源）。水分分「自己喝的」與「食物內含的」；截圖即可給醫生看。</p>
           </div>
         </details>
-        <details class="block fold" id="visitFold">
-          <summary>
-            <span class="fold-title" id="visitFoldTitle">看診紀錄</span>
-            <span class="fold-toggle">＋</span>
-          </summary>
-          <div class="fold-body">
-            <div class="cap-hide" style="display:flex;justify-content:flex-end;margin-bottom:10px">
-              <button class="btn btn-secondary btn-sm" id="addVisitBtn" type="button">＋ 記錄看診</button>
-            </div>
-            <div class="grid" id="dayVisitList" style="gap:10px"></div>
-          </div>
-        </details>
         <details class="block fold daycards-fold">
           <summary>
             <span class="fold-head">
@@ -1839,6 +1827,7 @@
     }
 
     function renderDayVisits() {
+      if (!$('dayVisitList')) return; // 看診紀錄已從回顧頁移除（改在「設定 → 看診紀錄」）
       const vetsById = Object.fromEntries(state.vets.map((vet) => [vet.vetId, vet]));
       const visits = [...state.visits]
         .sort((a, b) => String(b.visitDate || b.nextVisitDate).localeCompare(String(a.visitDate || a.nextVisitDate)))
@@ -4204,7 +4193,7 @@
     $('recentFold').addEventListener('toggle', (event) => {
       if (event.target.open) loadRecent();
     });
-    $('addVisitBtn').addEventListener('click', () => openDayVisitModal(null));
+    { const _avb = $('addVisitBtn'); if (_avb) _avb.addEventListener('click', () => openDayVisitModal(null)); }
     // 存成圖片給醫生：把「回診」整頁（所有摺疊都展開、隱藏操作鈕）轉成一張圖，
     // 然後把圖直接顯示在畫面上讓使用者「長按儲存」——這招在 LINE 內建瀏覽器也有效，
     // 不倚賴 a[download]（內建瀏覽器常擋下載）也不倚賴檔案分享（多數 webview 不支援）。
@@ -4223,10 +4212,6 @@
       const folds = Array.from(view.querySelectorAll('details')).filter((d) => !d.classList.contains('hidden'));
       const wasOpen = folds.map((d) => d.open);
       folds.forEach((d) => { d.open = true; });
-      // 沒有看診紀錄時，截圖不放整個空區塊（避免大片留白）
-      const visitFold = $('visitFold');
-      const hideVisit = visitFold && !(state.visits && state.visits.length);
-      if (hideVisit) visitFold.classList.add('cap-gone');
       // 插入截圖標題（貓咪名字＋產生日期）
       const header = document.createElement('div');
       header.className = 'cap-header';
@@ -4267,7 +4252,6 @@
         view.classList.remove('capturing');
         header.remove();
         capFooter.remove();
-        if (hideVisit) visitFold.classList.remove('cap-gone');
         folds.forEach((d, i) => { d.open = wasOpen[i]; });
         btn.disabled = false;
         btn.textContent = orig;
