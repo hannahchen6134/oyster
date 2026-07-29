@@ -314,7 +314,7 @@
     }
     .doctor-note #doctorNote { font-family: var(--serif); font-size: 14.5px; letter-spacing: 0.02em; }
     /* 收合區塊：預設收起，首頁保持乾淨 */
-    /* 優雅收合：品牌小記號＋明體標題＋圓形＋鈕（展開轉 45° 成 ×） */
+    /* 優雅收合：品牌小記號＋明體標題＋圓形鈕內細緻 V 形箭頭（展開時箭頭上翻，非「＋」避免誤解為新增） */
     details.fold { padding: 0; overflow: hidden; }
     .fold summary {
       list-style: none; cursor: pointer; display: flex; align-items: center; gap: 13px;
@@ -338,11 +338,20 @@
       width: 27px; height: 27px; border-radius: 50%; flex: none;
       border: 1px solid rgba(115, 73, 33, 0.3); color: var(--brand);
       display: flex; align-items: center; justify-content: center;
-      font-size: 19px; font-weight: 400; line-height: 1;
-      transition: transform 0.22s ease, background 0.22s ease, border-color 0.22s ease;
+      font-size: 0; /* 隱藏原本的「＋」字元，改用下方細緻箭頭 */
+      transition: background 0.22s ease, border-color 0.22s ease;
+    }
+    /* 細緻 V 形箭頭：以兩條細邊框畫出，比字型箭頭更輕盈優雅 */
+    .fold .fold-toggle::before {
+      content: ''; width: 6.5px; height: 6.5px;
+      border-right: 1.4px solid currentColor; border-bottom: 1.4px solid currentColor;
+      border-radius: 0.5px; margin-top: -2.5px;
+      transform: rotate(45deg);
+      transition: transform 0.24s ease, margin-top 0.24s ease;
     }
     .fold summary:hover .fold-toggle { background: var(--brand-tint); border-color: var(--brand); }
-    .fold[open] .fold-toggle { transform: rotate(45deg); background: var(--brand); color: #fff; border-color: var(--brand); }
+    .fold[open] .fold-toggle { background: var(--brand); color: #fff; border-color: var(--brand); }
+    .fold[open] .fold-toggle::before { transform: rotate(-135deg); margin-top: 2.5px; }
     /* 相容舊的箭頭寫法 */
     .fold .fold-arrow { display: none; }
     .fold .fold-body { padding: 0 22px 20px; }
@@ -408,7 +417,7 @@
     /* 有記錄的小橫條（底部），比小圓點更明顯，一眼看出哪幾天記了 */
     .cal-recbar { width: 16px; height: 4px; border-radius: 999px; margin-top: auto; background: rgba(122, 80, 36, 0.5); }
     .cal-rec { width: 5px; height: 5px; border-radius: 50%; margin-top: auto; background: rgba(115, 73, 33, 0.4); }
-    /* 角落小標記：右上＝需注意(吐/漏藥)，左上＝回診 */
+    /* 角落小標記：右上＝已標記事件(吐/漏藥，飼主紀錄非系統判定)，左上＝回診 */
     .cal-mark { position: absolute; top: 6px; width: 7px; height: 7px; border-radius: 50%; }
     .cal-mark.warn { right: 6px; background: var(--seal); box-shadow: 0 0 0 2px rgba(191, 59, 32, 0.14); }
     .cal-mark.visit { left: 6px; background: transparent; border: 1.6px solid var(--brand); box-sizing: border-box; }
@@ -1219,7 +1228,7 @@
         <div class="cal-grid" id="calGrid"></div>
         <div class="cal-legend" id="calLegend" hidden>
           <span><span class="cal-recbar" style="display:inline-block;vertical-align:2px;margin-right:5px"></span>暖色格＝有記錄</span>
-          <span><span class="cal-mark warn" style="position:static;display:inline-block"></span>需注意（吐／漏藥）</span>
+          <span><span class="cal-mark warn" style="position:static;display:inline-block"></span>已標記事件（吐／漏藥）</span>
           <span><span class="cal-mark visit" style="position:static;display:inline-block"></span>回診</span>
           <span class="cal-legend-faint">淡色空格＝這天沒記錄</span>
         </div>
@@ -2336,11 +2345,11 @@
         const hasRecord = row && row.entryCount > 0;
         const isWarn = row && (row.vomitCount > 0 || row.medIssueCount > 0);
         const isVisit = visitDates.has(date);
-        // 月曆只做「一眼概覽」：有記錄＝亮底、需注意＝右上紅點、回診＝左上圈；細節點進去看
+        // 月曆只做「一眼概覽」：有記錄＝亮底、已標記事件(吐/漏藥)＝右上紅點、回診＝左上圈；細節點進去看
         html += `
           <div class="cal-cell ${date === today ? 'today' : ''} ${hasRecord ? 'has' : 'norec'} ${isWarn ? 'warn' : ''}" data-date="${date}">
             ${isVisit ? '<span class="cal-mark visit" title="回診"></span>' : ''}
-            ${isWarn ? '<span class="cal-mark warn" title="需注意"></span>' : ''}
+            ${isWarn ? '<span class="cal-mark warn" title="已標記事件（吐／漏藥）"></span>' : ''}
             <div class="cal-daynum">${day}</div>
             ${hasRecord && !isWarn ? `<span class="cal-recbar" title="有 ${row.entryCount} 筆記錄"></span>` : ''}
           </div>`;
