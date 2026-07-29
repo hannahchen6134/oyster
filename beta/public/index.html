@@ -573,14 +573,19 @@
     .capturing .cap-hide, .capturing .fold-toggle, .capturing #addVisitBtn,
     .capturing #labItemSelect { display: none !important; }
     .capturing .cap-gone { display: none !important; }   /* 截圖時隱藏沒資料的整個區塊（例如無看診紀錄） */
-    /* 截圖時把 30 天長表縮到近 ~14 列，報告變短才能用高解析度、不模糊（完整明細螢幕上仍在） */
-    .capturing #dayCardList > *:nth-child(n+16) { display: none !important; }
     .cap-only { display: none; }
     .capturing .cap-only { display: block !important; }
-    .capturing .cap-header { display: block !important; }
+    /* 截圖＝一張專業 A4 報告：白底、加寬、圖表三欄卡、長明細表分兩欄 → 資料全留、頁面變矮、高解析度不模糊 */
+    #trendView.capturing { width: 794px; max-width: none; padding: 30px 34px; background: #fff; }
+    .capturing .block { box-shadow: none; }
+    .capturing .cap-header { display: block !important; border-bottom: 2px solid var(--brand); padding: 0 2px 12px; margin-bottom: 4px; }
+    .capturing .cap-title { font-family: var(--serif); font-size: 23px; }
+    .capturing #trendCharts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .capturing #trendCharts .chart-block { margin: 0; border: 1px solid var(--line); border-radius: 12px; padding: 11px 12px 6px; }
+    .capturing .daycards { display: block; column-count: 2; column-gap: 22px; column-rule: 1px solid var(--line); }
+    .capturing .dcard, .capturing .dmonth { break-inside: avoid; -webkit-column-break-inside: avoid; }
+    .capturing .dcard::after { display: none; }   /* 隱藏每列的「›」互動箭頭 */
     .capturing summary { pointer-events: none; }
-    /* 截圖時給報告左右留白，內容才不會貼邊（畫面上靠外層容器 padding，截 #trendView 會失去） */
-    #trendView.capturing { padding: 0 16px 12px; }
     /* 回診重點：只列須注意事件；漏藥補一條紅旗（截圖給醫生用） */
     .vh-flags { margin: 0 0 10px; padding: 11px 14px; border-radius: var(--radius); font-size: 13px; line-height: 1.6; }
     .vh-flags.warn { background: #fbeee9; border: 1px solid rgba(191, 59, 32, 0.2); color: var(--seal); font-weight: 700; }
@@ -1379,7 +1384,6 @@
               <button data-trange="90" type="button">90 天</button>
             </div>
             <div class="daycards" id="dayCardList"></div>
-            <p class="cap-only muted" style="font-size:11.5px;margin:10px 2px 0">※ 圖片僅列近 14 天，完整明細請看照護站。</p>
           </div>
         </details>
       </section>
@@ -4243,11 +4247,12 @@
         // 報告很長時，手機瀏覽器的畫布高度有上限，太高會把下半截（看診紀錄、明細）截成空白。
         // 依實際高度動態調整 pixelRatio：越長就用越低的倍率，確保整份都畫得出來。
         const tall = view.scrollHeight || 0;
-        // 表格截短後報告變矮 → 大多落在高解析度區間；只有極長才降倍率保住「不空白」
-        const pr = tall > 4200 ? 1 : (tall > 2900 ? 1.5 : 2);
+        // 手機對「輸出圖片高度」有上限，超過就把下半截畫成空白。
+        // 動態調解析度：讓輸出高度 ≈ 3400px（夠清楚又不會超過上限），倍率夾在 1～2 之間。
+        const pr = Math.min(2, Math.max(1, 3400 / (tall || 3400)));
         // skipFonts：不抓 Google 字型內嵌（那步在受限瀏覽器會卡死）
         // 明確帶入寬高：部分瀏覽器對很長的內容不指定尺寸會把下半截算成空白
-        const opts = { backgroundColor: '#efe9dd', pixelRatio: pr, style: { margin: '0' }, skipFonts: true, width: view.scrollWidth || undefined, height: tall || undefined };
+        const opts = { backgroundColor: '#ffffff', pixelRatio: pr, style: { margin: '0' }, skipFonts: true, width: view.scrollWidth || undefined, height: tall || undefined };
         const withTimeout = (p, ms) => Promise.race([
           p, new Promise((_, reject) => setTimeout(() => reject(new Error(`逾時 ${ms / 1000} 秒`)), ms))
         ]);
