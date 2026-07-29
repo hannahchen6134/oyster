@@ -572,8 +572,11 @@
     /* 產生圖片中：隱藏互動控制與操作說明，只留報告內容 */
     .capturing .cap-hide, .capturing .fold-toggle, .capturing #addVisitBtn,
     .capturing #labItemSelect { display: none !important; }
+    .capturing .cap-gone { display: none !important; }   /* 截圖時隱藏沒資料的整個區塊（例如無看診紀錄） */
     .capturing .cap-header { display: block !important; }
     .capturing summary { pointer-events: none; }
+    /* 截圖時給報告左右留白，內容才不會貼邊（畫面上靠外層容器 padding，截 #trendView 會失去） */
+    #trendView.capturing { padding: 0 16px 12px; }
     /* 回診重點：只列須注意事件；漏藥補一條紅旗（截圖給醫生用） */
     .vh-flags { margin: 0 0 10px; padding: 11px 14px; border-radius: var(--radius); font-size: 13px; line-height: 1.6; }
     .vh-flags.warn { background: #fbeee9; border: 1px solid rgba(191, 59, 32, 0.2); color: var(--seal); font-weight: 700; }
@@ -1345,13 +1348,13 @@
             <p class="muted cap-hide" style="font-size:12px;margin:14px 2px 0">濕食＝罐頭與濕糧（含水量高，是重要補水來源）。水分分「自己喝的」與「食物內含的」；截圖即可給醫生看。</p>
           </div>
         </details>
-        <details class="block fold">
+        <details class="block fold" id="visitFold">
           <summary>
             <span class="fold-title" id="visitFoldTitle">看診紀錄</span>
             <span class="fold-toggle">＋</span>
           </summary>
           <div class="fold-body">
-            <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+            <div class="cap-hide" style="display:flex;justify-content:flex-end;margin-bottom:10px">
               <button class="btn btn-secondary btn-sm" id="addVisitBtn" type="button">＋ 記錄看診</button>
             </div>
             <div class="grid" id="dayVisitList" style="gap:10px"></div>
@@ -4211,6 +4214,10 @@
       const folds = Array.from(view.querySelectorAll('details')).filter((d) => !d.classList.contains('hidden'));
       const wasOpen = folds.map((d) => d.open);
       folds.forEach((d) => { d.open = true; });
+      // 沒有看診紀錄時，截圖不放整個空區塊（避免大片留白）
+      const visitFold = $('visitFold');
+      const hideVisit = visitFold && !(state.visits && state.visits.length);
+      if (hideVisit) visitFold.classList.add('cap-gone');
       // 插入截圖標題（貓咪名字＋產生日期）
       const header = document.createElement('div');
       header.className = 'cap-header';
@@ -4244,6 +4251,7 @@
         view.classList.remove('capturing');
         header.remove();
         capFooter.remove();
+        if (hideVisit) visitFold.classList.remove('cap-gone');
         folds.forEach((d, i) => { d.open = wasOpen[i]; });
         btn.disabled = false;
         btn.textContent = orig;
