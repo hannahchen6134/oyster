@@ -1608,8 +1608,16 @@
       const addBtn = $('settingsAddBtn');
       tourShow(addBtn, {
         text: '點「<b>＋ 新增</b>」把常吃的乾乾／罐罐建起來，填上每克熱量（包裝上通常有），熱量就會準。',
-        primary: '好，開始新增',
-        onPrimary: () => { endTour(); if (addBtn) addBtn.click(); }
+        primary: '下一步 →',
+        onPrimary: () => { state.settingsTab = null; switchTab('settings'); setTimeout(tourStepCare, 480); }
+      });
+    }
+    // 第 4 步：帶到「共同照護」——不只你一個人顧的話，這是重點功能
+    function tourStepCare() {
+      tourShow(document.querySelector('[data-settings="care"]'), {
+        text: '照顧不只你一個？到「<b>共同照護</b>」邀請家人或幫手，大家記進同一隻貓，藥／嘔吐還會即時通知彼此。',
+        primary: '好，開始使用',
+        onPrimary: endTour
       });
     }
 
