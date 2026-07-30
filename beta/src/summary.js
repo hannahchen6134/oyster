@@ -215,13 +215,13 @@ export function computeTodayBoard({ pet = {}, tasks = [], logs = [], date = '' }
   const completed = [];
   for (const t of tasks || []) {
     if (t.status === 'completed') {
-      completed.push({ kind: 'task', taskId: t.taskId, title: t.title, by: String(t.completedBy || ''), at: String(t.completedAt || '').slice(11, 16) });
+      completed.push({ kind: 'task', taskId: t.taskId, title: t.title, by: String(t.completedBy || ''), byName: '', at: String(t.completedAt || '').slice(11, 16) });
     }
   }
   for (const l of liveLogs) {
     // 排除「由任務完成而生」的藥事件（避免和上面的任務重複計）
     if (l.category === 'med' && l.medStatus === '已吃' && !l.sourceTaskId) {
-      completed.push({ kind: 'med', medSlot: String(l.medSlot || ''), title: `餵藥（${String(l.medSlot || '')}）`, by: String(l.recordedBy || l.caregiverName || ''), at: timeOf(l) });
+      completed.push({ kind: 'med', medSlot: String(l.medSlot || ''), title: `餵藥（${String(l.medSlot || '')}）`, by: String(l.recordedBy || ''), byName: String(l.caregiverName || ''), at: timeOf(l) });
     }
   }
 
