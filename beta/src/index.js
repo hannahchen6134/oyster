@@ -25,7 +25,7 @@ import {
   websiteReply, helpText, welcomeText, unknownReply, invalidReply,
   recordTutorial, medTutorial, onboardingText, recordPrompt, backfillGuide
 } from './replies.js';
-import { getRecentLogsByPet } from './db.js';
+import { getRecentLogsByPet, ensureTaskSchema } from './db.js';
 import { jsonResponse, taipeiToday, taipeiNowDateTime, addDays } from './util.js';
 
 // 官方 LINE 加好友連結（basicId @232mjffx）——給共同照護邀請用
@@ -49,6 +49,8 @@ function isDuplicateMessage(messageId) {
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    // 確保 tasks 表與 logs.sourceTaskId 已存在（冪等、每 isolate 一次），再進任何會寫 logs 的路徑
+    await ensureTaskSchema(env.DB);
 
     if (url.pathname === '/webhook' && request.method === 'POST') {
       return handleWebhook(request, env, url, ctx);

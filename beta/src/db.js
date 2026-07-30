@@ -372,6 +372,32 @@ export async function getLog(db, logId) {
 
 // ---------- tasks（任務＝還要做的事；已發生的事存在 logs 事件）----------
 
+// 自動建表/加欄（沿用本專案 ensureShotTable 的做法）：只在每個 isolate 跑一次成功即止，
+// 讓沒有 D1 遷移權限也能上線；全程冪等，失敗不擋請求，下次再試。
+let taskSchemaReady = false;
+export async function ensureTaskSchema(db) {
+  if (taskSchemaReady) return;
+  try {
+    await db.prepare(
+      `CREATE TABLE IF NOT EXISTS tasks (
+        taskId TEXT PRIMARY KEY, petId TEXT NOT NULL, taskType TEXT NOT NULL DEFAULT '',
+        title TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '', scheduledAt TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'pending', createdBy TEXT NOT NULL DEFAULT '',
+        completedAt TEXT NOT NULL DEFAULT '', completedBy TEXT NOT NULL DEFAULT '',
+        skippedAt TEXT NOT NULL DEFAULT '', repeatRule TEXT NOT NULL DEFAULT '',
+        createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL)`
+    ).run();
+    await db.prepare('CREATE INDEX IF NOT EXISTS idx_tasks_pet ON tasks(petId, status, scheduledAt)').run();
+    try {
+      await db.prepare("ALTER TABLE logs ADD COLUMN sourceTaskId TEXT NOT NULL DEFAULT ''").run();
+    } catch (error) { /* 欄位已存在就略過 */ }
+    await db.prepare(
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_logs_sourcetask ON logs(sourceTaskId) WHERE sourceTaskId != '' AND isDeleted = 0"
+    ).run();
+    taskSchemaReady = true;
+  } catch (error) { /* 不擋請求，下次請求再嘗試建立 */ }
+}
+
 const TASK_TYPE_TO_CATEGORY = {
   medication: 'med', med: 'med', water: 'water', food: 'food',
   weight: 'weight', vomit: 'vomit', stool: 'stool', poop: 'stool'
