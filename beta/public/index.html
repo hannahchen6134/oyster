@@ -575,16 +575,14 @@
     .capturing .cap-gone { display: none !important; }
     .cap-only { display: none; }
     .capturing .cap-only { display: block !important; }
-    /* 截圖＝一張專業 A4 報告：白底、加寬、圖表三欄卡、長明細表分兩欄 → 資料全留、頁面變矮、高解析度不模糊 */
-    #trendView.capturing { width: 794px; max-width: none; padding: 30px 34px; background: #fff; }
+    /* 截圖：白底、左右留白、標頭加品牌線；單欄穩定排版（不用 CSS 多欄，html-to-image 無法算多欄→會變空白） */
+    #trendView.capturing { padding: 22px 20px; background: #fff; max-width: none; }
     .capturing .block { box-shadow: none; }
     .capturing .cap-header { display: block !important; border-bottom: 2px solid var(--brand); padding: 0 2px 12px; margin-bottom: 4px; }
-    .capturing .cap-title { font-family: var(--serif); font-size: 23px; }
-    .capturing #trendCharts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
-    .capturing #trendCharts .chart-block { margin: 0; border: 1px solid var(--line); border-radius: 12px; padding: 11px 12px 6px; }
-    .capturing .daycards { display: block; column-count: 2; column-gap: 22px; column-rule: 1px solid var(--line); }
-    .capturing .dcard, .capturing .dmonth { break-inside: avoid; -webkit-column-break-inside: avoid; }
+    .capturing .cap-title { font-family: var(--serif); font-size: 22px; }
     .capturing .dcard::after { display: none; }   /* 隱藏每列的「›」互動箭頭 */
+    /* 截圖時明細只列近 ~14 天：報告變短→可用高解析度、不模糊（完整明細螢幕上仍在） */
+    .capturing #dayCardList > *:nth-child(n+16) { display: none !important; }
     .capturing summary { pointer-events: none; }
     /* 回診重點：只列須注意事件；漏藥補一條紅旗（截圖給醫生用） */
     .vh-flags { margin: 0 0 10px; padding: 11px 14px; border-radius: var(--radius); font-size: 13px; line-height: 1.6; }
@@ -1372,6 +1370,7 @@
               <button data-trange="90" type="button">90 天</button>
             </div>
             <div class="daycards" id="dayCardList"></div>
+            <p class="cap-only muted" style="font-size:11.5px;margin:10px 2px 0">※ 圖片僅列近 14 天，完整明細請看照護站。</p>
           </div>
         </details>
       </section>
