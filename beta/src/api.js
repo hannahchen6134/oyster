@@ -12,7 +12,7 @@ import {
   createTask, getTask, listTasksForPet, completeTask, uncompleteTask, skipTask, cancelTask
 } from './db.js';
 import { displayMedStatus, displayMedSlot } from './brand.js';
-import { computeDailySummary, deriveFoodFields } from './summary.js';
+import { computeDailySummary, deriveFoodFields, computeTodayBoard } from './summary.js';
 import { matchFood } from './parser.js';
 import { jsonResponse, newId, nowIso, isValidDate, isValidDateTime, taipeiNowDateTime, taipeiToday } from './util.js';
 
@@ -109,6 +109,19 @@ export async function handleApi(request, env, url) {
       if (!(await assertPetOwner(db, petId, dataOwnerId))) return forbidden();
       const logs = await getLogsForDay(db, petId, date);
       return jsonResponse({ ok: true, date, logs, summary: computeDailySummary(logs) });
+    }
+
+    // 今日照護看板：今天還要做什麼／完成了什麼（誰做的）／有沒有異常
+    if (resource === 'today' && method === 'GET') {
+      const petId = url.searchParams.get('petId') || '';
+      const date = url.searchParams.get('date') || taipeiToday();
+      if (!isValidDate(date)) return jsonResponse({ ok: false, message: '日期格式錯誤' }, 400);
+      if (!(await assertPetOwner(db, petId, dataOwnerId))) return forbidden();
+      const pet = await getPet(db, petId);
+      const logs = await getLogsForDay(db, petId, date);
+      const tasks = await listTasksForPet(db, petId, { date });
+      const board = computeTodayBoard({ pet, tasks, logs, date });
+      return jsonResponse({ ok: true, board });
     }
 
     if (resource === 'summary' && method === 'GET') {

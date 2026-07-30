@@ -178,3 +178,58 @@ export function computeDailySummary(logs) {
 
   return summary;
 }
+
+function parseSlots(pet) {
+  try {
+    const s = JSON.parse(pet?.goalMedSlots || '[]');
+    return Array.isArray(s) ? s.filter(Boolean).map(String) : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+// 今日照護看板：把「待辦」「已完成」「異常」三塊，從 tasks ＋ logs ＋ pet(餵藥時段) 收斂出來。
+// 純函式（方便測試），前端 /api/today 直接用。輸入的 tasks 由呼叫端決定範圍（通常＝當日）。
+export function computeTodayBoard({ pet = {}, tasks = [], logs = [], date = '' } = {}) {
+  const summary = computeDailySummary(logs);
+  const liveLogs = (logs || []).filter((l) => !l.isDeleted);
+
+  // 今天已「已吃」的餵藥時段（用來把待辦裡已完成的時段扣掉）
+  const doneSlots = new Set(
+    liveLogs.filter((l) => l.category === 'med' && l.medStatus === '已吃')
+      .map((l) => String(l.medSlot || '')).filter(Boolean)
+  );
+
+  // 待辦：明確 pending 任務 ＋ 尚未完成的餵藥時段
+  const pending = [];
+  for (const t of tasks || []) {
+    if (t.status === 'pending') {
+      pending.push({ kind: 'task', taskId: t.taskId, taskType: t.taskType, title: t.title, scheduledAt: t.scheduledAt });
+    }
+  }
+  for (const slot of parseSlots(pet)) {
+    if (!doneSlots.has(slot)) pending.push({ kind: 'medSlot', medSlot: slot, title: `餵藥（${slot}）` });
+  }
+
+  // 已完成：完成的任務 ＋ 今天已吃的藥（含誰、幾點）
+  const completed = [];
+  for (const t of tasks || []) {
+    if (t.status === 'completed') {
+      completed.push({ kind: 'task', taskId: t.taskId, title: t.title, by: String(t.completedBy || ''), at: String(t.completedAt || '').slice(11, 16) });
+    }
+  }
+  for (const l of liveLogs) {
+    // 排除「由任務完成而生」的藥事件（避免和上面的任務重複計）
+    if (l.category === 'med' && l.medStatus === '已吃' && !l.sourceTaskId) {
+      completed.push({ kind: 'med', medSlot: String(l.medSlot || ''), title: `餵藥（${String(l.medSlot || '')}）`, by: String(l.recordedBy || l.caregiverName || ''), at: timeOf(l) });
+    }
+  }
+
+  // 異常：重用每日總結的旗標（不做醫療判斷，只呈現）
+  const abnormal = [];
+  if (summary.vomitCount > 0) abnormal.push({ type: 'vomit', count: summary.vomitCount, notes: summary.vomitNotes });
+  if (summary.medIssueCount > 0) abnormal.push({ type: 'medIssue', count: summary.medIssueCount });
+  if (summary.moodNotes.length > 0) abnormal.push({ type: 'mood', notes: summary.moodNotes });
+
+  return { date, pending, completed, abnormal, summary };
+}
