@@ -1127,9 +1127,8 @@
       .cal-num { font-size: 11px; }
       .colophon { margin-top: 44px; }
     }
-    /* 今日看板：待辦（可點完成）／完成（誰做的）／狀況。沿用 .block、h2 樣式，全咖啡色調 */
-    #todayBoard .block + .block { margin-top: 18px; }
-    .tb-count { font-size: 12.5px; color: var(--muted); flex: none; letter-spacing: .02em; }
+    /* 今日看板：待辦／完成／狀況，全部用網站摺疊卡（.block.fold）。今天分頁卡片間距統一 14px */
+    #todayView .block { margin-top: 14px; }
     .tb-row { display: flex; align-items: center; gap: 14px; padding: 14px 0; border-top: 1px solid var(--line); }
     .tb-row:first-of-type { border-top: none; }
     .tb-tick { width: 22px; height: 22px; border-radius: 50%; flex: none; border: 1.5px solid var(--line-strong); background: #fff; cursor: pointer; transition: transform .1s ease, box-shadow .15s ease; }
@@ -1139,7 +1138,7 @@
     .tb-tick.busy { opacity: .5; pointer-events: none; }
     .tb-body { flex: 1; min-width: 0; }
     .tb-ttl { font-size: 15px; color: var(--ink); line-height: 1.45; }
-    .tb-card.done .tb-ttl { color: var(--ink-soft); }
+    .tb-row.done .tb-ttl { color: var(--ink-soft); }
     .tb-meta { font-size: 12.5px; color: var(--muted); margin-top: 3px; line-height: 1.4; }
     .tb-meta b { color: var(--ink-soft); font-weight: 600; }
     .tb-when { font-size: 12.5px; color: var(--muted); flex: none; padding-left: 12px; font-variant-numeric: tabular-nums; letter-spacing: .02em; }
@@ -1234,14 +1233,21 @@
           </div>
           <button class="link-btn hidden" id="goTodayBtn" type="button">回到今天</button>
         </div>
-        <!-- 今日看板：待辦／完成／狀況（只在「今天」顯示；點待辦圈圈＝完成） -->
+        <!-- 今日看板：待辦(打開)／完成／狀況(收合)。只在「今天」顯示；點待辦圈圈＝完成 -->
         <div id="todayBoard"></div>
-        <div class="block today-hero" id="todayHero" style="margin-top:0">
-          <div id="todayProgress"></div>
-        </div>
-        <div class="block">
+        <div class="block" style="margin-top:14px">
           <button class="record-entry" id="recordEntryBtn" type="button"><span class="q-plus">＋</span> 記一筆</button>
         </div>
+        <details class="block fold" id="todayHero">
+          <summary>
+            <span class="fold-head">
+              <span class="fold-title">今日累計</span>
+              <span class="fold-sub">水分・熱量對照今日目標</span>
+            </span>
+            <span class="fold-toggle">＋</span>
+          </summary>
+          <div class="fold-body"><div id="todayProgress"></div></div>
+        </details>
         <details class="block fold sec-confirm">
           <summary>
             <span class="fold-head">
@@ -1728,7 +1734,7 @@
       const done = board.completed || [];
       const doneRows = done.length ? done.map((c) => {
         const verb = c.kind === 'med' ? '餵的' : '做的';
-        return `<div class="tb-row"><div class="tb-tick on"></div>`
+        return `<div class="tb-row done"><div class="tb-tick on"></div>`
           + `<div class="tb-body"><div class="tb-ttl">${esc(c.title || '')}</div><div class="tb-meta"><b>${who(c)}</b> ${verb}</div></div>`
           + `<div class="tb-when">${esc(c.at || '')}</div></div>`;
       }).join('') : '<div class="tb-empty">今天還沒有完成的紀錄</div>';
@@ -1747,10 +1753,15 @@
         }).join('');
       }
 
+      // 統一摺疊卡：只有待辦預設打開；狀況若有異常也自動打開（重要的事不藏）
+      const fold = (title, sub, count, body, open) =>
+        `<details class="block fold"${open ? ' open' : ''}>`
+        + `<summary><span class="fold-head"><span class="fold-title">${title}${count ? `<span class="fold-count">${count}</span>` : ''}</span><span class="fold-sub">${sub}</span></span><span class="fold-toggle"></span></summary>`
+        + `<div class="fold-body">${body}</div></details>`;
       el.innerHTML =
-        `<div class="block tb-card"><div class="section-head"><h2>今日待辦</h2>${pend.length ? `<span class="tb-count">還有 ${pend.length} 項</span>` : ''}</div>${pendRows}</div>`
-        + `<div class="block tb-card done"><div class="section-head"><h2>今日完成</h2>${done.length ? `<span class="tb-count">${done.length} 項</span>` : ''}</div>${doneRows}</div>`
-        + `<div class="block tb-card"><div class="section-head"><h2>今日狀況</h2></div>${abRows}</div>`;
+        fold('今日待辦', '今天還沒完成的照護', pend.length ? `還有 ${pend.length} 項` : '', pendRows, true)
+        + fold('今日完成', '誰在幾點完成了什麼', done.length ? `${done.length} 項` : '', doneRows, false)
+        + fold('今日狀況', ab.length ? '有需要注意的狀況' : '今天一切平穩', '', abRows, ab.length > 0);
     }
 
     // 今日累計：總水分/總熱量對照每日目標，長條圖顯示還差多少
