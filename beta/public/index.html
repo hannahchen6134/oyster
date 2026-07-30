@@ -581,9 +581,12 @@
     .capturing .cap-header { display: block !important; border-bottom: 2px solid var(--brand); padding: 0 2px 12px; margin-bottom: 4px; }
     .capturing .cap-title { font-family: var(--serif); font-size: 22px; }
     .capturing .dcard::after { display: none; }   /* 隱藏每列的「›」互動箭頭 */
-    /* 截圖時明細只列近 ~14 天：報告變短→可用高解析度、不模糊（完整明細螢幕上仍在） */
-    .capturing #dayCardList > *:nth-child(n+16) { display: none !important; }
+    /* 兩張式報告：第 1 張＝趨勢/血檢/事件/組成（不含明細表）；第 2 張＝完整近日明細表 */
+    .capturing.cap-main .daycards-fold { display: none !important; }
+    .capturing.cap-table .block:not(.daycards-fold) { display: none !important; }
     .capturing summary { pointer-events: none; }
+    .imgbox-page { margin-bottom: 18px; }
+    .imgbox-plabel { color: #fff; font-size: 12.5px; font-weight: 600; margin: 0 0 6px; text-align: center; opacity: .85; }
     /* 回診重點：只列須注意事件；漏藥補一條紅旗（截圖給醫生用） */
     .vh-flags { margin: 0 0 10px; padding: 11px 14px; border-radius: var(--radius); font-size: 13px; line-height: 1.6; }
     .vh-flags.warn { background: #fbeee9; border: 1px solid rgba(191, 59, 32, 0.2); color: var(--seal); font-weight: 700; }
@@ -1370,7 +1373,6 @@
               <button data-trange="90" type="button">90 天</button>
             </div>
             <div class="daycards" id="dayCardList"></div>
-            <p class="cap-only muted" style="font-size:11.5px;margin:10px 2px 0">※ 圖片僅列近 14 天，完整明細請看照護站。</p>
           </div>
         </details>
       </section>
@@ -4196,51 +4198,33 @@
     // 存成圖片給醫生：把「回診」整頁（所有摺疊都展開、隱藏操作鈕）轉成一張圖，
     // 然後把圖直接顯示在畫面上讓使用者「長按儲存」——這招在 LINE 內建瀏覽器也有效，
     // 不倚賴 a[download]（內建瀏覽器常擋下載）也不倚賴檔案分享（多數 webview 不支援）。
-    $('reportSaveBtn').addEventListener('click', async () => {
-      trackEvent('report_save');
+    // 產生一張報告圖：mode＝'cap-main'（趨勢/血檢/事件/組成）或 'cap-table'（近日明細）；label 印在標頭
+    async function captureReportImage(mode, label, petName, today) {
       const view = $('trendView');
-      const btn = $('reportSaveBtn');
-      if (!window.htmlToImage) { toast('圖片功能還在載入，請稍等一下再按', true); return; }
-      const petName = ($('petTitle').textContent || '貓咪').trim();
-      const today = todayStr();
-      const orig = btn.textContent;
-      btn.disabled = true;
-      btn.textContent = '產生圖片中…';
-      const loading = showLoadingOverlay(); // 一按就有全螢幕回饋，蓋住按鈕消失的空檔
-      // 展開所有（非隱藏的）摺疊區，記住原本開闔狀態，截完還原
       const folds = Array.from(view.querySelectorAll('details')).filter((d) => !d.classList.contains('hidden'));
       const wasOpen = folds.map((d) => d.open);
       folds.forEach((d) => { d.open = true; });
-      // 插入截圖標題（貓咪名字＋產生日期）
       const header = document.createElement('div');
       header.className = 'cap-header';
       header.innerHTML = `<div class="cap-title">${esc(petName)}・照護紀錄</div>`
-        + `<div class="cap-sub">產生日期 ${esc(today)}　·　來源：喵喵照護站</div>`;
+        + `<div class="cap-sub">產生日期 ${esc(today)}　·　${esc(label)}　·　來源：喵喵照護站</div>`;
       view.prepend(header);
-      // 圖片底部免責（給醫生看的圖也帶著，避免被當成精確醫療數據）
       const capFooter = document.createElement('div');
       capFooter.className = 'cap-header';
       capFooter.innerHTML = `<div class="cap-sub">※ 飼主自行記錄，可能有誤差，僅供醫生參考。紀錄正常不代表貓咪完全健康，請以獸醫判斷為準。</div>`;
       view.appendChild(capFooter);
-      view.classList.add('capturing');
-      // 讓瀏覽器先完成版面重排（展開多個摺疊區＋圖表），圖才不會被截到一半
+      view.classList.add('capturing', mode);
       await new Promise((resolve) => setTimeout(resolve, 200));
       let dataUrl = '';
       let failMsg = '';
       try {
-        // 報告很長時，手機瀏覽器的畫布高度有上限，太高會把下半截（看診紀錄、明細）截成空白。
-        // 依實際高度動態調整 pixelRatio：越長就用越低的倍率，確保整份都畫得出來。
         const tall = view.scrollHeight || 0;
-        // 手機對「輸出圖片高度」有上限，超過就把下半截畫成空白。
-        // 動態調解析度：讓輸出高度 ≈ 3400px（夠清楚又不會超過上限），倍率夾在 1～2 之間。
+        // 動態調解析度：讓輸出高度 ≈ 3400px（夠清楚又不超過手機算圖上限）
         const pr = Math.min(2, Math.max(1, 3400 / (tall || 3400)));
-        // skipFonts：不抓 Google 字型內嵌（那步在受限瀏覽器會卡死）
-        // 明確帶入寬高：部分瀏覽器對很長的內容不指定尺寸會把下半截算成空白
         const opts = { backgroundColor: '#ffffff', pixelRatio: pr, style: { margin: '0' }, skipFonts: true, width: view.scrollWidth || undefined, height: tall || undefined };
         const withTimeout = (p, ms) => Promise.race([
           p, new Promise((_, reject) => setTimeout(() => reject(new Error(`逾時 ${ms / 1000} 秒`)), ms))
         ]);
-        // iOS Safari 第一次算圖常空白 → 只有 iOS 才先暖身一次（Android 保持單次、較快）
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
           || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
         if (isIOS) { try { await withTimeout(window.htmlToImage.toPng(view, opts), 12000); } catch (warmErr) { /* 暖身失敗不當錯誤 */ } }
@@ -4248,36 +4232,51 @@
       } catch (error) {
         failMsg = (error && error.message) ? error.message : String(error);
       } finally {
-        view.classList.remove('capturing');
+        view.classList.remove('capturing', mode);
         header.remove();
         capFooter.remove();
         folds.forEach((d, i) => { d.open = wasOpen[i]; });
-        btn.disabled = false;
-        btn.textContent = orig;
       }
-      // 診斷用：把真正的結果直接跳出來，才知道死在哪一步
-      if (dataUrl && dataUrl.length > 100) {
-        // 把 PNG 上傳成「真圖片網址」，LINE 內建瀏覽器才能長按儲存（data 網址常無法長按存）；
-        // 上傳失敗就退回直接用 data 網址（至少畫面看得到）。
-        let imgSrc = dataUrl;
-        try {
-          const resp = await fetch('/shot', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + state.token },
-            body: JSON.stringify({ png: dataUrl })
-          });
-          const j = await resp.json();
-          if (j && j.ok && j.url) imgSrc = j.url;
-        } catch (e) { /* 上傳失敗就用 dataURL */ }
-        loading.remove();
-        try { showReportImage(imgSrc, `${petName}_照護紀錄_${today}.png`); }
+      return { dataUrl, failMsg };
+    }
+    // 把 PNG 上傳成真圖片網址（LINE 內建瀏覽器才能長按儲存）；失敗就退回 dataURL
+    async function uploadShot(dataUrl) {
+      try {
+        const resp = await fetch('/shot', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + state.token },
+          body: JSON.stringify({ png: dataUrl })
+        });
+        const j = await resp.json();
+        if (j && j.ok && j.url) return j.url;
+      } catch (e) { /* ignore */ }
+      return dataUrl;
+    }
+    $('reportSaveBtn').addEventListener('click', async () => {
+      trackEvent('report_save');
+      const btn = $('reportSaveBtn');
+      if (!window.htmlToImage) { toast('圖片功能還在載入，請稍等一下再按', true); return; }
+      const petName = ($('petTitle').textContent || '貓咪').trim();
+      const today = todayStr();
+      const orig = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = '產生圖片中…';
+      const loading = showLoadingOverlay();
+      // 一次產兩張：第 1 張＝趨勢/血檢/事件/組成；第 2 張＝完整近日明細
+      const r1 = await captureReportImage('cap-main', '第 1 張・共 2 張', petName, today);
+      const r2 = await captureReportImage('cap-table', '第 2 張・共 2 張（近日健康明細）', petName, today);
+      btn.disabled = false;
+      btn.textContent = orig;
+      const imgs = [];
+      if (r1.dataUrl && r1.dataUrl.length > 100) imgs.push({ src: await uploadShot(r1.dataUrl), name: `${petName}_照護紀錄_1of2_${today}.png` });
+      if (r2.dataUrl && r2.dataUrl.length > 100) imgs.push({ src: await uploadShot(r2.dataUrl), name: `${petName}_明細_2of2_${today}.png` });
+      loading.remove();
+      if (imgs.length) {
+        try { showReportImages(imgs); }
         catch (e) { alert('圖片產生成功，但顯示時出錯：' + (e && e.message ? e.message : e)); }
-      } else if (failMsg) {
-        loading.remove();
-        alert('產生圖片失敗：' + failMsg + '\n\n（可先用手機截圖給醫生，我會依這個訊息修正）');
       } else {
-        loading.remove();
-        alert('這個瀏覽器產出的圖片是空白的，可能不支援。請改用一般瀏覽器（Safari／Chrome）開，或先用手機截圖。');
+        const msg = r1.failMsg || r2.failMsg || '空白';
+        alert('產生圖片失敗：' + msg + '\n\n（可先用手機截圖給醫生，我會依這個訊息修正）');
       }
     });
     // 「產生中…」全螢幕轉圈：一按就給回饋，算圖＋上傳期間都顯示
@@ -4290,6 +4289,38 @@
     }
     // 顯示產生好的報告圖：長按可儲存（全平台通用）；另備一顆「分享／存圖」用新的一次點擊觸發，
     // 讓支援的手機能叫出系統分享面板（新手勢才不會被瀏覽器擋掉）。
+    // 多張報告圖：逐張顯示、各標「第 N 張」，長按可存
+    function showReportImages(imgs) {
+      const box = document.createElement('div');
+      box.className = 'imgbox';
+      const total = imgs.length;
+      const pages = imgs.map((im, i) => `<div class="imgbox-page">${total > 1 ? `<div class="imgbox-plabel">第 ${i + 1} 張・共 ${total} 張</div>` : ''}<img alt="照護紀錄 ${i + 1}" src="${im.src}"></div>`).join('');
+      box.innerHTML = `
+        <div class="imgbox-bar">
+          <div class="imgbox-hint">${total > 1 ? `共 ${total} 張，請「逐一長按圖片 → 儲存到相簿」` : '長按下面的圖片 → 「儲存到相簿」'}，看診時打開給醫生看</div>
+          <button class="imgbox-btn imgbox-share" type="button">分享／存圖</button>
+          <button class="imgbox-btn imgbox-close" type="button">關閉</button>
+        </div>
+        <div class="imgbox-scroll">${pages}</div>`;
+      document.body.appendChild(box);
+      box.querySelector('.imgbox-close').onclick = () => box.remove();
+      box.querySelector('.imgbox-share').onclick = async () => {
+        try {
+          const files = [];
+          for (const im of imgs) {
+            const blob = await (await fetch(im.src)).blob();
+            files.push(new File([blob], im.name, { type: 'image/png' }));
+          }
+          if (navigator.canShare && navigator.canShare({ files })) {
+            await navigator.share({ files });
+          } else {
+            alert('這個瀏覽器無法直接分享。\n請「逐張長按圖片 →　儲存到相簿」。');
+          }
+        } catch (error) {
+          if (!(error && error.name === 'AbortError')) alert('請「逐張長按圖片 →　儲存到相簿」。');
+        }
+      };
+    }
     function showReportImage(dataUrl, fileName) {
       const box = document.createElement('div');
       box.className = 'imgbox';
