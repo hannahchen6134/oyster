@@ -425,8 +425,12 @@ export function handoffFlex(pet, dateLabel, data) {
     ]
   };
   const footer = {
-    type: 'box', layout: 'vertical', paddingAll: '12px', paddingStart: '20px', paddingEnd: '20px', backgroundColor: FOOTER_COLOR,
-    contents: [text('照護夥伴在自己的 LINE 打「交班」，也能看到今天狀況', { size: 'xxs', color: C.muted, align: 'center', wrap: true })]
+    type: 'box', layout: 'vertical', paddingAll: '12px', paddingStart: '20px', paddingEnd: '20px', backgroundColor: FOOTER_COLOR, spacing: 'sm',
+    contents: [
+      { type: 'button', height: 'sm', style: 'primary', color: C.brand,
+        action: { type: 'postback', label: '傳給照護夥伴', data: 'action=handoffShare', displayText: '傳今日交班給夥伴' } },
+      text('夥伴也可在自己的 LINE 打「交班」查看', { size: 'xxs', color: C.muted, align: 'center', wrap: true })
+    ]
   };
   return bubble(
     `今日交班（${petName}）${dateLabel}`,

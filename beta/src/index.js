@@ -995,6 +995,32 @@ async function handlePostback(event, env, baseUrl) {
   // 共同照護者操作時解析到飼主本人（飼主本人時 ownerId === lineUserId，行為不變）
   const ownerId = lineUserId ? await resolveDataOwner(db, lineUserId) : lineUserId;
 
+  // 一鍵把今日交班推播給所有共照夥伴（LINE 不能轉傳 Flex，改由機器人主動推）
+  if (action === 'handoffShare') {
+    const user = await getUser(db, lineUserId);
+    const pets = await listPets(db, ownerId);
+    const pet = await resolveDefaultPet(db, user, pets);
+    if (!pet) { await replyOrPush(env, event, '找不到貓咪資料，請先建立檔案。'); return; }
+    const today = taipeiToday();
+    const logs = await getLogsForDay(db, pet.petId, today);
+    const data = buildHandoff(pet, logs);
+    const dateLabel = shortDate(today);
+    const circle = await listCareCircle(db, pet.ownerLineUserId); // [飼主, ...已加入夥伴]
+    const recipients = circle.filter((id) => id && id !== lineUserId); // 除了自己
+    if (!recipients.length) {
+      await replyOrPush(env, event, '目前還沒有共照夥伴。到「設定 → 邀請夥伴」把家人或幫手加進來，就能一鍵傳給大家。');
+      return;
+    }
+    const card = handoffFlex(pet, dateLabel, data);
+    let ok = 0;
+    for (const rid of recipients) {
+      try { await pushMessages(env, rid, [card]); ok += 1; } catch (error) { /* 個別失敗略過 */ }
+    }
+    await track(db, lineUserId, 'handoff_share', String(ok));
+    await replyOrPush(env, event, ok ? `已把今日交班傳給 ${ok} 位照護夥伴。` : '這次沒有傳成功，請稍後再試一次。');
+    return;
+  }
+
   // 其他狀況（較少記的）：點分類 → 常用描述，兩層即可
   if (action === 'recmore') {
     await replyOrPushQuick(env, event, '其他狀況？點一個分類 👇', symptomCategoryQuick());
