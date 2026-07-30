@@ -459,7 +459,7 @@ export async function completeTask(db, taskId, opts = {}) {
     petId: task.petId,
     eventDateTime: when,
     category,
-    medStatus: category === 'med' ? 'done' : '',
+    medStatus: category === 'med' ? '已吃' : '', // 與 computeDailySummary 一致（'已吃'＝已服藥）
     note: task.title || task.note || '',
     sourceTaskId: task.taskId,
     source: 'task',

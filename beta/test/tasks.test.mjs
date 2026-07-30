@@ -68,7 +68,7 @@ test('pending 任務可完成，並建立一筆連回任務的事件', async () 
   assert.equal(r.event.eventDateTime, '2026-07-30 20:03');
   assert.equal(r.event.recordedBy, 'u2');
   assert.equal(r.event.category, 'med');
-  assert.equal(r.event.medStatus, 'done');
+  assert.equal(r.event.medStatus, '已吃');
   assert.equal(r.event.source, 'task');
 });
 
