@@ -575,6 +575,9 @@
     .capturing .cap-gone { display: none !important; }   /* 截圖時隱藏沒資料的整個區塊（例如無看診紀錄） */
     .capturing .cap-header { display: block !important; }
     .capturing summary { pointer-events: none; }
+    /* 存圖時停用摺疊展開動畫：近日健康明細是唯一「截圖當下才被打開」的區塊，
+       若還在 foldReveal（從 opacity:0 淡入）就被截，內容會變空白 → 強制立即全顯示 */
+    .capturing .fold-body { animation: none !important; opacity: 1 !important; transform: none !important; }
     /* 截圖時給報告左右留白，內容才不會貼邊（畫面上靠外層容器 padding，截 #trendView 會失去） */
     #trendView.capturing { padding: 0 16px 12px; }
     /* 回診重點：只列須注意事件；漏藥補一條紅旗（截圖給醫生用） */
