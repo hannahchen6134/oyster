@@ -75,27 +75,24 @@ test('軟刪的紀錄不列入看板', () => {
   assert.equal(b.abnormal.length, 0);
 });
 
-test('buildHandoff：已完成含誰與時間、還沒做為未餵藥時段、狀況列嘔吐', () => {
+test('buildHandoff：今日總計、用藥完成度、還沒做為未餵藥時段、狀況列嘔吐', () => {
   const pet = petWithSlots(['早', '晚']);
   const logs = [
     { category: 'med', medSlot: '早', medStatus: '已吃', caregiverName: '玥鳴', eventDateTime: `${DATE} 08:05`, isDeleted: 0 },
     { category: 'weight', amount: 4.27, eventDateTime: `${DATE} 09:12`, isDeleted: 0 },
-    { category: 'food', itemName: '主食罐', amount: 40, unit: 'g', caregiverName: '玥鳴', eventDateTime: `${DATE} 08:20`, isDeleted: 0 },
+    { category: 'water', waterMl: 30, eventDateTime: `${DATE} 08:30`, isDeleted: 0 },
+    { category: 'food', foodType: '乾糧', amount: 40, unit: 'g', eventDateTime: `${DATE} 08:20`, isDeleted: 0 },
     { category: 'vomit', note: '白沫', eventDateTime: `${DATE} 14:00`, isDeleted: 0 }
   ];
   const h = buildHandoff(pet, logs);
-  // 已完成：藥、體重、餵食（依時間排序）
-  assert.equal(h.done.length, 3);
-  assert.equal(h.done[0].at, '08:05');
-  const med = h.done.find((d) => d.title === '早上的藥');
-  assert.ok(med); assert.equal(med.who, '玥鳴');
-  assert.ok(h.done.find((d) => d.title === '體重 4.3kg' || d.title === '體重 4.27kg' || d.title.startsWith('體重')));
-  // 沒設 caregiverName 的體重 → 飼主
-  assert.equal(h.done.find((d) => d.title.startsWith('體重')).who, '飼主');
-  // 還沒做：晚的藥（早已餵）
+  assert.equal(h.entryCount, 5);
+  assert.equal(h.totals.waterMl, 30);
+  assert.equal(h.totals.foodG, 40);
+  assert.equal(h.medDone, 1);
+  assert.equal(h.medTotal, 2);
   assert.deepEqual(h.pending.map((p) => p.title), ['晚上的藥']);
-  // 狀況：嘔吐
   assert.ok(h.status.some((s) => s.includes('吐')));
+  assert.ok(!('done' in h), '不再逐筆列出');
 });
 
 test('buildHandoff：全平穩、藥都餵了 → 還沒做/狀況給空陣列', () => {

@@ -396,12 +396,6 @@ export function todayFlex({ pet, date, summary, dateLabel, siteUrl = '' }) {
 export function handoffFlex(pet, dateLabel, data) {
   const petName = pet?.petName || '貓貓';
   const label = (t, first = false) => text(t, { size: 'sm', weight: 'bold', color: C.brand, margin: first ? 'none' : 'lg' });
-  const doneRow = (d) => ({
-    type: 'box', layout: 'baseline', margin: 'sm', contents: [
-      text(d.title, { size: 'sm', color: C.ink, flex: 5, wrap: true }),
-      text(`${d.who}${d.at ? ' ' + d.at : ''}`, { size: 'xs', color: C.muted, flex: 4, align: 'end' })
-    ]
-  });
   const pendRow = (p) => ({
     type: 'box', layout: 'baseline', margin: 'sm', contents: [
       text(p.title, { size: 'sm', color: C.ink, flex: 5, wrap: true }),
@@ -413,10 +407,15 @@ export function handoffFlex(pet, dateLabel, data) {
   const body = {
     type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
     contents: [
-      text(dateLabel, { size: 'xs', color: C.muted }),
+      text(`${dateLabel}　共 ${data.entryCount} 筆`, { size: 'xs', color: C.muted }),
       { type: 'separator', margin: 'md', color: SEPARATOR },
-      label('已完成', true),
-      ...(data.done.length ? data.done.map(doneRow) : [text('今天還沒有紀錄', { size: 'sm', color: C.muted, margin: 'sm' })]),
+      label('今日總計', true),
+      statCellRow([
+        statCell('水分', fmt(data.totals.waterMl), 'ml', STAT_ACCENT.water),
+        statCell('食物', fmt(data.totals.foodG), 'g', STAT_ACCENT.food),
+        statCell('熱量', fmt(data.totals.kcal), 'kcal', STAT_ACCENT.kcal)
+      ]),
+      ...(data.medTotal ? [statRow('用藥', `${data.medDone}/${data.medTotal} 已完成`)] : []),
       { type: 'separator', margin: 'lg', color: SEPARATOR },
       label('還沒做'),
       ...(data.pending.length ? data.pending.map(pendRow) : [text('今天都完成了', { size: 'sm', color: C.muted, margin: 'sm' })]),
@@ -427,7 +426,7 @@ export function handoffFlex(pet, dateLabel, data) {
   };
   const footer = {
     type: 'box', layout: 'vertical', paddingAll: '12px', paddingStart: '20px', paddingEnd: '20px', backgroundColor: FOOTER_COLOR,
-    contents: [text('長按這張卡，可轉傳給照護夥伴', { size: 'xxs', color: C.muted, align: 'center' })]
+    contents: [text('照護夥伴在自己的 LINE 打「交班」，也能看到今天狀況', { size: 'xxs', color: C.muted, align: 'center', wrap: true })]
   };
   return bubble(
     `今日交班（${petName}）${dateLabel}`,

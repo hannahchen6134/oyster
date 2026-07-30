@@ -147,16 +147,15 @@ export function todayReply(pet, date, summary) {
 
 export function handoffReply(pet, dateLabel, data) {
   const petName = pet?.petName || '貓貓';
-  const lines = [`${petName}・今日交班　${dateLabel}`, '', '〔已完成〕'];
-  if (data.done.length) for (const d of data.done) lines.push(`・${d.title}　${d.who}${d.at ? ' ' + d.at : ''}`);
-  else lines.push('・今天還沒有紀錄');
+  const lines = [`${petName}・今日交班　${dateLabel}`, '', '〔今日總計〕',
+    `水分 ${formatNumber(data.totals.waterMl)} ml・食物 ${formatNumber(data.totals.foodG)} g・熱量 ${formatNumber(data.totals.kcal)} kcal`];
+  if (data.medTotal) lines.push(`用藥 ${data.medDone}/${data.medTotal} 已完成`);
   lines.push('', '〔還沒做〕');
   if (data.pending.length) for (const p of data.pending) lines.push(`・${p.title}${p.at ? '（' + p.at + '）' : ''}`);
   else lines.push('・今天都完成了');
   lines.push('', '〔今日狀況〕');
   if (data.status.length) for (const s of data.status) lines.push(`・${s}`);
   else lines.push('・今天一切平穩');
-  lines.push('', '（可轉傳給照護夥伴）');
   return lines.join('\n');
 }
 
