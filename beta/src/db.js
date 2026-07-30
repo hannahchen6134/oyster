@@ -2,7 +2,7 @@
 // 規則：所有刪除都是 isDeleted 軟刪除；logs 有任何變動就重算該日 daily_summary。
 
 import { computeDailySummary, deriveFoodFields } from './summary.js';
-import { newId, newToken, nowIso, addDays } from './util.js';
+import { newId, newToken, nowIso, addDays, taipeiNowDateTime } from './util.js';
 
 // ---------- users ----------
 
@@ -317,16 +317,16 @@ export async function getAllLogsForPet(db, petId) {
 
 // ---------- logs ----------
 
-export async function insertLog(db, log) {
-  const now = nowIso();
+// 建一筆 logs 事件的「已綁定語句」＋ logId（供 insertLog 直接 run，或放進 db.batch 做原子交易）
+export function buildInsertLog(db, log, now = nowIso()) {
   const logId = log.logId || newId();
-  await db
+  const stmt = db
     .prepare(
       `INSERT INTO logs (logId, lineUserId, petId, eventDateTime, category, itemName, foodType, foodId,
         amount, unit, waterMl, kcal, medStatus, medSlot, doseText, medForm, beforeMeal, note, sourceMessageId,
         recordedBy, caregiverName, isBackfilled, source, isDeleted,
-        createdAt, updatedAt, updatedBy)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`
+        createdAt, updatedAt, updatedBy, sourceTaskId)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`
     )
     .bind(
       logId,
@@ -354,14 +354,142 @@ export async function insertLog(db, log) {
       String(log.source || ''),
       now,
       now,
-      String(log.updatedBy || log.lineUserId || '')
-    )
-    .run();
+      String(log.updatedBy || log.lineUserId || ''),
+      String(log.sourceTaskId || '')
+    );
+  return { stmt, logId };
+}
+
+export async function insertLog(db, log) {
+  const { stmt, logId } = buildInsertLog(db, log);
+  await stmt.run();
   return getLog(db, logId);
 }
 
 export async function getLog(db, logId) {
   return db.prepare('SELECT * FROM logs WHERE logId = ?').bind(logId).first();
+}
+
+// ---------- tasks（任務＝還要做的事；已發生的事存在 logs 事件）----------
+
+const TASK_TYPE_TO_CATEGORY = {
+  medication: 'med', med: 'med', water: 'water', food: 'food',
+  weight: 'weight', vomit: 'vomit', stool: 'stool', poop: 'stool'
+};
+function taskEventCategory(taskType) {
+  const key = String(taskType || '').toLowerCase();
+  return TASK_TYPE_TO_CATEGORY[key] || String(taskType || '') || 'note';
+}
+
+export async function createTask(db, task) {
+  const now = nowIso();
+  const taskId = task.taskId || newId();
+  await db.prepare(
+    `INSERT INTO tasks (taskId, petId, taskType, title, note, scheduledAt, status,
+       createdBy, completedAt, completedBy, skippedAt, repeatRule, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, '', '', '', ?, ?, ?)`
+  ).bind(
+    taskId, String(task.petId || ''), String(task.taskType || ''), String(task.title || ''),
+    String(task.note || ''), String(task.scheduledAt || ''), String(task.createdBy || ''),
+    String(task.repeatRule || ''), now, now
+  ).run();
+  return getTask(db, taskId);
+}
+
+export async function getTask(db, taskId) {
+  return db.prepare('SELECT * FROM tasks WHERE taskId = ?').bind(String(taskId || '')).first();
+}
+
+export async function listTasksForPet(db, petId, { status = '', date = '' } = {}) {
+  let sql = 'SELECT * FROM tasks WHERE petId = ?';
+  const args = [String(petId || '')];
+  if (status) { sql += ' AND status = ?'; args.push(status); }
+  if (date) { sql += ' AND substr(scheduledAt, 1, 10) = ?'; args.push(date); }
+  sql += ' ORDER BY scheduledAt, createdAt';
+  const { results } = await db.prepare(sql).bind(...args).all();
+  return results || [];
+}
+
+async function taskEvent(db, taskId) {
+  return db.prepare('SELECT * FROM logs WHERE sourceTaskId = ? AND isDeleted = 0').bind(String(taskId || '')).first();
+}
+
+// 完成任務：原子交易同時「把 task 標 completed」＋「建一筆帶 sourceTaskId 的事件」。
+// 冪等：已完成→回既有事件；併發/重送撞唯一索引→交易回滾後當作已完成回既有，不會重複建事件。
+export async function completeTask(db, taskId, opts = {}) {
+  const task = await getTask(db, taskId);
+  if (!task) return { ok: false, reason: 'not_found' };
+  if (task.status === 'completed') {
+    return { ok: true, already: true, task, event: await taskEvent(db, taskId) };
+  }
+  if (task.status !== 'pending') return { ok: false, reason: task.status, task }; // skipped / cancelled
+
+  const now = nowIso();
+  const when = String(opts.completedAt || taipeiNowDateTime());
+  const actorId = String(opts.completedBy || task.createdBy || '');
+  const category = taskEventCategory(task.taskType);
+  const { stmt: insertEvent, logId } = buildInsertLog(db, {
+    lineUserId: task.createdBy || actorId,
+    petId: task.petId,
+    eventDateTime: when,
+    category,
+    medStatus: category === 'med' ? 'done' : '',
+    note: task.title || task.note || '',
+    sourceTaskId: task.taskId,
+    source: 'task',
+    recordedBy: actorId,
+    caregiverName: String(opts.caregiverName || ''),
+    isBackfilled: 0,
+    updatedBy: actorId
+  }, now);
+
+  try {
+    await db.batch([
+      db.prepare("UPDATE tasks SET status = 'completed', completedAt = ?, completedBy = ?, updatedAt = ? WHERE taskId = ? AND status = 'pending'")
+        .bind(when, actorId, now, task.taskId),
+      insertEvent
+    ]);
+  } catch (error) {
+    // 唯一索引衝突（連點／重送／兩人同時）→ 已有一筆事件，回既有、不重複建立
+    const existing = await taskEvent(db, taskId);
+    if (existing) return { ok: true, already: true, task: await getTask(db, taskId), event: existing };
+    throw error; // 其他錯誤（如事件建立失敗）→ 交易已回滾，task 仍為 pending
+  }
+  return { ok: true, already: false, task: await getTask(db, taskId), event: await getLog(db, logId) };
+}
+
+// 取消完成：task 回 pending，對應事件軟刪（保留可追溯），同一交易。
+export async function uncompleteTask(db, taskId, opts = {}) {
+  const task = await getTask(db, taskId);
+  if (!task) return { ok: false, reason: 'not_found' };
+  if (task.status !== 'completed') return { ok: true, already: true, task };
+  const now = nowIso();
+  await db.batch([
+    db.prepare("UPDATE tasks SET status = 'pending', completedAt = '', completedBy = '', updatedAt = ? WHERE taskId = ?")
+      .bind(now, task.taskId),
+    db.prepare("UPDATE logs SET isDeleted = 1, updatedAt = ?, updatedBy = ? WHERE sourceTaskId = ? AND isDeleted = 0")
+      .bind(now, String(opts.actorId || ''), task.taskId)
+  ]);
+  return { ok: true, task: await getTask(db, taskId) };
+}
+
+export async function skipTask(db, taskId) {
+  const task = await getTask(db, taskId);
+  if (!task) return { ok: false, reason: 'not_found' };
+  if (task.status === 'completed') return { ok: false, reason: 'already_completed', task };
+  const now = nowIso();
+  await db.prepare("UPDATE tasks SET status = 'skipped', skippedAt = ?, updatedAt = ? WHERE taskId = ?")
+    .bind(now, now, task.taskId).run();
+  return { ok: true, task: await getTask(db, taskId) };
+}
+
+export async function cancelTask(db, taskId) {
+  const task = await getTask(db, taskId);
+  if (!task) return { ok: false, reason: 'not_found' };
+  const now = nowIso();
+  await db.prepare("UPDATE tasks SET status = 'cancelled', updatedAt = ? WHERE taskId = ?")
+    .bind(now, task.taskId).run();
+  return { ok: true, task: await getTask(db, taskId) };
 }
 
 // 最近 n 筆紀錄（新到舊），供 LINE「回顧」清單使用

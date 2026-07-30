@@ -112,6 +112,9 @@ CREATE TABLE IF NOT EXISTS logs (
   kcal REAL NOT NULL DEFAULT 0,
   medStatus TEXT NOT NULL DEFAULT '',
   medSlot TEXT NOT NULL DEFAULT '',
+  doseText TEXT NOT NULL DEFAULT '',
+  medForm TEXT NOT NULL DEFAULT '',
+  beforeMeal TEXT NOT NULL DEFAULT '',
   note TEXT NOT NULL DEFAULT '',
   sourceMessageId TEXT NOT NULL DEFAULT '',
   recordedBy TEXT NOT NULL DEFAULT '',
@@ -121,10 +124,14 @@ CREATE TABLE IF NOT EXISTS logs (
   isDeleted INTEGER NOT NULL DEFAULT 0,
   createdAt TEXT NOT NULL,
   updatedAt TEXT NOT NULL,
-  updatedBy TEXT NOT NULL DEFAULT ''
+  updatedBy TEXT NOT NULL DEFAULT '',
+  sourceTaskId TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_logs_pet_event ON logs(petId, eventDateTime, isDeleted);
 CREATE INDEX IF NOT EXISTS idx_logs_message ON logs(sourceMessageId);
+-- 一個任務最多一筆「有效」正式事件（只約束非空 sourceTaskId 且未軟刪；舊資料為空、不受影響）
+-- 加上 isDeleted = 0：取消完成會把事件軟刪，之後重新完成才不會撞到舊事件的 sourceTaskId
+CREATE UNIQUE INDEX IF NOT EXISTS idx_logs_sourcetask ON logs(sourceTaskId) WHERE sourceTaskId != '' AND isDeleted = 0;
 
 CREATE TABLE IF NOT EXISTS daily_summary (
   petId TEXT NOT NULL,
@@ -195,3 +202,22 @@ CREATE TABLE IF NOT EXISTS labs (
 );
 CREATE INDEX IF NOT EXISTS idx_labs_pet_date ON labs(petId, testDate, isDeleted);
 CREATE INDEX IF NOT EXISTS idx_labs_pet_item ON labs(petId, itemName, isDeleted);
+
+-- 任務（還要做的事）；已發生的事存在 logs（事件）。完成任務→建一筆帶 sourceTaskId 的 logs 事件。
+CREATE TABLE IF NOT EXISTS tasks (
+  taskId TEXT PRIMARY KEY,
+  petId TEXT NOT NULL,
+  taskType TEXT NOT NULL DEFAULT '',
+  title TEXT NOT NULL DEFAULT '',
+  note TEXT NOT NULL DEFAULT '',
+  scheduledAt TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'pending',
+  createdBy TEXT NOT NULL DEFAULT '',
+  completedAt TEXT NOT NULL DEFAULT '',
+  completedBy TEXT NOT NULL DEFAULT '',
+  skippedAt TEXT NOT NULL DEFAULT '',
+  repeatRule TEXT NOT NULL DEFAULT '',
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_tasks_pet ON tasks(petId, status, scheduledAt);

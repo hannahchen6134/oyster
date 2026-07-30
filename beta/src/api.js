@@ -8,7 +8,8 @@ import {
   insertLog, getLog, getLogsForDay, updateLog, softDeleteLog,
   recomputeDay, getSummaries, getSessionUser, getRecentLogsByPet,
   resolveDataOwner, createCareInvite, listCareMembers, track, healFoodKcal,
-  updatePetFields, getAllLogsForPet, saveDataExport
+  updatePetFields, getAllLogsForPet, saveDataExport,
+  createTask, getTask, listTasksForPet, completeTask, uncompleteTask, skipTask, cancelTask
 } from './db.js';
 import { displayMedStatus, displayMedSlot } from './brand.js';
 import { computeDailySummary, deriveFoodFields } from './summary.js';
@@ -198,6 +199,10 @@ export async function handleApi(request, env, url) {
       return handleLogs(db, request, method, resourceId, dataOwnerId, lineUserId);
     }
 
+    if (resource === 'tasks') {
+      return handleTasks(db, request, url, method, resourceId, segments[2] || '', dataOwnerId, lineUserId);
+    }
+
     if (resource === 'labs') {
       return handleLabs(db, request, url, method, resourceId, dataOwnerId);
     }
@@ -298,6 +303,56 @@ async function assertPetOwner(db, petId, lineUserId) {
   if (!petId) return false;
   const pet = await getPet(db, petId);
   return Boolean(pet && pet.ownerLineUserId === lineUserId);
+}
+
+// ---------- tasks（任務；完成後在 logs 建立可追溯事件）----------
+
+async function handleTasks(db, request, url, method, taskId, action, ownerId, actorId) {
+  // 列出某隻貓的任務：/api/tasks?petId=&date=&status=
+  if (method === 'GET' && !taskId) {
+    const petId = String(url.searchParams.get('petId') || '');
+    if (!(await assertPetOwner(db, petId, ownerId))) return forbidden();
+    const rows = await listTasksForPet(db, petId, {
+      status: String(url.searchParams.get('status') || ''),
+      date: String(url.searchParams.get('date') || '')
+    });
+    return jsonResponse({ ok: true, tasks: rows });
+  }
+
+  // 新增任務：POST /api/tasks
+  if (method === 'POST' && !taskId) {
+    const body = await request.json().catch(() => ({}));
+    const petId = String(body.petId || '');
+    if (!(await assertPetOwner(db, petId, ownerId))) return forbidden();
+    const task = await createTask(db, {
+      petId,
+      taskType: String(body.taskType || ''),
+      title: String(body.title || ''),
+      note: String(body.note || ''),
+      scheduledAt: String(body.scheduledAt || ''),
+      createdBy: actorId
+    });
+    return jsonResponse({ ok: true, task });
+  }
+
+  // 對單一任務的動作：POST /api/tasks/:id/(complete|uncomplete|skip|cancel)
+  if (method === 'POST' && taskId) {
+    const task = await getTask(db, taskId);
+    if (!task) return jsonResponse({ ok: false, message: '找不到這個任務' }, 404);
+    if (!(await assertPetOwner(db, task.petId, ownerId))) return forbidden();
+
+    let result;
+    if (action === 'complete') result = await completeTask(db, taskId, { completedBy: actorId });
+    else if (action === 'uncomplete') result = await uncompleteTask(db, taskId, { actorId });
+    else if (action === 'skip') result = await skipTask(db, taskId);
+    else if (action === 'cancel') result = await cancelTask(db, taskId);
+    else return jsonResponse({ ok: false, message: '不支援的任務動作' }, 400);
+
+    if (!result.ok) return jsonResponse({ ok: false, message: `任務狀態不允許此操作（${result.reason}）` }, 409);
+    return jsonResponse(result);
+  }
+
+  return jsonResponse({ ok: false, message: '不支援的請求' }, 405);
 }
 
 // ---------- logs（新增/修改/刪除都要重算 daily_summary）----------
