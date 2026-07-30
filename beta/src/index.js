@@ -4,12 +4,12 @@
 // 其餘路徑 → 照護站網站（public/ 靜態資源）
 
 import { parseMessage, matchFood, guessFood, normalizeText } from './parser.js';
-import { deriveFoodFields, isWetFoodType, isEstimableType } from './summary.js';
+import { deriveFoodFields, isWetFoodType, isEstimableType, buildHandoff } from './summary.js';
 import { handleApi } from './api.js';
 import { verifyLineSignature, replyOrPush, replyOrPushQuick, replyOrPushFlex, replyMessages, pushText, pushMessages, getProfile, getAccessToken, checkAccessToken } from './line.js';
 import { hasAnyReminder, parseReminderSettings, buildReminderLines, reminderMessage, visitReminderMessage } from './reminders.js';
 import { shortDate } from './replies.js';
-import { recordFlex, recordFlexCompact, foodDisambigFlex, multiRecordFlex, todayFlex, websiteFlex, menuFlex, recordMenuFlex, recordTutorialFlex, quickRecordCarousel, weekFlex, monthFlex, recentFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, onboardingCarousel, menuCell, exampleCard, petDataFlex, deletedCard, confirmDeleteFlex, careNotifyFlex, careInviteFlex } from './flex.js';
+import { recordFlex, recordFlexCompact, foodDisambigFlex, multiRecordFlex, todayFlex, handoffFlex, websiteFlex, menuFlex, recordMenuFlex, recordTutorialFlex, quickRecordCarousel, weekFlex, monthFlex, recentFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, onboardingCarousel, menuCell, exampleCard, petDataFlex, deletedCard, confirmDeleteFlex, careNotifyFlex, careInviteFlex } from './flex.js';
 import { isBetaAllowed, normalizeCode, gateText } from './plan.js';
 import {
   ensureUser, updateUser, getUser, listPets, createPet, resolveDefaultPet, getPet, updatePetFields, createFoodItem, createMedItem,
@@ -21,11 +21,11 @@ import {
   createLoginCode, redeemLoginCode
 } from './db.js';
 import {
-  recordReply, lightRecordReply, todayReply, weekReply, monthReply, visitReply,
+  recordReply, lightRecordReply, todayReply, handoffReply, weekReply, monthReply, visitReply,
   websiteReply, helpText, welcomeText, unknownReply, invalidReply,
   recordTutorial, medTutorial, onboardingText, recordPrompt, backfillGuide
 } from './replies.js';
-import { getRecentLogsByPet, ensureTaskSchema } from './db.js';
+import { getRecentLogsByPet, ensureTaskSchema, getLogsForDay } from './db.js';
 import { jsonResponse, taipeiToday, taipeiNowDateTime, addDays } from './util.js';
 
 // 官方 LINE 加好友連結（basicId @232mjffx）——給共同照護邀請用
@@ -2187,6 +2187,14 @@ async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId, ow
     const siteUrl = await siteLink(env, baseUrl, lineUserId);
     const card = todayFlex({ pet, date: today, summary, dateLabel: shortDate(today), siteUrl });
     await replyOrPushFlex(env, event, card, todayReply(pet, today, summary));
+    return;
+  }
+
+  if (query === 'handoff') {
+    const logs = await getLogsForDay(db, pet.petId, today);
+    const data = buildHandoff(pet, logs);
+    const dateLabel = shortDate(today);
+    await replyOrPushFlex(env, event, handoffFlex(pet, dateLabel, data), handoffReply(pet, dateLabel, data));
     return;
   }
 

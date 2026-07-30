@@ -1,7 +1,7 @@
 // 今日照護看板引擎測試（純函式）：待辦（任務＋餵藥時段）、已完成（含誰）、異常。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { computeTodayBoard } from '../src/summary.js';
+import { computeTodayBoard, buildHandoff } from '../src/summary.js';
 
 const DATE = '2026-07-30';
 const petWithSlots = (slots) => ({ goalMedSlots: JSON.stringify(slots) });
@@ -73,4 +73,35 @@ test('軟刪的紀錄不列入看板', () => {
   const logs = [{ category: 'vomit', eventDateTime: `${DATE} 10:00`, isDeleted: 1 }];
   const b = computeTodayBoard({ pet: {}, tasks: [], logs, date: DATE });
   assert.equal(b.abnormal.length, 0);
+});
+
+test('buildHandoff：已完成含誰與時間、還沒做為未餵藥時段、狀況列嘔吐', () => {
+  const pet = petWithSlots(['早', '晚']);
+  const logs = [
+    { category: 'med', medSlot: '早', medStatus: '已吃', caregiverName: '玥鳴', eventDateTime: `${DATE} 08:05`, isDeleted: 0 },
+    { category: 'weight', amount: 4.27, eventDateTime: `${DATE} 09:12`, isDeleted: 0 },
+    { category: 'food', itemName: '主食罐', amount: 40, unit: 'g', caregiverName: '玥鳴', eventDateTime: `${DATE} 08:20`, isDeleted: 0 },
+    { category: 'vomit', note: '白沫', eventDateTime: `${DATE} 14:00`, isDeleted: 0 }
+  ];
+  const h = buildHandoff(pet, logs);
+  // 已完成：藥、體重、餵食（依時間排序）
+  assert.equal(h.done.length, 3);
+  assert.equal(h.done[0].at, '08:05');
+  const med = h.done.find((d) => d.title === '早上的藥');
+  assert.ok(med); assert.equal(med.who, '玥鳴');
+  assert.ok(h.done.find((d) => d.title === '體重 4.3kg' || d.title === '體重 4.27kg' || d.title.startsWith('體重')));
+  // 沒設 caregiverName 的體重 → 飼主
+  assert.equal(h.done.find((d) => d.title.startsWith('體重')).who, '飼主');
+  // 還沒做：晚的藥（早已餵）
+  assert.deepEqual(h.pending.map((p) => p.title), ['晚上的藥']);
+  // 狀況：嘔吐
+  assert.ok(h.status.some((s) => s.includes('吐')));
+});
+
+test('buildHandoff：全平穩、藥都餵了 → 還沒做/狀況給空陣列', () => {
+  const pet = petWithSlots(['早']);
+  const logs = [{ category: 'med', medSlot: '早', medStatus: '已吃', eventDateTime: `${DATE} 08:00`, isDeleted: 0 }];
+  const h = buildHandoff(pet, logs);
+  assert.equal(h.pending.length, 0);
+  assert.equal(h.status.length, 0);
 });

@@ -188,6 +188,46 @@ function parseSlots(pet) {
   }
 }
 
+const SLOT_WORD = { '早': '早上', '中': '中午', '晚': '晚上' };
+function slotWord(s) { return SLOT_WORD[s] || String(s || ''); }
+function num1(v) { const x = Number(v) || 0; return Number.isInteger(x) ? String(x) : x.toFixed(1); }
+
+// 今日交班：把今天的紀錄整理成「已完成（誰・幾點）／還沒做／今日狀況」，供 LINE 交班卡與文字用。
+// done 取自實際照護動作（餵食/喝水/藥/體重/保健）；狀況取自嘔吐/漏藥/精神；還沒做＝未餵的藥時段＋待辦。
+export function buildHandoff(pet, logs = [], tasks = []) {
+  const live = (logs || []).filter((l) => !l.isDeleted);
+  const who = (l) => String(l.caregiverName || '') || '飼主';
+  const tm = (l) => String(l.eventDateTime || '').slice(11, 16);
+
+  const done = [];
+  for (const l of live) {
+    let title = '';
+    switch (l.category) {
+      case 'food': title = (l.itemName || l.foodType || '餵食') + (Number(l.amount) > 0 ? ` ${num1(l.amount)}${l.unit || 'g'}` : ''); break;
+      case 'water': { const ml = Number(l.waterMl) || Number(l.amount) || 0; title = ml > 0 ? `喝水 ${num1(ml)}ml` : '喝水'; break; }
+      case 'med': if (l.medStatus === '已吃') { title = l.medSlot ? `${slotWord(l.medSlot)}的藥` : (l.itemName || '餵藥'); } else { continue; } break;
+      case 'weight': title = `體重 ${num1(l.amount)}kg`; break;
+      case 'supplement': title = l.itemName ? `保健 ${l.itemName}` : '保健品'; break;
+      default: continue; // 嘔吐/排泄/精神/其他 → 不列入「已完成」
+    }
+    done.push({ title, who: who(l), at: tm(l) });
+  }
+  done.sort((a, b) => String(a.at).localeCompare(String(b.at)));
+
+  const doneSlots = new Set(live.filter((l) => l.category === 'med' && l.medStatus === '已吃').map((l) => String(l.medSlot || '')).filter(Boolean));
+  const pending = [];
+  for (const s of parseSlots(pet)) if (!doneSlots.has(s)) pending.push({ title: `${slotWord(s)}的藥`, at: '' });
+  for (const t of tasks || []) if (t.status === 'pending') pending.push({ title: t.title || '待辦', at: (t.scheduledAt && t.scheduledAt.length >= 16) ? t.scheduledAt.slice(11, 16) : '' });
+
+  const s = computeDailySummary(live);
+  const status = [];
+  for (const n of (s.vomitNotes || [])) status.push(`吐　${n}`);
+  if (s.medIssueCount > 0) status.push(`有 ${s.medIssueCount} 筆用藥沒有正常完成`);
+  for (const n of (s.moodNotes || [])) status.push(n);
+
+  return { done, pending, status };
+}
+
 // 今日照護看板：把「待辦」「已完成」「異常」三塊，從 tasks ＋ logs ＋ pet(餵藥時段) 收斂出來。
 // 純函式（方便測試），前端 /api/today 直接用。輸入的 tasks 由呼叫端決定範圍（通常＝當日）。
 export function computeTodayBoard({ pet = {}, tasks = [], logs = [], date = '' } = {}) {

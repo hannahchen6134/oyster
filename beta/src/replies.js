@@ -145,6 +145,21 @@ export function todayReply(pet, date, summary) {
   return lines.join('\n');
 }
 
+export function handoffReply(pet, dateLabel, data) {
+  const petName = pet?.petName || '貓貓';
+  const lines = [`${petName}・今日交班　${dateLabel}`, '', '〔已完成〕'];
+  if (data.done.length) for (const d of data.done) lines.push(`・${d.title}　${d.who}${d.at ? ' ' + d.at : ''}`);
+  else lines.push('・今天還沒有紀錄');
+  lines.push('', '〔還沒做〕');
+  if (data.pending.length) for (const p of data.pending) lines.push(`・${p.title}${p.at ? '（' + p.at + '）' : ''}`);
+  else lines.push('・今天都完成了');
+  lines.push('', '〔今日狀況〕');
+  if (data.status.length) for (const s of data.status) lines.push(`・${s}`);
+  else lines.push('・今天一切平穩');
+  lines.push('', '（可轉傳給照護夥伴）');
+  return lines.join('\n');
+}
+
 export function weekReply(petName, rows) {
   const lines = [`近 7 天（${petName}）`];
   for (const row of rows) {

@@ -392,6 +392,49 @@ export function todayFlex({ pet, date, summary, dateLabel, siteUrl = '' }) {
   );
 }
 
+// ---------- 今日交班卡（可長按轉傳給照護夥伴）----------
+export function handoffFlex(pet, dateLabel, data) {
+  const petName = pet?.petName || '貓貓';
+  const label = (t, first = false) => text(t, { size: 'sm', weight: 'bold', color: C.brand, margin: first ? 'none' : 'lg' });
+  const doneRow = (d) => ({
+    type: 'box', layout: 'baseline', margin: 'sm', contents: [
+      text(d.title, { size: 'sm', color: C.ink, flex: 5, wrap: true }),
+      text(`${d.who}${d.at ? ' ' + d.at : ''}`, { size: 'xs', color: C.muted, flex: 4, align: 'end' })
+    ]
+  });
+  const pendRow = (p) => ({
+    type: 'box', layout: 'baseline', margin: 'sm', contents: [
+      text(p.title, { size: 'sm', color: C.ink, flex: 5, wrap: true }),
+      text(p.at || '', { size: 'xs', color: C.muted, flex: 2, align: 'end' })
+    ]
+  });
+  const statLine = (t) => text(`・${t}`, { size: 'sm', color: C.inkSoft, margin: 'sm', wrap: true });
+
+  const body = {
+    type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
+    contents: [
+      text(dateLabel, { size: 'xs', color: C.muted }),
+      { type: 'separator', margin: 'md', color: SEPARATOR },
+      label('已完成', true),
+      ...(data.done.length ? data.done.map(doneRow) : [text('今天還沒有紀錄', { size: 'sm', color: C.muted, margin: 'sm' })]),
+      { type: 'separator', margin: 'lg', color: SEPARATOR },
+      label('還沒做'),
+      ...(data.pending.length ? data.pending.map(pendRow) : [text('今天都完成了', { size: 'sm', color: C.muted, margin: 'sm' })]),
+      { type: 'separator', margin: 'lg', color: SEPARATOR },
+      label('今日狀況'),
+      ...(data.status.length ? data.status.map(statLine) : [text('今天一切平穩', { size: 'sm', color: C.muted, margin: 'sm' })])
+    ]
+  };
+  const footer = {
+    type: 'box', layout: 'vertical', paddingAll: '12px', paddingStart: '20px', paddingEnd: '20px', backgroundColor: FOOTER_COLOR,
+    contents: [text('長按這張卡，可轉傳給照護夥伴', { size: 'xxs', color: C.muted, align: 'center' })]
+  };
+  return bubble(
+    `今日交班（${petName}）${dateLabel}`,
+    { type: 'bubble', size: 'mega', header: header(`今日交班・${petName}`), body, footer }
+  );
+}
+
 // ---------- 網站連結卡 ----------
 export function websiteFlex(url) {
   const body = {
