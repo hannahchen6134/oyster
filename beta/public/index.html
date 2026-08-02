@@ -2171,7 +2171,14 @@
     function qpButton(label, payload, extraClass = '') {
       return `<button type="button" class="qp-btn ${extraClass}" data-qp="record" data-payload='${esc(JSON.stringify(payload))}'>${label}</button>`;
     }
-    function renderQuickPad(category, foodType) {
+    // 依乾/濕給少量克數 preset（第一版保持簡單：preset ＋ 自訂，不做智慧推薦、不擴單位）
+    function foodGramPresets(foodType) {
+      if (foodType === '乾糧') return [5, 10, 15, 20];
+      if (foodType === '零食') return [3, 5, 10];
+      if (['罐頭', '濕食', '生食'].includes(foodType)) return [20, 40, 60, 80];
+      return [10, 20, 30];
+    }
+    function renderQuickPad(category, foodType, foodId, showAll) {
       const cfg = QUICK_PAD[category];
       const custom = `<button type="button" class="qp-btn qp-custom" data-qp="custom">自訂／更多欄位…</button>`;
       if (cfg.kind === 'values') {
@@ -2187,16 +2194,40 @@
           <div class="qp-grid">${cfg.chips.map(([label, p]) => qpButton(label, p, 'qp-word')).join('')}${custom}</div>`;
       }
       if (cfg.kind === 'food') {
-        if (!foodType) {
-          return `<div class="qp-prompt">吃哪一種？</div>
-            <div class="qp-grid">${cfg.types.map((t) => `<button type="button" class="qp-btn qp-word" data-qp="foodType" data-type="${esc(t)}">${esc(t)}</button>`).join('')}${custom}</div>`;
+        const myFoods = (state.foods || []).filter((f) => !f.isDeleted); // 停用/刪除的品項不顯示
+        // 第二步：幾克。選到具名品項（foodId）→ 顯示品名、熱量算得準；只選通用類型 → 存成模糊紀錄、不猜品牌。
+        if (foodId || foodType) {
+          const picked = foodId ? myFoods.find((f) => f.foodId === foodId) : null;
+          const ftype = picked ? picked.foodType : foodType;
+          const label = picked ? esc(picked.displayName) : esc(ftype);
+          const chip = (g) => qpButton(`${g}<small>g</small>`, { category: 'food', foodType: ftype, foodId: foodId || '', amount: g, unit: 'g' });
+          return `<div class="qp-prompt">${label}・餵了幾克？點克數就記好，或自己輸入（記為現在／剛剛）</div>
+            <div class="qp-grid">${foodGramPresets(ftype).map(chip).join('')}</div>
+            <div class="qp-weight" style="margin-top:10px">
+              <input class="qp-w-input qp-food-input" type="number" step="0.1" inputmode="decimal" placeholder="幾克 例如 24">
+              <button type="button" class="qp-btn qp-w-save" data-qp="food-save" data-type="${esc(ftype)}" data-food-id="${esc(foodId || '')}">記一筆</button>
+            </div>
+            <button type="button" class="qp-btn qp-custom" data-qp="custom" style="margin-top:10px">自訂更多…</button>`;
         }
-        return `<div class="qp-prompt">${esc(foodType)}吃了幾克？（直接輸入實際克數）</div>
-          <div class="qp-weight">
-            <input class="qp-w-input qp-food-input" type="number" step="0.1" inputmode="decimal" placeholder="幾克 例如 24">
-            <button type="button" class="qp-btn qp-w-save" data-qp="food-save" data-type="${esc(foodType)}">記一筆</button>
-          </div>
-          <button type="button" class="qp-btn qp-custom" data-qp="custom" style="margin-top:10px">選品項／自訂更多…</button>`;
+        // 第一步：餵了哪一個？先把「她自己的罐頭」列成按鈕（用認得取代回想）。
+        const typeBtns = cfg.types.map((t) => `<button type="button" class="qp-btn qp-word" data-qp="foodType" data-type="${esc(t)}">${esc(t)}</button>`).join('');
+        if (!myFoods.length) {
+          // 沒建過品項的新手／共照者 → 直接選通用類型，不逼去設定頁
+          return `<div class="qp-prompt">吃哪一種？點種類就好，不用打名字（記為現在／剛剛）</div>
+            <div class="qp-grid">${typeBtns}${custom}</div>`;
+        }
+        // 排序＝food_items 建立順序（GET ORDER BY createdAt），穩定、每日不跳動。多數人少於 6 個全顯示；
+        // 超過 6 個才收前 6，其餘用「其他／完整清單」看得到全部，剛存的新品項也不會找不到。
+        const list = showAll ? myFoods : myFoods.slice(0, 6);
+        const namedBtns = list.map((f) =>
+          `<button type="button" class="qp-btn qp-word" data-qp="foodItem" data-food-id="${esc(f.foodId)}">${esc(f.displayName)}<small>${esc(f.foodType)}</small></button>`).join('');
+        const moreBtn = (!showAll && myFoods.length > 6)
+          ? `<button type="button" class="qp-btn qp-custom" data-qp="foodMore">其他／完整清單（${myFoods.length}）</button>`
+          : '';
+        return `<div class="qp-prompt">餵了哪一個？點一下就好（記為現在／剛剛）</div>
+          <div class="qp-grid">${namedBtns}${moreBtn}</div>
+          <div class="qp-prompt" style="margin:16px 0 10px;font-size:12.5px">沒列出？選種類就記，不用打名字</div>
+          <div class="qp-grid">${typeBtns}</div>`;
       }
       if (cfg.kind === 'weight') {
         const cur = Number((currentPet() || {}).weightKg) || 0;
@@ -2210,16 +2241,62 @@
     }
     async function quickRecordDirect(payload) {
       const now = new Date().toLocaleTimeString('en-GB', { timeZone: 'Asia/Taipei', hour12: false }).slice(0, 5);
-      const body = { petId: state.petId, eventDateTime: `${state.date} ${now}`, ...payload };
+      // source: 'web-quick' ＝ 今天頁快速盤點按（有別於完整表單的 'web'、LINE 的 'line'），用來看採用率
+      const body = { petId: state.petId, eventDateTime: `${state.date} ${now}`, source: 'web-quick', ...payload };
       try {
         await api('logs', { method: 'POST', body: JSON.stringify(body) });
         closeModal();
-        toast('已記錄 ✓');
+        toast(quickSavedMsg(payload, now)); // 存後回讀：貓名・品項・數量・時間，晚上補記也看得到記成幾點
         await loadDay();
         if ($('recentFold') && $('recentFold').open) await loadRecent();
         // 在「回顧」分頁就地記錄（例如趨勢圖上的記體重）→ 刷新趨勢圖與回診重點
         if ($('trendView') && !$('trendView').classList.contains('hidden')) await loadTrend();
+        // 模糊食物（只選通用類型、沒對到品項）→ 紀錄成功後才非強迫詢問「存成常用嗎？」
+        if (payload.category === 'food' && !payload.foodId) maybeOfferSaveFavorite(payload);
       } catch (error) { toast(error.message || '記錄失敗', true); }
+    }
+    function quickPetPrefix() {
+      const pet = currentPet();
+      const multi = (state.pets || []).filter((x) => !x.isDeleted).length > 1;
+      return multi && pet ? `${pet.petName}・` : '';
+    }
+    // 存後回讀確認：清楚顯示記到哪隻貓、什麼、多少、幾點（多貓時尤其重要，避免記錯對象）
+    function quickSavedMsg(p, timeStr) {
+      const who = quickPetPrefix();
+      let what = '';
+      if (p.category === 'food') {
+        const f = p.foodId ? (state.foods || []).find((x) => x.foodId === p.foodId) : null;
+        what = `${f ? f.displayName : (p.foodType || '食物')} ${fmt(p.amount)}g`;
+      } else if (p.category === 'water') {
+        what = `喝水 ${fmt(p.waterMl || p.amount)}ml`;
+      } else if (p.category === 'med') {
+        what = `用藥${p.medSlot ? ' ' + p.medSlot : ''} ${MED_LABEL(p.medStatus)}`;
+      } else if (p.category === 'weight') {
+        what = `體重 ${fmt(p.amount)}kg`;
+      } else {
+        const names = { vomit: '嘔吐', stool: '大便', urine: '尿尿', supplement: '保健', mood: '精神', note: '備註' };
+        what = `${names[p.category] || p.category}${p.note ? ' ' + p.note : ''}`;
+      }
+      return `${who}${what}・${timeStr} 已記錄 ✓`;
+    }
+    // 存成常用（非強迫、至多自動問一次）：完成模糊食物紀錄後，用她記得住的叫法存成 food_item，下次就變按鈕。
+    // kcalPerGram 先 0 ＝未設定（deriveFoodFields 會用類型預估並標記 estimated，不會當成真的 0 大卡計入）。
+    function maybeOfferSaveFavorite(payload) {
+      const ftype = payload.foodType || '罐頭';
+      if (localStorage.getItem('catcare_favOffered')) return;                 // 已問過就不再反覆打擾
+      if ((state.foods || []).some((f) => !f.isDeleted && f.foodType === ftype)) return; // 該類型已有品項就不問
+      localStorage.setItem('catcare_favOffered', '1');
+      const formHtml = `
+        <div class="qp-prompt" style="margin-bottom:14px">要把「${esc(ftype)}」存成常用嗎？下次一點就記，不用再想名字。可直接略過。</div>
+        <div class="field"><label>用你記得住的叫法（選填，例如 小藍罐）</label>
+          <input id="favName" placeholder="${esc(ftype)}" autocomplete="off"></div>
+        <div class="qp-prompt" style="font-size:12px;color:var(--muted);margin-top:6px">熱量之後在「設定 → 常吃的食物」補上會更準；先不填也能用。</div>`;
+      openModal('存成常用？', formHtml, async () => {
+        const name = ($('favName')?.value || '').trim() || ftype;
+        await api('foods', { method: 'POST', body: JSON.stringify({ displayName: name, foodType: ftype, kcalPerGram: 0 }) });
+        state.foods = (await api('foods')).rows;
+        toast('已存成常用 ✓　下次點一下就記');
+      });
     }
     function quickPadClick(event) {
       const btn = event.target.closest('[data-qp]');
@@ -2227,6 +2304,8 @@
       const act = btn.dataset.qp;
       if (act === 'custom') { const c = quickPadCategory; closeModal(); return openLogModal(null, c); }
       if (act === 'foodType') { $('modalForm').innerHTML = renderQuickPad('food', btn.dataset.type); return; }
+      if (act === 'foodItem') { $('modalForm').innerHTML = renderQuickPad('food', '', btn.dataset.foodId); return; }
+      if (act === 'foodMore') { $('modalForm').innerHTML = renderQuickPad('food', '', '', true); return; }
       if (act === 'weight-save') {
         const input = $('modalForm').querySelector('.qp-w-input');
         const kg = Number(input?.value || 0);
@@ -2237,7 +2316,7 @@
         const input = $('modalForm').querySelector('.qp-food-input');
         const g = Number(input?.value || 0);
         if (!(g > 0)) return toast('請輸入克數', true);
-        return quickRecordDirect({ category: 'food', foodType: btn.dataset.type, amount: g, unit: 'g' });
+        return quickRecordDirect({ category: 'food', foodType: btn.dataset.type, foodId: btn.dataset.foodId || '', amount: g, unit: 'g' });
       }
       if (act === 'record') { try { quickRecordDirect(JSON.parse(btn.dataset.payload)); } catch (e) { /* ignore */ } }
     }
@@ -2253,7 +2332,7 @@
       <button class="qbtn qbtn-sub" data-quick="weight" type="button"><span class="q-plus">＋</span>體重</button>
       <button class="qbtn qbtn-sub" data-quick="note" type="button"><span class="q-plus">＋</span>備註</button>`;
     function openRecordSheet() {
-      $('modalTitle').textContent = '記一筆';
+      $('modalTitle').textContent = `${quickPetPrefix()}記一筆`;
       $('modalForm').innerHTML = `<div class="quick-grid">${QUICK_ENTRY_GRID}</div>
         <div class="day-toolbar" style="margin-top:16px;justify-content:center"><button class="btn btn-secondary btn-sm" data-add-log="1" type="button">補登其他時間</button></div>`;
       modalSaveHandler = null;
@@ -2264,7 +2343,7 @@
       if (!QUICK_PAD[category]) return openLogModal(null, category); // 需要打字的（備註）走完整表單
       quickPadCategory = category;
       if (!openQuickPad._bound) { $('modalForm').addEventListener('click', quickPadClick); openQuickPad._bound = true; }
-      $('modalTitle').textContent = `記一筆・${QUICK_PAD[category].title}`;
+      $('modalTitle').textContent = `${quickPetPrefix()}記一筆・${QUICK_PAD[category].title}`;
       $('modalForm').innerHTML = renderQuickPad(category);
       modalSaveHandler = null;
       document.querySelector('.modal-actions').style.display = 'none';

@@ -403,7 +403,9 @@ async function handleLogs(db, request, method, logId, lineUserId, actorId = line
       note: String(body.note || ''),
       recordedBy: actorId,
       isBackfilled: eventDateTime.slice(0, 10) === taipeiNowDateTime().slice(0, 10) ? 0 : 1,
-      source: 'web',
+      // 來源標記：完整表單＝web、今天頁快速盤點按＝web-quick。
+      // 只接受這兩個網站來源；line／task 由伺服端各自流程設定，不吃前端傳入，避免被冒充。
+      source: ['web', 'web-quick'].includes(String(body.source || '')) ? String(body.source) : 'web',
       updatedBy: actorId
     });
 
