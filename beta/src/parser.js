@@ -475,6 +475,110 @@ function parseSegment(tokens, dayOffset, time) {
   return { type: 'unknown' };
 }
 
+// ── 句首貓名／不明句首偵測（第一階段安全修補用；純函式，不改動 parseMessage）──
+// 回傳其一：
+//   { kind: 'named', petName, rest }        句首是「同家庭已知貓名」（空格／黏著／標點皆可），rest 為剝掉名字後的事件文字
+//   { kind: 'leadingUnknown', prefix, eventText }  句首有不明字、後段可解析（例：旺財喝水1ml）→ 由呼叫端問要記哪隻貓
+//   { kind: 'clean' }                        句首就是事件或一般切換／無事件 → 走既有流程
+const LEADING_SEP = /^[\s,、。.:：;；~～!！?？@#\-—]+/;
+
+// 所有「事件起始詞」——用來偵測句首雜字後面是否其實有可解析事件
+const ALL_HEAD_WORDS = (() => {
+  const s = new Set();
+  for (const w of WATER_WORDS) s.add(w);
+  for (const w of MED_WORDS) s.add(w);
+  for (const w of VOMIT_WORDS) s.add(w);
+  for (const w of STOOL_PLAIN_WORDS) s.add(w);
+  for (const w of STOOL_DETAIL_WORDS) s.add(w);
+  for (const w of URINE_WORDS) s.add(w);
+  for (const w of SUPPLEMENT_WORDS) s.add(w);
+  for (const w of MOOD_WORDS) s.add(w);
+  for (const w of MOOD_DETAIL_WORDS) s.add(w);
+  for (const w of VACCINE_WORDS) s.add(w);
+  for (const w of DEWORM_WORDS) s.add(w);
+  for (const w of NOTE_WORDS) s.add(w);
+  for (const entry of FOOD_TYPE_WORDS) for (const w of entry.words) s.add(w);
+  return [...s];
+})();
+
+// 前綴是否「只是時間/動詞雜訊」（吃了、餵了、昨天、21:30…）→ 是的話不算不明句首
+function prefixIsOnlyNoise(prefix) {
+  let p = String(prefix || '').trim();
+  let guard = 0;
+  while (p && guard++ < 6) {
+    const t = p.match(/^(昨天|前天|今天|\d{1,2}:\d{2})\s*/);
+    if (t) { p = p.slice(t[0].length).trim(); continue; }
+    let hit = false;
+    for (const v of LEAD_VERBS) {
+      if (p === v || p.startsWith(v)) { p = p.slice(v.length).trim(); hit = true; break; }
+    }
+    if (!hit) break;
+  }
+  return p.length === 0;
+}
+
+function parsesToRecord(text) {
+  const r = parseMessage(text);
+  return r.type === 'record' || r.type === 'multiRecord';
+}
+
+// 不明句首偵測：前段不明、後段可解析。先試「整個 token 一段段丟」（處理有空格的雜字），
+// 再試「第一個 token 內找事件詞」（處理黏著，如 旺財喝水1ml）。回傳 {prefix, eventText} 或 null。
+function findLeadingUnknown(norm) {
+  const tokens = norm.split(' ');
+  // 守門：第一個 token 本身就是事件詞開頭 → 整句是正常（多筆）紀錄，不是不明句首
+  // （避免把「喝水1ml」的內部「水」誤當成事件起點、或把「喝水 20 罐頭 5」的句首當雜字）
+  const firstTok = tokens[0] || '';
+  if (ALL_HEAD_WORDS.some((w) => firstTok.startsWith(w))) return null;
+  // 階段一：逐個丟掉開頭整段 token
+  for (let k = 1; k < tokens.length; k += 1) {
+    const rest = tokens.slice(k).join(' ').replace(LEADING_SEP, '');
+    if (!rest) continue;
+    if (parsesToRecord(rest)) {
+      const prefix = tokens.slice(0, k).join(' ');
+      if (prefixIsOnlyNoise(prefix)) return null; // 只是動詞/時間 → 不算不明
+      return { prefix: prefix.trim(), eventText: rest };
+    }
+  }
+  // 階段二：黏著情況——在第一個 token 內找最早出現的事件詞
+  const first = tokens[0] || '';
+  let bestIdx = -1;
+  for (const w of ALL_HEAD_WORDS) {
+    const i = first.indexOf(w);
+    if (i > 0 && (bestIdx === -1 || i < bestIdx)) bestIdx = i;
+  }
+  if (bestIdx > 0) {
+    const prefix = first.slice(0, bestIdx);
+    if (prefixIsOnlyNoise(prefix)) return null;
+    const rest = (first.slice(bestIdx) + ' ' + tokens.slice(1).join(' ')).trim();
+    if (parsesToRecord(rest)) return { prefix: prefix.trim(), eventText: rest };
+  }
+  return null;
+}
+
+export function analyzeLeading(rawText, petNames = []) {
+  const norm = normalizeText(rawText);
+  if (!norm) return { kind: 'clean' };
+
+  // 1) 句首已知貓名（同家庭；長到短，避免「咪」誤吃「咪咪」；空格／黏著／標點皆可）
+  const names = [...petNames].filter(Boolean).sort((a, b) => b.length - a.length);
+  for (const name of names) {
+    if (norm === name) return { kind: 'clean' };            // 只打貓名 → 交回既有「切換預設貓」流程
+    if (norm.startsWith(name)) {
+      const rest = norm.slice(name.length).replace(LEADING_SEP, '');
+      if (!rest) return { kind: 'clean' };
+      // 剝了要能解析才算數（避免貓名與關鍵字碰撞，例如貓叫「水」時誤傷「水 20」）
+      if (parsesToRecord(rest)) return { kind: 'named', petName: name, rest };
+    }
+  }
+
+  // 2) 不明句首 + 後段可解析 → 交由呼叫端問要記哪隻貓（不得靜默寫預設貓）
+  const lead = findLeadingUnknown(norm);
+  if (lead) return { kind: 'leadingUnknown', prefix: lead.prefix, eventText: lead.eventText };
+
+  return { kind: 'clean' };
+}
+
 // 依名稱在食物清單中找最接近的一筆（displayName / brand / productName，優先同類型）
 export function matchFood(foods, itemName, foodType) {
   const name = String(itemName || '').trim().toLowerCase();
