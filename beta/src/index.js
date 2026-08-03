@@ -1131,21 +1131,22 @@ async function handlePostback(event, env, baseUrl) {
       await replyOrPush(env, event, '這筆已經記過了 👌');
       return;
     }
-    // 這個 smid 之前已記過（如同句先寫入的水）→ 這是「多筆的一部分」，完成後要出完整回讀卡、不只單筆卡
+    // 這個 smid 之前已記過（水）或還有其他待確認品項 → 這是「多筆的一部分」，走佇列＋完整回讀，不只單筆卡
     const priorIds = smid ? await smidPriorSavedIds(db, smid, ownerId) : [];
-    const isMultiCompletion = priorIds.length > 0;
+    const pendingBefore = smid ? await smidPendingFoods(db, smid, ownerId) : [];
+    const isMultiFlow = priorIds.length > 0 || pendingBefore.length > 0;
     const res = await handleRecord(env, event, pet, {
       category: 'food', foodType: food.foodType, itemName: food.displayName,
       amount: g, unit: 'g', addedWaterMl: aw, medStatus: '', medSlot: '', note: ''
-    }, ownerId, { fromButton: true, silent: isMultiCompletion, actorId: lineUserId, caregiverName, baseUrl, sourceMessageId: smid });
-    // 延後確認（awaiting_food_selection／multiRecord 局部 partial）完成 → 補一列最終 record；
-    // savedLogIds 合併先前同 smid 已記錄的（如同句的水），撤銷才能一次撤掉整批。
+    }, ownerId, { fromButton: true, silent: isMultiFlow, actorId: lineUserId, caregiverName, baseUrl, sourceMessageId: smid });
+    // 延後確認完成 → 補一列最終狀態；savedLogIds 合併先前同 smid 已記錄的（如同句的水）、pendingFoods 減去剛確認的這筆。
     if (smid) {
       const sid = res?.savedLog?.logId || '';
       const allIds = [...new Set([...priorIds, res?.savedLog?.logId, res?.addedWaterLog?.logId].filter(Boolean))];
-      await logTextInput(db, { lineUserId, ownerId, petId: pet.petId, rawText: '', parseStatus: 'record', failReason: '', sourceMessageId: smid, resolvedPetId: pet.petId, linkedLogId: sid, parsedResult: JSON.stringify({ events: [{ category: 'food', foodType: food.foodType, itemName: food.displayName, amount: g, addedWaterMl: aw }], savedLogIds: allIds, unparsedSegments: [], awaitingAction: '' }) });
-      // 多筆的一部分完成 → 不只回單筆食物卡，改回「本次共記錄 N 筆」完整卡（依 smid 重查，含先前的水）
-      if (isMultiCompletion) await sendSmidSummaryCard(env, event, db, pet, smid, ownerId, baseUrl, lineUserId);
+      const remaining = pendingBefore.slice(1); // 確認的是目前顯示的 pending[0]
+      await logTextInput(db, { lineUserId, ownerId, petId: pet.petId, rawText: '', parseStatus: remaining.length ? 'multi_partial' : 'record', failReason: '', sourceMessageId: smid, resolvedPetId: pet.petId, linkedLogId: sid, parsedResult: JSON.stringify({ events: [{ category: 'food', foodType: food.foodType, itemName: food.displayName, amount: g, addedWaterMl: aw }], savedLogIds: allIds, pendingFoods: remaining, unparsedSegments: [], awaitingAction: remaining.length ? 'food_selection' : '' }) });
+      // 還有待確認→只 prompt 下一筆（不宣稱完成）；全數解決→完整完成卡
+      if (isMultiFlow) await advancePending(env, event, db, pet, smid, ownerId, baseUrl, lineUserId);
     }
     return;
   }
@@ -1167,16 +1168,18 @@ async function handlePostback(event, env, baseUrl) {
       return;
     }
     const priorIds = smid ? await smidPriorSavedIds(db, smid, ownerId) : [];
-    const isMultiCompletion = priorIds.length > 0;
+    const pendingBefore = smid ? await smidPendingFoods(db, smid, ownerId) : [];
+    const isMultiFlow = priorIds.length > 0 || pendingBefore.length > 0;
     const res = await handleRecord(env, event, pet, {
       category: 'food', foodType: t, itemName: name,
       amount: g, unit: 'g', addedWaterMl: aw, medStatus: '', medSlot: '', note: '', forceRaw: true
-    }, ownerId, { fromButton: true, silent: isMultiCompletion, actorId: lineUserId, caregiverName, baseUrl, sourceMessageId: smid });
+    }, ownerId, { fromButton: true, silent: isMultiFlow, actorId: lineUserId, caregiverName, baseUrl, sourceMessageId: smid });
     if (smid) {
       const sid = res?.savedLog?.logId || '';
       const allIds = [...new Set([...priorIds, res?.savedLog?.logId, res?.addedWaterLog?.logId].filter(Boolean))];
-      await logTextInput(db, { lineUserId, ownerId, petId: pet.petId, rawText: '', parseStatus: 'record', failReason: '', sourceMessageId: smid, resolvedPetId: pet.petId, linkedLogId: sid, parsedResult: JSON.stringify({ events: [{ category: 'food', foodType: t, itemName: name, amount: g, addedWaterMl: aw }], savedLogIds: allIds, unparsedSegments: [], awaitingAction: '' }) });
-      if (isMultiCompletion) await sendSmidSummaryCard(env, event, db, pet, smid, ownerId, baseUrl, lineUserId);
+      const remaining = pendingBefore.slice(1);
+      await logTextInput(db, { lineUserId, ownerId, petId: pet.petId, rawText: '', parseStatus: remaining.length ? 'multi_partial' : 'record', failReason: '', sourceMessageId: smid, resolvedPetId: pet.petId, linkedLogId: sid, parsedResult: JSON.stringify({ events: [{ category: 'food', foodType: t, itemName: name, amount: g, addedWaterMl: aw }], savedLogIds: allIds, pendingFoods: remaining, unparsedSegments: [], awaitingAction: remaining.length ? 'food_selection' : '' }) });
+      if (isMultiFlow) await advancePending(env, event, db, pet, smid, ownerId, baseUrl, lineUserId);
     }
     return;
   }
@@ -1334,9 +1337,31 @@ async function handlePostback(event, env, baseUrl) {
   // 品項確認卡「取消」：這筆食物不寫入；但同句已成功的水／其他片段仍保留，明確回讀讓使用者不用猜。
   if (action === 'foodCancel') {
     const smid = data.get('smid') || '';
-    const kept = smid ? await logsForSmid(db, smid, ownerId) : [];
-    if (kept.length) await replyOrPush(env, event, `已保留 ${kept.map((l) => describeLog(l)).join('、')}，這筆食物未記錄。`);
-    else await replyOrPush(env, event, '好，這筆先不記 👌');
+    if (!smid) { await replyOrPush(env, event, '好，這筆先不記 👌'); return; }
+    const pendingBefore = await smidPendingFoods(db, smid, ownerId);
+    const kept = await logsForSmid(db, smid, ownerId);
+    if (!pendingBefore.length) {
+      // 無待確認佇列（如 item_lookup 取消）→ 沿用「已保留…」
+      await replyOrPush(env, event, kept.length ? `已保留 ${kept.map((l) => describeLog(l)).join('、')}，這筆食物未記錄。` : '好，這筆先不記 👌');
+      return;
+    }
+    const cancelled = pendingBefore[0]; // 取消目前顯示的這一筆
+    const remaining = pendingBefore.slice(1);
+    const petId = kept[0]?.petId || '';
+    // 寫一列反映取消後狀態：savedLogIds 不變、pendingFoods 減一
+    await logTextInput(db, { lineUserId, ownerId, petId, rawText: '', parseStatus: remaining.length ? 'multi_partial' : 'record', failReason: '', sourceMessageId: smid, resolvedPetId: petId, linkedLogId: kept.map((l) => l.logId).join(','), parsedResult: JSON.stringify({ events: [], savedLogIds: kept.map((l) => l.logId), pendingFoods: remaining, unparsedSegments: [], awaitingAction: remaining.length ? 'food_selection' : '' }) });
+    if (remaining.length) {
+      // 還有其他待確認 → 繼續 prompt 下一筆
+      const user = await getUser(db, lineUserId);
+      const pets = await listPets(db, ownerId);
+      const pet = await resolveDefaultPet(db, user, pets);
+      await advancePending(env, event, db, pet, smid, ownerId, baseUrl, lineUserId);
+      return;
+    }
+    // 全數處理完、這筆取消 → 明確列出已記錄 ＋ 這筆未記錄
+    const cancelledDesc = `${cancelled.typedName || ''}${cancelled.foodType} ${cancelled.grams}g`.replace(/\s+/g, ' ').trim();
+    const keptDesc = kept.map((l) => describeLog(l)).join('、');
+    await replyOrPush(env, event, kept.length ? `本次已記錄 ${keptDesc}；${cancelledDesc} 未記錄。` : `${cancelledDesc} 未記錄。`);
     return;
   }
 }
@@ -1399,6 +1424,14 @@ export async function smidPriorSavedIds(db, smid, ownerId) {
   ).bind(String(smid), ownerId, ownerId).first();
   try { const pr = JSON.parse(row?.parsedResult || '{}'); return Array.isArray(pr.savedLogIds) ? pr.savedLogIds : []; } catch (error) { return []; }
 }
+// 這個 smid 最新一列「尚未確認的食物片段」佇列（多筆待確認時逐一 prompt 用）。
+export async function smidPendingFoods(db, smid, ownerId) {
+  if (!smid) return [];
+  const row = await db.prepare(
+    "SELECT parsedResult FROM text_inputs WHERE sourceMessageId = ? AND (ownerLineUserId = ? OR lineUserId = ?) ORDER BY id DESC LIMIT 1"
+  ).bind(String(smid), ownerId, ownerId).first();
+  try { const pr = JSON.parse(row?.parsedResult || '{}'); return Array.isArray(pr.pendingFoods) ? pr.pendingFoods : []; } catch (error) { return []; }
+}
 // 冪等：這個 smid 是否已寫過「同一筆食物」（同 foodId＋克數；raw 無 foodId 時比對類型＋品名＋克數）。
 export async function smidHasFoodLog(db, smid, ownerId, { foodId = '', grams = 0, foodType = '', itemName = '' }) {
   const ids = await smidPriorSavedIds(db, smid, ownerId);
@@ -1413,12 +1446,16 @@ export async function smidHasFoodLog(db, smid, ownerId, { foodId = '', grams = 0
 // 依原始 smid 重查「這次操作」的全部正式紀錄（從最新 savedLogIds 取，過濾已刪／非本家庭）。
 // 局部確認完成後的「完整回讀卡」要用它，而不是只用剛新增的那一筆 log 產卡。
 export async function logsForSmid(db, smid, ownerId) {
+  // 只讀「這個 smid、這個家庭（owner）」的 savedLogIds → 逐筆取 log，排除已刪／已撤銷／非本家庭。
+  // ownerLineUserId 已在 smidPriorSavedIds 限定家庭，這裡再以 log.lineUserId===ownerId 二次確認、不跨家庭。
   const ids = await smidPriorSavedIds(db, smid, ownerId);
   const logs = [];
   for (const id of ids) {
     const l = await getLog(db, id);
     if (l && !l.isDeleted && l.lineUserId === ownerId) logs.push(l);
   }
+  // 穩定順序：事件時間、再 logId（同一次寫入的順序固定，回讀顯示不跳動）
+  logs.sort((a, b) => String(a.eventDateTime).localeCompare(String(b.eventDateTime)) || String(a.logId).localeCompare(String(b.logId)));
   return logs;
 }
 // 局部確認完成 → 依原始 smid 重查全部正式紀錄，回一張「本次共記錄 N 筆」完整卡（統一撤銷／開啟照護站），
@@ -1432,6 +1469,25 @@ async function sendSmidSummaryCard(env, event, db, pet, smid, ownerId, baseUrl, 
   const siteUrl = await siteLink(env, baseUrl, lineUserId);
   const fallback = `本次共記錄 ${lines.length} 筆：\n${lines.map((l) => `· ${l}`).join('\n')}`;
   await replyOrPushFlex(env, event, multiRecordFlex(pet, lines, summary, date, siteUrl, `smid=${smid}`), fallback);
+}
+// 局部確認流程的下一步：以「該 smid 最新狀態」為準——
+//  - 還有待確認品項（pending>0）→ 只 prompt 下一筆，回「已記錄 N 筆，另有 M 筆待確認」，絕不宣稱完成
+//  - 待確認為 0 → 才出「本次共記錄」完整完成卡
+async function advancePending(env, event, db, pet, smid, ownerId, baseUrl, lineUserId) {
+  const pending = await smidPendingFoods(db, smid, ownerId);
+  const logs = await logsForSmid(db, smid, ownerId);
+  if (pending.length) {
+    const next = pending[0];
+    const foods = await listFoods(db, ownerId);
+    const sameType = foods.filter((f) => !f.isDeleted && f.foodType === next.foodType);
+    const guess = guessFood(sameType, next.typedName, next.foodType);
+    const done = logs.length ? `目前已記錄 ${logs.length} 筆，` : '';
+    const leadText = `${done}另有 ${pending.length} 筆待確認：「${next.typedName}」是哪一個${next.foodType}？（${next.grams} g）`;
+    const card = foodDisambigFlex({ pet, foodType: next.foodType, typedName: next.typedName, grams: next.grams, addedWaterMl: next.aw || 0, smid, options: sameType, guessId: guess?.foodId || '' });
+    await replyOrPushMulti(env, event, [{ type: 'text', text: leadText }, card]);
+    return;
+  }
+  await sendSmidSummaryCard(env, event, db, pet, smid, ownerId, baseUrl, lineUserId);
 }
 // 一次回多則訊息（文字＋確認卡）：局部 partial 時要同時「告知已記錄的水」＋「只確認不確定的那一段」。
 async function replyOrPushMulti(env, event, messages) {
@@ -1890,20 +1946,15 @@ async function handleTextMessage(event, env, baseUrl) {
         parsedResult: JSON.stringify({
           events: intent.records.map((r) => ({ category: r.category, amount: r.amount, unit: r.unit, itemName: r.itemName, addedWaterMl: r.addedWaterMl || 0 })),
           savedLogIds: savedIds,
+          // 多筆待確認品項存成佇列，逐一 prompt；未確認前一律不寫入正式 logs
+          pendingFoods: pendingDisambig.map((d) => ({ foodType: d.foodType, typedName: d.typedName, grams: d.grams, aw: d.addedWaterMl || 0 })),
           unparsedSegments: unparsed,
           awaitingAction: pendingDisambig.length ? 'food_selection' : ''
         })
       });
-      // 有待確認的食物品項 → 已成功片段照記，只對「不確定的那一段」出品項確認卡（沿用 smid，確認後合併進撤銷範圍）。
+      // 有待確認的食物品項 → 已成功片段照記，逐一確認（advancePending 會回「已記錄N筆，另有M筆待確認」）。
       if (pendingDisambig.length) {
-        const d = pendingDisambig[0]; // Commit 1：一句最多一段待確認品項；多段時先確認第一段，其餘列為尚未記錄
-        const doneBits = lines.length ? `✅ 已記錄 ${lines.length} 筆：\n${lines.map((l) => `· ${l}`).join('\n')}\n\n` : '';
-        const extraPending = pendingDisambig.slice(1).map((x) => `${x.foodType} ${x.grams}g（${x.typedName}）`);
-        const unBits = [...unparsed, ...extraPending];
-        const unTxt = unBits.length ? `\n\n⚠️ 這些還沒記：\n${unBits.map((u) => `· ${u}`).join('\n')}` : '';
-        const leadText = `${doneBits}還有 1 筆要確認品項：「${d.typedName}」是哪一個${d.foodType}？（${d.grams} g）${unTxt}`;
-        const card = foodDisambigFlex({ pet, foodType: d.foodType, typedName: d.typedName, grams: d.grams, addedWaterMl: d.addedWaterMl, smid, options: d.options, guessId: d.guessId });
-        await replyOrPushMulti(env, event, [{ type: 'text', text: leadText }, card]);
+        await advancePending(env, event, db, pet, smid, ownerId, baseUrl, lineUserId);
         return;
       }
       if (!lines.length) {
