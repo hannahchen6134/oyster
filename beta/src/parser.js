@@ -165,6 +165,61 @@ function emptyRecord() {
   };
 }
 
+// 所有食物類型詞（含別名）攤平、由長到短排序，供「子字串」偵測用（先比長的：主食罐 優先於 罐）
+const FLAT_FOOD_TYPE_WORDS = FOOD_TYPE_WORDS
+  .flatMap((e) => e.words.map((w) => ({ type: e.type, word: w })))
+  .sort((a, b) => b.word.length - a.word.length);
+
+// Commit 1 護欄：殘餘品名若含事件詞字（水／藥）→ 代表這段其實黏了別的事件（罐頭皇家水8）
+// 或品名本身含「水」（水解蛋白）——兩者都保守放棄、不誤記，留給 Commit 2（RC3 有上下文切分）處理。
+const EVENT_CHAR_IN_NAME = /[水藥]/;
+
+// RC1：類型詞與品名黏著或倒序（罐頭皇家33／皇家罐頭33／皇家33罐頭）時，仍解析出
+// {類型, 品名候選, 數量}。只用「類型詞＋數字＋既有單位規則」，品名一律當剩餘文字，不寫死任何品牌。
+// 回傳 { type:'record', record } 或 null（無法當單一食物 → 交由呼叫端續判斷）。
+function parseFoodExpression(tokens, dayOffset, time) {
+  const { tokens: afterWater, addedWaterMl } = parseFoodExtras(tokens);
+  const { amount, rest } = extractAmount(afterWater, 'g');
+  if (!amount) return null; // 沒有數量 → 不當食物，避免把任意詞硬歸類成食物
+  // 品名 blob＝剩餘 token 去掉純數字與純單位詞後相接（罐頭皇家 / 克 這種單位不進品名）
+  const nameTokens = rest.filter((t) => !parseAmountToken(t) && !UNIT_ONLY_WORDS.has(t.toLowerCase()));
+  const blob = nameTokens.join('');
+  if (!blob) return null;
+  // 在 blob 中找任一類型詞（子字串、由長到短）
+  let hit = null;
+  for (const e of FLAT_FOOD_TYPE_WORDS) {
+    const i = blob.indexOf(e.word);
+    if (i >= 0) { hit = { type: e.type, word: e.word, i }; break; }
+  }
+  if (!hit) return null;
+  // 品名候選＝blob 去掉「這一個」類型詞（罐頭皇家→皇家、皇家罐頭→皇家、皇家罐頭→皇家）
+  const brand = (blob.slice(0, hit.i) + blob.slice(hit.i + hit.word.length)).trim();
+  // 護欄：殘餘品名含事件字（水／藥）→ 這段可能黏了別的事件或品名含水，Commit 1 保守放棄
+  if (EVENT_CHAR_IN_NAME.test(brand)) return null;
+  const record = emptyRecord();
+  record.dayOffset = dayOffset;
+  record.time = time;
+  record.category = 'food';
+  record.foodType = hit.type;
+  record.amount = amount;
+  record.unit = 'g';
+  record.addedWaterMl = addedWaterMl;
+  record.itemName = brand;
+  return { type: 'record', record };
+}
+
+// 無任何類型詞、但有「品名＋數量」（皇家33）→ 中性候選，交 index.js 反查 food_items。
+// parser 不查資料庫、不臆測這是不是食物、更不臆測類型；只結構化描述「疑似品項＋數量」。
+function parseItemLookupCandidate(tokens, dayOffset, time) {
+  const { tokens: afterWater, addedWaterMl } = parseFoodExtras(tokens);
+  const { amount, rest } = extractAmount(afterWater, 'g');
+  if (!amount) return null;
+  const nameTokens = rest.filter((t) => !parseAmountToken(t) && !UNIT_ONLY_WORDS.has(t.toLowerCase()));
+  const itemName = nameTokens.join(' ').trim();
+  if (!itemName || EVENT_CHAR_IN_NAME.test(itemName) || LEAD_VERBS.has(itemName)) return null;
+  return { type: 'item_lookup_candidate', itemName, amount, unit: 'g', addedWaterMl, dayOffset, time };
+}
+
 export function parseMessage(rawText) {
   const text = normalizeText(rawText);
   if (!text) return { type: 'unknown' };
@@ -299,8 +354,8 @@ export function parseMessage(rawText) {
   if (tokens.length > 1 && LEAD_VERBS.has(tokens[0])) {
     tokens = tokens.slice(1);
   } else if (tokens.length >= 1) {
-    // 黏在一起的也切：「吃了罐頭 30g」→「罐頭 30g」
-    for (const verb of ['吃了', '餵了', '吃掉', '餵食', '有吃', '有餵']) {
+    // 黏在一起的也切：「吃了罐頭 30g」→「罐頭 30g」、「吃皇家罐頭33」→「皇家罐頭33」（長的動詞先比）
+    for (const verb of ['吃了', '餵了', '吃掉', '餵食', '有吃', '有餵', '吃', '餵']) {
       if (tokens[0].length > verb.length && tokens[0].startsWith(verb)) {
         tokens = [tokens[0].slice(verb.length), ...tokens.slice(1)];
         break;
@@ -484,6 +539,13 @@ function parseSegment(tokens, dayOffset, time) {
     return { type: 'record', record };
   }
 
+  // RC1：類型詞與品名黏著／倒序（罐頭皇家33、皇家罐頭33）→ 解析成食物，品名候選交下游動態比對
+  const foodExpr = parseFoodExpression(tokens, dayOffset, time);
+  if (foodExpr) return foodExpr;
+  // 無類型詞、但有品名＋數量（皇家33）→ 中性候選，交 index.js 反查 food_items，不臆測類型
+  const candidate = parseItemLookupCandidate(tokens, dayOffset, time);
+  if (candidate) return candidate;
+
   return { type: 'unknown' };
 }
 
@@ -661,7 +723,7 @@ export function matchFood(foods, itemName, foodType) {
 }
 
 // 把「罐頭/乾糧/濕食…」這種類別字從品名裡拿掉，只留可辨識的核心字（皇家罐頭 → 皇家）
-function stripFoodTypeWords(value) {
+export function stripFoodTypeWords(value) {
   return String(value || '').toLowerCase().replace(/罐頭|罐罐|乾糧|乾乾|濕糧|濕食|飼料|主食罐|副食罐|罐|包/g, '').replace(/\s+/g, '').trim();
 }
 

@@ -94,22 +94,35 @@ test('A. 蚵仔喝水1ml → named 蚵仔／water／1ml', () => {
   assert.equal(ev(r.rest), 'water 1ml');
 });
 
-test('B. 蚵仔希爾斯罐頭23g → partial（辨認蚵仔，不寫入、不降級成通用罐頭）', () => {
+// RC1 後：後段食物（品項名黏著類別詞）現在能解析，貓名仍先剝離＝named；
+// 「品項是否可靠對到」交下游 handleRecord（對不到→品項確認卡，確認前不寫入）。
+test('B. 蚵仔希爾斯罐頭23g → named 蚵仔，後段解析成食物（品項候選＝希爾斯，交下游比對）', () => {
   const r = analyzeLeading('蚵仔希爾斯罐頭23g', FAMILY);
-  assert.equal(r.kind, 'partial');
+  assert.equal(r.kind, 'named');
   assert.equal(r.petName, '蚵仔');
   assert.equal(r.rest, '希爾斯罐頭 23g');
+  const sub = parseMessage(r.rest);
+  assert.equal(sub.type, 'record');
+  assert.equal(sub.record.category, 'food');
+  assert.equal(sub.record.foodType, '罐頭');
+  assert.equal(sub.record.itemName, '希爾斯');
+  assert.equal(sub.record.amount, 23);
 });
 
-test('B. 標點版 蚵仔，希爾斯罐頭23g → partial（辨認蚵仔）', () => {
+test('B. 標點版 蚵仔，希爾斯罐頭23g → named 蚵仔', () => {
   const r = analyzeLeading('蚵仔，希爾斯罐頭23g', FAMILY);
-  assert.equal(r.kind, 'partial');
+  assert.equal(r.kind, 'named');
   assert.equal(r.petName, '蚵仔');
 });
 
-test('C. 希爾斯罐頭23g → clean（無貓名，不猜品項；走 unknown）', () => {
+test('C. 希爾斯罐頭23g → clean（無貓名）；RC1 後 parseMessage 認得食物，品項候選＝希爾斯（交下游比對）', () => {
   assert.equal(analyzeLeading('希爾斯罐頭23g', FAMILY).kind, 'clean');
-  assert.equal(parseMessage('希爾斯罐頭23g').type, 'unknown');
+  const r = parseMessage('希爾斯罐頭23g');
+  assert.equal(r.type, 'record');
+  assert.equal(r.record.category, 'food');
+  assert.equal(r.record.foodType, '罐頭');
+  assert.equal(r.record.itemName, '希爾斯');
+  assert.equal(r.record.amount, 23);
 });
 
 test('D. 旺財 喝水1ml（家庭無旺財）→ leadingUnknown（不得寫預設貓）', () => {
@@ -118,9 +131,16 @@ test('D. 旺財 喝水1ml（家庭無旺財）→ leadingUnknown（不得寫預�
   assert.equal(r.prefix, '旺財');
 });
 
-test('E. 旺財希爾斯罐頭23g → clean（不猜貓、不猜食物；走 unknown）', () => {
+// 旺財非家庭貓、且與食物黏著無法分離出未知前綴 → analyzeLeading 維持 clean（不變）。
+// RC1 後 parseMessage 認得食物（品項候選含未知前綴）；安全性靠下游：多貓時先 needsCatPick 問貓、
+// 品項對不到時走品項確認卡，都不會靜默寫錯。
+test('E. 旺財希爾斯罐頭23g → clean（黏著無法分離未知前綴，不變）；RC1 後認得食物', () => {
   assert.equal(analyzeLeading('旺財希爾斯罐頭23g', FAMILY).kind, 'clean');
-  assert.equal(parseMessage('旺財希爾斯罐頭23g').type, 'unknown');
+  const r = parseMessage('旺財希爾斯罐頭23g');
+  assert.equal(r.type, 'record');
+  assert.equal(r.record.category, 'food');
+  assert.equal(r.record.foodType, '罐頭');
+  assert.equal(r.record.amount, 23);
 });
 
 test('F. 罐頭30 → clean，且既有通用食物格式仍正常解析', () => {

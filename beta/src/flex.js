@@ -316,7 +316,9 @@ export function foodDisambigFlex({ pet, foodType, typedName, grams, addedWaterMl
       { type: 'button', height: 'sm', style: 'link', color: C.brand,
         action: { type: 'message', label: `新增「${typedName}」`.slice(0, 20), text: `設定${foodType}` } },
       { type: 'button', height: 'sm', style: 'link', color: C.muted,
-        action: { type: 'postback', label: '就先記著，不算熱量', data: `action=recFoodRaw&t=${encodeURIComponent(foodType)}&g=${g}&name=${encodeURIComponent(typedName)}${carry}`, displayText: '照打的記，先不算熱量' } }
+        action: { type: 'postback', label: `只記${foodType} ${g}g`.slice(0, 20), data: `action=recFoodRaw&t=${encodeURIComponent(foodType)}&g=${g}&name=${encodeURIComponent(typedName)}${carry}`, displayText: `只記${foodType} ${g}g` } },
+      { type: 'button', height: 'sm', style: 'link', color: C.muted,
+        action: { type: 'postback', label: '取消', data: 'action=foodCancel', displayText: '取消' } }
     ]
   };
   return bubble(`「${typedName}」是哪一個${foodType}？`, { type: 'bubble', size: 'mega', header: header(`確認品項・${pet?.petName || '貓貓'}`), body, footer });
