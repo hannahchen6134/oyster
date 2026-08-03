@@ -265,7 +265,10 @@ export async function logTextInput(db, r = {}) {
       typeof r.parsedResult === 'string' ? r.parsedResult : JSON.stringify(r.parsedResult || ''),
       nowIso()
     ).run();
-  } catch (error) { /* raw 紀錄壞掉不得影響照護紀錄 */ }
+  } catch (error) {
+    // raw 紀錄壞掉「不得」影響照護紀錄；但留下可追查的錯誤日誌（不含使用者原文，避免日誌外洩敏感內容）
+    console.error('logTextInput failed:', error?.message, '| parseStatus=', r.parseStatus, 'resolvedPetId=', r.resolvedPetId);
+  }
 }
 
 // 清除逾期的原始文字輸入（預設保留 90 天）。本階段不自動排程，供未來排程或手動呼叫。
@@ -273,7 +276,7 @@ export async function purgeOldTextInputs(db, days = 90) {
   try {
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
     await db.prepare('DELETE FROM text_inputs WHERE createdAt < ?').bind(cutoff).run();
-  } catch (error) { /* 清理失敗不影響產品 */ }
+  } catch (error) { console.error('purgeOldTextInputs failed:', error?.message); }
 }
 
 // ---------- app_kv（一般鍵值：目前存 LINE 自動換發權杖）----------

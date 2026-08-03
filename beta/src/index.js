@@ -1446,9 +1446,16 @@ async function handleTextMessage(event, env, baseUrl) {
       parseStatus: 'partial', failReason: 'unknown_food_expression', sourceMessageId: String(event.message?.id || ''),
       resolvedPetId: rpid, linkedLogId: '', parsedResult: JSON.stringify({ recognizedPetName: leadPartial.petName, rest: leadPartial.rest })
     });
-    const shortcuts = await quickShortcuts(db, rpid);
+    // 下方捷徑一律「帶上這隻貓的名字」再送出（例：點「罐頭 30」實際送「蚵仔 罐頭 30」），
+    // 確保記到正確的貓；每個都是完整獨立指令，不靠任何暫存狀態，不會跨訊息污染或重複。
+    const shortcuts = (await quickShortcuts(db, rpid)).map((it) => ({
+      type: 'action',
+      action: { type: 'message', label: it.action.label, text: `${leadPartial.petName} ${it.action.text}` }
+    }));
     await replyOrPushQuick(env, event,
-      `我知道是「${leadPartial.petName}」，但後面的「${leadPartial.rest}」我還沒辦法看懂 🙏\n可以點下面常用的，或改打「罐頭 23」這種格式：`,
+      `我知道你要記錄「${leadPartial.petName}」，但還看不懂「${leadPartial.rest}」🙏\n`
+      + `⚠️ 這筆尚未記錄。\n`
+      + `請從下方選一個（會記給「${leadPartial.petName}」），或改打「${leadPartial.petName} 罐頭 23」這種格式：`,
       shortcuts);
     return;
   }
