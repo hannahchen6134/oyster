@@ -318,7 +318,7 @@ export function foodDisambigFlex({ pet, foodType, typedName, grams, addedWaterMl
       { type: 'button', height: 'sm', style: 'link', color: C.muted,
         action: { type: 'postback', label: `只記${foodType} ${g}g`.slice(0, 20), data: `action=recFoodRaw&t=${encodeURIComponent(foodType)}&g=${g}&name=${encodeURIComponent(typedName)}${carry}`, displayText: `只記${foodType} ${g}g` } },
       { type: 'button', height: 'sm', style: 'link', color: C.muted,
-        action: { type: 'postback', label: '取消', data: 'action=foodCancel', displayText: '取消' } }
+        action: { type: 'postback', label: '取消', data: `action=foodCancel&smid=${encodeURIComponent(String(smid || ''))}`, displayText: '取消' } }
     ]
   };
   return bubble(`「${typedName}」是哪一個${foodType}？`, { type: 'bubble', size: 'mega', header: header(`確認品項・${pet?.petName || '貓貓'}`), body, footer });

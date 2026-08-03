@@ -1131,17 +1131,21 @@ async function handlePostback(event, env, baseUrl) {
       await replyOrPush(env, event, '這筆已經記過了 👌');
       return;
     }
+    // 這個 smid 之前已記過（如同句先寫入的水）→ 這是「多筆的一部分」，完成後要出完整回讀卡、不只單筆卡
+    const priorIds = smid ? await smidPriorSavedIds(db, smid, ownerId) : [];
+    const isMultiCompletion = priorIds.length > 0;
     const res = await handleRecord(env, event, pet, {
       category: 'food', foodType: food.foodType, itemName: food.displayName,
       amount: g, unit: 'g', addedWaterMl: aw, medStatus: '', medSlot: '', note: ''
-    }, ownerId, { fromButton: true, actorId: lineUserId, caregiverName, baseUrl, sourceMessageId: smid });
+    }, ownerId, { fromButton: true, silent: isMultiCompletion, actorId: lineUserId, caregiverName, baseUrl, sourceMessageId: smid });
     // 延後確認（awaiting_food_selection／multiRecord 局部 partial）完成 → 補一列最終 record；
     // savedLogIds 合併先前同 smid 已記錄的（如同句的水），撤銷才能一次撤掉整批。
     if (smid) {
       const sid = res?.savedLog?.logId || '';
-      const priorIds = await smidPriorSavedIds(db, smid, ownerId);
       const allIds = [...new Set([...priorIds, res?.savedLog?.logId, res?.addedWaterLog?.logId].filter(Boolean))];
       await logTextInput(db, { lineUserId, ownerId, petId: pet.petId, rawText: '', parseStatus: 'record', failReason: '', sourceMessageId: smid, resolvedPetId: pet.petId, linkedLogId: sid, parsedResult: JSON.stringify({ events: [{ category: 'food', foodType: food.foodType, itemName: food.displayName, amount: g, addedWaterMl: aw }], savedLogIds: allIds, unparsedSegments: [], awaitingAction: '' }) });
+      // 多筆的一部分完成 → 不只回單筆食物卡，改回「本次共記錄 N 筆」完整卡（依 smid 重查，含先前的水）
+      if (isMultiCompletion) await sendSmidSummaryCard(env, event, db, pet, smid, ownerId, baseUrl, lineUserId);
     }
     return;
   }
@@ -1162,15 +1166,17 @@ async function handlePostback(event, env, baseUrl) {
       await replyOrPush(env, event, '這筆已經記過了 👌');
       return;
     }
+    const priorIds = smid ? await smidPriorSavedIds(db, smid, ownerId) : [];
+    const isMultiCompletion = priorIds.length > 0;
     const res = await handleRecord(env, event, pet, {
       category: 'food', foodType: t, itemName: name,
       amount: g, unit: 'g', addedWaterMl: aw, medStatus: '', medSlot: '', note: '', forceRaw: true
-    }, ownerId, { fromButton: true, actorId: lineUserId, caregiverName, baseUrl, sourceMessageId: smid });
+    }, ownerId, { fromButton: true, silent: isMultiCompletion, actorId: lineUserId, caregiverName, baseUrl, sourceMessageId: smid });
     if (smid) {
       const sid = res?.savedLog?.logId || '';
-      const priorIds = await smidPriorSavedIds(db, smid, ownerId);
       const allIds = [...new Set([...priorIds, res?.savedLog?.logId, res?.addedWaterLog?.logId].filter(Boolean))];
       await logTextInput(db, { lineUserId, ownerId, petId: pet.petId, rawText: '', parseStatus: 'record', failReason: '', sourceMessageId: smid, resolvedPetId: pet.petId, linkedLogId: sid, parsedResult: JSON.stringify({ events: [{ category: 'food', foodType: t, itemName: name, amount: g, addedWaterMl: aw }], savedLogIds: allIds, unparsedSegments: [], awaitingAction: '' }) });
+      if (isMultiCompletion) await sendSmidSummaryCard(env, event, db, pet, smid, ownerId, baseUrl, lineUserId);
     }
     return;
   }
@@ -1325,8 +1331,14 @@ async function handlePostback(event, env, baseUrl) {
     return;
   }
   if (action === 'undoCancel') { await replyOrPush(env, event, '好，這次紀錄先保留著 👌'); return; }
-  // 品項確認卡「取消」：確認前本來就還沒寫入，直接輕輕帶過（同句已成功的水／其他片段照舊保留）
-  if (action === 'foodCancel') { await replyOrPush(env, event, '好，這筆先不記 👌'); return; }
+  // 品項確認卡「取消」：這筆食物不寫入；但同句已成功的水／其他片段仍保留，明確回讀讓使用者不用猜。
+  if (action === 'foodCancel') {
+    const smid = data.get('smid') || '';
+    const kept = smid ? await logsForSmid(db, smid, ownerId) : [];
+    if (kept.length) await replyOrPush(env, event, `已保留 ${kept.map((l) => describeLog(l)).join('、')}，這筆食物未記錄。`);
+    else await replyOrPush(env, event, '好，這筆先不記 👌');
+    return;
+  }
 }
 
 // 撤銷核心（可單測）：挑出「屬於這個家庭、還沒刪」的可撤銷筆。ids 不可信 → 先 parseUndoIds。
@@ -1397,6 +1409,29 @@ export async function smidHasFoodLog(db, smid, ownerId, { foodId = '', grams = 0
     else if (l.foodType === foodType && String(l.itemName || '') === String(itemName || '')) return true;
   }
   return false;
+}
+// 依原始 smid 重查「這次操作」的全部正式紀錄（從最新 savedLogIds 取，過濾已刪／非本家庭）。
+// 局部確認完成後的「完整回讀卡」要用它，而不是只用剛新增的那一筆 log 產卡。
+export async function logsForSmid(db, smid, ownerId) {
+  const ids = await smidPriorSavedIds(db, smid, ownerId);
+  const logs = [];
+  for (const id of ids) {
+    const l = await getLog(db, id);
+    if (l && !l.isDeleted && l.lineUserId === ownerId) logs.push(l);
+  }
+  return logs;
+}
+// 局部確認完成 → 依原始 smid 重查全部正式紀錄，回一張「本次共記錄 N 筆」完整卡（統一撤銷／開啟照護站），
+// 讓使用者一眼看到水＋食物同屬這一次、都真的寫進去了，不用靠猜。
+async function sendSmidSummaryCard(env, event, db, pet, smid, ownerId, baseUrl, lineUserId) {
+  const logs = await logsForSmid(db, smid, ownerId);
+  if (!logs.length) return;
+  const lines = logs.map((l) => describeLog(l));
+  const date = String(logs[0].eventDateTime || '').slice(0, 10) || taipeiToday();
+  const summary = await recomputeDay(db, pet.petId, date);
+  const siteUrl = await siteLink(env, baseUrl, lineUserId);
+  const fallback = `本次共記錄 ${lines.length} 筆：\n${lines.map((l) => `· ${l}`).join('\n')}`;
+  await replyOrPushFlex(env, event, multiRecordFlex(pet, lines, summary, date, siteUrl, `smid=${smid}`), fallback);
 }
 // 一次回多則訊息（文字＋確認卡）：局部 partial 時要同時「告知已記錄的水」＋「只確認不確定的那一段」。
 async function replyOrPushMulti(env, event, messages) {
@@ -1921,7 +1956,7 @@ async function handleTextMessage(event, env, baseUrl) {
       if (matches.length > 1) {
         const smidEnc = encodeURIComponent(smid);
         const btns = matches.slice(0, 10).map((f) => qrPost(String(f.displayName).slice(0, 20), `action=recFoodG&foodId=${f.foodId}&g=${intent.amount}&aw=${intent.addedWaterMl || 0}&smid=${smidEnc}`, `${f.displayName} ${intent.amount}g`));
-        btns.push(qrPost('取消', 'action=foodCancel', '取消'));
+        btns.push(qrPost('取消', `action=foodCancel&smid=${smidEnc}`, '取消'));
         await logTextInput(db, {
           lineUserId, ownerId, petId: pet.petId, rawText: event.message?.text || '',
           parseStatus: 'awaiting_food_selection', failReason: 'item_lookup_multi', sourceMessageId: smid, resolvedPetId: pet.petId, linkedLogId: '',

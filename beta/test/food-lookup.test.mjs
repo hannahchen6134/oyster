@@ -9,7 +9,7 @@ import { dirname, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
 import { parseMessage } from '../src/parser.js';
-import { exactFoodMatches, smidPriorSavedIds, smidHasFoodLog, collectUndoableBySmid, applyUndo } from '../src/index.js';
+import { exactFoodMatches, smidPriorSavedIds, smidHasFoodLog, logsForSmid, collectUndoableBySmid, applyUndo } from '../src/index.js';
 import { insertLog, logTextInput } from '../src/db.js';
 
 // ---------- part A：parser RC1 詞序/黏字 + 中性候選 ----------
@@ -125,6 +125,57 @@ test('延後確認：水先記→確認食物合併同 smid→撤銷撤兩筆→
   assert.equal(db.prepare('SELECT isDeleted d FROM logs WHERE logId=?').bind(w).first().d, 1);
   assert.equal(db.prepare('SELECT isDeleted d FROM logs WHERE logId=?').bind(f).first().d, 1);
   assert.equal((await collectUndoableBySmid(db, smid, 'u1')).length, 0, '撤銷後不再有可撤銷筆（冪等）');
+});
+
+// ---------- Commit 1.1：局部成功→補確認→依 smid 完整回讀 ----------
+test('Commit1.1：完整回讀卡的資料來自 smid 重查（含先前的水），不是只用新增食物 log', async () => {
+  const db = new D1();
+  db.prepare("INSERT INTO pets (petId, ownerLineUserId, petName, createdAt, updatedAt) VALUES ('p1','u1','蚵仔','t','t')").bind().run();
+  const smid = 'MSG_READBACK';
+
+  // (1) 第一次「罐頭希爾斯26 水8」：水先寫入 → water log 確實存在
+  const w = U();
+  await insertLog(db, { logId: w, lineUserId: 'u1', petId: 'p1', eventDateTime: '2026-08-03 12:00', category: 'water', amount: 8, unit: 'ml', waterMl: 8, sourceMessageId: smid, source: 'line', recordedBy: 'u1', updatedBy: 'u1' });
+  await logTextInput(db, { lineUserId: 'u1', ownerId: 'u1', petId: 'p1', parseStatus: 'multi_partial', sourceMessageId: smid, resolvedPetId: 'p1', linkedLogId: w, parsedResult: JSON.stringify({ events: [], savedLogIds: [w], unparsedSegments: [], awaitingAction: 'food_selection' }) });
+  assert.equal(db.prepare("SELECT COUNT(*) c FROM logs WHERE category='water' AND isDeleted=0").bind().first().c, 1, '(1) water log 確實存在');
+  // 局部完成前，回讀只有水
+  const before = await logsForSmid(db, smid, 'u1');
+  assert.equal(before.length, 1);
+  assert.equal(before[0].category, 'water');
+
+  // (2)(3) 確認食物 → 食物與水共用同一 smid，savedLogIds 含兩筆
+  const f = U();
+  await insertLog(db, { logId: f, lineUserId: 'u1', petId: 'p1', eventDateTime: '2026-08-03 12:00', category: 'food', foodType: '罐頭', foodId: 'f-hills-can', itemName: '希爾斯罐頭', amount: 26, unit: 'g', sourceMessageId: smid, source: 'line', recordedBy: 'u1', updatedBy: 'u1' });
+  const merged = [...new Set([...(await smidPriorSavedIds(db, smid, 'u1')), f])];
+  await logTextInput(db, { lineUserId: 'u1', ownerId: 'u1', petId: 'p1', parseStatus: 'record', sourceMessageId: smid, resolvedPetId: 'p1', linkedLogId: f, parsedResult: JSON.stringify({ events: [], savedLogIds: merged, unparsedSegments: [], awaitingAction: '' }) });
+  assert.deepEqual(merged, [w, f], '(3) savedLogIds 含水＋食物兩筆');
+  assert.equal(db.prepare('SELECT sourceMessageId s FROM logs WHERE logId=?').bind(f).first().s, smid, '(2) 食物 log 用同一原始 smid');
+
+  // (4) 完整回讀卡的資料＝依 smid 重查全部正式紀錄（水＋食物），非只用新增食物 log
+  const readback = await logsForSmid(db, smid, 'u1');
+  assert.equal(readback.length, 2, '(4) 回讀兩筆');
+  assert.deepEqual(readback.map((l) => l.category).sort(), ['food', 'water']);
+
+  // (5) 撤銷同時撤水與食物
+  const items = await collectUndoableBySmid(db, smid, 'u1');
+  assert.equal(items.length, 2);
+  await applyUndo(db, items, 'u1');
+  assert.equal((await logsForSmid(db, smid, 'u1')).length, 0, '(5) 撤銷後回讀為空');
+});
+
+test('Commit1.1：食物取消時水仍保留，回讀仍看得到水（不會靠猜）', async () => {
+  const db = new D1();
+  db.prepare("INSERT INTO pets (petId, ownerLineUserId, petName, createdAt, updatedAt) VALUES ('p1','u1','蚵仔','t','t')").bind().run();
+  const smid = 'MSG_CANCEL';
+  const w = U();
+  await insertLog(db, { logId: w, lineUserId: 'u1', petId: 'p1', eventDateTime: '2026-08-03 12:00', category: 'water', amount: 8, unit: 'ml', waterMl: 8, sourceMessageId: smid, source: 'line', recordedBy: 'u1', updatedBy: 'u1' });
+  await logTextInput(db, { lineUserId: 'u1', ownerId: 'u1', petId: 'p1', parseStatus: 'multi_partial', sourceMessageId: smid, resolvedPetId: 'p1', linkedLogId: w, parsedResult: JSON.stringify({ events: [], savedLogIds: [w], unparsedSegments: [], awaitingAction: 'food_selection' }) });
+  // 使用者按「取消」→ 不寫食物；水仍在，回讀仍為 1 筆水（foodCancel 會據此回「已保留水」）
+  const kept = await logsForSmid(db, smid, 'u1');
+  assert.equal(kept.length, 1);
+  assert.equal(kept[0].category, 'water');
+  assert.equal(kept[0].amount, 8);
+  assert.equal(db.prepare("SELECT COUNT(*) c FROM logs WHERE category='food' AND isDeleted=0").bind().first().c, 0, '取消後沒有食物 log');
 });
 
 test('冪等（recFoodG foodId 路徑）：同 smid 同 foodId+克數只算一次', async () => {
