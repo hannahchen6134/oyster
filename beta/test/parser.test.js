@@ -53,9 +53,10 @@ test('罐罐同義詞', () => {
   assert.equal(intent.record.foodType, '罐頭');
 });
 
-// 「食物 ... 水 N」＝食物＋泡食物加的水，合成單筆（addedWaterMl），不拆成兩筆。
+// 「食物 ... 加水 N」＝食物＋泡食物加的水，合成單筆（addedWaterMl），不拆成兩筆。
+// （裸寫的「水 N／喝水 N」改視為獨立喝水事件——見 parser-multiseg.test.mjs）
 test('罐頭加水：先抽加水量、再抓克數，品名可比對', () => {
-  const intent = parseMessage('罐頭 皇家 13g 水 10');
+  const intent = parseMessage('罐頭 皇家 13g 加水 10');
   assert.equal(intent.record.foodType, '罐頭');
   assert.equal(intent.record.amount, 13);            // 食物克數 = 13（不是加的水 10）
   assert.equal(intent.record.addedWaterMl, 10);      // 加的水 = 10ml
@@ -65,14 +66,14 @@ test('罐頭加水：先抽加水量、再抓克數，品名可比對', () => {
 });
 
 test('罐頭加水：克數沒帶單位也不會被加水覆蓋（嚴格）', () => {
-  const intent = parseMessage('罐頭 皇家 13 水 10');
-  assert.equal(intent.record.amount, 13);            // 先移除「水 10」→ 剩下唯一數字 13
+  const intent = parseMessage('罐頭 皇家 13 加水 10');
+  assert.equal(intent.record.amount, 13);            // 先移除「加水 10」→ 剩下唯一數字 13
   assert.equal(intent.record.addedWaterMl, 10);
   assert.equal(intent.record.itemName, '皇家');
 });
 
 test('罐頭加水：小數克數＋較大加水量', () => {
-  const intent = parseMessage('罐頭 皇家 14.8g 水 28');
+  const intent = parseMessage('罐頭 皇家 14.8g 加水 28');
   assert.equal(intent.record.amount, 14.8);
   assert.equal(intent.record.addedWaterMl, 28);
   assert.equal(intent.record.itemName, '皇家');

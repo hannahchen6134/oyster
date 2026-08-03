@@ -81,3 +81,29 @@ test('多筆 raw 各自獨立寫入，不會互相覆蓋或去重', async () => 
   await logTextInput(db, { lineUserId: 'u1', rawText: '水20', parseStatus: 'record' });
   assert.equal(countRaw(db), 2);
 });
+
+// 四.三：append-only，同一 sourceMessageId 以最新一列（最大 id）為最終狀態
+test('狀態流轉：awaiting_food_selection → record，最新列才是完整成功', async () => {
+  const db = new D1();
+  const smid = 'MSG_1';
+  // 第一列：待選品牌（0 log）
+  await logTextInput(db, { lineUserId: 'u1', sourceMessageId: smid, parseStatus: 'awaiting_food_selection', resolvedPetId: 'p1', linkedLogId: '', parsedResult: JSON.stringify({ awaitingAction: 'food_selection', savedLogIds: [], unparsedSegments: [] }) });
+  // 第二列：選完品牌，成功寫入
+  await logTextInput(db, { lineUserId: 'u1', sourceMessageId: smid, parseStatus: 'record', resolvedPetId: 'p1', linkedLogId: 'LOG_9', parsedResult: JSON.stringify({ awaitingAction: '', savedLogIds: ['LOG_9'], unparsedSegments: [] }) });
+
+  // 以最大 id 判斷最終狀態，不靠 linkedLogId 是否為空猜
+  const latest = db.prepare('SELECT * FROM text_inputs WHERE sourceMessageId = ? ORDER BY id DESC LIMIT 1').bind(smid).first();
+  assert.equal(latest.parseStatus, 'record');
+  assert.equal(latest.linkedLogId, 'LOG_9');
+  // 中途那列仍在（append-only，不被覆蓋）
+  assert.equal(db.prepare('SELECT COUNT(*) c FROM text_inputs WHERE sourceMessageId = ?').bind(smid).first().c, 2);
+});
+
+test('狀態流轉：只到 awaiting 未完成 → 最新列不得是 record', async () => {
+  const db = new D1();
+  const smid = 'MSG_2';
+  await logTextInput(db, { lineUserId: 'u1', sourceMessageId: smid, parseStatus: 'awaiting_pet_selection', linkedLogId: '' });
+  const latest = db.prepare('SELECT * FROM text_inputs WHERE sourceMessageId = ? ORDER BY id DESC LIMIT 1').bind(smid).first();
+  assert.notEqual(latest.parseStatus, 'record');
+  assert.equal(latest.parseStatus, 'awaiting_pet_selection');
+});

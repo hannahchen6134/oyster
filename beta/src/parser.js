@@ -38,6 +38,10 @@ const MOOD_DETAIL_WORDS = new Set(['沒精神', '精神差', '活力差', '懶�
 // 句首的動詞雜訊：吃了罐頭30g、餵了乾糧4g
 const LEAD_VERBS = new Set(['吃了', '餵了', '吃', '餵', '吃掉', '餵食', '有吃', '有餵']);
 const NOTE_WORDS = new Set(['備註', '筆記']);
+// 純單位詞：食物品名不該把它們留下來（例如「乾糧 34 克 加水 14 克」剝完剩「克 克」）
+const UNIT_ONLY_WORDS = new Set(['克', '公克', 'g', 'ml', '毫升', 'cc', '公斤', 'kg']);
+// 語音常見連接詞：僅在「後方緊接一個新的照護事件詞」時才當分隔（保守，不粗暴全域替換）
+const CONNECTOR_WORDS = ['然後', '接著', '再'];
 
 const MED_STATUS_WORDS = [
   { status: '已吃', words: ['已吃', '已餵', '有吃', '有餵', '吃了', '餵了', 'ok'] },
@@ -82,6 +86,10 @@ export function normalizeText(value) {
   // 中文字與數字相連時補空白：水20 → 水 20、乾糧4g → 乾糧 4g
   text = text.replace(/([一-鿿])(\d)/g, '$1 $2');
   text = text.replace(/(\d(?:[a-zA-Z.]*)?)([一-鿿])/g, '$1 $2');
+  // 逗號、頓號視為段落分隔（語音/打字常見）；換行已由下方 \s+ 收成空白
+  text = text.replace(/[,、]/g, ' ');
+  // 「加水/清水/泡水/兌水」與前後字分開，避免「克加水」黏成一詞、把加水量抓錯或漏掉
+  text = text.replace(/(加水|清水|泡水|兌水)/g, ' $1 ');
   return text.trim().replace(/\s+/g, ' ');
 }
 
@@ -121,9 +129,9 @@ function extractAmount(tokens, defaultUnit) {
   return { amount: 0, unit: defaultUnit, rest: tokens };
 }
 
-// 罐頭常見「另外加水」：把「水/加水/泡水/清水 + 緊接的數字」抽出來當加水量（ml），
-// 並從 token 移除，避免加的水被誤當成食物克數。嚴格：先抽水量、再抓克數。
-const FOOD_WATER_WORDS = new Set(['水', '加水', '清水', '泡水', '兌水']);
+// 「食物額外加水」：只認明講「加水/清水/泡水/兌水 + 數字」才當 addedWater（ml）。
+// 裸寫的「水14／喝水14」一律視為獨立喝水事件（不再自動當成泡罐頭的水），語意更精準、不誤併。
+const FOOD_WATER_WORDS = new Set(['加水', '清水', '泡水', '兌水']);
 function parseFoodExtras(tokens) {
   const toks = [...tokens];
   let addedWaterMl = 0;
@@ -261,7 +269,8 @@ export function parseMessage(rawText) {
     return { type: 'fixHint' };
   }
 
-  let tokens = text.split(' ');
+  // 保守處理語音連接詞（然後/接著/再）：只有後方緊接一個事件詞時，才把它當段落分隔
+  let tokens = splitConnectorsAtEvents(text).split(' ');
 
   // 時間前綴：昨天 / 前天 / HH:MM（可組合，例如「昨天 21:30 水 20」）
   let dayOffset = 0;
@@ -305,12 +314,14 @@ export function parseMessage(rawText) {
   if (segments.length > 1) {
     const records = [];
     const invalids = [];
+    const unparsed = []; // 無法解析的段落「原片段文字」——保留、不靜默丟棄
     for (const seg of segments) {
       const intent = parseSegment(seg, dayOffset, time);
       if (intent.type === 'record') records.push(intent.record);
-      else if (intent.type === 'invalid') invalids.push(intent);
+      else if (intent.type === 'invalid') { invalids.push(intent); unparsed.push(seg.join(' ')); }
+      else unparsed.push(seg.join(' ')); // unknown 段：保留原文，交由呼叫端明列「尚未記錄」
     }
-    if (records.length) return { type: 'multiRecord', records, invalids };
+    if (records.length) return { type: 'multiRecord', records, invalids, unparsed };
     // 全部都不成立 → 落回單段解析，沿用原本的錯誤訊息
   }
 
@@ -392,7 +403,8 @@ function parseSegment(tokens, dayOffset, time) {
     const nameTokens = [];
     const strayNums = [];
     for (const token of leftover) (parseAmountToken(token) ? strayNums : nameTokens).push(token);
-    record.itemName = nameTokens.join(' ');
+    // 品名去掉殘留的純單位詞（克/公克/g…），避免「乾糧 34 克 加水 14 克」剝完把「克」當品名
+    record.itemName = nameTokens.filter((t) => !UNIT_ONLY_WORDS.has(t.toLowerCase())).join(' ');
     if (strayNums.length) record.note = strayNums.join(' ');
     return { type: 'record', record };
   }
@@ -521,6 +533,26 @@ function prefixIsOnlyNoise(prefix) {
 // （希爾斯罐頭、皇家乾糧），拿它們在 token 內比對會誤切食物名。食物名＋份量交第二階段處理。
 const FOOD_TYPE_WORD_SET = new Set(FOOD_TYPE_WORDS.flatMap((e) => e.words));
 const EMBED_HEAD_WORDS = ALL_HEAD_WORDS.filter((w) => !FOOD_TYPE_WORD_SET.has(w));
+
+// 保守連接詞分隔：把「然後/接著/再」換成空白，但「只有」當它後面緊接一個事件起始詞時才換
+// （例：「克然後水 14」→「克 水 14」；「再喝水」→「 喝水」）。避免粗暴全域替換破壞語意。
+// 「加」「跟」本輪不納入（會和「加水」等既有語意衝突）。
+function splitConnectorsAtEvents(text) {
+  let s = String(text || '');
+  for (const c of CONNECTOR_WORDS) {
+    let idx = 0;
+    while ((idx = s.indexOf(c, idx)) !== -1) {
+      const after = s.slice(idx + c.length).replace(/^\s+/, '');
+      if (after && ALL_HEAD_WORDS.some((w) => after.startsWith(w))) {
+        s = `${s.slice(0, idx)} ${s.slice(idx + c.length)}`;
+        idx += 1;
+      } else {
+        idx += c.length;
+      }
+    }
+  }
+  return s.replace(/\s+/g, ' ').trim();
+}
 
 function parsesToRecord(text) {
   const r = parseMessage(text);

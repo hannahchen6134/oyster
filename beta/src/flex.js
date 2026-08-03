@@ -276,10 +276,12 @@ export function recordFlexCompact({ pet, categoryKey, mainText, subText, summary
 
 // ②③ 打了品名卻對不到已建立的品項時：不默默記 0 熱量，先回這張卡讓使用者選正確品項（熱量才算得到）。
 // guessId＝模糊比對猜到最接近的品項 foodId，排最前面並標「最接近」。
-export function foodDisambigFlex({ pet, foodType, typedName, grams, options = [], guessId = '' }) {
+export function foodDisambigFlex({ pet, foodType, typedName, grams, addedWaterMl = 0, smid = '', options = [], guessId = '' }) {
   const styleKey = foodType === '乾糧' ? 'dry' : isWetFoodType(foodType) ? 'wet' : 'note';
   const style = CATEGORY_STYLE[styleKey] || CATEGORY_STYLE.note;
   const g = Number(grams) || 0;
+  const aw = Number(addedWaterMl) || 0;                       // 額外加水（ml）：選品牌後仍要完整保留
+  const carry = `&aw=${aw}&smid=${encodeURIComponent(String(smid || ''))}`; // 帶過品牌選擇的加水量與原訊息 id
   const sorted = [...options].sort((a, b) => (b.foodId === guessId ? 1 : 0) - (a.foodId === guessId ? 1 : 0));
   const pickButtons = sorted.slice(0, 6).map((food) => {
     const isGuess = food.foodId === guessId;
@@ -288,7 +290,7 @@ export function foodDisambigFlex({ pet, foodType, typedName, grams, options = []
       action: {
         type: 'postback',
         label: `${isGuess ? '⭐ ' : ''}${String(food.displayName)}`.slice(0, 20),
-        data: `action=recFoodG&foodId=${food.foodId}&g=${g}`,
+        data: `action=recFoodG&foodId=${food.foodId}&g=${g}${carry}`,
         displayText: `${food.displayName} ${g}g`
       }
     };
@@ -310,7 +312,7 @@ export function foodDisambigFlex({ pet, foodType, typedName, grams, options = []
       { type: 'button', height: 'sm', style: 'link', color: C.brand,
         action: { type: 'message', label: `新增「${typedName}」`.slice(0, 20), text: `設定${foodType}` } },
       { type: 'button', height: 'sm', style: 'link', color: C.muted,
-        action: { type: 'postback', label: '就先記著，不算熱量', data: `action=recFoodRaw&t=${encodeURIComponent(foodType)}&g=${g}&name=${encodeURIComponent(typedName)}`, displayText: '照打的記，先不算熱量' } }
+        action: { type: 'postback', label: '就先記著，不算熱量', data: `action=recFoodRaw&t=${encodeURIComponent(foodType)}&g=${g}&name=${encodeURIComponent(typedName)}${carry}`, displayText: '照打的記，先不算熱量' } }
     ]
   };
   return bubble(`「${typedName}」是哪一個${foodType}？`, { type: 'bubble', size: 'mega', header: header(`確認品項・${pet?.petName || '貓貓'}`), body, footer });

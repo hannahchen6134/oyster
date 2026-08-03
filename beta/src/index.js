@@ -1112,10 +1112,19 @@ async function handlePostback(event, env, baseUrl) {
     const pet = await resolveDefaultPet(db, user, pets);
     if (!pet) { await replyOrPush(env, event, '還沒有建立貓咪。'); return; }
     const caregiverName = ownerId !== lineUserId ? String(user.displayName || '') : '';
-    await handleRecord(env, event, pet, {
+    const g = Number(data.get('g')) || 0;
+    const aw = Number(data.get('aw')) || 0;      // 保留過品牌選擇的額外加水量
+    const smid = data.get('smid') || '';          // 文字澄清帶來的原訊息 id
+    const res = await handleRecord(env, event, pet, {
       category: 'food', foodType: food.foodType, itemName: food.displayName,
-      amount: Number(data.get('g')) || 0, unit: 'g', addedWaterMl: 0, medStatus: '', medSlot: '', note: ''
+      amount: g, unit: 'g', addedWaterMl: aw, medStatus: '', medSlot: '', note: ''
     }, ownerId, { fromButton: true, actorId: lineUserId, caregiverName, baseUrl });
+    // 從文字澄清（awaiting_food_selection）完成 → 補一列最終 record，讓同一 sourceMessageId 的最新狀態反映成功
+    if (smid) {
+      const sid = res?.savedLog?.logId || '';
+      const allIds = [res?.savedLog?.logId, res?.addedWaterLog?.logId].filter(Boolean); // 食物＋加水
+      await logTextInput(db, { lineUserId, ownerId, petId: pet.petId, rawText: '', parseStatus: 'record', failReason: '', sourceMessageId: smid, resolvedPetId: pet.petId, linkedLogId: sid, parsedResult: JSON.stringify({ events: [{ category: 'food', foodType: food.foodType, itemName: food.displayName, amount: g, addedWaterMl: aw }], savedLogIds: allIds, unparsedSegments: [], awaitingAction: '' }) });
+    }
     return;
   }
   // ② 確認卡按「就先記著，不算熱量」→ 照打的品名如實記下（forceRaw 跳過再次確認），確認卡會標紅提醒
@@ -1123,15 +1132,22 @@ async function handlePostback(event, env, baseUrl) {
     const t = data.get('t') || '罐頭';
     const g = Number(data.get('g')) || 0;
     const name = data.get('name') || '';
+    const aw = Number(data.get('aw')) || 0;
+    const smid = data.get('smid') || '';
     const user = await getUser(db, lineUserId);
     const pets = await listPets(db, ownerId);
     const pet = await resolveDefaultPet(db, user, pets);
     if (!pet) { await replyOrPush(env, event, '還沒有建立貓咪。'); return; }
     const caregiverName = ownerId !== lineUserId ? String(user.displayName || '') : '';
-    await handleRecord(env, event, pet, {
+    const res = await handleRecord(env, event, pet, {
       category: 'food', foodType: t, itemName: name,
-      amount: g, unit: 'g', addedWaterMl: 0, medStatus: '', medSlot: '', note: '', forceRaw: true
+      amount: g, unit: 'g', addedWaterMl: aw, medStatus: '', medSlot: '', note: '', forceRaw: true
     }, ownerId, { fromButton: true, actorId: lineUserId, caregiverName, baseUrl });
+    if (smid) {
+      const sid = res?.savedLog?.logId || '';
+      const allIds = [res?.savedLog?.logId, res?.addedWaterLog?.logId].filter(Boolean);
+      await logTextInput(db, { lineUserId, ownerId, petId: pet.petId, rawText: '', parseStatus: 'record', failReason: '', sourceMessageId: smid, resolvedPetId: pet.petId, linkedLogId: sid, parsedResult: JSON.stringify({ events: [{ category: 'food', foodType: t, itemName: name, amount: g, addedWaterMl: aw }], savedLogIds: allIds, unparsedSegments: [], awaitingAction: '' }) });
+    }
     return;
   }
 
@@ -1143,6 +1159,7 @@ async function handlePostback(event, env, baseUrl) {
     const pets = await listPets(db, ownerId);
     const chosen = pets.find((p) => p.petId === petId);
     if (!chosen) { await replyOrPush(env, event, '找不到這隻貓，請重新輸入一次。'); return; }
+    const smid = data.get('smid') || '';
     const sub = parseMessage(ev);
     const recs = sub.type === 'multiRecord' ? sub.records : (sub.type === 'record' ? [sub.record] : []);
     if (!recs.length) { await replyOrPush(env, event, '這筆我沒抓到內容，請重新輸入一次。'); return; }
@@ -1152,8 +1169,10 @@ async function handlePostback(event, env, baseUrl) {
     for (const rec of recs) {
       const res = await handleRecord(env, event, chosen, rec, ownerId, { silent: recs.length > 1, actorId: lineUserId, caregiverName, baseUrl });
       if (res?.savedLog?.logId) savedIds.push(res.savedLog.logId);
+      if (res?.addedWaterLog?.logId) savedIds.push(res.addedWaterLog.logId);
     }
-    await logTextInput(db, { lineUserId, ownerId, petId: chosen.petId, rawText: ev, parseStatus: 'record', failReason: '', sourceMessageId: '', resolvedPetId: chosen.petId, linkedLogId: savedIds.join(','), parsedResult: JSON.stringify(recs) });
+    // awaiting_pet_selection 完成 → 補一列最終 record（帶原 sourceMessageId），最新狀態反映成功
+    await logTextInput(db, { lineUserId, ownerId, petId: chosen.petId, rawText: ev, parseStatus: 'record', failReason: '', sourceMessageId: smid, resolvedPetId: chosen.petId, linkedLogId: savedIds.join(','), parsedResult: JSON.stringify({ events: recs.map((r) => ({ category: r.category, amount: r.amount, unit: r.unit, itemName: r.itemName, addedWaterMl: r.addedWaterMl || 0 })), savedLogIds: savedIds, unparsedSegments: [], awaitingAction: '' }) });
     if (recs.length > 1) await replyOrPush(env, event, `已記到「${chosen.petName}」✓ 共 ${recs.length} 筆`);
     return;
   }
@@ -1444,7 +1463,7 @@ async function handleTextMessage(event, env, baseUrl) {
     await logTextInput(db, {
       lineUserId, ownerId, petId: rpid, rawText: event.message?.text || '',
       parseStatus: 'partial', failReason: 'unknown_food_expression', sourceMessageId: String(event.message?.id || ''),
-      resolvedPetId: rpid, linkedLogId: '', parsedResult: JSON.stringify({ recognizedPetName: leadPartial.petName, rest: leadPartial.rest })
+      resolvedPetId: rpid, linkedLogId: '', parsedResult: JSON.stringify({ events: [], savedLogIds: [], unparsedSegments: [leadPartial.rest], awaitingAction: '', recognizedPetName: leadPartial.petName, rest: leadPartial.rest })
     });
     // 下方捷徑一律「帶上這隻貓的名字」再送出（例：點「罐頭 30」實際送「蚵仔 罐頭 30」），
     // 確保記到正確的貓；每個都是完整獨立指令，不靠任何暫存狀態，不會跨訊息污染或重複。
@@ -1463,11 +1482,12 @@ async function handleTextMessage(event, env, baseUrl) {
   // 不明句首（前段不明、後段可解析）→ 不猜前段是貓名、不靜默寫預設貓；請使用者選貓。
   // 選貓（postback）前正式 logs 為 0 筆；事件文字帶在 postback，選完保留原事件、不用重打。
   if (leadPick) {
-    const catBtns = pets.slice(0, 12).map((p) => qrPost(p.petName, `action=pickcatFor&petId=${p.petId}&ev=${encodeURIComponent(leadPick.eventText)}`, p.petName));
+    const smid = String(event.message?.id || '');
+    const catBtns = pets.slice(0, 12).map((p) => qrPost(p.petName, `action=pickcatFor&petId=${p.petId}&ev=${encodeURIComponent(leadPick.eventText)}&smid=${encodeURIComponent(smid)}`, p.petName));
     await logTextInput(db, {
       lineUserId, ownerId, petId: '', rawText: event.message?.text || '',
-      parseStatus: 'ask_cat', failReason: 'leading_unknown', sourceMessageId: String(event.message?.id || ''),
-      resolvedPetId: '', linkedLogId: '', parsedResult: JSON.stringify({ prefix: leadPick.prefix, eventText: leadPick.eventText })
+      parseStatus: 'awaiting_pet_selection', failReason: 'leading_unknown', sourceMessageId: smid,
+      resolvedPetId: '', linkedLogId: '', parsedResult: JSON.stringify({ events: [], savedLogIds: [], unparsedSegments: [], awaitingAction: 'pet_selection', prefix: leadPick.prefix, eventText: leadPick.eventText })
     });
     await replyOrPushQuick(env, event,
       `我看得懂「${leadPick.eventText}」，但不確定前面的「${leadPick.prefix}」代表什麼。\n請選要記錄的貓咪，或直接重新輸入：`,
@@ -1651,7 +1671,21 @@ async function handleTextMessage(event, env, baseUrl) {
         await updateUser(db, lineUserId, { defaultPetId: pet.petId });
       }
       const recRes = await handleRecord(env, event, pet, intent.record, ownerId, { actorId: lineUserId, caregiverName, baseUrl });
-      await logTextInput(db, { lineUserId, ownerId, petId: pet.petId, rawText: event.message?.text || '', parseStatus: 'record', failReason: '', sourceMessageId: String(event.message?.id || ''), resolvedPetId: pet.petId, linkedLogId: recRes?.savedLog?.logId || '', parsedResult: JSON.stringify(intent.record) });
+      const recSavedId = recRes?.savedLog?.logId || '';                                  // 主 log（食物/該事件）
+      const recAllIds = [recRes?.savedLog?.logId, recRes?.addedWaterLog?.logId].filter(Boolean); // 全部（含加水）
+      // 狀態誠實：只有真的寫入 log 才算 record；待選品牌 → awaiting_food_selection（0 正式 log）
+      const recStatus = recSavedId ? 'record' : (recRes?.disambiguated ? 'awaiting_food_selection' : 'record');
+      await logTextInput(db, {
+        lineUserId, ownerId, petId: pet.petId, rawText: event.message?.text || '',
+        parseStatus: recStatus, failReason: recRes?.disambiguated ? 'need_food_selection' : '',
+        sourceMessageId: String(event.message?.id || ''), resolvedPetId: pet.petId, linkedLogId: recSavedId,
+        parsedResult: JSON.stringify({
+          events: [{ category: intent.record.category, amount: intent.record.amount, unit: intent.record.unit, itemName: intent.record.itemName, addedWaterMl: intent.record.addedWaterMl || 0 }],
+          savedLogIds: recAllIds,
+          unparsedSegments: [],
+          awaitingAction: recRes?.disambiguated ? 'food_selection' : ''
+        })
+      });
       return;
     }
 
@@ -1669,10 +1703,35 @@ async function handleTextMessage(event, env, baseUrl) {
         const res = await handleRecord(env, event, pet, rec, ownerId, { silent: true, actorId: lineUserId, caregiverName });
         if (res?.mainText) lines.push(res.mainText);
         if (res?.savedLog?.logId) savedIds.push(res.savedLog.logId);
+        if (res?.addedWaterLog?.logId) savedIds.push(res.addedWaterLog.logId); // 加水另一筆 log 也算
         if (res?.summary) { lastSummary = res.summary; lastDate = res.eventDate; }
       }
-      await logTextInput(db, { lineUserId, ownerId, petId: pet.petId, rawText: event.message?.text || '', parseStatus: lines.length ? 'multiRecord' : 'unknown', failReason: lines.length ? '' : 'no_valid_segment', sourceMessageId: String(event.message?.id || ''), resolvedPetId: pet.petId, linkedLogId: savedIds.join(','), parsedResult: JSON.stringify(intent.records) });
-      if (!lines.length) { await guideUnknown(env, event, pet?.petId || ''); return; }
+      const unparsed = Array.isArray(intent.unparsed) ? intent.unparsed : [];
+      // 部分成功＝multi_partial；全成且無 unparsed 才算 record；全敗＝unknown
+      const multiStatus = !lines.length ? 'unknown' : (unparsed.length ? 'multi_partial' : 'record');
+      await logTextInput(db, {
+        lineUserId, ownerId, petId: pet.petId, rawText: event.message?.text || '',
+        parseStatus: multiStatus, failReason: lines.length ? '' : 'no_valid_segment',
+        sourceMessageId: String(event.message?.id || ''), resolvedPetId: pet.petId, linkedLogId: savedIds.join(','),
+        parsedResult: JSON.stringify({
+          events: intent.records.map((r) => ({ category: r.category, amount: r.amount, unit: r.unit, itemName: r.itemName, addedWaterMl: r.addedWaterMl || 0 })),
+          savedLogIds: savedIds,
+          unparsedSegments: unparsed,
+          awaitingAction: ''
+        })
+      });
+      if (!lines.length) {
+        // 全部看不懂：也要明講尚未記錄了哪些，不靜默
+        if (unparsed.length) { await replyOrPush(env, event, `⚠️ 這些我看不懂、尚未記錄：\n${unparsed.map((u) => `· ${u}`).join('\n')}\n可以分開再打一次（例：罐頭 34）。`); return; }
+        await guideUnknown(env, event, pet?.petId || ''); return;
+      }
+      if (unparsed.length) {
+        // 部分成功：明確分「✅已記錄／⚠️尚未記錄」，避免使用者誤以為整句都成功
+        const recTxt = `✅ 已記錄 ${lines.length} 筆：\n${lines.map((l) => `· ${l}`).join('\n')}`;
+        const unTxt = `⚠️ 這 ${unparsed.length} 筆看不懂、尚未記錄：\n${unparsed.map((u) => `· ${u}`).join('\n')}\n可以分開再打一次（例：罐頭 34），或用選單按鈕記。`;
+        await replyOrPush(env, event, `${recTxt}\n\n${unTxt}`);
+        return;
+      }
       const fallback = `已記錄 ${lines.length} 筆：\n${lines.map((line) => `· ${line}`).join('\n')}`;
       const multiSiteUrl = await siteLink(env, baseUrl, lineUserId);
       await replyOrPushFlex(env, event, multiRecordFlex(pet, lines, lastSummary, lastDate, multiSiteUrl), fallback);
@@ -1769,7 +1828,7 @@ async function handleTextMessage(event, env, baseUrl) {
     }
 
     case 'invalid': {
-      await logTextInput(db, { lineUserId, ownerId, petId: '', rawText: event.message?.text || '', parseStatus: 'invalid', failReason: intent.reason || '', sourceMessageId: String(event.message?.id || ''), resolvedPetId: '', linkedLogId: '', parsedResult: JSON.stringify({ category: intent.category, reason: intent.reason }) });
+      await logTextInput(db, { lineUserId, ownerId, petId: '', rawText: event.message?.text || '', parseStatus: 'invalid', failReason: intent.reason || '', sourceMessageId: String(event.message?.id || ''), resolvedPetId: '', linkedLogId: '', parsedResult: JSON.stringify({ events: [], savedLogIds: [], unparsedSegments: [event.message?.text || ''], awaitingAction: '', category: intent.category, reason: intent.reason }) });
       if (intent.reason === 'missing_amount' && intent.category === 'food' && pet) {
         await updateUser(db, lineUserId, { pendingAction: `amount|${text}` });
         await replyOrPush(env, event, '幾克呢？直接打數字就好');
@@ -1781,7 +1840,7 @@ async function handleTextMessage(event, env, baseUrl) {
 
     default: {
       // 看不懂不當死路：教打字 ＋ 這隻貓的一鍵捷徑，順手就能記
-      await logTextInput(db, { lineUserId, ownerId, petId: '', rawText: event.message?.text || '', parseStatus: 'unknown', failReason: 'unrecognized', sourceMessageId: String(event.message?.id || ''), resolvedPetId: '', linkedLogId: '', parsedResult: '' });
+      await logTextInput(db, { lineUserId, ownerId, petId: '', rawText: event.message?.text || '', parseStatus: 'unknown', failReason: 'unrecognized', sourceMessageId: String(event.message?.id || ''), resolvedPetId: '', linkedLogId: '', parsedResult: JSON.stringify({ events: [], savedLogIds: [], unparsedSegments: [event.message?.text || ''], awaitingAction: '' }) });
       await guideUnknown(env, event, pet?.petId || '');
     }
   }
@@ -2008,7 +2067,8 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
       const guess = guessFood(sameType, record.itemName, record.foodType);
       await replyOrPushFlex(env, event, foodDisambigFlex({
         pet, foodType: record.foodType, typedName: record.itemName || record.foodType,
-        grams: Number(record.amount) || 0, options: sameType, guessId: guess?.foodId || ''
+        grams: Number(record.amount) || 0, addedWaterMl: Number(record.addedWaterMl) || 0,
+        smid: String(event.message?.id || ''), options: sameType, guessId: guess?.foodId || ''
       }), `「${record.itemName || record.foodType}」對不到已建立的品項，請選正確的${record.foodType}，熱量才算得到。`);
       return { disambiguated: true };
     }
@@ -2079,9 +2139,10 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
   }
 
   const savedLog = await insertLog(db, log);
+  let addedWaterLog = null; // 這次操作若含加水，另建的喝水 log（其 id 要一起回傳，讓 savedLogIds 完整）
   // 罐頭另外加的水 → 另存一筆喝水（沿用已驗證的喝水計算，不動食物固形/熱量公式）
   if (addedWaterMl > 0) {
-    await insertLog(db, {
+    addedWaterLog = await insertLog(db, {
       lineUserId,
       petId: pet.petId,
       eventDateTime,
@@ -2145,7 +2206,7 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
   }
   // 一則多筆時：不各自回覆，交由呼叫端彙整成一張卡
   if (opts.silent) {
-    return { mainText, summary, eventDate, savedLog };
+    return { mainText, summary, eventDate, savedLog, addedWaterLog };
   }
   // 單筆記錄：一律回完整卡片（不再忽大忽小分級）。純文字為 LINE 通知/無法顯示卡片時的備援。
   const fallbackText = recordReply(description, pet, summary, hints, eventDate);
@@ -2164,7 +2225,7 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
   if (opts.baseUrl) {
     try { await ensurePersonalRichMenu(env, opts.baseUrl, lineUserId); } catch (error) { console.error('personal richmenu refresh failed:', error.message); }
   }
-  return { mainText, summary, eventDate, savedLog };
+  return { mainText, summary, eventDate, savedLog, addedWaterLog };
 }
 
 // 每位使用者專屬的圖文選單：把本人登入連結烤進「喵喵照護站／回診資訊」，
