@@ -36,6 +36,17 @@ test('RC1：罐頭皇家/皇家罐頭 黏字倒序現在能解析成食物（品
   }
 });
 
+test('多個黏字食物各自成段：皇家罐頭33 希爾斯乾糧10 水8 → 兩食物＋水，數量不合併不遺失', () => {
+  const r = parseMessage('皇家罐頭33 希爾斯乾糧10 水8');
+  assert.equal(r.type, 'multiRecord');
+  const foods = r.records.filter((x) => x.category === 'food');
+  assert.equal(foods.length, 2, '應切成兩筆食物');
+  assert.ok(foods.some((f) => f.foodType === '罐頭' && f.itemName === '皇家' && f.amount === 33), '皇家罐頭 33');
+  assert.ok(foods.some((f) => f.foodType === '乾糧' && f.itemName === '希爾斯' && f.amount === 10), '希爾斯乾糧 10');
+  assert.ok(r.records.some((x) => x.category === 'water' && x.amount === 8), '水 8');
+  assert.equal((r.unparsed || []).length, 0);
+});
+
 test('multiRecord 不靜默丟棄：真的看不懂的片段仍保留在 unparsed、水正常記', () => {
   // 「abc」沒有類別詞也沒有數量 → 無法解析，必須明列尚未記錄，不得靜默丟棄
   const r = parseMessage('abc 水14');

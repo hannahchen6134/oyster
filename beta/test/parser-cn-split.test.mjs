@@ -104,9 +104,22 @@ test('RC3 反例：罐頭泡水33 依既有語意不切出獨立 water 事件', 
 test('RC3 反例：品名的水 vs 句尾水事件——皇家水解蛋白33水8 只切句尾水8', () => {
   const r = multi('皇家水解蛋白33水8');
   assert.ok(pick(r, 'water') && pick(r, 'water').amount === 8, '句尾水8應記');
-  // 品名段（皇家水解蛋白33）保留，不因品名的「水」被誤切、也不遺失
-  assert.ok((r.unparsed || []).some((u) => u.includes('水解蛋白')), '品名段保留於 unparsed，不誤切/不遺失');
+  // 品名段（皇家水解蛋白33）成為 lookup 候選，不因品名的「水」被誤切、也不遺失
+  assert.ok((r.candidates || []).some((c) => c.itemName.includes('水解蛋白') && c.amount === 33), '品名段保留為候選，不誤切/不遺失');
   assert.ok(!r.records.some((x) => x.category === 'water' && x.amount !== 8), '不得多出別的 water');
+});
+
+// ---------- 部署前必修③：罐頭泡水33 歧義（不預設 33＝加水）----------
+test('罐頭泡水33 → foodWaterAmbiguous（不預設）；罐頭30泡水33（兩者都有）→ 正常記錄', () => {
+  const a = parseMessage('罐頭泡水33');
+  assert.equal(a.type, 'foodWaterAmbiguous');
+  assert.equal(a.foodType, '罐頭');
+  assert.equal(a.amount, 33);
+  const b = parseMessage('罐頭30泡水33');
+  assert.equal(b.type, 'record');
+  assert.equal(b.record.category, 'food');
+  assert.equal(b.record.amount, 30);
+  assert.equal(b.record.addedWaterMl, 33);
 });
 
 // ---------- 藥字在品名中不得誤切 ----------

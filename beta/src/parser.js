@@ -213,6 +213,13 @@ function emptyRecord() {
 const FLAT_FOOD_TYPE_WORDS = FOOD_TYPE_WORDS
   .flatMap((e) => e.words.map((w) => ({ type: e.type, word: w })))
   .sort((a, b) => b.word.length - a.word.length);
+// token 是否「內含」食物類型詞（皇家罐頭／希爾斯乾糧）——用來把多個黏字食物（皇家罐頭33 希爾斯乾糧10）切成不同段。
+// 排除「其他」這個 catch-all，避免「其他事情」等被誤當食物切段。
+const SPLIT_FOOD_TYPE_WORDS = FLAT_FOOD_TYPE_WORDS.filter((e) => e.type !== '其他');
+function foodTypeInToken(token) {
+  const t = String(token || '');
+  return SPLIT_FOOD_TYPE_WORDS.some((e) => t.includes(e.word));
+}
 
 // RC3：黏字用藥事件（早藥吃了／晚藥已吃／藥早吃了）——必須「含藥」且有時段或狀態才算，
 // 品名含「藥」但無時段/狀態（藥膳罐頭）不誤判成用藥。回傳 {medSlot, medStatus} 或 null。
@@ -422,14 +429,16 @@ export function parseMessage(rawText) {
   if (segments.length > 1) {
     const records = [];
     const invalids = [];
+    const candidates = []; // 無類別詞品項候選（皇家水解蛋白33）——交呼叫端反查 food_items
     const unparsed = []; // 無法解析的段落「原片段文字」——保留、不靜默丟棄
     for (const seg of segments) {
       const intent = parseSegment(seg, dayOffset, time);
       if (intent.type === 'record') records.push(intent.record);
+      else if (intent.type === 'item_lookup_candidate') candidates.push(intent); // 無類別詞品項候選：交呼叫端反查，不丟成 unparsed
       else if (intent.type === 'invalid') { invalids.push(intent); unparsed.push(seg.join(' ')); }
       else unparsed.push(seg.join(' ')); // unknown 段：保留原文，交由呼叫端明列「尚未記錄」
     }
-    if (records.length) return { type: 'multiRecord', records, invalids, unparsed };
+    if (records.length || candidates.length) return { type: 'multiRecord', records, invalids, unparsed, candidates };
     // 全部都不成立 → 落回單段解析，沿用原本的錯誤訊息
   }
 
@@ -444,7 +453,8 @@ function isSegmentHead(token) {
     || SUPPLEMENT_HEAD_WORDS.has(token) || MOOD_WORDS.has(token) || MOOD_DETAIL_WORDS.has(token)
     || NOTE_WORDS.has(token)
   ) return true;
-  if (matchWordList(token, FOOD_TYPE_WORDS)) return true;
+  // 食物段起始：類型詞（含黏在品名裡的，如 皇家罐頭／希爾斯乾糧）——讓多個食物各自成段
+  if (foodTypeInToken(token)) return true;
   // RC3：黏字用藥事件（早藥吃了）也是段落起始，才不會被吞進前一段（水）的備註
   return Boolean(parseMedToken(token));
 }
@@ -465,11 +475,11 @@ function splitSegments(tokens) {
       segments.push(current);
       current = [token];
       currentIsMed = MED_WORDS.has(token) || Boolean(parseMedToken(token));
-      currentIsFood = Boolean(matchWordList(token, FOOD_TYPE_WORDS));
+      currentIsFood = foodTypeInToken(token);
     } else {
       if (!current.length) {
         currentIsMed = MED_WORDS.has(token) || Boolean(parseMedToken(token));
-        currentIsFood = Boolean(matchWordList(token, FOOD_TYPE_WORDS));
+        currentIsFood = foodTypeInToken(token);
       }
       current.push(token);
     }
@@ -503,7 +513,12 @@ function parseSegment(tokens, dayOffset, time) {
     // 先抽「另外加水」量，再從剩下的 token 抓食物克數（嚴格：加的水不會被當成克數）
     const { tokens: afterWater, addedWaterMl } = parseFoodExtras(rest);
     const { amount, rest: leftover } = extractAmount(afterWater, 'g');
-    if (!amount) return { type: 'invalid', reason: 'missing_amount', category: 'food' };
+    if (!amount) {
+      // 只有「加水/泡水＋數字」、卻沒有食物克數（罐頭泡水33）→ 語意不明（33 是克數還是加水？）
+      // 不預設，回報歧義由呼叫端二選一；一般的缺克數仍回 invalid。
+      if (addedWaterMl > 0) return { type: 'foodWaterAmbiguous', foodType: foodEntry.type, amount: addedWaterMl };
+      return { type: 'invalid', reason: 'missing_amount', category: 'food' };
+    }
     record.category = 'food';
     record.foodType = foodEntry.type;
     record.amount = amount;

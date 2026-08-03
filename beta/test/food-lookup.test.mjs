@@ -48,7 +48,7 @@ test('安全：品名含「水」不得誤切出 water（Commit2 後品名保留
   const r1 = parseMessage('皇家水解蛋白33水8');
   assert.equal(r1.type, 'multiRecord');
   assert.ok(water(r1) && water(r1).amount === 8, '句尾水8應記');
-  assert.ok((r1.unparsed || []).some((u) => u.includes('水解蛋白')), '品名段保留，不誤切成 water');
+  assert.ok((r1.candidates || []).some((c) => c.itemName.includes('水解蛋白') && c.amount === 33), '品名段成為 lookup 候選、保留、不誤切成 water');
   // 罐頭皇家水8：RC3 切出句尾水8；罐頭皇家（無克數）保留、不誤記成食物
   const r2 = parseMessage('罐頭皇家水8');
   assert.equal(r2.type, 'multiRecord');
@@ -80,6 +80,22 @@ test('exactFoodMatches：皇家有罐頭＋乾糧兩型 → 多筆命中（跨�
 test('exactFoodMatches：未知品牌 → 無命中（模糊不算精確）', () => {
   assert.equal(exactFoodMatches(FOODS, '未知品牌').length, 0);
   assert.equal(exactFoodMatches(FOODS, '皇冠').length, 0); // 皇冠≈皇家 只是模糊，不得算精確
+});
+
+// ---------- 部署前必修①：multiRecord 中無類別詞候選被結構化保留、可反查（不進 unparsed、不消失）----------
+test('multiRecord 保留候選：皇家水解蛋白33水8 → 水8＋候選(皇家水解蛋白,33)，不落 unparsed', () => {
+  const r = parseMessage('皇家水解蛋白33水8');
+  assert.equal(r.type, 'multiRecord');
+  assert.ok(r.records.some((x) => x.category === 'water' && x.amount === 8));
+  assert.equal((r.unparsed || []).length, 0, '候選不落 unparsed');
+  assert.ok((r.candidates || []).some((c) => c.itemName === '皇家水解蛋白' && c.amount === 33), '結構化保留候選');
+});
+test('候選反查三態決策（exactFoodMatches 去類別詞後精確）：唯一→記／多筆→選／無→保留告知', () => {
+  const uniq = [{ foodId: 'a', displayName: '皇家水解蛋白罐頭', foodType: '罐頭', isDeleted: 0 }];
+  assert.equal(exactFoodMatches(uniq, '皇家水解蛋白').length, 1); // 唯一 → 直接記
+  const many = [{ foodId: 'a', displayName: '皇家水解蛋白罐頭', foodType: '罐頭', isDeleted: 0 }, { foodId: 'b', displayName: '皇家水解蛋白乾糧', foodType: '乾糧', isDeleted: 0 }];
+  assert.equal(exactFoodMatches(many, '皇家水解蛋白').length, 2); // 多筆（跨類型）→ 讓使用者選
+  assert.equal(exactFoodMatches(uniq, '完全不同的品牌名').length, 0); // 無命中 → 保留告知
 });
 
 // ---------- part C：smid 合併／冪等／撤銷（罐頭未知品牌33 水8 的延後確認流程）----------
@@ -183,64 +199,95 @@ test('Commit1.1：食物取消時水仍保留，回讀仍看得到水（不會�
   assert.equal(db.prepare("SELECT COUNT(*) c FROM logs WHERE category='food' AND isDeleted=0").bind().first().c, 0, '取消後沒有食物 log');
 });
 
-// ---------- Commit 1.1-followup：多 pending 佇列（確認一筆不宣稱全部完成）----------
-// 模擬「皇家罐頭33 希爾斯乾糧10 水8」：水先寫入，兩個食物待確認，逐一確認/取消才收斂。
+// ---------- 部署前必修②：多 pending 綁 pendingId＋狀態機（確認一筆不宣稱全部完成、取消只動被點那筆）----------
+// 模擬「皇家罐頭33 希爾斯乾糧10 水8」：水先寫入，兩個食物 pending(p0/p1)，逐一確認/取消才收斂。
 const latestStatus = (db, smid) => db.prepare('SELECT parseStatus FROM text_inputs WHERE sourceMessageId=? ORDER BY id DESC LIMIT 1').bind(smid).first().parseStatus;
+const activeCount = (arr) => arr.filter((p) => p.status === 'pending').length;
 async function seedMultiPending(db, smid) {
   db.prepare("INSERT INTO pets (petId, ownerLineUserId, petName, createdAt, updatedAt) VALUES ('p1','u1','蚵仔','t','t')").bind().run();
   const w = U();
   await insertLog(db, { logId: w, lineUserId: 'u1', petId: 'p1', eventDateTime: '2026-08-03 12:00', category: 'water', amount: 8, unit: 'ml', waterMl: 8, sourceMessageId: smid, source: 'line', recordedBy: 'u1', updatedBy: 'u1' });
-  await logTextInput(db, { lineUserId: 'u1', ownerId: 'u1', petId: 'p1', parseStatus: 'multi_partial', sourceMessageId: smid, resolvedPetId: 'p1', linkedLogId: w, parsedResult: JSON.stringify({ events: [], savedLogIds: [w], pendingFoods: [{ foodType: '罐頭', typedName: '皇家', grams: 33, aw: 0 }, { foodType: '乾糧', typedName: '希爾斯', grams: 10, aw: 0 }], unparsedSegments: [], awaitingAction: 'food_selection' }) });
+  await logTextInput(db, { lineUserId: 'u1', ownerId: 'u1', petId: 'p1', parseStatus: 'multi_partial', sourceMessageId: smid, resolvedPetId: 'p1', linkedLogId: w, parsedResult: JSON.stringify({ events: [], savedLogIds: [w], pendingFoods: [{ id: 'p0', kind: 'typed', status: 'pending', foodType: '罐頭', typedName: '皇家', grams: 33, aw: 0 }, { id: 'p1', kind: 'typed', status: 'pending', foodType: '乾糧', typedName: '希爾斯', grams: 10, aw: 0 }], unparsedSegments: [], awaitingAction: 'food_selection' }) });
   return w;
 }
-// 確認一筆 pending（模擬 recFoodG/recFoodRaw 尾段：寫 log、合併 savedLogIds、pendingFoods 減一）
-async function confirmOne(db, smid, foodType, typedName, grams) {
-  const priorIds = await smidPriorSavedIds(db, smid, 'u1');
-  const pending = await smidPendingFoods(db, smid, 'u1');
-  const remaining = pending.slice(1);
+// 模擬 confirmPendingFood(pid)：狀態機——非 pending → 不動作回 false；否則寫 log、標 confirmed
+async function confirmPid(db, smid, pid, owner = 'u1') {
+  const pendings = await smidPendingFoods(db, smid, owner);
+  const entry = pendings.find((p) => p.id === pid);
+  if (!entry || entry.status !== 'pending') return false;
+  const priorIds = await smidPriorSavedIds(db, smid, owner);
   const f = U();
-  await insertLog(db, { logId: f, lineUserId: 'u1', petId: 'p1', eventDateTime: '2026-08-03 12:00', category: 'food', foodType, itemName: typedName, amount: grams, unit: 'g', sourceMessageId: smid, source: 'line', recordedBy: 'u1', updatedBy: 'u1' });
+  await insertLog(db, { logId: f, lineUserId: owner, petId: 'p1', eventDateTime: '2026-08-03 12:00', category: 'food', foodType: entry.foodType, itemName: entry.typedName || entry.itemName || '', amount: entry.grams, unit: 'g', sourceMessageId: smid, source: 'line', recordedBy: owner, updatedBy: owner });
   const allIds = [...new Set([...priorIds, f])];
-  await logTextInput(db, { lineUserId: 'u1', ownerId: 'u1', petId: 'p1', parseStatus: remaining.length ? 'multi_partial' : 'record', sourceMessageId: smid, resolvedPetId: 'p1', linkedLogId: f, parsedResult: JSON.stringify({ events: [], savedLogIds: allIds, pendingFoods: remaining, unparsedSegments: [], awaitingAction: remaining.length ? 'food_selection' : '' }) });
-  return f;
+  const np = pendings.map((p) => (p.id === pid ? { ...p, status: 'confirmed' } : p));
+  const active = np.some((p) => p.status === 'pending');
+  await logTextInput(db, { lineUserId: owner, ownerId: owner, petId: 'p1', parseStatus: active ? 'multi_partial' : 'record', sourceMessageId: smid, resolvedPetId: 'p1', linkedLogId: f, parsedResult: JSON.stringify({ events: [], savedLogIds: allIds, pendingFoods: np, unparsedSegments: [], awaitingAction: active ? 'food_selection' : '' }) });
+  return true;
+}
+// 模擬 foodCancel(pid)：狀態機——非 pending → 不動作回 false；否則標 cancelled、savedLogIds 不變
+async function cancelPid(db, smid, pid, owner = 'u1') {
+  const pendings = await smidPendingFoods(db, smid, owner);
+  const entry = pendings.find((p) => p.id === pid);
+  if (!entry || entry.status !== 'pending') return false;
+  const kept = await logsForSmid(db, smid, owner);
+  const np = pendings.map((p) => (p.id === pid ? { ...p, status: 'cancelled' } : p));
+  const active = np.some((p) => p.status === 'pending');
+  await logTextInput(db, { lineUserId: owner, ownerId: owner, petId: 'p1', parseStatus: active ? 'multi_partial' : 'record', sourceMessageId: smid, resolvedPetId: 'p1', linkedLogId: kept.map((l) => l.logId).join(','), parsedResult: JSON.stringify({ events: [], savedLogIds: kept.map((l) => l.logId), pendingFoods: np, unparsedSegments: [], awaitingAction: active ? 'food_selection' : '' }) });
+  return true;
 }
 
-test('多 pending：確認第一筆食物後仍為 multi_partial（不得宣稱全部完成），另有 1 筆待確認', async () => {
+test('多 pending：確認第一筆仍 multi_partial（不宣稱完成），兩筆都確認才 record', async () => {
   const db = new D1();
   const smid = 'MSG_MULTI';
   await seedMultiPending(db, smid);
-  assert.equal((await smidPendingFoods(db, smid, 'u1')).length, 2, '起始兩筆待確認');
+  assert.equal(activeCount(await smidPendingFoods(db, smid, 'u1')), 2);
   assert.equal((await logsForSmid(db, smid, 'u1')).length, 1, '起始只有水');
 
-  await confirmOne(db, smid, '罐頭', '皇家', 33); // 確認第一筆
-  assert.equal(latestStatus(db, smid), 'multi_partial', '確認第一筆後仍 multi_partial，不算完成');
-  assert.equal((await smidPendingFoods(db, smid, 'u1')).length, 1, '還剩 1 筆待確認');
-  assert.equal((await logsForSmid(db, smid, 'u1')).length, 2, '已記錄水＋皇家罐頭');
+  assert.equal(await confirmPid(db, smid, 'p0'), true);
+  assert.equal(latestStatus(db, smid), 'multi_partial', '確認第一筆後仍 multi_partial');
+  assert.equal(activeCount(await smidPendingFoods(db, smid, 'u1')), 1, '還剩 1 筆待確認');
+  assert.equal((await logsForSmid(db, smid, 'u1')).length, 2);
 
-  await confirmOne(db, smid, '乾糧', '希爾斯', 10); // 確認第二筆
-  assert.equal(latestStatus(db, smid), 'record', '兩筆都確認後才算完成');
-  assert.equal((await smidPendingFoods(db, smid, 'u1')).length, 0);
-  const finalLogs = await logsForSmid(db, smid, 'u1');
-  assert.equal(finalLogs.length, 3, '最終水＋兩食物共三筆');
-  assert.deepEqual(finalLogs.map((l) => l.category).sort(), ['food', 'food', 'water']);
+  assert.equal(await confirmPid(db, smid, 'p1'), true);
+  assert.equal(latestStatus(db, smid), 'record', '兩筆都確認後才 record');
+  assert.equal(activeCount(await smidPendingFoods(db, smid, 'u1')), 0);
+  assert.equal((await logsForSmid(db, smid, 'u1')).length, 3);
 });
 
-test('多 pending：確認一筆、取消最後一筆 → 保留已記錄、明確標未記錄', async () => {
+test('pendingId 狀態機：取消第一筆兩次→第二次無效、不動第二筆；再確認第二筆→只 water＋第二筆', async () => {
   const db = new D1();
-  const smid = 'MSG_MULTI_CANCEL';
+  const smid = 'MSG_PID';
   await seedMultiPending(db, smid);
-  await confirmOne(db, smid, '罐頭', '皇家', 33); // 確認皇家罐頭
-  // 取消最後一筆（希爾斯乾糧）：模擬 foodCancel 尾段
-  const pending = await smidPendingFoods(db, smid, 'u1');
-  assert.equal(pending.length, 1);
-  const cancelled = pending[0];
-  assert.equal(cancelled.typedName, '希爾斯');
-  const kept = await logsForSmid(db, smid, 'u1');
-  await logTextInput(db, { lineUserId: 'u1', ownerId: 'u1', petId: 'p1', parseStatus: 'record', sourceMessageId: smid, resolvedPetId: 'p1', linkedLogId: kept.map((l) => l.logId).join(','), parsedResult: JSON.stringify({ events: [], savedLogIds: kept.map((l) => l.logId), pendingFoods: [], unparsedSegments: [], awaitingAction: '' }) });
-  // 取消後：沒有希爾斯乾糧 log；已記錄仍是水＋皇家罐頭
-  assert.equal((await smidPendingFoods(db, smid, 'u1')).length, 0);
-  assert.equal(db.prepare("SELECT COUNT(*) c FROM logs WHERE category='food' AND isDeleted=0").bind().first().c, 1, '只有皇家罐頭一筆食物，希爾斯未寫入');
-  assert.equal((await logsForSmid(db, smid, 'u1')).length, 2);
+  assert.equal(await cancelPid(db, smid, 'p0'), true, '第一次取消 p0 生效');
+  assert.equal(await cancelPid(db, smid, 'p0'), false, '重複取消同一 pid → 無效（不重複處理）');
+  // p1 仍 pending、未被連帶取消
+  const after = await smidPendingFoods(db, smid, 'u1');
+  assert.equal(after.find((p) => p.id === 'p0').status, 'cancelled');
+  assert.equal(after.find((p) => p.id === 'p1').status, 'pending', '不得取消到下一個 pending');
+  // 已 cancelled 的再確認 → 無效，不新增 log
+  assert.equal(await confirmPid(db, smid, 'p0'), false, '已取消的 pid 再確認 → 不新增 log');
+  // 確認第二筆
+  assert.equal(await confirmPid(db, smid, 'p1'), true);
+  // 已 confirmed 的再確認/再取消 → 無效
+  assert.equal(await confirmPid(db, smid, 'p1'), false, '已確認的 pid 再確認 → 無效');
+  assert.equal(await cancelPid(db, smid, 'p1'), false, '已確認的 pid 再取消 → 不撤 log');
+  const logs = await logsForSmid(db, smid, 'u1');
+  assert.equal(logs.length, 2, '最終只有 水＋希爾斯乾糧');
+  assert.deepEqual(logs.map((l) => l.category).sort(), ['food', 'water']);
+  assert.ok(logs.some((l) => l.itemName === '希爾斯'), '第二筆（希爾斯）已記');
+  assert.ok(!logs.some((l) => l.itemName === '皇家'), '第一筆（皇家）未寫入');
+  assert.equal(db.prepare("SELECT COUNT(*) c FROM logs WHERE category='food' AND isDeleted=0").bind().first().c, 1, '只有一筆食物');
+});
+
+test('pendingId 跨家庭：別家不得取消/確認我的 pending', async () => {
+  const db = new D1();
+  const smid = 'MSG_XFAM';
+  await seedMultiPending(db, smid); // owner u1
+  // u2（別家）用同一 pid 取消/確認 → smidPendingFoods(u2) 讀不到 → 無效
+  assert.equal(await cancelPid(db, smid, 'p0', 'u2'), false, '別家取消無效');
+  assert.equal(await confirmPid(db, smid, 'p0', 'u2'), false, '別家確認無效');
+  // u1 的 pending 未受影響
+  assert.equal(activeCount(await smidPendingFoods(db, smid, 'u1')), 2);
 });
 
 test('logsForSmid 不跨家庭：別家相同 smid 的紀錄讀不到', async () => {

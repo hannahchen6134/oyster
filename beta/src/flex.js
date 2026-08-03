@@ -280,12 +280,13 @@ export function recordFlexCompact({ pet, categoryKey, mainText, subText, summary
 
 // ②③ 打了品名卻對不到已建立的品項時：不默默記 0 熱量，先回這張卡讓使用者選正確品項（熱量才算得到）。
 // guessId＝模糊比對猜到最接近的品項 foodId，排最前面並標「最接近」。
-export function foodDisambigFlex({ pet, foodType, typedName, grams, addedWaterMl = 0, smid = '', options = [], guessId = '' }) {
+export function foodDisambigFlex({ pet, foodType, typedName, grams, addedWaterMl = 0, smid = '', pid = '', options = [], guessId = '' }) {
   const styleKey = foodType === '乾糧' ? 'dry' : isWetFoodType(foodType) ? 'wet' : 'note';
   const style = CATEGORY_STYLE[styleKey] || CATEGORY_STYLE.note;
   const g = Number(grams) || 0;
   const aw = Number(addedWaterMl) || 0;                       // 額外加水（ml）：選品牌後仍要完整保留
-  const carry = `&aw=${aw}&smid=${encodeURIComponent(String(smid || ''))}`; // 帶過品牌選擇的加水量與原訊息 id
+  // 帶過加水量、原訊息 id 與 pending id（pid＝多筆待確認時綁定「這一筆」，避免取消/確認動到別筆）
+  const carry = `&aw=${aw}&smid=${encodeURIComponent(String(smid || ''))}${pid ? `&pid=${encodeURIComponent(String(pid))}` : ''}`;
   const sorted = [...options].sort((a, b) => (b.foodId === guessId ? 1 : 0) - (a.foodId === guessId ? 1 : 0));
   const pickButtons = sorted.slice(0, 6).map((food) => {
     const isGuess = food.foodId === guessId;
@@ -318,7 +319,7 @@ export function foodDisambigFlex({ pet, foodType, typedName, grams, addedWaterMl
       { type: 'button', height: 'sm', style: 'link', color: C.muted,
         action: { type: 'postback', label: `只記${foodType} ${g}g`.slice(0, 20), data: `action=recFoodRaw&t=${encodeURIComponent(foodType)}&g=${g}&name=${encodeURIComponent(typedName)}${carry}`, displayText: `只記${foodType} ${g}g` } },
       { type: 'button', height: 'sm', style: 'link', color: C.muted,
-        action: { type: 'postback', label: '取消', data: `action=foodCancel&smid=${encodeURIComponent(String(smid || ''))}`, displayText: '取消' } }
+        action: { type: 'postback', label: '取消', data: `action=foodCancel&smid=${encodeURIComponent(String(smid || ''))}${pid ? `&pid=${encodeURIComponent(String(pid))}` : ''}`, displayText: '取消' } }
     ]
   };
   return bubble(`「${typedName}」是哪一個${foodType}？`, { type: 'bubble', size: 'mega', header: header(`確認品項・${pet?.petName || '貓貓'}`), body, footer });
