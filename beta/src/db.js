@@ -225,8 +225,9 @@ export async function track(db, lineUserId, event, meta = '') {
 // 保存每一則文字輸入的原文＋解析結果，供分析「大家實際打什麼、卡在哪」。
 // 重要容錯：這張表寫入失敗「不得」讓原本可成功的照護紀錄失敗——全程 try/catch 吞掉，
 // 呼叫端也一律「先完成 logs 寫入，再記 text_inputs」，兩者不綁在同一交易。
-// 保存期限：規劃保留 90 天（僅測試分析用）；本階段先不建自動清理排程，
-// 之後以 purgeOldTextInputs（見下）或手動 DELETE createdAt < now-90d 清除，不預設永久保存。
+// 保存期限（隱私/資料生命週期缺口，部署前需注意）：
+//   規劃保留 90 天，但「自動清理尚未啟用」——在排程完成前，rawText 可能持續保存。
+//   目前僅提供 purgeOldTextInputs（見下）供手動/未來排程呼叫；不得對外描述為「已保留 90 天」。
 let textInputsReady = false;
 export async function logTextInput(db, r = {}) {
   try {

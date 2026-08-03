@@ -223,7 +223,8 @@ CREATE TABLE IF NOT EXISTS tasks (
 CREATE INDEX IF NOT EXISTS idx_tasks_pet ON tasks(petId, status, scheduledAt);
 
 -- 文字輸入原始紀錄（獨立於正式 logs，不進任何摘要）：保存原文＋解析結果，供分析「大家實際打什麼、卡在哪」。
--- 寫入失敗不得影響照護紀錄（呼叫端 try/catch、先寫 logs 再記這裡）。規劃保留 90 天，非永久。
+-- 寫入失敗不得影響照護紀錄（呼叫端 try/catch、先寫 logs 再記這裡）。
+-- 資料生命週期：規劃保留 90 天，但自動清理尚未啟用；在排程完成前資料可能持續保存（部署前隱私缺口）。
 CREATE TABLE IF NOT EXISTS text_inputs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   lineUserId TEXT NOT NULL DEFAULT '',
