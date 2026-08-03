@@ -221,6 +221,61 @@ export async function track(db, lineUserId, event, meta = '') {
   } catch (error) { /* 追蹤壞掉不能影響產品 */ }
 }
 
+// ---------- text_inputs（文字輸入的原始紀錄；獨立於正式 logs，不進任何摘要）----------
+// 保存每一則文字輸入的原文＋解析結果，供分析「大家實際打什麼、卡在哪」。
+// 重要容錯：這張表寫入失敗「不得」讓原本可成功的照護紀錄失敗——全程 try/catch 吞掉，
+// 呼叫端也一律「先完成 logs 寫入，再記 text_inputs」，兩者不綁在同一交易。
+// 保存期限：規劃保留 90 天（僅測試分析用）；本階段先不建自動清理排程，
+// 之後以 purgeOldTextInputs（見下）或手動 DELETE createdAt < now-90d 清除，不預設永久保存。
+let textInputsReady = false;
+export async function logTextInput(db, r = {}) {
+  try {
+    if (!textInputsReady) {
+      await db.prepare(
+        `CREATE TABLE IF NOT EXISTS text_inputs (
+           id INTEGER PRIMARY KEY AUTOINCREMENT,
+           lineUserId TEXT NOT NULL DEFAULT '',
+           ownerLineUserId TEXT NOT NULL DEFAULT '',
+           petId TEXT NOT NULL DEFAULT '',
+           rawText TEXT NOT NULL DEFAULT '',
+           parseStatus TEXT NOT NULL DEFAULT '',
+           failReason TEXT NOT NULL DEFAULT '',
+           sourceMessageId TEXT NOT NULL DEFAULT '',
+           resolvedPetId TEXT NOT NULL DEFAULT '',
+           linkedLogId TEXT NOT NULL DEFAULT '',
+           parsedResult TEXT NOT NULL DEFAULT '',
+           createdAt TEXT NOT NULL
+         )`
+      ).run();
+      textInputsReady = true;
+    }
+    await db.prepare(
+      `INSERT INTO text_inputs (lineUserId, ownerLineUserId, petId, rawText, parseStatus, failReason, sourceMessageId, resolvedPetId, linkedLogId, parsedResult, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(
+      String(r.lineUserId || ''),
+      String(r.ownerId || r.ownerLineUserId || ''),
+      String(r.petId || ''),
+      String(r.rawText || ''),
+      String(r.parseStatus || ''),
+      String(r.failReason || ''),
+      String(r.sourceMessageId || ''),
+      String(r.resolvedPetId || ''),
+      String(r.linkedLogId || ''),
+      typeof r.parsedResult === 'string' ? r.parsedResult : JSON.stringify(r.parsedResult || ''),
+      nowIso()
+    ).run();
+  } catch (error) { /* raw 紀錄壞掉不得影響照護紀錄 */ }
+}
+
+// 清除逾期的原始文字輸入（預設保留 90 天）。本階段不自動排程，供未來排程或手動呼叫。
+export async function purgeOldTextInputs(db, days = 90) {
+  try {
+    const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+    await db.prepare('DELETE FROM text_inputs WHERE createdAt < ?').bind(cutoff).run();
+  } catch (error) { /* 清理失敗不影響產品 */ }
+}
+
 // ---------- app_kv（一般鍵值：目前存 LINE 自動換發權杖）----------
 export async function appKvGet(db, key) {
   const row = await db.prepare('SELECT v FROM app_kv WHERE k = ?').bind(String(key)).first();

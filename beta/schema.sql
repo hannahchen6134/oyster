@@ -221,3 +221,22 @@ CREATE TABLE IF NOT EXISTS tasks (
   updatedAt TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_tasks_pet ON tasks(petId, status, scheduledAt);
+
+-- 文字輸入原始紀錄（獨立於正式 logs，不進任何摘要）：保存原文＋解析結果，供分析「大家實際打什麼、卡在哪」。
+-- 寫入失敗不得影響照護紀錄（呼叫端 try/catch、先寫 logs 再記這裡）。規劃保留 90 天，非永久。
+CREATE TABLE IF NOT EXISTS text_inputs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  lineUserId TEXT NOT NULL DEFAULT '',
+  ownerLineUserId TEXT NOT NULL DEFAULT '',
+  petId TEXT NOT NULL DEFAULT '',
+  rawText TEXT NOT NULL DEFAULT '',
+  parseStatus TEXT NOT NULL DEFAULT '',
+  failReason TEXT NOT NULL DEFAULT '',
+  sourceMessageId TEXT NOT NULL DEFAULT '',
+  resolvedPetId TEXT NOT NULL DEFAULT '',
+  linkedLogId TEXT NOT NULL DEFAULT '',
+  parsedResult TEXT NOT NULL DEFAULT '',
+  createdAt TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_text_inputs_user ON text_inputs(lineUserId, createdAt);
+CREATE INDEX IF NOT EXISTS idx_text_inputs_created ON text_inputs(createdAt);

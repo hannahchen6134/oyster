@@ -517,6 +517,11 @@ function prefixIsOnlyNoise(prefix) {
   return p.length === 0;
 }
 
+// 黏著偵測「只」用非食物類的事件詞：因為「罐頭/乾糧/濕食…」常內嵌在食物名字裡
+// （希爾斯罐頭、皇家乾糧），拿它們在 token 內比對會誤切食物名。食物名＋份量交第二階段處理。
+const FOOD_TYPE_WORD_SET = new Set(FOOD_TYPE_WORDS.flatMap((e) => e.words));
+const EMBED_HEAD_WORDS = ALL_HEAD_WORDS.filter((w) => !FOOD_TYPE_WORD_SET.has(w));
+
 function parsesToRecord(text) {
   const r = parseMessage(text);
   return r.type === 'record' || r.type === 'multiRecord';
@@ -540,10 +545,10 @@ function findLeadingUnknown(norm) {
       return { prefix: prefix.trim(), eventText: rest };
     }
   }
-  // 階段二：黏著情況——在第一個 token 內找最早出現的事件詞
+  // 階段二：黏著情況——在第一個 token 內找最早出現的事件詞（只找非食物類，避免誤切食物名）
   const first = tokens[0] || '';
   let bestIdx = -1;
-  for (const w of ALL_HEAD_WORDS) {
+  for (const w of EMBED_HEAD_WORDS) {
     const i = first.indexOf(w);
     if (i > 0 && (bestIdx === -1 || i < bestIdx)) bestIdx = i;
   }

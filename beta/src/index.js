@@ -3,7 +3,7 @@
 // /api/*    → 照護站 REST API
 // 其餘路徑 → 照護站網站（public/ 靜態資源）
 
-import { parseMessage, matchFood, guessFood, normalizeText } from './parser.js';
+import { parseMessage, matchFood, guessFood, normalizeText, analyzeLeading } from './parser.js';
 import { deriveFoodFields, isWetFoodType, isEstimableType, buildHandoff } from './summary.js';
 import { handleApi } from './api.js';
 import { verifyLineSignature, replyOrPush, replyOrPushQuick, replyOrPushFlex, replyMessages, pushText, pushMessages, getProfile, getAccessToken, checkAccessToken } from './line.js';
@@ -25,7 +25,7 @@ import {
   websiteReply, helpText, welcomeText, unknownReply, invalidReply,
   recordTutorial, medTutorial, onboardingText, recordPrompt, backfillGuide
 } from './replies.js';
-import { getRecentLogsByPet, ensureTaskSchema, getLogsForDay } from './db.js';
+import { getRecentLogsByPet, ensureTaskSchema, getLogsForDay, logTextInput } from './db.js';
 import { jsonResponse, taipeiToday, taipeiNowDateTime, addDays } from './util.js';
 
 // 官方 LINE 加好友連結（basicId @232mjffx）——給共同照護邀請用
@@ -1135,6 +1135,29 @@ async function handlePostback(event, env, baseUrl) {
     return;
   }
 
+  // 不明句首澄清：使用者選了要記哪隻貓 → 用 postback 帶回來的事件文字寫入，保留原事件、不用重打。
+  // 事件文字來自「已解析可成立」的後段，這裡再 parse 一次落地；選貓＝確認，選貓前正式 logs 為 0 筆。
+  if (action === 'pickcatFor') {
+    const petId = data.get('petId') || '';
+    const ev = data.get('ev') || '';
+    const pets = await listPets(db, ownerId);
+    const chosen = pets.find((p) => p.petId === petId);
+    if (!chosen) { await replyOrPush(env, event, '找不到這隻貓，請重新輸入一次。'); return; }
+    const sub = parseMessage(ev);
+    const recs = sub.type === 'multiRecord' ? sub.records : (sub.type === 'record' ? [sub.record] : []);
+    if (!recs.length) { await replyOrPush(env, event, '這筆我沒抓到內容，請重新輸入一次。'); return; }
+    const user = await getUser(db, lineUserId);
+    const caregiverName = ownerId !== lineUserId ? String(user.displayName || '') : '';
+    const savedIds = [];
+    for (const rec of recs) {
+      const res = await handleRecord(env, event, chosen, rec, ownerId, { silent: recs.length > 1, actorId: lineUserId, caregiverName, baseUrl });
+      if (res?.savedLog?.logId) savedIds.push(res.savedLog.logId);
+    }
+    await logTextInput(db, { lineUserId, ownerId, petId: chosen.petId, rawText: ev, parseStatus: 'record', failReason: '', sourceMessageId: '', resolvedPetId: chosen.petId, linkedLogId: savedIds.join(','), parsedResult: JSON.stringify(recs) });
+    if (recs.length > 1) await replyOrPush(env, event, `已記到「${chosen.petName}」✓ 共 ${recs.length} 筆`);
+    return;
+  }
+
   // 月曆點某一天 → 回那天的總結卡
   if (action === 'calDay') {
     const date = data.get('date') || '';
@@ -1356,11 +1379,23 @@ async function handleTextMessage(event, env, baseUrl) {
   let pet = await resolveDefaultPet(db, user, pets);
   let switchTarget = null;
   let explicitPet = false; // 這則有沒有「明確指定貓」（打名字前綴），有的話就不用再問要記哪隻
+  let leadPick = null;     // 不明句首＋後段可解析（例：旺財 喝水 1ml）→ 待問要記哪隻貓，先不寫入
   for (const candidate of pets) {
     const names = [candidate.petName, `@${candidate.petName}`];
     if (names.includes(text)) { switchTarget = candidate; break; }
     const pfx = names.find((n) => text.startsWith(`${n} `));
     if (pfx) { pet = candidate; explicitPet = true; text = text.slice(pfx.length).trim(); break; }
+  }
+  // 既有「貓名＋空格」沒命中時，補：①黏著／標點的已知貓名（蚵仔喝水1ml、蚵仔，喝水1ml）→ 指定該貓；
+  // ②不明句首＋後段可解析（旺財 喝水 1ml）→ 不靜默寫預設貓，改問要記哪隻。既有正常格式不受影響（clean）。
+  if (!switchTarget && !explicitPet) {
+    const lead = analyzeLeading(text, pets.map((p) => p.petName));
+    if (lead.kind === 'named') {
+      const target = pets.find((p) => p.petName === lead.petName);
+      if (target) { pet = target; explicitPet = true; text = lead.rest; }
+    } else if (lead.kind === 'leadingUnknown') {
+      leadPick = lead;
+    }
   }
   if (switchTarget) {
     if (pets.length > 1) {
@@ -1396,6 +1431,21 @@ async function handleTextMessage(event, env, baseUrl) {
   if (user.pendingAction) {
     const consumed = await handlePending(env, event, { db, user, pet, pets, lineUserId, ownerId, text, baseUrl });
     if (consumed) return;
+  }
+
+  // 不明句首（前段不明、後段可解析）→ 不猜前段是貓名、不靜默寫預設貓；請使用者選貓。
+  // 選貓（postback）前正式 logs 為 0 筆；事件文字帶在 postback，選完保留原事件、不用重打。
+  if (leadPick) {
+    const catBtns = pets.slice(0, 12).map((p) => qrPost(p.petName, `action=pickcatFor&petId=${p.petId}&ev=${encodeURIComponent(leadPick.eventText)}`, p.petName));
+    await logTextInput(db, {
+      lineUserId, ownerId, petId: '', rawText: event.message?.text || '',
+      parseStatus: 'ask_cat', failReason: 'leading_unknown', sourceMessageId: String(event.message?.id || ''),
+      resolvedPetId: '', linkedLogId: '', parsedResult: JSON.stringify({ prefix: leadPick.prefix, eventText: leadPick.eventText })
+    });
+    await replyOrPushQuick(env, event,
+      `我看得懂「${leadPick.eventText}」，但不確定前面的「${leadPick.prefix}」代表什麼。\n請選要記錄的貓咪，或直接重新輸入：`,
+      catBtns);
+    return;
   }
 
   const intent = parseMessage(text);
@@ -1573,7 +1623,8 @@ async function handleTextMessage(event, env, baseUrl) {
         pet = await createPet(db, ownerId, { petName: '貓貓' });
         await updateUser(db, lineUserId, { defaultPetId: pet.petId });
       }
-      await handleRecord(env, event, pet, intent.record, ownerId, { actorId: lineUserId, caregiverName, baseUrl });
+      const recRes = await handleRecord(env, event, pet, intent.record, ownerId, { actorId: lineUserId, caregiverName, baseUrl });
+      await logTextInput(db, { lineUserId, ownerId, petId: pet.petId, rawText: event.message?.text || '', parseStatus: 'record', failReason: '', sourceMessageId: String(event.message?.id || ''), resolvedPetId: pet.petId, linkedLogId: recRes?.savedLog?.logId || '', parsedResult: JSON.stringify(intent.record) });
       return;
     }
 
@@ -1584,13 +1635,16 @@ async function handleTextMessage(event, env, baseUrl) {
         await updateUser(db, lineUserId, { defaultPetId: pet.petId });
       }
       const lines = [];
+      const savedIds = [];
       let lastSummary = null;
       let lastDate = '';
       for (const rec of intent.records) {
         const res = await handleRecord(env, event, pet, rec, ownerId, { silent: true, actorId: lineUserId, caregiverName });
         if (res?.mainText) lines.push(res.mainText);
+        if (res?.savedLog?.logId) savedIds.push(res.savedLog.logId);
         if (res?.summary) { lastSummary = res.summary; lastDate = res.eventDate; }
       }
+      await logTextInput(db, { lineUserId, ownerId, petId: pet.petId, rawText: event.message?.text || '', parseStatus: lines.length ? 'multiRecord' : 'unknown', failReason: lines.length ? '' : 'no_valid_segment', sourceMessageId: String(event.message?.id || ''), resolvedPetId: pet.petId, linkedLogId: savedIds.join(','), parsedResult: JSON.stringify(intent.records) });
       if (!lines.length) { await guideUnknown(env, event, pet?.petId || ''); return; }
       const fallback = `已記錄 ${lines.length} 筆：\n${lines.map((line) => `· ${line}`).join('\n')}`;
       const multiSiteUrl = await siteLink(env, baseUrl, lineUserId);
@@ -1688,6 +1742,7 @@ async function handleTextMessage(event, env, baseUrl) {
     }
 
     case 'invalid': {
+      await logTextInput(db, { lineUserId, ownerId, petId: '', rawText: event.message?.text || '', parseStatus: 'invalid', failReason: intent.reason || '', sourceMessageId: String(event.message?.id || ''), resolvedPetId: '', linkedLogId: '', parsedResult: JSON.stringify({ category: intent.category, reason: intent.reason }) });
       if (intent.reason === 'missing_amount' && intent.category === 'food' && pet) {
         await updateUser(db, lineUserId, { pendingAction: `amount|${text}` });
         await replyOrPush(env, event, '幾克呢？直接打數字就好');
@@ -1699,6 +1754,7 @@ async function handleTextMessage(event, env, baseUrl) {
 
     default: {
       // 看不懂不當死路：教打字 ＋ 這隻貓的一鍵捷徑，順手就能記
+      await logTextInput(db, { lineUserId, ownerId, petId: '', rawText: event.message?.text || '', parseStatus: 'unknown', failReason: 'unrecognized', sourceMessageId: String(event.message?.id || ''), resolvedPetId: '', linkedLogId: '', parsedResult: '' });
       await guideUnknown(env, event, pet?.petId || '');
     }
   }
