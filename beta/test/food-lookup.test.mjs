@@ -43,18 +43,23 @@ test('中性候選：皇家33（只有品名＋數量、無類別詞）→ item_
   assert.equal(r.foodType, undefined); // parser 不臆測類型
 });
 
-test('安全：品名含「水」不得誤切出 water；黏著水事件保守放棄不誤記', () => {
-  // 皇家水解蛋白33 水8：句尾「水8」是獨立水事件，品名裡的「水」不切
+test('安全：品名含「水」不得誤切出 water（Commit2 後品名保留、句尾水正常切）', () => {
+  // 皇家水解蛋白33 水8：句尾「水8」是獨立水事件，品名裡的「水」不切；品名段（無類別詞）保留在 unparsed
   const r1 = parseMessage('皇家水解蛋白33水8');
   assert.equal(r1.type, 'multiRecord');
   assert.ok(water(r1) && water(r1).amount === 8, '句尾水8應記');
   assert.ok((r1.unparsed || []).some((u) => u.includes('水解蛋白')), '品名段保留，不誤切成 water');
-  assert.ok(!r1.records.some((x) => x.category === 'food'), 'Commit1：水解蛋白暫不誤記成食物（留 Commit2）');
-  // 罐頭皇家水8：類別詞黏著、無法乾淨切出 → 保守不誤記
-  assert.equal(parseMessage('罐頭皇家水8').type, 'unknown');
-  // 水解蛋白罐頭33：Commit1 保守（含水的品名）→ 不誤記、不誤切 water
+  // 罐頭皇家水8：RC3 切出句尾水8；罐頭皇家（無克數）保留、不誤記成食物
+  const r2 = parseMessage('罐頭皇家水8');
+  assert.equal(r2.type, 'multiRecord');
+  assert.ok(water(r2) && water(r2).amount === 8);
+  assert.ok((r2.unparsed || []).some((u) => u.includes('罐頭皇家')));
+  // 水解蛋白罐頭33：Commit2 後認得食物（罐頭/水解蛋白/33），且不誤切出獨立 water
   const r3 = parseMessage('水解蛋白罐頭33');
-  assert.notEqual(r3.type, 'multiRecord'); // 不會冒出獨立 water
+  assert.equal(r3.type, 'record');
+  assert.equal(r3.record.category, 'food');
+  assert.equal(r3.record.foodType, '罐頭');
+  assert.equal(r3.record.itemName, '水解蛋白');
 });
 
 // ---------- part B：exactFoodMatches 唯一/多筆/無 ----------

@@ -45,7 +45,7 @@ const CONNECTOR_WORDS = ['然後', '接著', '再'];
 
 const MED_STATUS_WORDS = [
   { status: '已吃', words: ['已吃', '已餵', '有吃', '有餵', '吃了', '餵了', 'ok'] },
-  { status: '漏餵', words: ['未餵', '漏餵', '漏', '忘記', '忘了', '沒餵', '沒餵到', '沒吃到'] },
+  { status: '漏餵', words: ['未餵', '未吃', '漏餵', '漏', '忘記', '忘了', '沒餵', '沒餵到', '沒吃到'] },
   { status: '吐掉', words: ['吐掉', '吐出', '吐了'] },
   { status: '拒吃', words: ['拒吃', '不吃', '沒吃', '拒絕'] }
 ];
@@ -78,14 +78,53 @@ const RECORD_PROMPT_WORDS = {
   '記精神': 'mood', '記備註': 'note'
 };
 
+// ── RC2：中文數字（僅在數量上下文轉阿拉伯數字，避免全句誤轉）──
+function cnToArabic(s) {
+  const D = { 零: 0, 一: 1, 二: 2, 兩: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 };
+  const U = { 十: 10, 百: 100 };
+  let section = 0, num = 0, seen = false;
+  for (const ch of String(s)) {
+    if (ch in D) { num = D[ch]; seen = true; }
+    else if (ch in U) { section += (num || 1) * U[ch]; num = 0; seen = true; }
+    else return null;
+  }
+  return seen ? section + num : null;
+}
+const CN_RUN = '[零一二兩三四五六七八九十百]+';
+const CN_UNIT = 'g|ml|cc|c\\.c\\.?|公克|克|毫升';
+const CN_TYPE_ANCHOR = FOOD_TYPE_WORDS.flatMap((e) => e.words).sort((a, b) => b.length - a.length).join('|');
+const CN_WATER_ANCHOR = '喝水|飲水|加水|清水|泡水|兌水|水|喝';
+// 中文數字要被視為「完整數量」的右界（單位／水詞／空白／數字／句尾）——避免「三花貓」「一半」的三、一誤轉
+const CN_RIGHT_BOUND = `(?=${CN_UNIT}|${CN_WATER_ANCHOR}|$|\\s|\\d)`;
+const CN_RE_A = new RegExp(`(${CN_RUN})(${CN_UNIT})`, 'gi');
+const CN_RE_B = new RegExp(`(${CN_TYPE_ANCHOR}|${CN_WATER_ANCHOR})(${CN_RUN})${CN_RIGHT_BOUND}`, 'g');
+const CN_RE_C = new RegExp(`(${CN_RUN})(${CN_WATER_ANCHOR})`, 'g');
+function convertCnNumbers(text) {
+  let t = text;
+  // A：中文數字＋單位（三十三克、八毫升）
+  t = t.replace(CN_RE_A, (m, n, u) => { const v = cnToArabic(n); return v == null ? m : ` ${v} ${u} `; });
+  // B：類型/水詞＋中文數字（罐頭三十三、水八），且右界是完整數量
+  t = t.replace(CN_RE_B, (m, w, n) => { const v = cnToArabic(n); return v == null ? m : `${w} ${v} `; });
+  // C：中文數字＋水詞（三十三水）
+  t = t.replace(CN_RE_C, (m, n, w) => { const v = cnToArabic(n); return v == null ? m : ` ${v} ${w} `; });
+  return t;
+}
+
 export function normalizeText(value) {
   let text = String(value || '');
   // 全形轉半形（含全形空白）
   text = text.replace(/[！-～]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0));
   text = text.replace(/　/g, ' ');
+  // RC2：中文數字→阿拉伯（僅數量上下文，非全句）
+  text = convertCnNumbers(text);
   // 中文字與數字相連時補空白：水20 → 水 20、乾糧4g → 乾糧 4g
   text = text.replace(/([一-鿿])(\d)/g, '$1 $2');
   text = text.replace(/(\d(?:[a-zA-Z.]*)?)([一-鿿])/g, '$1 $2');
+  // RC3：中文單位詞黏在後字時補空白（33克水8 → 33 克 水 8、8毫升早藥 → 8 毫升 早藥）
+  text = text.replace(/(公克|克|毫升|cc)([^\s\d])/g, '$1 $2');
+  // RC3：水事件詞黏在中文名後、且後接數量（皇家水8 的「水8」）→ 在水前補空白；
+  //      品名裡的水（水解蛋白：水後非數字）不動；加水/喝水/泡水… 的水不切（前一字被排除）
+  text = text.replace(/([^\s加喝泡清兌飲\d])(水)(?=\s*\d)/g, '$1 $2');
   // 逗號、頓號視為段落分隔（語音/打字常見）；換行已由下方 \s+ 收成空白
   text = text.replace(/[,、]/g, ' ');
   // 「加水/清水/泡水/兌水」與前後字分開，避免「克加水」黏成一詞、把加水量抓錯或漏掉
@@ -170,9 +209,18 @@ const FLAT_FOOD_TYPE_WORDS = FOOD_TYPE_WORDS
   .flatMap((e) => e.words.map((w) => ({ type: e.type, word: w })))
   .sort((a, b) => b.word.length - a.word.length);
 
-// Commit 1 護欄：殘餘品名若含事件詞字（水／藥）→ 代表這段其實黏了別的事件（罐頭皇家水8）
-// 或品名本身含「水」（水解蛋白）——兩者都保守放棄、不誤記，留給 Commit 2（RC3 有上下文切分）處理。
-const EVENT_CHAR_IN_NAME = /[水藥]/;
+// RC3：黏字用藥事件（早藥吃了／晚藥已吃／藥早吃了）——必須「含藥」且有時段或狀態才算，
+// 品名含「藥」但無時段/狀態（藥膳罐頭）不誤判成用藥。回傳 {medSlot, medStatus} 或 null。
+function parseMedToken(token) {
+  const t = String(token || '');
+  if (!t.includes('藥')) return null;
+  let medSlot = '';
+  for (const entry of MED_SLOT_WORDS) { if (entry.words.some((w) => t.includes(w))) { medSlot = entry.slot; break; } }
+  let medStatus = '';
+  for (const entry of MED_STATUS_WORDS) { if (entry.words.some((w) => t.includes(w))) { medStatus = entry.status; break; } }
+  if (!medSlot && !medStatus) return null; // 只有「藥」、無時段無狀態 → 不當用藥（品名含藥字）
+  return { medSlot, medStatus: medStatus || '已吃', itemName: '' };
+}
 
 // RC1：類型詞與品名黏著或倒序（罐頭皇家33／皇家罐頭33／皇家33罐頭）時，仍解析出
 // {類型, 品名候選, 數量}。只用「類型詞＋數字＋既有單位規則」，品名一律當剩餘文字，不寫死任何品牌。
@@ -192,10 +240,9 @@ function parseFoodExpression(tokens, dayOffset, time) {
     if (i >= 0) { hit = { type: e.type, word: e.word, i }; break; }
   }
   if (!hit) return null;
-  // 品名候選＝blob 去掉「這一個」類型詞（罐頭皇家→皇家、皇家罐頭→皇家、皇家罐頭→皇家）
+  // 品名候選＝blob 去掉「這一個」類型詞（罐頭皇家→皇家、皇家罐頭→皇家、水解蛋白罐頭→水解蛋白）
+  // RC3 後：真正的水/藥事件已在切段階段被切成獨立段落，故品名裡的「水」（水解蛋白）可安全保留。
   const brand = (blob.slice(0, hit.i) + blob.slice(hit.i + hit.word.length)).trim();
-  // 護欄：殘餘品名含事件字（水／藥）→ 這段可能黏了別的事件或品名含水，Commit 1 保守放棄
-  if (EVENT_CHAR_IN_NAME.test(brand)) return null;
   const record = emptyRecord();
   record.dayOffset = dayOffset;
   record.time = time;
@@ -216,7 +263,8 @@ function parseItemLookupCandidate(tokens, dayOffset, time) {
   if (!amount) return null;
   const nameTokens = rest.filter((t) => !parseAmountToken(t) && !UNIT_ONLY_WORDS.has(t.toLowerCase()));
   const itemName = nameTokens.join(' ').trim();
-  if (!itemName || EVENT_CHAR_IN_NAME.test(itemName) || LEAD_VERBS.has(itemName)) return null;
+  // RC3 後：品名含「水」（水解蛋白）可保留——真正的水事件已在切段階段被切走。
+  if (!itemName || LEAD_VERBS.has(itemName)) return null;
   return { type: 'item_lookup_candidate', itemName, amount, unit: 'g', addedWaterMl, dayOffset, time };
 }
 
@@ -391,7 +439,9 @@ function isSegmentHead(token) {
     || SUPPLEMENT_HEAD_WORDS.has(token) || MOOD_WORDS.has(token) || MOOD_DETAIL_WORDS.has(token)
     || NOTE_WORDS.has(token)
   ) return true;
-  return Boolean(matchWordList(token, FOOD_TYPE_WORDS));
+  if (matchWordList(token, FOOD_TYPE_WORDS)) return true;
+  // RC3：黏字用藥事件（早藥吃了）也是段落起始，才不會被吞進前一段（水）的備註
+  return Boolean(parseMedToken(token));
 }
 
 // 以「類別起始詞」為界，把 token 切成多段（每段一筆紀錄）。
@@ -409,11 +459,11 @@ function splitSegments(tokens) {
     if (isSegmentHead(token) && current.length && !medStatusInMed && !waterInFood) {
       segments.push(current);
       current = [token];
-      currentIsMed = MED_WORDS.has(token);
+      currentIsMed = MED_WORDS.has(token) || Boolean(parseMedToken(token));
       currentIsFood = Boolean(matchWordList(token, FOOD_TYPE_WORDS));
     } else {
       if (!current.length) {
-        currentIsMed = MED_WORDS.has(token);
+        currentIsMed = MED_WORDS.has(token) || Boolean(parseMedToken(token));
         currentIsFood = Boolean(matchWordList(token, FOOD_TYPE_WORDS));
       }
       current.push(token);
@@ -464,8 +514,10 @@ function parseSegment(tokens, dayOffset, time) {
     return { type: 'record', record };
   }
 
-  // 藥物：藥 [名稱] [早|中午|晚] [已吃|漏餵|吐掉|拒吃]
-  if (MED_WORDS.has(head)) {
+  // 藥物：藥 [名稱] [早|中午|晚] [已吃|漏餵|吐掉|拒吃]；或黏字用藥（早藥吃了）＝head 本身帶時段/狀態
+  const medFromHead = MED_WORDS.has(head) ? null : parseMedToken(head);
+  if (MED_WORDS.has(head) || medFromHead) {
+    if (medFromHead) { record.medSlot = medFromHead.medSlot; record.medStatus = medFromHead.medStatus; }
     const nameParts = [];
     for (const token of rest) {
       const slotEntry = matchWordList(token, MED_SLOT_WORDS);
