@@ -84,20 +84,54 @@ test('回歸：沒有家庭貓名清單時，一般格式仍 clean、不誤判',
   assert.equal(analyzeLeading('喝水1ml', []).kind, 'clean');
 });
 
-// 食物名內含類別詞（希爾斯「罐頭」）不得被誤切：第一階段一律安全退回 clean，
-// 交由第二階段「已知 food_item 比對」正式處理，不在這裡靜默降級成通用罐頭。
-test('安全退讓：貓名＋食物名＋份量（蚵仔希爾斯罐頭23g）→ clean，不誤切成通用罐頭', () => {
-  assert.equal(analyzeLeading('蚵仔希爾斯罐頭23g', FAMILY).kind, 'clean');
+// 食物名內含類別詞（希爾斯「罐頭」）不得被誤切成通用罐頭。已知貓名先剝離：
+//  - 剝出貓名、後段像食物名＋份量卻無法可靠解析 → partial（辨認到貓、但不寫入，交第二階段）
+//  - 沒有貓名 → clean（走一般 unknown）
+test('A. 蚵仔喝水1ml → named 蚵仔／water／1ml', () => {
+  const r = analyzeLeading('蚵仔喝水1ml', FAMILY);
+  assert.equal(r.kind, 'named');
+  assert.equal(r.petName, '蚵仔');
+  assert.equal(ev(r.rest), 'water 1ml');
 });
 
-test('安全退讓：食物名＋份量（希爾斯罐頭23g）→ clean，不把貓名/品名丟掉', () => {
+test('B. 蚵仔希爾斯罐頭23g → partial（辨認蚵仔，不寫入、不降級成通用罐頭）', () => {
+  const r = analyzeLeading('蚵仔希爾斯罐頭23g', FAMILY);
+  assert.equal(r.kind, 'partial');
+  assert.equal(r.petName, '蚵仔');
+  assert.equal(r.rest, '希爾斯罐頭 23g');
+});
+
+test('B. 標點版 蚵仔，希爾斯罐頭23g → partial（辨認蚵仔）', () => {
+  const r = analyzeLeading('蚵仔，希爾斯罐頭23g', FAMILY);
+  assert.equal(r.kind, 'partial');
+  assert.equal(r.petName, '蚵仔');
+});
+
+test('C. 希爾斯罐頭23g → clean（無貓名，不猜品項；走 unknown）', () => {
   assert.equal(analyzeLeading('希爾斯罐頭23g', FAMILY).kind, 'clean');
+  assert.equal(parseMessage('希爾斯罐頭23g').type, 'unknown');
 });
 
-test('安全退讓：標點版 蚵仔，希爾斯罐頭23g → clean', () => {
-  assert.equal(analyzeLeading('蚵仔，希爾斯罐頭23g', FAMILY).kind, 'clean');
+test('D. 旺財 喝水1ml（家庭無旺財）→ leadingUnknown（不得寫預設貓）', () => {
+  const r = analyzeLeading('旺財 喝水1ml', FAMILY);
+  assert.equal(r.kind, 'leadingUnknown');
+  assert.equal(r.prefix, '旺財');
 });
 
-test('食物類詞不得觸發黏著問貓：旺財乾糧5（乾糧內含類別詞）→ clean（退回現況）', () => {
+test('E. 旺財希爾斯罐頭23g → clean（不猜貓、不猜食物；走 unknown）', () => {
+  assert.equal(analyzeLeading('旺財希爾斯罐頭23g', FAMILY).kind, 'clean');
+  assert.equal(parseMessage('旺財希爾斯罐頭23g').type, 'unknown');
+});
+
+test('F. 罐頭30 → clean，且既有通用食物格式仍正常解析', () => {
+  assert.equal(analyzeLeading('罐頭30', FAMILY).kind, 'clean');
+  const r = parseMessage('罐頭30');
+  assert.equal(r.type, 'record');
+  assert.equal(r.record.category, 'food');
+  assert.equal(r.record.foodType, '罐頭');
+  assert.equal(r.record.amount, 30);
+});
+
+test('旺財乾糧5（乾糧內含類別詞、旺財非貓）→ clean（不誤切、不問貓）', () => {
   assert.equal(analyzeLeading('旺財乾糧5', FAMILY).kind, 'clean');
 });

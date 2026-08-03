@@ -565,15 +565,22 @@ export function analyzeLeading(rawText, petNames = []) {
   const norm = normalizeText(rawText);
   if (!norm) return { kind: 'clean' };
 
-  // 1) 句首已知貓名（同家庭；長到短，避免「咪」誤吃「咪咪」；空格／黏著／標點皆可）
+  // 1) 句首已知貓名（同家庭；長到短，避免「咪」誤吃「咪咪」；空格／黏著／標點皆可）——最先執行
   const names = [...petNames].filter(Boolean).sort((a, b) => b.length - a.length);
   for (const name of names) {
     if (norm === name) return { kind: 'clean' };            // 只打貓名 → 交回既有「切換預設貓」流程
     if (norm.startsWith(name)) {
       const rest = norm.slice(name.length).replace(LEADING_SEP, '');
       if (!rest) return { kind: 'clean' };
-      // 剝了要能解析才算數（避免貓名與關鍵字碰撞，例如貓叫「水」時誤傷「水 20」）
+      // 剝出貓名後能可靠解析 → named（可寫入該貓）
       if (parsesToRecord(rest)) return { kind: 'named', petName: name, rest };
+      // 剝出貓名、但後段像「食物名＋份量」卻無法可靠解析（如 希爾斯罐頭23g）→ partial：
+      // 辨認到貓、但「不寫入、不降級成通用罐頭」；交第二階段用 food_item 精確比對／澄清。
+      // 加「像食物/有數量」條件，避免把「蚵仔你好嗎」這種閒聊也當 partial。
+      if (/\d/.test(rest) || [...FOOD_TYPE_WORD_SET].some((w) => rest.includes(w))) {
+        return { kind: 'partial', petName: name, rest };
+      }
+      // 其餘（純文字、非食物非數量）→ 交回既有流程當一般 unknown
     }
   }
 

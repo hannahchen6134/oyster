@@ -1380,6 +1380,7 @@ async function handleTextMessage(event, env, baseUrl) {
   let switchTarget = null;
   let explicitPet = false; // 這則有沒有「明確指定貓」（打名字前綴），有的話就不用再問要記哪隻
   let leadPick = null;     // 不明句首＋後段可解析（例：旺財 喝水 1ml）→ 待問要記哪隻貓，先不寫入
+  let leadPartial = null;  // 已辨認貓、但後段（像食物名＋份量）尚無法可靠解析（例：蚵仔希爾斯罐頭23g）→ 不寫入
   for (const candidate of pets) {
     const names = [candidate.petName, `@${candidate.petName}`];
     if (names.includes(text)) { switchTarget = candidate; break; }
@@ -1393,6 +1394,8 @@ async function handleTextMessage(event, env, baseUrl) {
     if (lead.kind === 'named') {
       const target = pets.find((p) => p.petName === lead.petName);
       if (target) { pet = target; explicitPet = true; text = lead.rest; }
+    } else if (lead.kind === 'partial') {
+      leadPartial = lead;
     } else if (lead.kind === 'leadingUnknown') {
       leadPick = lead;
     }
@@ -1431,6 +1434,23 @@ async function handleTextMessage(event, env, baseUrl) {
   if (user.pendingAction) {
     const consumed = await handlePending(env, event, { db, user, pet, pets, lineUserId, ownerId, text, baseUrl });
     if (consumed) return;
+  }
+
+  // 已辨認貓、但後段（像食物名＋份量）尚無法可靠解析（蚵仔希爾斯罐頭23g）→ 不寫入、不降級成通用罐頭。
+  // 第一階段安全失敗：辨認到的貓存進 raw，給這隻貓的常用捷徑；正式 logs 為 0。（第二階段用 food_item 精確比對）
+  if (leadPartial) {
+    const target = pets.find((p) => p.petName === leadPartial.petName);
+    const rpid = target?.petId || '';
+    await logTextInput(db, {
+      lineUserId, ownerId, petId: rpid, rawText: event.message?.text || '',
+      parseStatus: 'partial', failReason: 'unknown_food_expression', sourceMessageId: String(event.message?.id || ''),
+      resolvedPetId: rpid, linkedLogId: '', parsedResult: JSON.stringify({ recognizedPetName: leadPartial.petName, rest: leadPartial.rest })
+    });
+    const shortcuts = await quickShortcuts(db, rpid);
+    await replyOrPushQuick(env, event,
+      `我知道是「${leadPartial.petName}」，但後面的「${leadPartial.rest}」我還沒辦法看懂 🙏\n可以點下面常用的，或改打「罐頭 23」這種格式：`,
+      shortcuts);
+    return;
   }
 
   // 不明句首（前段不明、後段可解析）→ 不猜前段是貓名、不靜默寫預設貓；請使用者選貓。
