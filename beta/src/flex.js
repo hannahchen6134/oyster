@@ -173,7 +173,7 @@ function bubble(altText, contents) {
 }
 
 // ---------- 記錄確認卡 ----------
-export function recordFlex({ pet, categoryKey, mainText, subText, summary, date, logId, hints = [], title = '', tip = '', siteUrl = '', warnNoKcal = false, foodType = '', estimated = false, estKcalPerG = 0, addedWaterMl = 0 }) {
+export function recordFlex({ pet, categoryKey, mainText, subText, summary, date, logId, hints = [], title = '', tip = '', siteUrl = '', warnNoKcal = false, foodType = '', estimated = false, estKcalPerG = 0, addedWaterMl = 0, undoData = '' }) {
   const style = CATEGORY_STYLE[categoryKey] || CATEGORY_STYLE.note;
   // 零食/其他這種「沒辦法估」的類型：不假裝估算，也不用紅色錯誤——溫和請使用者填一次（包裝上有）
   const warnBox = warnNoKcal ? [{
@@ -225,8 +225,12 @@ export function recordFlex({ pet, categoryKey, mainText, subText, summary, date,
       { type: 'box', layout: 'horizontal', spacing: 'sm', contents: [
         ...(editable ? [{ type: 'button', height: 'sm', style: 'link', color: C.brand,
           action: { type: 'postback', label: '✏️ 改數量', data: `action=editAmount&logId=${logId}`, displayText: '改數量' } }] : []),
-        { type: 'button', height: 'sm', style: 'link', color: C.brand,
-          action: { type: 'postback', label: '🗑 刪除', data: `action=delAsk&logId=${logId}`, displayText: '刪除剛剛那筆' } }
+        // 有 undoData（這次操作建立的全部 log，含連動加水）→ 統一「撤銷這次紀錄」，撤整批；否則沿用單筆「刪除」
+        (undoData
+          ? { type: 'button', height: 'sm', style: 'link', color: C.brand,
+              action: { type: 'postback', label: '↩️ 撤銷這次紀錄', data: `action=undoOp&${undoData}`, displayText: '撤銷這次紀錄' } }
+          : { type: 'button', height: 'sm', style: 'link', color: C.brand,
+              action: { type: 'postback', label: '🗑 刪除', data: `action=delAsk&logId=${logId}`, displayText: '刪除剛剛那筆' } })
       ] },
       // 零食/其他沒辦法估 → 「填這個的熱量」擺成主要按鈕（品牌色，非紅色警示）
       ...(warnNoKcal ? [{ type: 'button', height: 'sm', style: 'primary', color: C.brand,
@@ -319,7 +323,7 @@ export function foodDisambigFlex({ pet, foodType, typedName, grams, addedWaterMl
 }
 
 // 一則訊息記多筆時的合併確認卡：條列這次記了哪幾筆 ＋ 當天累積
-export function multiRecordFlex(pet, lines, summary, date, siteUrl = '') {
+export function multiRecordFlex(pet, lines, summary, date, siteUrl = '', undoData = '') {
   const foodG = (Number(summary.dryFoodG) || 0) + (Number(summary.wetFoodG) || 0) + (Number(summary.otherFoodG) || 0);
   const body = {
     type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
@@ -337,8 +341,11 @@ export function multiRecordFlex(pet, lines, summary, date, siteUrl = '') {
     ]
   };
   const footer = {
-    type: 'box', layout: 'horizontal', spacing: 'sm', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
+    type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
     contents: [
+      // 統一「撤銷這次紀錄」：一次撤銷這張卡建立的全部 log（含連動加水）
+      ...(undoData ? [{ type: 'button', height: 'sm', style: 'link', color: C.brand,
+        action: { type: 'postback', label: '↩️ 撤銷這次紀錄', data: `action=undoOp&${undoData}`, displayText: '撤銷這次紀錄' } }] : []),
       { type: 'button', height: 'sm', style: 'primary', color: C.brand,
         action: siteUrl
           ? { type: 'uri', label: '開啟照護站', uri: siteUrl }

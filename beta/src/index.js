@@ -884,6 +884,17 @@ async function handlePending(env, event, { db, user, pet, pets, lineUserId, owne
 const qrMsg = (label, text) => ({ type: 'action', action: { type: 'message', label: String(label).slice(0, 20), text } });
 const qrPost = (label, data, displayText) => ({ type: 'action', action: { type: 'postback', label: String(label).slice(0, 20), data, displayText: displayText || String(label) } });
 
+// 撤銷用的 ids 視為不可信輸入：只收 uuid 格式、去重。接受字串或陣列。
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// 內嵌 postback 的 id 上限（配合 LINE 約 300 byte）；smid token 取回時的理智上限（不截斷真實操作）
+const MAX_INLINE_UNDO_IDS = 6;
+const MAX_TOKEN_UNDO_IDS = 50;
+export function parseUndoIds(raw) {
+  const arr = Array.isArray(raw) ? raw : String(raw || '').split(',');
+  const ids = arr.map((s) => String(s).trim()).filter(Boolean);
+  return [...new Set(ids)].filter((id) => UUID_RE.test(id));
+}
+
 // 症狀類分類鈕（吃喝藥用一鍵捷徑，這裡只留較少用的狀況當安全網）
 function symptomCategoryQuick() {
   return [
@@ -1173,7 +1184,10 @@ async function handlePostback(event, env, baseUrl) {
     }
     // awaiting_pet_selection 完成 → 補一列最終 record（帶原 sourceMessageId），最新狀態反映成功
     await logTextInput(db, { lineUserId, ownerId, petId: chosen.petId, rawText: ev, parseStatus: 'record', failReason: '', sourceMessageId: smid, resolvedPetId: chosen.petId, linkedLogId: savedIds.join(','), parsedResult: JSON.stringify({ events: recs.map((r) => ({ category: r.category, amount: r.amount, unit: r.unit, itemName: r.itemName, addedWaterMl: r.addedWaterMl || 0 })), savedLogIds: savedIds, unparsedSegments: [], awaitingAction: '' }) });
-    if (recs.length > 1) await replyOrPush(env, event, `已記到「${chosen.petName}」✓ 共 ${recs.length} 筆`);
+    if (recs.length > 1) {
+      const undoBtn = (savedIds.length && smid) ? [qrPost('↩️ 撤銷這次紀錄', `action=undoOp&smid=${encodeURIComponent(smid)}`, '撤銷這次紀錄')] : [];
+      await replyOrPushQuick(env, event, `已記到「${chosen.petName}」✓ 共 ${recs.length} 筆`, undoBtn);
+    }
     return;
   }
 
@@ -1273,6 +1287,66 @@ async function handlePostback(event, env, baseUrl) {
     await replyOrPushFlex(env, event, deletedCard(url),
       '已刪除剛剛的資料囉。若要再調整，請開啟照護站。');
   }
+
+  // ↩️ 撤銷這次紀錄：以「這張結果卡建立的全部 log」為單位（含連動加水），二段式確認後才軟刪。
+  // ids 不可信：collectUndoable 內已 parseUndoIds（驗格式/去重/限筆數）＋逐筆沿用既有權限。
+  if (action === 'undoOp' || action === 'undoDo') {
+    // 兩把鑰匙：smid（多筆用 token，不塞 UUID）優先；否則內嵌 ids（單筆/食物+加水，≤2）
+    const smid = data.get('smid') || '';
+    const items = smid
+      ? await collectUndoableBySmid(db, smid, ownerId)
+      : await collectUndoable(db, data.get('ids') || '', ownerId);
+    if (!items.length) { await replyOrPush(env, event, '這次紀錄已經撤銷過了 👌'); return; }
+    if (action === 'undoOp') {
+      // 護欄一：先確認、不立即刪。undoDo 沿用同一把鑰匙，避免大量 UUID 塞爆 postback。
+      const undoKey = smid ? `smid=${encodeURIComponent(smid)}` : `ids=${items.map((l) => l.logId).join(',')}`;
+      const lines = items.map((l) => `· ${describeLog(l)}`).join('\n');
+      await replyOrPushQuick(env, event, `確定要撤銷這次紀錄嗎？\n${lines}`, [
+        qrPost('確定撤銷', `action=undoDo&${undoKey}`, '確定撤銷'),
+        qrPost('取消', 'action=undoCancel', '取消')
+      ]);
+      return;
+    }
+    const undone = await applyUndo(db, items, lineUserId); // 確認後才軟刪＋重算受影響貓/日期
+    await replyOrPush(env, event, `↩️ 已撤銷這次紀錄：\n${undone.map((l) => `· ${describeLog(l)}`).join('\n')}`);
+    return;
+  }
+  if (action === 'undoCancel') { await replyOrPush(env, event, '好，這次紀錄先保留著 👌'); return; }
+}
+
+// 撤銷核心（可單測）：挑出「屬於這個家庭、還沒刪」的可撤銷筆。ids 不可信 → 先 parseUndoIds。
+// 沿用既有權限：log.lineUserId === ownerId（owner 或已接受共照者解析到的家庭 owner）。
+export async function collectUndoable(db, rawIds, ownerId, cap = MAX_INLINE_UNDO_IDS) {
+  const items = [];
+  for (const id of parseUndoIds(rawIds).slice(0, cap)) {
+    const log = await getLog(db, id);
+    if (log && log.lineUserId === ownerId && !log.isDeleted) items.push(log);
+  }
+  return items;
+}
+// smid token 撤銷：從 text_inputs 最新列取這次操作的全部 savedLogIds（不塞進 postback、不截斷真實操作）。
+// 只認屬於這個家庭的列（ownerLineUserId / lineUserId）。
+export async function collectUndoableBySmid(db, smid, ownerId) {
+  if (!smid) return [];
+  const row = await db.prepare(
+    "SELECT parsedResult FROM text_inputs WHERE sourceMessageId = ? AND (ownerLineUserId = ? OR lineUserId = ?) ORDER BY id DESC LIMIT 1"
+  ).bind(String(smid), ownerId, ownerId).first();
+  let ids = [];
+  try { const pr = JSON.parse(row?.parsedResult || '{}'); if (Array.isArray(pr.savedLogIds)) ids = pr.savedLogIds; } catch (error) { /* ignore */ }
+  return collectUndoable(db, ids, ownerId, MAX_TOKEN_UNDO_IDS);
+}
+// 執行撤銷：對已挑出的可撤銷筆軟刪除，並重算受影響的（貓,日期）。回傳實際撤銷的 log。
+export async function applyUndo(db, items, actorId) {
+  const undone = [];
+  const affected = new Map();
+  for (const log of items) {
+    await softDeleteLog(db, log.logId, actorId);
+    undone.push(log);
+    const date = String(log.eventDateTime).slice(0, 10);
+    affected.set(`${log.petId}|${date}`, [log.petId, date]);
+  }
+  for (const [, [petId, date]] of affected) { try { await recomputeDay(db, petId, date); } catch (error) { /* 重算失敗不影響撤銷結果 */ } }
+  return undone;
 }
 
 async function handleFollow(event, env) {
@@ -1726,15 +1800,17 @@ async function handleTextMessage(event, env, baseUrl) {
         await guideUnknown(env, event, pet?.petId || ''); return;
       }
       if (unparsed.length) {
-        // 部分成功：明確分「✅已記錄／⚠️尚未記錄」，避免使用者誤以為整句都成功
+        // 部分成功：明確分「✅已記錄／⚠️尚未記錄」，避免使用者誤以為整句都成功；撤銷只撤已成功的
         const recTxt = `✅ 已記錄 ${lines.length} 筆：\n${lines.map((l) => `· ${l}`).join('\n')}`;
         const unTxt = `⚠️ 這 ${unparsed.length} 筆看不懂、尚未記錄：\n${unparsed.map((u) => `· ${u}`).join('\n')}\n可以分開再打一次（例：罐頭 34），或用選單按鈕記。`;
-        await replyOrPush(env, event, `${recTxt}\n\n${unTxt}`);
+        const undoBtn = savedIds.length ? [qrPost('↩️ 撤銷這次紀錄', `action=undoOp&smid=${event.message?.id || ''}`, '撤銷這次紀錄')] : [];
+        await replyOrPushQuick(env, event, `${recTxt}\n\n${unTxt}`, undoBtn);
         return;
       }
       const fallback = `已記錄 ${lines.length} 筆：\n${lines.map((line) => `· ${line}`).join('\n')}`;
       const multiSiteUrl = await siteLink(env, baseUrl, lineUserId);
-      await replyOrPushFlex(env, event, multiRecordFlex(pet, lines, lastSummary, lastDate, multiSiteUrl), fallback);
+      const multiUndo = savedIds.length ? `smid=${event.message?.id || ''}` : '';
+      await replyOrPushFlex(env, event, multiRecordFlex(pet, lines, lastSummary, lastDate, multiSiteUrl, multiUndo), fallback);
       return;
     }
 
@@ -2216,6 +2292,14 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
     addedWaterMl,
     summary, date: eventDate,
     logId: savedLog?.logId || '',
+    // 撤銷範圍＝這次操作建立的全部 log。文字輸入有 message id → 用 smid token（多筆也不塞爆 postback）；
+    // 按鈕盤等無 message 的來源 → 內嵌 ≤2 個 id（食物＋連動加水）。
+    undoData: (() => {
+      const mid = event.message?.id;
+      if (mid) return `smid=${mid}`;
+      const ids = [savedLog?.logId, addedWaterLog?.logId].filter(Boolean);
+      return ids.length ? `ids=${ids.join(',')}` : '';
+    })(),
     hints, tip, siteUrl: await siteLink(env, opts.baseUrl, lineUserId),
     warnNoKcal: record.category === 'food' && noKcal, foodType: record.foodType || '',
     estimated: record.category === 'food' && estimated, estKcalPerG
