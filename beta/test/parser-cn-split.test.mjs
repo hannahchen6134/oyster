@@ -17,6 +17,15 @@ test('RC2：品名＋類別＋中文數字＋單位 皇家罐頭三十三克 →
   const x = rec('皇家罐頭三十三克');
   assert.equal(x.category, 'food'); assert.equal(x.foodType, '罐頭'); assert.equal(x.itemName, '皇家'); assert.equal(x.amount, 33);
 });
+test('RC2：品名尾隨中文數字（無單位）罐頭皇家三十三 → 食物 罐頭/皇家/33', () => {
+  const x = rec('罐頭皇家三十三');
+  assert.equal(x.category, 'food'); assert.equal(x.foodType, '罐頭'); assert.equal(x.itemName, '皇家'); assert.equal(x.amount, 33);
+});
+test('RC2 界線：「第三次」中間的數字（後面接字、非結尾）不被結尾規則轉換', () => {
+  const x = rec('備註 第三次回診');
+  assert.equal(x.category, 'note');
+  assert.ok(x.note.includes('第三次'), '「第三次」不是數量，不得被轉換');
+});
 test('RC2：水＋中文數字 水八 → 水 8ml；喝水八毫升 → 水 8ml', () => {
   assert.equal(rec('水八').category, 'water');
   assert.equal(rec('水八').amount, 8);

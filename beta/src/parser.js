@@ -96,9 +96,12 @@ const CN_TYPE_ANCHOR = FOOD_TYPE_WORDS.flatMap((e) => e.words).sort((a, b) => b.
 const CN_WATER_ANCHOR = '喝水|飲水|加水|清水|泡水|兌水|水|喝';
 // 中文數字要被視為「完整數量」的右界（單位／水詞／空白／數字／句尾）——避免「三花貓」「一半」的三、一誤轉
 const CN_RIGHT_BOUND = `(?=${CN_UNIT}|${CN_WATER_ANCHOR}|$|\\s|\\d)`;
+const CN_NUM_SET = new Set('零一二兩三四五六七八九十百');
 const CN_RE_A = new RegExp(`(${CN_RUN})(${CN_UNIT})`, 'gi');
 const CN_RE_B = new RegExp(`(${CN_TYPE_ANCHOR}|${CN_WATER_ANCHOR})(${CN_RUN})${CN_RIGHT_BOUND}`, 'g');
 const CN_RE_C = new RegExp(`(${CN_RUN})(${CN_WATER_ANCHOR})`, 'g');
+// D：品名（中文，非數字字）＋結尾中文數字（皇家三十三、罐頭皇家三十三）——右界限句尾/空白/單位，避免「三花貓」「第三次」
+const CN_RE_D = new RegExp(`([一-鿿])(${CN_RUN})(?=${CN_UNIT}|$|\\s)`, 'g');
 function convertCnNumbers(text) {
   let t = text;
   // A：中文數字＋單位（三十三克、八毫升）
@@ -107,6 +110,8 @@ function convertCnNumbers(text) {
   t = t.replace(CN_RE_B, (m, w, n) => { const v = cnToArabic(n); return v == null ? m : `${w} ${v} `; });
   // C：中文數字＋水詞（三十三水）
   t = t.replace(CN_RE_C, (m, n, w) => { const v = cnToArabic(n); return v == null ? m : ` ${v} ${w} `; });
+  // D：品名尾隨中文數字（前一字是中文但非數字字，才不會把純數字串重切）
+  t = t.replace(CN_RE_D, (m, pre, n) => { if (CN_NUM_SET.has(pre)) return m; const v = cnToArabic(n); return v == null ? m : `${pre} ${v} `; });
   return t;
 }
 
