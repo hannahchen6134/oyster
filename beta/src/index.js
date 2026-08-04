@@ -1239,7 +1239,7 @@ async function handlePostback(event, env, baseUrl) {
     // awaiting_pet_selection 完成 → 補一列最終 record（帶原 sourceMessageId），最新狀態反映成功
     await logTextInput(db, { lineUserId, ownerId, petId: chosen.petId, rawText: ev, parseStatus: 'record', failReason: '', sourceMessageId: smid, resolvedPetId: chosen.petId, linkedLogId: savedIds.join(','), parsedResult: JSON.stringify({ events: recs.map((r) => ({ category: r.category, amount: r.amount, unit: r.unit, itemName: r.itemName, addedWaterMl: r.addedWaterMl || 0 })), savedLogIds: savedIds, unparsedSegments: [], awaitingAction: '' }) });
     if (recs.length > 1) {
-      const undoBtn = (savedIds.length && smid) ? [qrPost('↩️ 撤銷本次紀錄', `action=undoOp&smid=${encodeURIComponent(smid)}`, '撤銷本次紀錄')] : [];
+      const undoBtn = (savedIds.length && smid) ? [qrPost(`🗑 刪除這次 ${recs.length} 筆`, `action=undoOp&smid=${encodeURIComponent(smid)}`, `刪除這次 ${recs.length} 筆`)] : [];
       await replyOrPushQuick(env, event, `已記到「${chosen.petName}」✓ 共 ${recs.length} 筆`, undoBtn);
     }
     return;
@@ -1350,7 +1350,12 @@ async function handlePostback(event, env, baseUrl) {
     const items = smid
       ? await collectUndoableBySmid(db, smid, ownerId)
       : await collectUndoable(db, data.get('ids') || '', ownerId);
-    if (!items.length) { await replyOrPush(env, event, '這次紀錄已經撤銷過了 👌'); return; }
+    if (!items.length) {
+      // 已全部刪除後重複點擊：依「原本這次操作的筆數」回單/多筆訊息（savedLogIds 不隨軟刪消失）。
+      const origN = smid ? (await savedLogIdsBySmid(db, smid, ownerId)).length : parseUndoIds(data.get('ids') || '').length;
+      await replyOrPush(env, event, origN >= 2 ? '這次紀錄已經刪除了 👌' : '這筆紀錄已經刪除了 👌');
+      return;
+    }
     if (action === 'undoOp') {
       // 護欄一：先確認、不立即刪。undoDo 沿用同一把鑰匙（smid 優先，否則內嵌 ids），避免大量 UUID 塞爆 postback。
       const undoKey = smid ? `smid=${encodeURIComponent(smid)}` : `ids=${items.map((l) => l.logId).join(',')}`;
@@ -1358,12 +1363,12 @@ async function handlePostback(event, env, baseUrl) {
       // 用 Flex 氣泡內建按鈕做二段確認（永遠可見），取代原本浮動易漏看的 quick reply → 使用者不用打字。
       const confirmPet = await getPet(db, items[0]?.petId || '');
       const multi = items.length >= 2;
-      const fallback = `${multi ? `確定要撤銷本次 ${items.length} 筆紀錄嗎？` : '確定要刪除這筆紀錄嗎？'}\n${lineTexts.map((t) => `· ${t}`).join('\n')}`;
+      const fallback = `${multi ? `確定要刪除這次 ${items.length} 筆紀錄嗎？` : '確定要刪除這筆紀錄嗎？'}\n${lineTexts.map((t) => `· ${t}`).join('\n')}`;
       await replyOrPushFlex(env, event, undoConfirmFlex({ pet: confirmPet, lines: lineTexts, undoKey, count: items.length }), fallback);
       return;
     }
     const undone = await applyUndo(db, items, lineUserId); // 確認後才軟刪＋重算受影響貓/日期
-    const doneHead = undone.length >= 2 ? `↩️ 已撤銷本次 ${undone.length} 筆紀錄：` : '🗑 已刪除這筆紀錄：';
+    const doneHead = undone.length >= 2 ? `🗑 已刪除這次 ${undone.length} 筆紀錄：` : '🗑 已刪除這筆紀錄：';
     await replyOrPush(env, event, `${doneHead}\n${undone.map((l) => `· ${describeLog(l)}`).join('\n')}`);
     return;
   }
@@ -1430,13 +1435,19 @@ export async function collectUndoable(db, rawIds, ownerId, cap = MAX_INLINE_UNDO
 }
 // smid token 撤銷：從 text_inputs 最新列取這次操作的全部 savedLogIds（不塞進 postback、不截斷真實操作）。
 // 只認屬於這個家庭的列（ownerLineUserId / lineUserId）。
-export async function collectUndoableBySmid(db, smid, ownerId) {
+// 取這個 smid（家庭範圍）最新一列登記的 savedLogIds 原始清單——不論是否已軟刪。
+// 用於：批次刪除挑筆、以及「已刪除後重複點擊」時判斷原本是單筆或多筆（savedLogIds 不隨軟刪消失）。
+export async function savedLogIdsBySmid(db, smid, ownerId) {
   if (!smid) return [];
   const row = await db.prepare(
     "SELECT parsedResult FROM text_inputs WHERE sourceMessageId = ? AND (ownerLineUserId = ? OR lineUserId = ?) ORDER BY id DESC LIMIT 1"
   ).bind(String(smid), ownerId, ownerId).first();
-  let ids = [];
-  try { const pr = JSON.parse(row?.parsedResult || '{}'); if (Array.isArray(pr.savedLogIds)) ids = pr.savedLogIds; } catch (error) { /* ignore */ }
+  try { const pr = JSON.parse(row?.parsedResult || '{}'); if (Array.isArray(pr.savedLogIds)) return pr.savedLogIds; } catch (error) { /* ignore */ }
+  return [];
+}
+export async function collectUndoableBySmid(db, smid, ownerId) {
+  if (!smid) return [];
+  const ids = await savedLogIdsBySmid(db, smid, ownerId);
   return collectUndoable(db, ids, ownerId, MAX_TOKEN_UNDO_IDS);
 }
 // 執行撤銷：對已挑出的可撤銷筆軟刪除，並重算受影響的（貓,日期）。回傳實際撤銷的 log。
@@ -2075,8 +2086,8 @@ async function handleTextMessage(event, env, baseUrl) {
         // 已記錄 ＋ 尚未找到相符/看不懂 → 明列，撤銷只撤已成功的
         const recTxt = `✅ 已記錄 ${lines.length} 筆：\n${lines.map((l) => `· ${l}`).join('\n')}`;
         const extras = [noMatchTxt, unparsed.length ? `⚠️ 這 ${unparsed.length} 筆看不懂、尚未記錄：\n${unparsed.map((u) => `· ${u}`).join('\n')}` : ''].filter(Boolean).join('\n\n');
-        const undoLabel = savedIds.length >= 2 ? '↩️ 撤銷本次紀錄' : '🗑 刪除這筆';
-        const undoBtn = savedIds.length ? [qrPost(undoLabel, `action=undoOp&smid=${smid}`, savedIds.length >= 2 ? '撤銷本次紀錄' : '刪除這筆')] : [];
+        const undoLabel = savedIds.length >= 2 ? `🗑 刪除這次 ${savedIds.length} 筆` : '🗑 刪除這筆';
+        const undoBtn = savedIds.length ? [qrPost(undoLabel, `action=undoOp&smid=${smid}`, savedIds.length >= 2 ? `刪除這次 ${savedIds.length} 筆` : '刪除這筆')] : [];
         await replyOrPushQuick(env, event, `${recTxt}\n\n${extras}`, undoBtn);
         return;
       }

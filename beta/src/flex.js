@@ -219,11 +219,11 @@ export function recordFlex({ pet, categoryKey, mainText, subText, summary, date,
   };
   // 記錯了不用背指令：水/食可「改數量」，人人都會的「刪除」；下面一顆開站
   const editable = ['water', 'dry', 'wet'].includes(categoryKey);
-  // 撤銷鈕文案依「這次 smid 的正式紀錄筆數」：1 筆＝刪除這筆、2 筆以上＝撤銷本次紀錄。
-  // 底層行為不變（都走 undoOp，用 undoData 撤同次整批）；label 只是顯示。
+  // 刪除鈕文案依「這次 smid 的正式紀錄筆數」：1 筆＝刪除這筆、2 筆以上＝刪除這次 N 筆。
+  // （資料已正式寫入，對使用者是「刪除」不是「撤銷」。）底層行為不變：都走 undoOp，用 undoData 刪同次整批。
   const multiUndo = Number(undoCount) >= 2;
-  const undoLabel = multiUndo ? '↩️ 撤銷本次紀錄' : '🗑 刪除這筆';
-  const undoDisplay = multiUndo ? '撤銷本次紀錄' : '刪除這筆';
+  const undoLabel = multiUndo ? `🗑 刪除這次 ${undoCount} 筆` : '🗑 刪除這筆';
+  const undoDisplay = multiUndo ? `刪除這次 ${undoCount} 筆` : '刪除這筆';
   const footer = {
     type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
     contents: [
@@ -350,9 +350,9 @@ export function multiRecordFlex(pet, lines, summary, date, siteUrl = '', undoDat
   const footer = {
     type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
     contents: [
-      // 一次記多筆＝必為 2 筆以上，統一「撤銷本次紀錄」：一次撤銷這張卡建立的全部 log（含連動加水）
+      // 一次記多筆＝必為 2 筆以上，統一「刪除這次 N 筆」：一次刪除這張卡建立的全部 log（含連動加水）
       ...(undoData ? [{ type: 'button', height: 'sm', style: 'link', color: C.brand,
-        action: { type: 'postback', label: '↩️ 撤銷本次紀錄', data: `action=undoOp&${undoData}`, displayText: '撤銷本次紀錄' } }] : []),
+        action: { type: 'postback', label: `🗑 刪除這次 ${lines.length} 筆`, data: `action=undoOp&${undoData}`, displayText: `刪除這次 ${lines.length} 筆` } }] : []),
       { type: 'button', height: 'sm', style: 'primary', color: C.brand,
         action: siteUrl
           ? { type: 'uri', label: '開啟照護站', uri: siteUrl }
@@ -362,13 +362,13 @@ export function multiRecordFlex(pet, lines, summary, date, siteUrl = '', undoDat
   return bubble(`已記錄 ${lines.length} 筆`, { type: 'bubble', size: 'mega', header: header(`已記錄・${pet?.petName || '貓貓'}`), body, footer });
 }
 
-// 撤銷／刪除二段式確認卡：用 Flex 氣泡內建按鈕（永遠可見、進對話流），取代原本浮動易漏看的 quick reply。
+// 刪除二段式確認卡：用 Flex 氣泡內建按鈕（永遠可見、進對話流），取代原本浮動易漏看的 quick reply。
 // 兩顆都是 postback：確認鈕綁原本的 undo token（smid 或 內嵌 ids），取消鈕只回覆、不動任何紀錄。
-// count＝這次要處理的正式紀錄筆數：1 筆＝刪除、2 筆以上＝撤銷本次 N 筆。
+// count＝這次要處理的正式紀錄筆數：1 筆＝「刪除這筆」、2 筆以上＝「刪除這次 N 筆」。（資料已寫入，一律用「刪除」措辭。）
 export function undoConfirmFlex({ pet, lines = [], undoKey = '', count = 1 }) {
   const multi = Number(count) >= 2;
-  const title = multi ? `確定要撤銷本次 ${count} 筆紀錄嗎？` : '確定要刪除這筆紀錄嗎？';
-  const confirmLabel = multi ? '確認撤銷' : '確認刪除';
+  const title = multi ? `確定要刪除這次 ${count} 筆紀錄嗎？` : '確定要刪除這筆紀錄嗎？';
+  const confirmLabel = '確認刪除';
   const body = {
     type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
     contents: [
@@ -387,7 +387,7 @@ export function undoConfirmFlex({ pet, lines = [], undoKey = '', count = 1 }) {
         action: { type: 'postback', label: '取消', data: 'action=undoCancel', displayText: '取消' } }
     ]
   };
-  return bubble(title, { type: 'bubble', size: 'mega', header: header(`撤銷確認・${pet?.petName || '貓貓'}`), body, footer });
+  return bubble(title, { type: 'bubble', size: 'mega', header: header(`刪除確認・${pet?.petName || '貓貓'}`), body, footer });
 }
 
 // ---------- 今日總結卡 ----------
