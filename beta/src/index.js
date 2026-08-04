@@ -2152,6 +2152,26 @@ async function handleTextMessage(event, env, baseUrl) {
       return;
     }
 
+    // 多個中文數字、無單位無標點 → 對應不明（皇家三八水十五）：保守起見「不先寫入任何一筆」，
+    // 保留原文＋數字候選，回 partial 並請使用者打清楚（帶單位或分行）。不臆測、不靜默寫入。
+    case 'ambiguousAmounts': {
+      const smid = String(event.message?.id || '');
+      const rawText = event.message?.text || '';
+      const nums = (intent.amountCandidates || []).join('、');
+      await logTextInput(db, {
+        lineUserId, ownerId, petId: pet?.petId || '', rawText,
+        parseStatus: 'partial', failReason: 'ambiguous_amounts', sourceMessageId: smid,
+        resolvedPetId: pet?.petId || '', linkedLogId: '',
+        parsedResult: JSON.stringify({ events: [], savedLogIds: [], amountCandidates: intent.amountCandidates || [], unparsedSegments: [rawText], awaitingAction: 'clarify_amounts' })
+      });
+      await replyOrPush(env, event,
+        `我看到「${nums}」這幾個數字，但不確定它們分別代表什麼 🙏\n`
+        + `這筆先沒有記錄。可以幫我打清楚一點，例如：\n`
+        + `· 帶單位：「皇家罐頭 38克，喝水 15ml」\n`
+        + `· 或分行分開打：\n　皇家罐頭 38克\n　喝水 15ml`);
+      return;
+    }
+
     // 只有「品名＋數量」、沒有類別詞（皇家33）→ 反查家庭 food_items，不臆測是不是食物、更不臆測類型。
     case 'item_lookup_candidate': {
       if (!explicitPet && needsCatPick(user, pets)) { await askWhichCat(env, event, pets); return; }

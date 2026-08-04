@@ -332,6 +332,15 @@ export function parseMessage(rawText) {
   const text = normalizeText(rawText);
   if (!text) return { type: 'unknown' };
 
+  // 多行輸入：換行＝明確分段。先逐行獨立解析、只在明確延續時保守跨行合併，
+  // 避免把不同段落拼成假品名（皇家＋水粉→皇家水粉）或因後行數字覆蓋/丟失前行數字。
+  const rawLines = String(rawText).split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (rawLines.length > 1) {
+    const multi = parseMultiLine(rawLines);
+    if (multi) return multi;
+    // 無法成立 → 落回下方「整段」解析（沿用既有錯誤訊息）
+  }
+
   // 查詢詞同時比對「去空白」版本（normalizeText 會把「近7天」拆成「近 7 天」）
   const compact = text.replace(/ /g, '');
   if (RECORD_PROMPT_WORDS[compact]) {
@@ -486,11 +495,70 @@ export function parseMessage(rawText) {
       else if (intent.type === 'invalid') { invalids.push(intent); unparsed.push(seg.join(' ')); }
       else unparsed.push(seg.join(' ')); // unknown 段：保留原文，交由呼叫端明列「尚未記錄」
     }
+    // 保守：單行、全中文數字（原文沒有阿拉伯/全形數字）、沒有明確單位／標點／換行，
+    // 且其中有「品名候選帶數字」（皇家三八）——此時數字對應仍有歧義（三八是數量或品名的一部分？），
+    // 不先寫入任何一筆，回 ambiguousAmounts 由呼叫端詢問。
+    // 反之：寫阿拉伯數字（皇家水解蛋白33水8）、或有明確單位（皇家三八克 水十五毫升）、或用標點/換行分段者，
+    // 視為清楚，照既有多筆流程處理（不改動）。
+    const hasArabicDigit = /[0-9０-９]/.test(String(rawText));
+    const hasUnitWord = /(克|公克|毫升|cc|西西)/.test(text) || /\d\s*(?:g|ml)\b/i.test(text);
+    const candWithAmount = candidates.some((c) => Number(c.amount) > 0);
+    if (candWithAmount && (records.length + candidates.length) >= 2 && !hasUnitWord && !hasArabicDigit) {
+      const amountCandidates = [...records.map((r) => r.amount), ...candidates.map((c) => c.amount)].filter((n) => Number(n) > 0);
+      return { type: 'ambiguousAmounts', amountCandidates, records, candidates, unparsed };
+    }
     if (records.length || candidates.length) return { type: 'multiRecord', records, invalids, unparsed, candidates };
     // 全部都不成立 → 落回單段解析，沿用原本的錯誤訊息
   }
 
   return parseSegment(tokens, dayOffset, time);
+}
+
+// 該行「只有品名／類型、沒有任何數字」——可作為下一行延續數量的載體（皇家罐頭）
+function lineHasNoNumber(line) {
+  return !/\d/.test(normalizeText(line));
+}
+// 該行「只有明確數量＋單位」（三八克→38g、十五ml→15ml）——才可當前一行品名的延續數量；
+// 沒有單位（三八、十五）一律不合併，保守處理。
+function lineIsAmountUnitOnly(line) {
+  const compact = normalizeText(line).replace(/\s+/g, '');
+  const p = parseAmountToken(compact);
+  return Boolean(p && p.value > 0 && p.hasUnit);
+}
+// 逐行獨立解析成 { records, candidates }；命令/unknown/invalid 回 null（呼叫端保留整行原文為 unparsed）。
+// 每行都沒有換行 → 遞迴進 parseMessage 不會再走多行分支。
+function parseLineRecords(line) {
+  const r = parseMessage(line);
+  if (r.type === 'record') return { records: [r.record], candidates: [] };
+  if (r.type === 'multiRecord') return { records: r.records || [], candidates: r.candidates || [] };
+  if (r.type === 'item_lookup_candidate') {
+    return { records: [], candidates: [{ itemName: r.itemName, amount: r.amount, unit: r.unit, addedWaterMl: r.addedWaterMl || 0 }] };
+  }
+  return null;
+}
+// 多行：換行為界逐行解析＋保守跨行合併，彙整成 multiRecord（含未解析行）。
+// 合併規則（保守）：第 i 行只有品名（無數字）＋第 i+1 行只有明確數量＋單位 → 併成一行再解析；其餘一律各自成段。
+function parseMultiLine(rawLines) {
+  const merged = [];
+  for (let i = 0; i < rawLines.length; i += 1) {
+    if (i + 1 < rawLines.length && lineHasNoNumber(rawLines[i]) && lineIsAmountUnitOnly(rawLines[i + 1])) {
+      merged.push(`${rawLines[i]} ${rawLines[i + 1]}`);
+      i += 1; // 吃掉下一行（延續數量）
+    } else {
+      merged.push(rawLines[i]);
+    }
+  }
+  const records = [];
+  const candidates = [];
+  const unparsed = [];
+  for (const line of merged) {
+    const pl = parseLineRecords(line);
+    if (!pl) { unparsed.push(line); continue; }   // 無法可靠解析的行：保留原文、不靜默丟
+    records.push(...pl.records);
+    candidates.push(...pl.candidates);
+  }
+  if (records.length || candidates.length) return { type: 'multiRecord', records, invalids: [], unparsed, candidates };
+  return null; // 全部不成立 → 交回整段解析
 }
 
 // 判斷 token 是否為「類別起始詞」（用來把一則訊息切成多筆）

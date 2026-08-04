@@ -63,13 +63,24 @@ test('品項錯字「皇家水粉三八克」：辨識為候選 itemName=皇家�
   assert.equal(p.unit, 'g');
 });
 
-// ── 三、多數字對應不明：不猜（水明確者記，食物候選另問，不憑空造食物紀錄）──
-test('多數字對應不明「皇家三八水十五」：水15 明確、皇家38 當候選詢問，不臆測成食物紀錄', () => {
+// ── 三、多數字對應不明（全中文數字、無單位）：保守 → 不先寫入任何一筆，回 ambiguousAmounts ──
+test('多數字對應不明「皇家三八水十五」：ambiguousAmounts，不先寫入任何一筆（含水）', () => {
   const p = parseMessage('皇家三八水十五');
+  assert.equal(p.type, 'ambiguousAmounts');
+  assert.deepEqual([...p.amountCandidates].sort((a, b) => a - b), [15, 38]);
+  // 不得直接產生任何 water/food 紀錄型別（records 只是候選內容，非落地）
+});
+
+test('反例：寫阿拉伯數字（皇家水解蛋白33水8）維持既有多筆（水8＋候選），不受保守規則影響', () => {
+  const p = parseMessage('皇家水解蛋白33水8');
   assert.equal(p.type, 'multiRecord');
-  assert.ok(p.records.some((r) => r.category === 'water' && r.amount === 15), '水 15 明確辨識');
-  assert.ok(!p.records.some((r) => r.category === 'food'), '不得直接產生食物紀錄');
-  assert.ok((p.candidates || []).some((c) => c.itemName === '皇家' && c.amount === 38), '皇家 38 進候選待確認');
+  assert.ok(p.records.some((r) => r.category === 'water' && r.amount === 8), '水 8 照舊直接辨識');
+  assert.ok((p.candidates || []).some((c) => c.itemName === '皇家水解蛋白' && c.amount === 33), '皇家水解蛋白 33 進候選');
+});
+
+test('反例：有明確單位（皇家三八克 水十五毫升）→ 清楚，照正常多筆（不進 ambiguousAmounts）', () => {
+  const p = parseMessage('皇家三八克 水十五毫升');
+  assert.notEqual(p.type, 'ambiguousAmounts');
 });
 
 // ── 整合：真 db.js（LINE stub），驗證品項錯字流程的資料寫入 ──
