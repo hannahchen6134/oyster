@@ -173,7 +173,7 @@ function bubble(altText, contents) {
 }
 
 // ---------- 記錄確認卡 ----------
-export function recordFlex({ pet, categoryKey, mainText, subText, summary, date, logId, hints = [], title = '', tip = '', siteUrl = '', warnNoKcal = false, foodType = '', estimated = false, estKcalPerG = 0, addedWaterMl = 0, undoData = '' }) {
+export function recordFlex({ pet, categoryKey, mainText, subText, summary, date, logId, hints = [], title = '', tip = '', siteUrl = '', warnNoKcal = false, foodType = '', estimated = false, estKcalPerG = 0, addedWaterMl = 0, undoData = '', undoCount = 1 }) {
   const style = CATEGORY_STYLE[categoryKey] || CATEGORY_STYLE.note;
   // 零食/其他這種「沒辦法估」的類型：不假裝估算，也不用紅色錯誤——溫和請使用者填一次（包裝上有）
   const warnBox = warnNoKcal ? [{
@@ -219,19 +219,23 @@ export function recordFlex({ pet, categoryKey, mainText, subText, summary, date,
   };
   // 記錯了不用背指令：水/食可「改數量」，人人都會的「刪除」；下面一顆開站
   const editable = ['water', 'dry', 'wet'].includes(categoryKey);
+  // 撤銷鈕文案依「這次 smid 的正式紀錄筆數」：1 筆＝刪除這筆、2 筆以上＝撤銷本次紀錄。
+  // 底層行為不變（都走 undoOp，用 undoData 撤同次整批）；label 只是顯示。
+  const multiUndo = Number(undoCount) >= 2;
+  const undoLabel = multiUndo ? '↩️ 撤銷本次紀錄' : '🗑 刪除這筆';
+  const undoDisplay = multiUndo ? '撤銷本次紀錄' : '刪除這筆';
   const footer = {
     type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
     contents: [
-      { type: 'box', layout: 'horizontal', spacing: 'sm', contents: [
-        ...(editable ? [{ type: 'button', height: 'sm', style: 'link', color: C.brand,
-          action: { type: 'postback', label: '✏️ 改數量', data: `action=editAmount&logId=${logId}`, displayText: '改數量' } }] : []),
-        // 有 undoData（這次操作建立的全部 log，含連動加水）→ 統一「撤銷這次紀錄」，撤整批；否則沿用單筆「刪除」
-        (undoData
-          ? { type: 'button', height: 'sm', style: 'link', color: C.brand,
-              action: { type: 'postback', label: '↩️ 撤銷這次紀錄', data: `action=undoOp&${undoData}`, displayText: '撤銷這次紀錄' } }
-          : { type: 'button', height: 'sm', style: 'link', color: C.brand,
-              action: { type: 'postback', label: '🗑 刪除', data: `action=delAsk&logId=${logId}`, displayText: '刪除剛剛那筆' } })
-      ] },
+      // 每顆各佔整排（不再與「改數量」共用半寬），避免 LINE Flex 把中文按鈕文字截斷成「撤銷這次…」
+      ...(editable ? [{ type: 'button', height: 'sm', style: 'link', color: C.brand,
+        action: { type: 'postback', label: '✏️ 改數量', data: `action=editAmount&logId=${logId}`, displayText: '改數量' } }] : []),
+      // 有 undoData（這次操作建立的全部 log，含連動加水）→ 撤同次整批；否則沿用單筆「刪除這筆」
+      (undoData
+        ? { type: 'button', height: 'sm', style: 'link', color: C.brand,
+            action: { type: 'postback', label: undoLabel, data: `action=undoOp&${undoData}`, displayText: undoDisplay } }
+        : { type: 'button', height: 'sm', style: 'link', color: C.brand,
+            action: { type: 'postback', label: '🗑 刪除這筆', data: `action=delAsk&logId=${logId}`, displayText: '刪除這筆' } }),
       // 零食/其他沒辦法估 → 「填這個的熱量」擺成主要按鈕（品牌色，非紅色警示）
       ...(warnNoKcal ? [{ type: 'button', height: 'sm', style: 'primary', color: C.brand,
         action: { type: 'message', label: '填這個的熱量', text: `設定${foodType || '零食'}` } }] : []),
@@ -272,7 +276,7 @@ export function recordFlexCompact({ pet, categoryKey, mainText, subText, summary
       ...(editable ? [{ type: 'button', height: 'sm', style: 'link', color: C.brand,
         action: { type: 'postback', label: '✏️ 改數量', data: `action=editAmount&logId=${logId}`, displayText: '改數量' } }] : []),
       { type: 'button', height: 'sm', style: 'link', color: C.brand,
-        action: { type: 'postback', label: '🗑 刪除', data: `action=delAsk&logId=${logId}`, displayText: '刪除剛剛那筆' } }
+        action: { type: 'postback', label: '🗑 刪除這筆', data: `action=delAsk&logId=${logId}`, displayText: '刪除這筆' } }
     ]
   };
   return bubble(`已記錄 ${mainText}`, { type: 'bubble', size: 'kilo', body, footer });
@@ -294,7 +298,7 @@ export function foodDisambigFlex({ pet, foodType, typedName, grams, addedWaterMl
       type: 'button', height: 'sm', style: isGuess ? 'primary' : 'secondary', color: isGuess ? C.brand : undefined,
       action: {
         type: 'postback',
-        label: `${isGuess ? '⭐ ' : ''}${String(food.displayName)}`.slice(0, 20),
+        label: `${isGuess ? '🐱 ' : ''}${String(food.displayName)}`.slice(0, 20),
         data: `action=recFoodG&foodId=${food.foodId}&g=${g}${carry}`,
         displayText: `${food.displayName} ${g}g`
       }
@@ -306,7 +310,7 @@ export function foodDisambigFlex({ pet, foodType, typedName, grams, addedWaterMl
       { type: 'box', layout: 'horizontal', contents: [tag('要確認一下', CATEGORY_STYLE.vomit)] },
       text(`「${typedName}」我對不到已建立的品項`, { size: 'lg', weight: 'bold', color: C.ink, margin: 'md', wrap: true }),
       text(`選正確的${foodType}，這 ${g} g 的熱量才算得進去（避免記成 0）`, { size: 'xs', color: C.muted, wrap: true, margin: 'sm' }),
-      ...(guessId ? [text('⭐ 是我猜最接近的，直接點就好', { size: 'xxs', color: C.brand, wrap: true, margin: 'sm' })] : [])
+      ...(guessId ? [text('🐱 我猜最接近的是這個，直接點就好', { size: 'xxs', color: C.brand, wrap: true, margin: 'sm' })] : [])
     ]
   };
   const footer = {
@@ -346,9 +350,9 @@ export function multiRecordFlex(pet, lines, summary, date, siteUrl = '', undoDat
   const footer = {
     type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
     contents: [
-      // 統一「撤銷這次紀錄」：一次撤銷這張卡建立的全部 log（含連動加水）
+      // 一次記多筆＝必為 2 筆以上，統一「撤銷本次紀錄」：一次撤銷這張卡建立的全部 log（含連動加水）
       ...(undoData ? [{ type: 'button', height: 'sm', style: 'link', color: C.brand,
-        action: { type: 'postback', label: '↩️ 撤銷這次紀錄', data: `action=undoOp&${undoData}`, displayText: '撤銷這次紀錄' } }] : []),
+        action: { type: 'postback', label: '↩️ 撤銷本次紀錄', data: `action=undoOp&${undoData}`, displayText: '撤銷本次紀錄' } }] : []),
       { type: 'button', height: 'sm', style: 'primary', color: C.brand,
         action: siteUrl
           ? { type: 'uri', label: '開啟照護站', uri: siteUrl }
@@ -356,6 +360,34 @@ export function multiRecordFlex(pet, lines, summary, date, siteUrl = '', undoDat
     ]
   };
   return bubble(`已記錄 ${lines.length} 筆`, { type: 'bubble', size: 'mega', header: header(`已記錄・${pet?.petName || '貓貓'}`), body, footer });
+}
+
+// 撤銷／刪除二段式確認卡：用 Flex 氣泡內建按鈕（永遠可見、進對話流），取代原本浮動易漏看的 quick reply。
+// 兩顆都是 postback：確認鈕綁原本的 undo token（smid 或 內嵌 ids），取消鈕只回覆、不動任何紀錄。
+// count＝這次要處理的正式紀錄筆數：1 筆＝刪除、2 筆以上＝撤銷本次 N 筆。
+export function undoConfirmFlex({ pet, lines = [], undoKey = '', count = 1 }) {
+  const multi = Number(count) >= 2;
+  const title = multi ? `確定要撤銷本次 ${count} 筆紀錄嗎？` : '確定要刪除這筆紀錄嗎？';
+  const confirmLabel = multi ? '確認撤銷' : '確認刪除';
+  const body = {
+    type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
+    contents: [
+      { type: 'box', layout: 'horizontal', contents: [tag('要確認一下', CATEGORY_STYLE.vomit)] },
+      text(title, { size: 'lg', weight: 'bold', color: C.ink, margin: 'md', wrap: true }),
+      ...lines.map((line) => text(`· ${line}`, { size: 'sm', color: C.inkSoft, wrap: true, margin: 'sm' }))
+    ]
+  };
+  const footer = {
+    type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: '12px', backgroundColor: FOOTER_COLOR,
+    contents: [
+      // 危險動作＝朱紅實心，明確可點；確認鈕綁 undoKey（原 smid／ids），不要求使用者打字
+      { type: 'button', height: 'sm', style: 'primary', color: C.seal,
+        action: { type: 'postback', label: confirmLabel, data: `action=undoDo&${undoKey}`, displayText: confirmLabel } },
+      { type: 'button', height: 'sm', style: 'link', color: C.muted,
+        action: { type: 'postback', label: '取消', data: 'action=undoCancel', displayText: '取消' } }
+    ]
+  };
+  return bubble(title, { type: 'bubble', size: 'mega', header: header(`撤銷確認・${pet?.petName || '貓貓'}`), body, footer });
 }
 
 // ---------- 今日總結卡 ----------

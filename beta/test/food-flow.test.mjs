@@ -33,6 +33,21 @@ test('part四：品牌選擇卡 postback 完整保留 g=34、aw=14、smid，編�
   assert.ok(data.length < 300, `postback 長度需 < 300（LINE 限制），實際 ${data.length}`);
 });
 
+test('part四：推薦標記用 🐱（不再用 ⭐）——提示文字與「最接近」品項按鈕都是貓頭', () => {
+  const flex = foodDisambigFlex({
+    pet: { petName: '蚵仔' }, foodType: '罐頭', typedName: '希爾思',
+    grams: 32, addedWaterMl: 0, smid: '999',
+    options: [{ foodId: 'f-hills', displayName: '希爾斯罐頭', foodType: '罐頭' }, { foodId: 'f-royal', displayName: '皇家罐頭', foodType: '罐頭' }],
+    guessId: 'f-hills'
+  });
+  const json = JSON.stringify(flex);
+  assert.ok(!json.includes('⭐'), '不得再出現 ⭐');
+  assert.ok(json.includes('🐱 我猜最接近的是這個，直接點就好'), '提示文字改為 🐱 版本');
+  assert.ok(json.includes('🐱 希爾斯罐頭'), '「最接近」品項按鈕前綴改為 🐱');
+  // 非推薦品項不加任何前綴
+  assert.ok(json.includes('"label":"皇家罐頭"'), '非推薦品項不加標記');
+});
+
 test('part四：smid 為空時仍安全（smid= 空字串，不炸）', () => {
   const flex = foodDisambigFlex({ pet: {}, foodType: '乾糧', typedName: '乾糧', grams: 5, addedWaterMl: 0, smid: '', options: [{ foodId: 'a', displayName: 'A乾糧', foodType: '乾糧' }, { foodId: 'b', displayName: 'B乾糧', foodType: '乾糧' }] });
   const json = JSON.stringify(flex);

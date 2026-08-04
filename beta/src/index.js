@@ -9,7 +9,7 @@ import { handleApi } from './api.js';
 import { verifyLineSignature, replyOrPush, replyOrPushQuick, replyOrPushFlex, replyMessages, pushText, pushMessages, getProfile, getAccessToken, checkAccessToken } from './line.js';
 import { hasAnyReminder, parseReminderSettings, buildReminderLines, reminderMessage, visitReminderMessage } from './reminders.js';
 import { shortDate } from './replies.js';
-import { recordFlex, recordFlexCompact, foodDisambigFlex, multiRecordFlex, todayFlex, handoffFlex, websiteFlex, menuFlex, recordMenuFlex, recordTutorialFlex, quickRecordCarousel, weekFlex, monthFlex, recentFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, onboardingCarousel, menuCell, exampleCard, petDataFlex, deletedCard, confirmDeleteFlex, careNotifyFlex, careInviteFlex } from './flex.js';
+import { recordFlex, recordFlexCompact, foodDisambigFlex, multiRecordFlex, undoConfirmFlex, todayFlex, handoffFlex, websiteFlex, menuFlex, recordMenuFlex, recordTutorialFlex, quickRecordCarousel, weekFlex, monthFlex, recentFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, onboardingCarousel, menuCell, exampleCard, petDataFlex, deletedCard, confirmDeleteFlex, careNotifyFlex, careInviteFlex } from './flex.js';
 import { isBetaAllowed, normalizeCode, gateText } from './plan.js';
 import {
   ensureUser, updateUser, getUser, listPets, createPet, resolveDefaultPet, getPet, updatePetFields, createFoodItem, createMedItem,
@@ -1239,7 +1239,7 @@ async function handlePostback(event, env, baseUrl) {
     // awaiting_pet_selection 完成 → 補一列最終 record（帶原 sourceMessageId），最新狀態反映成功
     await logTextInput(db, { lineUserId, ownerId, petId: chosen.petId, rawText: ev, parseStatus: 'record', failReason: '', sourceMessageId: smid, resolvedPetId: chosen.petId, linkedLogId: savedIds.join(','), parsedResult: JSON.stringify({ events: recs.map((r) => ({ category: r.category, amount: r.amount, unit: r.unit, itemName: r.itemName, addedWaterMl: r.addedWaterMl || 0 })), savedLogIds: savedIds, unparsedSegments: [], awaitingAction: '' }) });
     if (recs.length > 1) {
-      const undoBtn = (savedIds.length && smid) ? [qrPost('↩️ 撤銷這次紀錄', `action=undoOp&smid=${encodeURIComponent(smid)}`, '撤銷這次紀錄')] : [];
+      const undoBtn = (savedIds.length && smid) ? [qrPost('↩️ 撤銷本次紀錄', `action=undoOp&smid=${encodeURIComponent(smid)}`, '撤銷本次紀錄')] : [];
       await replyOrPushQuick(env, event, `已記到「${chosen.petName}」✓ 共 ${recs.length} 筆`, undoBtn);
     }
     return;
@@ -1352,17 +1352,19 @@ async function handlePostback(event, env, baseUrl) {
       : await collectUndoable(db, data.get('ids') || '', ownerId);
     if (!items.length) { await replyOrPush(env, event, '這次紀錄已經撤銷過了 👌'); return; }
     if (action === 'undoOp') {
-      // 護欄一：先確認、不立即刪。undoDo 沿用同一把鑰匙，避免大量 UUID 塞爆 postback。
+      // 護欄一：先確認、不立即刪。undoDo 沿用同一把鑰匙（smid 優先，否則內嵌 ids），避免大量 UUID 塞爆 postback。
       const undoKey = smid ? `smid=${encodeURIComponent(smid)}` : `ids=${items.map((l) => l.logId).join(',')}`;
-      const lines = items.map((l) => `· ${describeLog(l)}`).join('\n');
-      await replyOrPushQuick(env, event, `確定要撤銷這次紀錄嗎？\n${lines}`, [
-        qrPost('確定撤銷', `action=undoDo&${undoKey}`, '確定撤銷'),
-        qrPost('取消', 'action=undoCancel', '取消')
-      ]);
+      const lineTexts = items.map((l) => describeLog(l));
+      // 用 Flex 氣泡內建按鈕做二段確認（永遠可見），取代原本浮動易漏看的 quick reply → 使用者不用打字。
+      const confirmPet = await getPet(db, items[0]?.petId || '');
+      const multi = items.length >= 2;
+      const fallback = `${multi ? `確定要撤銷本次 ${items.length} 筆紀錄嗎？` : '確定要刪除這筆紀錄嗎？'}\n${lineTexts.map((t) => `· ${t}`).join('\n')}`;
+      await replyOrPushFlex(env, event, undoConfirmFlex({ pet: confirmPet, lines: lineTexts, undoKey, count: items.length }), fallback);
       return;
     }
     const undone = await applyUndo(db, items, lineUserId); // 確認後才軟刪＋重算受影響貓/日期
-    await replyOrPush(env, event, `↩️ 已撤銷這次紀錄：\n${undone.map((l) => `· ${describeLog(l)}`).join('\n')}`);
+    const doneHead = undone.length >= 2 ? `↩️ 已撤銷本次 ${undone.length} 筆紀錄：` : '🗑 已刪除這筆紀錄：';
+    await replyOrPush(env, event, `${doneHead}\n${undone.map((l) => `· ${describeLog(l)}`).join('\n')}`);
     return;
   }
   if (action === 'undoCancel') { await replyOrPush(env, event, '好，這次紀錄先保留著 👌'); return; }
@@ -2073,7 +2075,8 @@ async function handleTextMessage(event, env, baseUrl) {
         // 已記錄 ＋ 尚未找到相符/看不懂 → 明列，撤銷只撤已成功的
         const recTxt = `✅ 已記錄 ${lines.length} 筆：\n${lines.map((l) => `· ${l}`).join('\n')}`;
         const extras = [noMatchTxt, unparsed.length ? `⚠️ 這 ${unparsed.length} 筆看不懂、尚未記錄：\n${unparsed.map((u) => `· ${u}`).join('\n')}` : ''].filter(Boolean).join('\n\n');
-        const undoBtn = savedIds.length ? [qrPost('↩️ 撤銷這次紀錄', `action=undoOp&smid=${smid}`, '撤銷這次紀錄')] : [];
+        const undoLabel = savedIds.length >= 2 ? '↩️ 撤銷本次紀錄' : '🗑 刪除這筆';
+        const undoBtn = savedIds.length ? [qrPost(undoLabel, `action=undoOp&smid=${smid}`, savedIds.length >= 2 ? '撤銷本次紀錄' : '刪除這筆')] : [];
         await replyOrPushQuick(env, event, `${recTxt}\n\n${extras}`, undoBtn);
         return;
       }
@@ -2646,6 +2649,9 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
       const ids = [savedLog?.logId, addedWaterLog?.logId].filter(Boolean);
       return ids.length ? `ids=${ids.join(',')}` : '';
     })(),
+    // 撤銷鈕文案用：這次操作實際建立的正式紀錄筆數（食物＋連動加水最多 2 筆）。
+    // 走到單筆 recordFlex 時，這個 smid 就只有本次這些 log（多筆流程改走 multiRecordFlex/靜默彙整卡）。
+    undoCount: [savedLog?.logId, addedWaterLog?.logId].filter(Boolean).length,
     hints, tip, siteUrl: await siteLink(env, opts.baseUrl, lineUserId),
     warnNoKcal: record.category === 'food' && noKcal, foodType: record.foodType || '',
     estimated: record.category === 'food' && estimated, estKcalPerG

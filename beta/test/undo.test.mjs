@@ -9,7 +9,7 @@ import { DatabaseSync } from 'node:sqlite';
 
 import { parseUndoIds, collectUndoable, collectUndoableBySmid, applyUndo } from '../src/index.js';
 import { insertLog, logTextInput } from '../src/db.js';
-import { recordFlex } from '../src/flex.js';
+import { recordFlex, multiRecordFlex, undoConfirmFlex } from '../src/flex.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SCHEMA = readFileSync(join(__dirname, '..', 'schema.sql'), 'utf8');
@@ -158,6 +158,54 @@ test('postback byte 長度：smid 與 內嵌 ids（上限 6）的 undoOp/undoDo 
   const ids = Array.from({ length: 6 }, () => U()).join(',');
   assert.ok(B(`action=undoOp&ids=${ids}`) < 300, `6 個 UUID 的 undoOp 應 < 300，實際 ${B(`action=undoOp&ids=${ids}`)}`);
   assert.ok(B(`action=undoDo&ids=${ids}`) < 300);
+});
+
+// ── 卡片文案：第一層撤銷鈕依「這次 smid 筆數」——單筆＝刪除這筆、多筆＝撤銷本次紀錄 ──
+test('recordFlex：undoCount=1 → 顯示「刪除這筆」（單筆）；undoCount≥2 → 顯示「撤銷本次紀錄」；底層都走 undoOp', () => {
+  const single = JSON.stringify(recordFlex({ pet: { petName: '蚵仔' }, categoryKey: 'wet', mainText: '希爾斯罐頭 32g', summary: {}, logId: 'L1', undoData: 'smid=12345', undoCount: 1 }));
+  assert.ok(single.includes('action=undoOp&smid=12345'), '單筆仍走 undoOp（撤同次整批）');
+  assert.ok(single.includes('刪除這筆'), '單筆顯示「刪除這筆」');
+  assert.ok(!single.includes('撤銷本次紀錄'), '單筆不顯示「撤銷本次紀錄」');
+  assert.ok(!single.includes('撤銷這次紀錄'), '不得再出現舊文案「撤銷這次紀錄」');
+
+  const multi = JSON.stringify(recordFlex({ pet: { petName: '蚵仔' }, categoryKey: 'wet', mainText: '罐頭 30g＋加水 10ml', summary: {}, logId: 'L2', undoData: 'smid=12345', undoCount: 2 }));
+  assert.ok(multi.includes('action=undoOp&smid=12345'), '多筆走 undoOp');
+  assert.ok(multi.includes('撤銷本次紀錄'), '多筆顯示「撤銷本次紀錄」');
+  assert.ok(!multi.includes('刪除這筆'), '多筆不顯示「刪除這筆」');
+});
+
+test('multiRecordFlex：一次記多筆 → 撤銷鈕文案為「撤銷本次紀錄」', () => {
+  const json = JSON.stringify(multiRecordFlex({ petName: '蚵仔' }, ['水 20ml', '乾糧 5g'], {}, '2026-08-04', '', 'smid=777'));
+  assert.ok(json.includes('action=undoOp&smid=777'));
+  assert.ok(json.includes('撤銷本次紀錄'));
+  assert.ok(!json.includes('撤銷這次紀錄'), '不得再出現舊文案');
+});
+
+// ── 二段確認卡：Flex 內建按鈕（永遠可見），確認鈕綁 undo token、不要求打字 ──
+test('undoConfirmFlex（單筆）：標題「刪除這筆」、確認鈕 postback 綁 smid、取消鈕 undoCancel、不含 quick reply', () => {
+  const json = JSON.stringify(undoConfirmFlex({ pet: { petName: '蚵仔' }, lines: ['希爾斯罐頭 32 g'], undoKey: 'smid=12345', count: 1 }));
+  assert.ok(json.includes('確定要刪除這筆紀錄嗎？'), '單筆標題');
+  assert.ok(json.includes('action=undoDo&smid=12345'), '確認鈕 postback 綁原 smid');
+  assert.ok(json.includes('"label":"確認刪除"'), '單筆確認鈕文字');
+  assert.ok(json.includes('action=undoCancel'), '取消鈕存在');
+  assert.ok(json.includes('希爾斯罐頭 32 g'), '列出要處理的內容');
+  assert.ok(!json.includes('quickReply'), '是氣泡內建按鈕，非 quick reply');
+  assert.ok(json.includes('"type":"flex"'), '確認介面為 Flex 氣泡');
+});
+
+test('undoConfirmFlex（多筆）：標題「撤銷本次 N 筆」、確認鈕文字「確認撤銷」，仍綁同一 undo token', () => {
+  const json = JSON.stringify(undoConfirmFlex({ pet: { petName: '蚵仔' }, lines: ['罐頭 30 g', '喝水 10 ml'], undoKey: 'smid=888', count: 2 }));
+  assert.ok(json.includes('確定要撤銷本次 2 筆紀錄嗎？'), '多筆標題含筆數');
+  assert.ok(json.includes('"label":"確認撤銷"'), '多筆確認鈕文字');
+  assert.ok(json.includes('action=undoDo&smid=888'));
+});
+
+test('undoConfirmFlex：內嵌 ids 版確認鈕 postback < 300 bytes（含 6 UUID 上限）', () => {
+  const ids = Array.from({ length: 6 }, () => U()).join(',');
+  const json = JSON.stringify(undoConfirmFlex({ pet: {}, lines: ['x'], undoKey: `ids=${ids}`, count: 6 }));
+  const m = json.match(/action=undoDo&ids=[^"']*/);
+  assert.ok(m, '應有 undoDo&ids postback');
+  assert.ok(Buffer.byteLength(m[0], 'utf8') < 300, `確認鈕 postback 應 < 300，實際 ${Buffer.byteLength(m[0], 'utf8')}`);
 });
 
 // ── smid token：從 text_inputs.savedLogIds 取全量、不截斷（多筆也能全撤，杜絕部分撤銷）──
