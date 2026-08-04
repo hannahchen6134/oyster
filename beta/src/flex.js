@@ -307,21 +307,25 @@ export function foodDisambigFlex({ pet, foodType, typedName, grams, addedWaterMl
   const body = {
     type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
     contents: [
-      { type: 'box', layout: 'horizontal', contents: [tag('要確認一下', CATEGORY_STYLE.vomit)] },
-      text(`「${typedName}」我對不到已建立的品項`, { size: 'lg', weight: 'bold', color: C.ink, margin: 'md', wrap: true }),
-      text(`選正確的${foodType}，這 ${g} g 的熱量才算得進去（避免記成 0）`, { size: 'xs', color: C.muted, wrap: true, margin: 'sm' }),
-      ...(guessId ? [text('🐱 我猜最接近的是這個，直接點就好', { size: 'xxs', color: C.brand, wrap: true, margin: 'sm' })] : [])
+      { type: 'box', layout: 'horizontal', contents: [tag('請確認這次吃的是哪一款', style)] },
+      text(`「${typedName}」找不到已建立的品項`, { size: 'lg', weight: 'bold', color: C.ink, margin: 'md', wrap: true }),
+      text(`選一下這次吃的是哪款${foodType}，我才能把 ${g}g 換算成熱量。`, { size: 'sm', color: C.inkSoft, wrap: true, margin: 'sm' }),
+      ...(guessId ? [text('最接近你常用的品項：', { size: 'xs', color: C.brand, weight: 'bold', wrap: true, margin: 'lg' })] : [])
     ]
   };
   const footer = {
     type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: '12px', backgroundColor: FOOTER_COLOR,
     contents: [
       ...pickButtons,
-      { type: 'separator', margin: 'sm', color: SEPARATOR },
+      { type: 'separator', margin: 'md', color: SEPARATOR },
+      // 新增這個品項（走既有「設定<類型>」訊息流程）
       { type: 'button', height: 'sm', style: 'link', color: C.brand,
-        action: { type: 'message', label: `新增「${typedName}」`.slice(0, 20), text: `設定${foodType}` } },
-      { type: 'button', height: 'sm', style: 'link', color: C.muted,
-        action: { type: 'postback', label: `只記${foodType} ${g}g`.slice(0, 20), data: `action=recFoodRaw&t=${encodeURIComponent(foodType)}&g=${g}&name=${encodeURIComponent(typedName)}${carry}`, displayText: `只記${foodType} ${g}g` } },
+        action: { type: 'message', label: `＋ 新增「${typedName}」`.slice(0, 20), text: `設定${foodType}` } },
+      // 先記份量：熱量先用「類型平均」估算（誠實標示，不假裝不計算）；下方一行柔性說明，長輩也看得懂
+      { type: 'button', height: 'sm', style: 'link', color: C.inkSoft,
+        action: { type: 'postback', label: `先記${foodType} ${g}g（熱量先估算）`.slice(0, 20), data: `action=recFoodRaw&t=${encodeURIComponent(foodType)}&g=${g}&name=${encodeURIComponent(typedName)}${carry}`, displayText: `先記${foodType} ${g}g（熱量先估算）` } },
+      text(`先依${foodType}平均熱量估算，之後設定正確品項，可再補上較精確的熱量。`, { size: 'xxs', color: C.muted, wrap: true, margin: 'none' }),
+      { type: 'separator', margin: 'md', color: SEPARATOR },
       { type: 'button', height: 'sm', style: 'link', color: C.muted,
         action: { type: 'postback', label: '取消', data: `action=foodCancel&smid=${encodeURIComponent(String(smid || ''))}${pid ? `&pid=${encodeURIComponent(String(pid))}` : ''}`, displayText: '取消' } }
     ]

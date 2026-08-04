@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
-import { foodDisambigFlex } from '../src/flex.js';
+import { foodDisambigFlex, recordFlex } from '../src/flex.js';
 import { deriveFoodFields } from '../src/summary.js';
 import { insertLog, logTextInput } from '../src/db.js';
 
@@ -33,19 +33,83 @@ test('part四：品牌選擇卡 postback 完整保留 g=34、aw=14、smid，編�
   assert.ok(data.length < 300, `postback 長度需 < 300（LINE 限制），實際 ${data.length}`);
 });
 
-test('part四：推薦標記用 🐱（不再用 ⭐）——提示文字與「最接近」品項按鈕都是貓頭', () => {
+test('part四：長輩友善文案——標題/提示/說明/推薦標記全部到位，且無工程術語與責備語氣', () => {
   const flex = foodDisambigFlex({
-    pet: { petName: '蚵仔' }, foodType: '罐頭', typedName: '希爾思',
-    grams: 32, addedWaterMl: 0, smid: '999',
-    options: [{ foodId: 'f-hills', displayName: '希爾斯罐頭', foodType: '罐頭' }, { foodId: 'f-royal', displayName: '皇家罐頭', foodType: '罐頭' }],
-    guessId: 'f-hills'
+    pet: { petName: '蚵仔' }, foodType: '罐頭', typedName: '皇家水粉',
+    grams: 15, addedWaterMl: 0, smid: '999',
+    options: [{ foodId: 'f-royal', displayName: '皇家罐頭', foodType: '罐頭' }, { foodId: 'f-hills', displayName: '希爾斯罐頭', foodType: '罐頭' }],
+    guessId: 'f-royal'
   });
   const json = JSON.stringify(flex);
-  assert.ok(!json.includes('⭐'), '不得再出現 ⭐');
-  assert.ok(json.includes('🐱 我猜最接近的是這個，直接點就好'), '提示文字改為 🐱 版本');
-  assert.ok(json.includes('🐱 希爾斯罐頭'), '「最接近」品項按鈕前綴改為 🐱');
-  // 非推薦品項不加任何前綴
-  assert.ok(json.includes('"label":"皇家罐頭"'), '非推薦品項不加標記');
+  // 標題維持「確認品項・蚵仔」
+  assert.ok(json.includes('確認品項・蚵仔'), '標題維持');
+  // 標籤／主訊息／說明
+  assert.ok(json.includes('請確認這次吃的是哪一款'), '提示標籤');
+  assert.ok(json.includes('「皇家水粉」找不到已建立的品項'), '主訊息');
+  assert.ok(json.includes('選一下這次吃的是哪款罐頭，我才能把 15g 換算成熱量。'), '說明文字');
+  assert.ok(json.includes('最接近你常用的品項：'), '推薦品項上方文字');
+  assert.ok(json.includes('🐱 皇家罐頭'), '主要推薦品項＝貓頭前綴');
+  assert.ok(json.includes('"label":"希爾斯罐頭"'), '其他既有品項不加標記');
+  // 舊文案不得殘留
+  for (const bad of ['⭐', '我猜最接近', '才算得進去', '避免記成 0', '要確認一下', '只記']) {
+    assert.ok(!json.includes(bad), `不得再出現舊文案：${bad}`);
+  }
+  // 不使用工程術語
+  for (const jargon of ['item', 'mapping', 'kcal', 'fallback', 'null', 'undefined']) {
+    assert.ok(!json.toLowerCase().includes(jargon.toLowerCase()), `不得出現工程術語：${jargon}`);
+  }
+});
+
+test('part四：四條路徑的按鈕與 postback 都在（點既有／新增／先記不計熱量／取消），文案與動作對齊', () => {
+  const flex = foodDisambigFlex({
+    pet: { petName: '蚵仔' }, foodType: '罐頭', typedName: '皇家水粉',
+    grams: 15, addedWaterMl: 0, smid: '777',
+    options: [{ foodId: 'f-royal', displayName: '皇家罐頭', foodType: '罐頭' }],
+    guessId: 'f-royal'
+  });
+  const json = JSON.stringify(flex);
+  // A. 既有品項：recFoodG，帶 foodId/g
+  assert.ok(json.includes('action=recFoodG&foodId=f-royal&g=15'), 'A 既有品項 postback');
+  // B. 新增：訊息「設定罐頭」，label「＋ 新增「皇家水粉」」
+  assert.ok(json.includes('＋ 新增「皇家水粉」') && json.includes('"text":"設定罐頭"'), 'B 新增 postback/label');
+  // C. 先記（熱量先估算）：recFoodRaw，帶 name/g/t，且誠實標示「估算」、不假裝不計算
+  assert.ok(json.includes('action=recFoodRaw&t=%E7%BD%90%E9%A0%AD&g=15&name=%E7%9A%87%E5%AE%B6%E6%B0%B4%E7%B2%89'), 'C 先記 postback 帶類型/份量/原品名');
+  assert.ok(json.includes('先記罐頭 15g（熱量先估算）'), 'C 按鈕標「熱量先估算」');
+  assert.ok(json.includes('先依罐頭平均熱量估算'), 'C 明確說明熱量是估算、之後可補精確值');
+  assert.ok(!json.includes('不計熱量') && !json.includes('暫不計算'), 'C 不得再宣稱「不計熱量」（與實際會估算不符）');
+  // D. 取消：foodCancel，帶 smid
+  assert.ok(json.includes('action=foodCancel&smid=777'), 'D 取消 postback 帶 smid');
+});
+
+test('part四：先記後的結果卡必須清楚標示「估算」——不得讓使用者誤以為是精確熱量', () => {
+  // recFoodRaw 未命中品項 → handleRecord 走類型預設估算（estimated=true），結果卡要標「估算」
+  const json = JSON.stringify(recordFlex({
+    pet: { petName: '蚵仔' }, categoryKey: 'wet', mainText: '罐頭 15g', summary: {}, logId: 'L1',
+    foodType: '罐頭', estimated: true, estKcalPerG: 0.9
+  }));
+  assert.ok(json.includes('熱量是估算的'), '結果卡明確標示熱量為估算');
+  assert.ok(json.includes('設定') && json.includes('自動補算'), '提示可設定精確每克熱量、之後自動補算');
+});
+
+test('part四：長品項名稱 → Flex JSON 合法、主訊息用 wrap 可換行、按鈕 label 不超過 20 字（不爆版）', () => {
+  const longName = '皇家腸胃道低脂處方主食濕糧化毛配方成貓專用';
+  const flex = foodDisambigFlex({
+    pet: { petName: '蚵仔' }, foodType: '罐頭', typedName: longName,
+    grams: 15, addedWaterMl: 0, smid: '999',
+    options: [{ foodId: 'f1', displayName: longName, foodType: '罐頭' }],
+    guessId: 'f1'
+  });
+  const json = JSON.stringify(flex);
+  const parsed = JSON.parse(json); // 合法 JSON
+  assert.equal(parsed.type, 'flex');
+  // 主訊息 text 帶 wrap:true（長名稱可換行）
+  const walk = (n, out = []) => { if (Array.isArray(n)) n.forEach((x) => walk(x, out)); else if (n && typeof n === 'object') { out.push(n); Object.values(n).forEach((v) => walk(v, out)); } return out; };
+  const nodes = walk(parsed);
+  const mainMsg = nodes.find((n) => n.type === 'text' && typeof n.text === 'string' && n.text.includes('找不到已建立的品項'));
+  assert.ok(mainMsg && mainMsg.wrap === true, '主訊息 wrap:true');
+  // 所有按鈕 label ≤ 20 字（LINE 限制、避免爆版）
+  const labels = nodes.filter((n) => n.type === 'button').map((b) => b.action?.label || '');
+  for (const l of labels) assert.ok(l.length <= 20, `按鈕 label 需 ≤ 20 字：「${l}」(${l.length})`);
 });
 
 test('part四：smid 為空時仍安全（smid= 空字串，不炸）', () => {
