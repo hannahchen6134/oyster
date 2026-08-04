@@ -1227,21 +1227,31 @@ async function handlePostback(event, env, baseUrl) {
     const smid = data.get('smid') || '';
     const sub = parseMessage(ev);
     const recs = sub.type === 'multiRecord' ? sub.records : (sub.type === 'record' ? [sub.record] : []);
-    if (!recs.length) { await replyOrPush(env, event, '這筆我沒抓到內容，請重新輸入一次。'); return; }
+    // 反查候選（無類別詞的品名＋份量，如「皇家 33」）也要帶進來，選完貓才不會遺失食物
+    let candidates = Array.isArray(sub.candidates) ? sub.candidates : [];
+    if (sub.type === 'item_lookup_candidate') candidates = [{ itemName: sub.itemName, amount: sub.amount, addedWaterMl: sub.addedWaterMl || 0 }];
+    const unparsed = Array.isArray(sub.unparsed) ? sub.unparsed : [];
+    if (!recs.length && !candidates.length) { await replyOrPush(env, event, '這筆我沒抓到內容，請重新輸入一次。'); return; }
     const user = await getUser(db, lineUserId);
     const caregiverName = ownerId !== lineUserId ? String(user.displayName || '') : '';
+    // 多筆／需品項確認／有看不懂片段 → 與正常多筆完全相同的機制（deferDisambig＋partial 確認卡＋advancePending），
+    // 保留同一 smid，杜絕「先選貓就遺失食物」，且食物需確認時走局部確認卡、全部確認後才宣告完成。
+    if (recs.length > 1 || candidates.length || unparsed.length) {
+      await recordMultiForPet(env, event, db, {
+        pet: chosen, records: recs, candidates, unparsed, smid, rawText: ev,
+        ownerId, lineUserId, caregiverName, baseUrl
+      });
+      return;
+    }
+    // 單筆乾淨紀錄（旺財類真雜字＋單一事件）→ 沿用原本行為：handleRecord 直接渲染紀錄卡
     const savedIds = [];
     for (const rec of recs) {
-      const res = await handleRecord(env, event, chosen, rec, ownerId, { silent: recs.length > 1, actorId: lineUserId, caregiverName, baseUrl });
+      const res = await handleRecord(env, event, chosen, rec, ownerId, { silent: false, actorId: lineUserId, caregiverName, baseUrl });
       if (res?.savedLog?.logId) savedIds.push(res.savedLog.logId);
       if (res?.addedWaterLog?.logId) savedIds.push(res.addedWaterLog.logId);
     }
     // awaiting_pet_selection 完成 → 補一列最終 record（帶原 sourceMessageId），最新狀態反映成功
     await logTextInput(db, { lineUserId, ownerId, petId: chosen.petId, rawText: ev, parseStatus: 'record', failReason: '', sourceMessageId: smid, resolvedPetId: chosen.petId, linkedLogId: savedIds.join(','), parsedResult: JSON.stringify({ events: recs.map((r) => ({ category: r.category, amount: r.amount, unit: r.unit, itemName: r.itemName, addedWaterMl: r.addedWaterMl || 0 })), savedLogIds: savedIds, unparsedSegments: [], awaitingAction: '' }) });
-    if (recs.length > 1) {
-      const undoBtn = (savedIds.length && smid) ? [qrPost(`🗑 刪除這次 ${recs.length} 筆`, `action=undoOp&smid=${encodeURIComponent(smid)}`, `刪除這次 ${recs.length} 筆`)] : [];
-      await replyOrPushQuick(env, event, `已記到「${chosen.petName}」✓ 共 ${recs.length} 筆`, undoBtn);
-    }
     return;
   }
 
@@ -1617,6 +1627,107 @@ async function handleFollow(event, env) {
   await replyOrPushFlex(env, event, await welcomeMsg(env.DB, lineUserId, lineUserId), welcomeText());
 }
 
+// 選貓提示用：把「已解析的事件」描述成人看得懂的一行（皇家罐頭33g／水8ml／早藥已吃…）。
+// 純顯示，不做 food_item 反查（那留到選完貓的落地階段）。
+function describeParsedEvent(r) {
+  if (!r) return '';
+  if (r.category === 'water') return `水 ${r.amount}ml`;
+  if (r.category === 'med') return `${r.medSlot || ''}藥 ${r.medStatus || '已餵'}`.trim();
+  if (r.category === 'food') return `${r.itemName || ''}${r.foodType || '食物'} ${r.amount}g`.trim();
+  if (r.category === 'vomit') return `嘔吐${r.itemName ? `（${r.itemName}）` : ''}`;
+  if (r.category === 'stool') return r.itemName || '排便';
+  if (r.category === 'mood') return `精神${r.itemName ? `（${r.itemName}）` : ''}`;
+  if (r.category === 'weight') return `體重 ${r.amount}kg`;
+  return r.itemName || r.note || r.category;
+}
+export function describeParsedEvents(text) {
+  const p = parseMessage(text);
+  const recs = p.type === 'multiRecord' ? p.records : (p.type === 'record' ? [p.record] : []);
+  return recs.map(describeParsedEvent).filter(Boolean);
+}
+
+// 多筆紀錄落地（可被「一則多筆」與「先選貓後補記」共用）：
+// 逐筆寫入（typed 品項對不到 → deferDisambig 進 pending）＋反查候選（唯一→記、需選→pending、無命中→告知）＋
+// 看不懂片段保留；有 pending → advancePending 逐一確認（回「已記錄N筆，另有M筆待確認」）；全成→多筆卡。
+// smid／rawText 由呼叫端帶入，確保「先選貓」流程延續同一次操作（savedLogIds／pendingId 都掛同一 smid）。
+export async function recordMultiForPet(env, event, db, opts) {
+  const { pet, records = [], candidates = [], unparsed: unparsedIn = [], smid, rawText, ownerId, lineUserId, caregiverName, baseUrl } = opts;
+  const lines = [];
+  const savedIds = [];
+  const pendingDisambig = []; // 有類別詞、品牌對不到 → typed pending
+  let lastSummary = null;
+  let lastDate = '';
+  for (const rec of records) {
+    const res = await handleRecord(env, event, pet, rec, ownerId, { silent: true, deferDisambig: true, actorId: lineUserId, caregiverName });
+    if (res?.needsDisambig) { pendingDisambig.push(res.disambig); continue; }
+    if (res?.mainText) lines.push(res.mainText);
+    if (res?.savedLog?.logId) savedIds.push(res.savedLog.logId);
+    if (res?.addedWaterLog?.logId) savedIds.push(res.addedWaterLog.logId); // 加水另一筆 log 也算
+    if (res?.summary) { lastSummary = res.summary; lastDate = res.eventDate; }
+  }
+  // 無類別詞品項候選：沿用單句相同的反查邏輯（唯一→記、多筆/模糊→partial、無命中→保留告知）
+  const lookupPendings = [];
+  const noMatch = [];
+  for (const cand of (Array.isArray(candidates) ? candidates : [])) {
+    const r = await resolveCandidate(db, ownerId, cand);
+    if (r.kind === 'unique') {
+      const res = await handleRecord(env, event, pet, { category: 'food', foodType: r.food.foodType, itemName: r.food.displayName, amount: cand.amount, unit: 'g', addedWaterMl: cand.addedWaterMl || 0, medStatus: '', medSlot: '', note: '' }, ownerId, { silent: true, actorId: lineUserId, caregiverName });
+      if (res?.mainText) lines.push(res.mainText);
+      if (res?.savedLog?.logId) savedIds.push(res.savedLog.logId);
+      if (res?.addedWaterLog?.logId) savedIds.push(res.addedWaterLog.logId);
+      if (res?.summary) { lastSummary = res.summary; lastDate = res.eventDate; }
+    } else if (r.kind === 'pick') {
+      lookupPendings.push({ kind: 'lookup', itemName: cand.itemName, grams: cand.amount, aw: cand.addedWaterMl || 0 });
+    } else {
+      noMatch.push({ itemName: cand.itemName, grams: cand.amount });
+    }
+  }
+  const unparsed = Array.isArray(unparsedIn) ? unparsedIn : [];
+  // 待確認佇列（typed＋lookup），每筆給穩定 id＋status，取消/確認只動被點的那一筆
+  const pendings = [
+    ...pendingDisambig.map((d) => ({ kind: 'typed', foodType: d.foodType, typedName: d.typedName, grams: d.grams, aw: d.addedWaterMl || 0 })),
+    ...lookupPendings
+  ].map((p, i) => ({ id: `p${i}`, status: 'pending', ...p }));
+  const hasPending = pendings.length > 0;
+  const anyContent = lines.length || pendings.length || noMatch.length;
+  const multiStatus = !anyContent ? 'unknown' : ((hasPending || unparsed.length || noMatch.length) ? 'multi_partial' : 'record');
+  await logTextInput(db, {
+    lineUserId, ownerId, petId: pet.petId, rawText: rawText || '',
+    parseStatus: multiStatus, failReason: !anyContent ? 'no_valid_segment' : '',
+    sourceMessageId: smid, resolvedPetId: pet.petId, linkedLogId: savedIds.join(','),
+    parsedResult: JSON.stringify({
+      events: records.map((r) => ({ category: r.category, amount: r.amount, unit: r.unit, itemName: r.itemName, addedWaterMl: r.addedWaterMl || 0 })),
+      savedLogIds: savedIds,
+      pendingFoods: pendings,
+      noMatch,
+      unparsedSegments: unparsed,
+      awaitingAction: hasPending ? 'food_selection' : ''
+    })
+  });
+  // 「尚未找到相符品項」文案：不得用「看不懂」、不得讓片段消失
+  const noMatchTxt = noMatch.map((x) => `我辨認到品項「${x.itemName}」${x.grams}g，但尚未找到相符的常用食物。`).join('\n');
+  // 有待確認 → 逐一 prompt（advancePending 會回「已記錄N筆，另有M筆待確認」，不宣稱完成）
+  if (hasPending) { await advancePending(env, event, db, pet, smid, ownerId, baseUrl, lineUserId); return; }
+  if (!lines.length) {
+    const parts = [noMatchTxt, unparsed.length ? `⚠️ 這些我看不懂、尚未記錄：\n${unparsed.map((u) => `· ${u}`).join('\n')}\n可以分開再打一次（例：罐頭 34）。` : ''].filter(Boolean);
+    if (parts.length) { await replyOrPush(env, event, parts.join('\n\n')); return; }
+    await guideUnknown(env, event, pet?.petId || ''); return;
+  }
+  if (noMatchTxt || unparsed.length) {
+    // 已記錄 ＋ 尚未找到相符/看不懂 → 明列，刪除只刪已成功的
+    const recTxt = `✅ 已記錄 ${lines.length} 筆：\n${lines.map((l) => `· ${l}`).join('\n')}`;
+    const extras = [noMatchTxt, unparsed.length ? `⚠️ 這 ${unparsed.length} 筆看不懂、尚未記錄：\n${unparsed.map((u) => `· ${u}`).join('\n')}` : ''].filter(Boolean).join('\n\n');
+    const undoLabel = savedIds.length >= 2 ? `🗑 刪除這次 ${savedIds.length} 筆` : '🗑 刪除這筆';
+    const undoBtn = savedIds.length ? [qrPost(undoLabel, `action=undoOp&smid=${smid}`, savedIds.length >= 2 ? `刪除這次 ${savedIds.length} 筆` : '刪除這筆')] : [];
+    await replyOrPushQuick(env, event, `${recTxt}\n\n${extras}`, undoBtn);
+    return;
+  }
+  const fallback = `已記錄 ${lines.length} 筆：\n${lines.map((line) => `· ${line}`).join('\n')}`;
+  const multiSiteUrl = await siteLink(env, baseUrl, lineUserId);
+  const multiUndo = savedIds.length ? `smid=${smid}` : '';
+  await replyOrPushFlex(env, event, multiRecordFlex(pet, lines, lastSummary, lastDate, multiSiteUrl, multiUndo), fallback);
+}
+
 async function handleTextMessage(event, env, baseUrl) {
   const db = env.DB;
   const lineUserId = event.source?.userId;
@@ -1740,7 +1851,9 @@ async function handleTextMessage(event, env, baseUrl) {
       if (target) { pet = target; explicitPet = true; text = lead.rest; }
     } else if (lead.kind === 'partial') {
       leadPartial = lead;
-    } else if (lead.kind === 'leadingUnknown') {
+    } else if (lead.kind === 'leadingUnknown' || lead.kind === 'leadingNoPet') {
+      // leadingUnknown＝句首有不明前綴（旺財…）；leadingNoPet＝無不明前綴、只是沒指定貓（皇家罐頭33 水8 早藥）。
+      // 兩者都問「要記哪隻貓」，但 leadingNoPet 帶完整句、列出所有事件、選完走完整多筆機制（不遺失食物）。
       leadPick = lead;
     }
   }
@@ -1804,19 +1917,30 @@ async function handleTextMessage(event, env, baseUrl) {
     return;
   }
 
-  // 不明句首（前段不明、後段可解析）→ 不猜前段是貓名、不靜默寫預設貓；請使用者選貓。
-  // 選貓（postback）前正式 logs 為 0 筆；事件文字帶在 postback，選完保留原事件、不用重打。
+  // 沒指定貓、但整句可解析 → 不靜默寫預設貓；請使用者選貓。選貓（postback）前正式 logs 為 0 筆；
+  // 事件文字帶在 postback，選完用同一 smid 落地、保留原事件、不用重打。
+  //  - leadingNoPet：無不明前綴（皇家罐頭33 水8 早藥），列出所有事件、帶完整句；選完走完整多筆機制（不遺失食物）。
+  //  - leadingUnknown：句首有不明前綴（旺財…），沿用「看得懂後段、不確定前綴」問法。
   if (leadPick) {
     const smid = String(event.message?.id || '');
-    const catBtns = pets.slice(0, 12).map((p) => qrPost(p.petName, `action=pickcatFor&petId=${p.petId}&ev=${encodeURIComponent(leadPick.eventText)}&smid=${encodeURIComponent(smid)}`, p.petName));
+    const noPrefix = leadPick.kind === 'leadingNoPet' || !leadPick.prefix;
+    const evText = leadPick.eventText;
+    const catBtns = pets.slice(0, 12).map((p) => qrPost(p.petName, `action=pickcatFor&petId=${p.petId}&ev=${encodeURIComponent(evText)}&smid=${encodeURIComponent(smid)}`, p.petName));
     await logTextInput(db, {
       lineUserId, ownerId, petId: '', rawText: event.message?.text || '',
-      parseStatus: 'awaiting_pet_selection', failReason: 'leading_unknown', sourceMessageId: smid,
-      resolvedPetId: '', linkedLogId: '', parsedResult: JSON.stringify({ events: [], savedLogIds: [], unparsedSegments: [], awaitingAction: 'pet_selection', prefix: leadPick.prefix, eventText: leadPick.eventText })
+      parseStatus: 'awaiting_pet_selection', failReason: noPrefix ? 'no_pet_specified' : 'leading_unknown', sourceMessageId: smid,
+      resolvedPetId: '', linkedLogId: '', parsedResult: JSON.stringify({ events: [], savedLogIds: [], unparsedSegments: [], awaitingAction: 'pet_selection', prefix: leadPick.prefix || '', eventText: evText })
     });
-    await replyOrPushQuick(env, event,
-      `我看得懂「${leadPick.eventText}」，但不確定前面的「${leadPick.prefix}」代表什麼。\n請選要記錄的貓咪，或直接重新輸入：`,
-      catBtns);
+    if (noPrefix) {
+      const list = describeParsedEvents(evText).map((t) => `・${t}`).join('\n');
+      await replyOrPushQuick(env, event,
+        `我看懂你要記：\n${list}\n\n請選擇要記在哪隻貓咪：`,
+        catBtns);
+    } else {
+      await replyOrPushQuick(env, event,
+        `我看得懂「${leadPick.eventText}」，但不確定前面的「${leadPick.prefix}」代表什麼。\n請選要記錄的貓咪，或直接重新輸入：`,
+        catBtns);
+    }
     return;
   }
 
@@ -2020,81 +2144,11 @@ async function handleTextMessage(event, env, baseUrl) {
         pet = await createPet(db, ownerId, { petName: '貓貓' });
         await updateUser(db, lineUserId, { defaultPetId: pet.petId });
       }
-      const lines = [];
-      const savedIds = [];
-      const pendingDisambig = []; // 有類別詞、品牌對不到 → typed pending
-      let lastSummary = null;
-      let lastDate = '';
-      for (const rec of intent.records) {
-        const res = await handleRecord(env, event, pet, rec, ownerId, { silent: true, deferDisambig: true, actorId: lineUserId, caregiverName });
-        if (res?.needsDisambig) { pendingDisambig.push(res.disambig); continue; }
-        if (res?.mainText) lines.push(res.mainText);
-        if (res?.savedLog?.logId) savedIds.push(res.savedLog.logId);
-        if (res?.addedWaterLog?.logId) savedIds.push(res.addedWaterLog.logId); // 加水另一筆 log 也算
-        if (res?.summary) { lastSummary = res.summary; lastDate = res.eventDate; }
-      }
-      // 無類別詞品項候選：沿用單句相同的反查邏輯（唯一→記、多筆/模糊→partial、無命中→保留告知）
-      const lookupPendings = [];
-      const noMatch = [];
-      for (const cand of (Array.isArray(intent.candidates) ? intent.candidates : [])) {
-        const r = await resolveCandidate(db, ownerId, cand);
-        if (r.kind === 'unique') {
-          const res = await handleRecord(env, event, pet, { category: 'food', foodType: r.food.foodType, itemName: r.food.displayName, amount: cand.amount, unit: 'g', addedWaterMl: cand.addedWaterMl || 0, medStatus: '', medSlot: '', note: '' }, ownerId, { silent: true, actorId: lineUserId, caregiverName });
-          if (res?.mainText) lines.push(res.mainText);
-          if (res?.savedLog?.logId) savedIds.push(res.savedLog.logId);
-          if (res?.addedWaterLog?.logId) savedIds.push(res.addedWaterLog.logId);
-          if (res?.summary) { lastSummary = res.summary; lastDate = res.eventDate; }
-        } else if (r.kind === 'pick') {
-          lookupPendings.push({ kind: 'lookup', itemName: cand.itemName, grams: cand.amount, aw: cand.addedWaterMl || 0 });
-        } else {
-          noMatch.push({ itemName: cand.itemName, grams: cand.amount });
-        }
-      }
-      const unparsed = Array.isArray(intent.unparsed) ? intent.unparsed : [];
-      const smid = String(event.message?.id || '');
-      // 待確認佇列（typed＋lookup），每筆給穩定 id＋status，取消/確認只動被點的那一筆
-      const pendings = [
-        ...pendingDisambig.map((d) => ({ kind: 'typed', foodType: d.foodType, typedName: d.typedName, grams: d.grams, aw: d.addedWaterMl || 0 })),
-        ...lookupPendings
-      ].map((p, i) => ({ id: `p${i}`, status: 'pending', ...p }));
-      const hasPending = pendings.length > 0;
-      const anyContent = lines.length || pendings.length || noMatch.length;
-      const multiStatus = !anyContent ? 'unknown' : ((hasPending || unparsed.length || noMatch.length) ? 'multi_partial' : 'record');
-      await logTextInput(db, {
-        lineUserId, ownerId, petId: pet.petId, rawText: event.message?.text || '',
-        parseStatus: multiStatus, failReason: !anyContent ? 'no_valid_segment' : '',
-        sourceMessageId: smid, resolvedPetId: pet.petId, linkedLogId: savedIds.join(','),
-        parsedResult: JSON.stringify({
-          events: intent.records.map((r) => ({ category: r.category, amount: r.amount, unit: r.unit, itemName: r.itemName, addedWaterMl: r.addedWaterMl || 0 })),
-          savedLogIds: savedIds,
-          pendingFoods: pendings,
-          noMatch,
-          unparsedSegments: unparsed,
-          awaitingAction: hasPending ? 'food_selection' : ''
-        })
+      await recordMultiForPet(env, event, db, {
+        pet, records: intent.records, candidates: intent.candidates, unparsed: intent.unparsed,
+        smid: String(event.message?.id || ''), rawText: event.message?.text || '',
+        ownerId, lineUserId, caregiverName, baseUrl
       });
-      // 「尚未找到相符品項」文案：不得用「看不懂」、不得讓片段消失
-      const noMatchTxt = noMatch.map((x) => `我辨認到品項「${x.itemName}」${x.grams}g，但尚未找到相符的常用食物。`).join('\n');
-      // 有待確認 → 逐一 prompt（advancePending 會回「已記錄N筆，另有M筆待確認」，不宣稱完成）
-      if (hasPending) { await advancePending(env, event, db, pet, smid, ownerId, baseUrl, lineUserId); return; }
-      if (!lines.length) {
-        const parts = [noMatchTxt, unparsed.length ? `⚠️ 這些我看不懂、尚未記錄：\n${unparsed.map((u) => `· ${u}`).join('\n')}\n可以分開再打一次（例：罐頭 34）。` : ''].filter(Boolean);
-        if (parts.length) { await replyOrPush(env, event, parts.join('\n\n')); return; }
-        await guideUnknown(env, event, pet?.petId || ''); return;
-      }
-      if (noMatchTxt || unparsed.length) {
-        // 已記錄 ＋ 尚未找到相符/看不懂 → 明列，撤銷只撤已成功的
-        const recTxt = `✅ 已記錄 ${lines.length} 筆：\n${lines.map((l) => `· ${l}`).join('\n')}`;
-        const extras = [noMatchTxt, unparsed.length ? `⚠️ 這 ${unparsed.length} 筆看不懂、尚未記錄：\n${unparsed.map((u) => `· ${u}`).join('\n')}` : ''].filter(Boolean).join('\n\n');
-        const undoLabel = savedIds.length >= 2 ? `🗑 刪除這次 ${savedIds.length} 筆` : '🗑 刪除這筆';
-        const undoBtn = savedIds.length ? [qrPost(undoLabel, `action=undoOp&smid=${smid}`, savedIds.length >= 2 ? `刪除這次 ${savedIds.length} 筆` : '刪除這筆')] : [];
-        await replyOrPushQuick(env, event, `${recTxt}\n\n${extras}`, undoBtn);
-        return;
-      }
-      const fallback = `已記錄 ${lines.length} 筆：\n${lines.map((line) => `· ${line}`).join('\n')}`;
-      const multiSiteUrl = await siteLink(env, baseUrl, lineUserId);
-      const multiUndo = savedIds.length ? `smid=${smid}` : '';
-      await replyOrPushFlex(env, event, multiRecordFlex(pet, lines, lastSummary, lastDate, multiSiteUrl, multiUndo), fallback);
       return;
     }
 

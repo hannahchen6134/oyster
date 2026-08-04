@@ -752,7 +752,17 @@ export function analyzeLeading(rawText, petNames = []) {
 
   // 2) 不明句首 + 後段可解析 → 交由呼叫端問要記哪隻貓（不得靜默寫預設貓）
   const lead = findLeadingUnknown(norm);
-  if (lead) return { kind: 'leadingUnknown', prefix: lead.prefix, eventText: lead.eventText };
+  if (lead) {
+    // 判別被剝掉的句首是不是「其實是事件」（例：食物名「皇家罐頭」＋份量 33 克）。
+    // 若「完整句」解析出的事件數 > 「剝掉句首後」的事件數，代表句首那段是食物事件、不是不明貓名前綴，
+    // 絕不可丟；改回報 leadingNoPet（無不明前綴、只是沒指定貓），讓呼叫端帶「完整句」去問要記哪隻貓，
+    // 選完再用同一套多筆機制落地（食物才不會遺失）。旺財類真雜字：完整句事件數＝尾段，維持 leadingUnknown。
+    const recCount = (r) => (r.type === 'multiRecord' ? r.records.length : (r.type === 'record' ? 1 : 0));
+    const fullN = recCount(parseMessage(norm));
+    const tailN = recCount(parseMessage(lead.eventText));
+    if (fullN > tailN) return { kind: 'leadingNoPet', eventText: norm };
+    return { kind: 'leadingUnknown', prefix: lead.prefix, eventText: lead.eventText };
+  }
 
   return { kind: 'clean' };
 }
