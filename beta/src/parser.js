@@ -79,18 +79,64 @@ const RECORD_PROMPT_WORDS = {
 };
 
 // ── RC2：中文數字（僅在數量上下文轉阿拉伯數字，避免全句誤轉）──
-function cnToArabic(s) {
-  const D = { 零: 0, 一: 1, 二: 2, 兩: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 };
-  const U = { 十: 10, 百: 100 };
-  let section = 0, num = 0, seen = false;
-  for (const ch of String(s)) {
-    if (ch in D) { num = D[ch]; seen = true; }
-    else if (ch in U) { section += (num || 1) * U[ch]; num = 0; seen = true; }
+const CN_DIGIT = { 零: 0, 一: 1, 二: 2, 兩: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 };
+const CN_UNIT_MULT = { 十: 10, 百: 100, 千: 1000 };
+// 整數部分：三種寫法自動判別
+//  - 純阿拉伯（38、15）直接取值
+//  - 帶位數（十/百/千：十五→15、三十八→38、一百二十→120、兩百→200）走位值運算
+//  - 逐字（無位數字：三八→38、一二三→123、零五→5）每字一位串接（中文/阿拉伯可混）
+function cnIntPart(s) {
+  const str = String(s || '');
+  if (str === '') return null;
+  if (/^\d+$/.test(str)) return Number(str);
+  const hasUnit = /[十百千]/.test(str);
+  if (hasUnit) {
+    let section = 0, num = 0, seen = false;
+    for (const ch of str) {
+      if (ch in CN_DIGIT) { num = CN_DIGIT[ch]; seen = true; }
+      else if (ch in CN_UNIT_MULT) { section += (num || 1) * CN_UNIT_MULT[ch]; num = 0; seen = true; }
+      else if (/\d/.test(ch)) { num = Number(ch); seen = true; }
+      else return null;
+    }
+    return seen ? section + num : null;
+  }
+  // 逐字串接
+  let digits = '';
+  for (const ch of str) {
+    if (ch in CN_DIGIT) digits += String(CN_DIGIT[ch]);
+    else if (/\d/.test(ch)) digits += ch;
     else return null;
   }
-  return seen ? section + num : null;
+  return digits === '' ? null : Number(digits);
 }
-const CN_RUN = '[零一二兩三四五六七八九十百]+';
+// 小數點後：一律逐字（三點五→.5、三點零五→.05），保留前導零
+function cnFracPart(s) {
+  const str = String(s || '');
+  if (str === '') return null;
+  let digits = '';
+  for (const ch of str) {
+    if (ch in CN_DIGIT) digits += String(CN_DIGIT[ch]);
+    else if (/\d/.test(ch)) digits += ch;
+    else return null;
+  }
+  return digits === '' ? null : digits;
+}
+function cnToArabic(s) {
+  const str = String(s || '');
+  if (str === '') return null;
+  // 小數：以「點」切左右（左右可為中文或阿拉伯：三點五、零點五、3點5）
+  if (str.includes('點')) {
+    const idx = str.indexOf('點');
+    const left = str.slice(0, idx);
+    const right = str.slice(idx + 1);
+    const li = left === '' ? 0 : cnIntPart(left);
+    const ri = cnFracPart(right);
+    if (li == null || ri == null) return null;
+    return Number(`${li}.${ri}`);
+  }
+  return cnIntPart(str);
+}
+const CN_RUN = '[零一二兩三四五六七八九十百千點]+';
 const CN_UNIT = 'g|ml|cc|c\\.c\\.?|公克|克|毫升';
 const CN_TYPE_ANCHOR = FOOD_TYPE_WORDS.flatMap((e) => e.words).sort((a, b) => b.length - a.length).join('|');
 const CN_WATER_ANCHOR = '喝水|飲水|加水|清水|泡水|兌水|水|喝';
@@ -104,6 +150,8 @@ const CN_RE_C = new RegExp(`(${CN_RUN})(${CN_WATER_ANCHOR})`, 'g');
 const CN_RE_D = new RegExp(`([一-鿿])(${CN_RUN})(?=${CN_UNIT}|$|\\s)`, 'g');
 function convertCnNumbers(text) {
   let t = text;
+  // 前置：阿拉伯數字用「點」當小數（3點5 → 3.5）；純中文小數（三點五）留給 A/B/C/D 用 cnToArabic 轉
+  t = t.replace(/(\d+)\s*點\s*(\d+)/g, '$1.$2');
   // A：中文數字＋單位（三十三克、八毫升）
   t = t.replace(CN_RE_A, (m, n, u) => { const v = cnToArabic(n); return v == null ? m : ` ${v} ${u} `; });
   // B：類型/水詞＋中文數字（罐頭三十三、水八），且右界是完整數量
