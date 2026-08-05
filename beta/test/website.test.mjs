@@ -74,3 +74,21 @@ test('describeLogFront：體重用 formatWeightKg（不再 toFixed 成一位小�
   const fn = html.slice(html.indexOf('function describeLogFront'), html.indexOf('function describeLogFront') + 700);
   assert.ok(/category === 'weight'\) return `體重 \$\{formatWeightKg\(log\.amount\)\} kg`/.test(fn), '體重描述需用 formatWeightKg');
 });
+
+// 網站體重編輯表單：category=weight 時顯示「體重(kg)」欄、預填原值、驗證擋空/0/負/非數字
+test('編輯表單：weight 欄位存在、預填 log.amount、最多兩位小數、可見性受 category 控制', () => {
+  // logFormFields 有 weightAmount 欄，且 category=weight 時預填 log.amount
+  assert.ok(/name="weightAmount"[^>]*step="0\.01"/.test(html), 'weight 欄需 step=0.01（最多兩位）');
+  assert.ok(/class="field log-weight"/.test(html), '需有 .log-weight 欄位容器');
+  assert.ok(/category === 'weight' \? esc\(log\?\.amount \?\? ''\) : ''/.test(html), 'weight 欄需預填 log.amount');
+  // 可見性切換：category=weight 顯示 log-weight、其餘（水/食/藥）隱藏
+  assert.ok(/\.log-weight'\)\.forEach\(\(el\) => el\.classList\.toggle\('hidden', category !== 'weight'\)\)/.test(html), 'syncLogFormVisibility 需切換 .log-weight');
+});
+
+test('編輯表單：collectLogForm 對 weight 擋空/0/負/非數字，並存兩位小數（不清成 0）', () => {
+  const collect = html.slice(html.indexOf('function collectLogForm'), html.indexOf('function collectLogForm') + 1800);
+  assert.ok(/category === 'weight'/.test(collect), 'collectLogForm 需有 weight 分支');
+  assert.ok(/n <= 0/.test(collect) && /Number\.isFinite\(n\)/.test(collect), '需擋 <=0 與非數字');
+  assert.ok(/Math\.round\(n \* 100\) \/ 100/.test(collect), '需存最多兩位小數');
+  assert.ok(/throw new Error/.test(collect), '無效值需丟錯（不送出）');
+});

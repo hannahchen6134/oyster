@@ -441,6 +441,11 @@ async function handleLogs(db, request, method, logId, lineUserId, actorId = line
     if ('eventDateTime' in body && !isValidDateTime(String(body.eventDateTime || ''))) {
       return jsonResponse({ ok: false, message: '時間格式須為 YYYY-MM-DD HH:MM' }, 400);
     }
+    // 體重是健康資料：伺服端也守一道，拒收空值/0/負數/非數字，絕不把 amount 清成 0（前端已擋，這裡防繞過）
+    if (existing.category === 'weight' && 'amount' in body) {
+      const n = Number(body.amount);
+      if (!Number.isFinite(n) || n <= 0) return jsonResponse({ ok: false, message: '體重須為大於 0 的數字' }, 400);
+    }
 
     const merged = await applyDerivedFields(db, { ...existing, ...body });
     const updated = await updateLog(db, logId, merged, actorId);
