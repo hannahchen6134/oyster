@@ -401,10 +401,30 @@ export function parseMessage(rawText) {
     return { type: 'medSlots', slots };
   }
 
-  // 體重：「體重 4.2」「記體重 4.2」→ 記一筆有日期的體重（給醫生看趨勢），並同步更新目前體重。
-  const weightMatch = text.match(/^(?:記|補)?體重\s*([0-9.]+)\s*(?:kg|公斤)?$/i);
-  if (weightMatch) {
-    return { type: 'record', record: { category: 'weight', amount: Number(weightMatch[1]), unit: 'kg', itemName: '', foodType: '', addedWaterMl: 0, medStatus: '', medSlot: '', note: '', dayOffset: 0, time: '' } };
+  // ── 體重（新增 / 修改）─────────────────────────────────────────────
+  // 「貓名＋公斤/kg」「改＋體重/公斤」具高體重語意，必須在食物候選與「改上一筆數量」之前判斷（規格三）。
+  // 在 compact（去空白）上比對；amount 支援整數與小數，中文數字已由 normalizeText 轉阿拉伯。
+  const W_NUM = '(\\d+(?:\\.\\d+)?)';
+  const W_UNIT = '(?:公斤|kg)';
+  const weightRecord = (amount) => ({
+    type: 'record',
+    record: { category: 'weight', amount, unit: 'kg', itemName: '', foodType: '', addedWaterMl: 0, medStatus: '', medSlot: '', note: '', dayOffset: 0, time: '' }
+  });
+  let wm;
+  // 修改最近一次體重：改體重6 / 改體重6.2公斤 / 體重改6 / 體重改成6公斤 / 改6公斤 / 改6kg。
+  //   規則：要嘛帶「體重」關鍵字，要嘛「改」後帶「公斤/kg」單位；純「改6」（無體重/公斤）不算，維持既有改數量。
+  if ((wm = compact.match(new RegExp(`^改(?:成)?體重${W_NUM}${W_UNIT}?$`, 'i')))
+    || (wm = compact.match(new RegExp(`^體重改(?:成)?${W_NUM}${W_UNIT}?$`, 'i')))
+    || (wm = compact.match(new RegExp(`^改(?:成)?${W_NUM}${W_UNIT}$`, 'i')))) {
+    return { type: 'weightModify', amount: Number(wm[1]) };
+  }
+  // 新增體重（明確帶「體重」字）：體重6 / 記體重6 / 補體重6 / 今天體重6 / 體重6公斤 / 記體重6.25kg。
+  if ((wm = compact.match(new RegExp(`^(?:記|補|今天|今日)?體重${W_NUM}${W_UNIT}?$`, 'i')))) {
+    return weightRecord(Number(wm[1]));
+  }
+  // 裸「數字＋公斤/kg」（貓名已被剝離，如 炭吉6公斤 → 6公斤）→ 體重新增候選；食物一律用克，不會誤收。
+  if ((wm = compact.match(new RegExp(`^${W_NUM}${W_UNIT}$`, 'i')))) {
+    return weightRecord(Number(wm[1]));
   }
   const ageMatch = text.match(/^年齡\s*(\d{1,2})\s*歲?$/);
   if (ageMatch) {
@@ -806,7 +826,8 @@ function splitConnectorsAtEvents(text) {
 
 function parsesToRecord(text) {
   const r = parseMessage(text);
-  return r.type === 'record' || r.type === 'multiRecord';
+  // weightModify 也算「可靠解析」，讓「炭吉改6公斤」「炭吉體重改成6」能被辨識為 named（剝出貓名後路由）。
+  return r.type === 'record' || r.type === 'multiRecord' || r.type === 'weightModify';
 }
 
 // 不明句首偵測：前段不明、後段可解析。先試「整個 token 一段段丟」（處理有空格的雜字），

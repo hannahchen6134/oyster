@@ -5,7 +5,7 @@ import { planStatus } from './plan.js';
 import {
   getUser, updateUser, listPets, getPet, createPet,
   listFoods, getFood,
-  insertLog, getLog, getLogsForDay, updateLog, softDeleteLog,
+  insertLog, getLog, getLogsForDay, updateLog, softDeleteLog, resyncPetWeight,
   recomputeDay, getSummaries, getSessionUser, getRecentLogsByPet,
   resolveDataOwner, createCareInvite, listCareMembers, track, healFoodKcal,
   updatePetFields, getAllLogsForPet, saveDataExport,
@@ -422,9 +422,10 @@ async function handleLogs(db, request, method, logId, lineUserId, actorId = line
         recordedBy: actorId, isBackfilled: log.isBackfilled, source: 'web', updatedBy: actorId
       });
     }
-    // 記體重時同步更新貓咪目前體重（每公斤喝水量、熱量目標都靠這個）
-    if (category === 'weight' && Number(saved.amount) > 0) {
-      await updatePetFields(db, petId, { weightKg: Number(saved.amount) });
+    // 記體重時同步更新貓咪目前體重（每公斤喝水量、熱量目標都靠這個）——
+    // 用 resync 依「最新未刪除體重」回算，補記舊日期也不會把目前體重錯設成舊值。
+    if (category === 'weight') {
+      await resyncPetWeight(db, petId);
     }
     const summary = await recomputeDay(db, petId, eventDateTime.slice(0, 10));
     return jsonResponse({ ok: true, log: saved, summary });
@@ -467,12 +468,16 @@ async function handleLogs(db, request, method, logId, lineUserId, actorId = line
     const newDate = String(updated.eventDateTime).slice(0, 10);
     const summary = await recomputeDay(db, existing.petId, newDate);
     if (oldDate !== newDate) await recomputeDay(db, existing.petId, oldDate);
+    // 網站改體重數字後，同步回算目前體重（先前缺這步，改完趨勢對、目前體重卻沒跟著動）
+    if (existing.category === 'weight') await resyncPetWeight(db, existing.petId);
     return jsonResponse({ ok: true, log: updated, summary });
   }
 
   if (method === 'DELETE') {
     await softDeleteLog(db, logId, lineUserId);
     const summary = await recomputeDay(db, existing.petId, String(existing.eventDateTime).slice(0, 10));
+    // 刪除體重後回退到上一筆未刪除體重（先前缺這步，刪最新體重後目前體重仍停在被刪的值）
+    if (existing.category === 'weight') await resyncPetWeight(db, existing.petId);
     return jsonResponse({ ok: true, summary });
   }
 

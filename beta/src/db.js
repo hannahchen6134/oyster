@@ -630,6 +630,28 @@ export async function softDeleteLog(db, logId, updatedBy) {
     .run();
 }
 
+// ---------- 體重 ----------
+// 取某隻貓「最近一次未刪除」的體重 log（趨勢與目前體重都以它為準）
+export async function getLatestWeightLog(db, petId) {
+  return db
+    .prepare(
+      `SELECT * FROM logs WHERE petId = ? AND category = 'weight' AND isDeleted = 0
+       ORDER BY eventDateTime DESC, createdAt DESC LIMIT 1`
+    )
+    .bind(String(petId || ''))
+    .first();
+}
+
+// 依「最新未刪除體重 log」回算 pets.weightKg：
+//  - 新增／修改／刪除任何一筆體重後都要呼叫，確保「目前體重」永遠等於最新一筆，而非盲目沿用。
+//  - 修改較舊紀錄時，仍取最新日期那筆（不被舊值蓋掉）。
+//  - 完全沒有體重紀錄時：沿用既有安全規則——保留原本 weightKg，不歸零（餵水量/熱量目標才不會壞）。
+export async function resyncPetWeight(db, petId) {
+  const latest = await getLatestWeightLog(db, petId);
+  if (!latest || !(Number(latest.amount) > 0)) return getPet(db, petId);
+  return updatePetFields(db, petId, { weightKg: Number(latest.amount) });
+}
+
 // ---------- daily_summary ----------
 
 export async function recomputeDay(db, petId, date) {
