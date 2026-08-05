@@ -15,7 +15,7 @@ import {
   getLatestWeightLog, resyncPetWeight, getPet, insertLog, updateLog, softDeleteLog, getLog
 } from '../src/db.js';
 import {
-  applyWeightModify, applyWeightAddToday, handleWeightModify, showWeightModifyConfirm
+  applyWeightModify, applyWeightAddToday, handleWeightModify, showWeightModifyConfirm, applyUndo
 } from '../src/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -184,4 +184,49 @@ test('不得修改其他家庭／其他貓的體重（ownerId 不符時拒絕）
   const res = await applyWeightModify(db, { logId: w.logId, amount: 6, ownerId: 'someone-else', actorId: 'someone-else' });
   assert.equal(res.ok, false); assert.equal(res.reason, 'not_found');
   assert.equal((await getLog(db, w.logId)).amount, 5.8, '未被改動');
+});
+
+// ── 部署前查核一：裸公斤貓名護欄 ──────────────────────────────
+test('裸公斤護欄：不存在的貓名（小黑6公斤）→ leadingUnknown（不默默記預設貓、不建新貓）', () => {
+  const l = analyzeLeading('小黑6公斤', ['炭吉', '蚵仔']);
+  assert.equal(l.kind, 'leadingUnknown', '應問要記哪隻貓');
+  assert.equal(l.prefix, '小黑');
+  // 整句不會被當成一筆可直接落地的體重 record
+  assert.notEqual(parseMessage('小黑6公斤').type, 'record');
+});
+test('裸公斤護欄：食物類型前綴（乾糧6公斤／罐頭6公斤）→ 維持食物、絕不當體重', () => {
+  for (const s of ['乾糧6公斤', '罐頭6公斤']) {
+    assert.equal(analyzeLeading(s, ['炭吉', '蚵仔']).kind, 'clean', `${s} 不應被當成選貓/不明前綴`);
+    const r = parseMessage(s);
+    assert.equal(r.type, 'record'); assert.equal(r.record.category, 'food', `${s} 應為食物`);
+  }
+});
+test('裸公斤護欄：存在的貓名（炭吉6公斤）剝名後 → 體重 record', () => {
+  const l = analyzeLeading('炭吉6公斤', ['炭吉', '蚵仔']);
+  assert.equal(l.kind, 'named'); assert.equal(l.petName, '炭吉');
+  assert.equal(parseMessage(l.rest).record.category, 'weight');
+});
+
+// ── 部署前查核二：最近一筆依 eventDateTime 排序（非 updatedAt/UUID）──
+test('同一天多筆體重：最近一筆＝事件時間最晚那筆（18:00），非最後被編輯', async () => {
+  const db = seed(); env.DB = db;
+  const am = await addWeight(db, 'p1', 4.2, '2026-08-05 09:00');
+  const pm = await addWeight(db, 'p1', 4.3, '2026-08-05 18:00');
+  assert.equal((await getLatestWeightLog(db, 'p1')).logId, pm.logId, '18:00 那筆才是最近一次');
+  // 修改「較早的 09:00」那筆 → updatedAt 變新，但最近一筆仍應是 18:00（證明依 eventDateTime 排序）
+  await applyWeightModify(db, { logId: am.logId, amount: 4.5, ownerId: 'u1', actorId: 'u1' });
+  assert.equal((await getLatestWeightLog(db, 'p1')).logId, pm.logId, '改舊紀錄後最近一筆仍為 18:00，不被 updatedAt 影響');
+  assert.equal((await getPet(db, 'p1')).weightKg, 4.3, '目前體重取最新 18:00 的 4.3，不是剛編輯的 4.5');
+});
+
+// ── 部署前查核三：批次刪除（含體重）也要 resync ──────────────────
+test('批次刪除（applyUndo）含體重最新那筆 → 目前體重回退上一筆', async () => {
+  const db = seed(); env.DB = db;
+  await addWeight(db, 'p1', 5.8, '2026-08-01 09:00');
+  const latest = await addWeight(db, 'p1', 5.5, '2026-08-04 09:00');
+  await resyncPetWeight(db, 'p1');
+  assert.equal((await getPet(db, 'p1')).weightKg, 5.5);
+  // 模擬「刪除這次 N 筆」把最新體重納入批次刪除
+  await applyUndo(db, [await getLog(db, latest.logId)], 'u1');
+  assert.equal((await getPet(db, 'p1')).weightKg, 5.8, 'applyUndo 後目前體重回退到 5.8');
 });

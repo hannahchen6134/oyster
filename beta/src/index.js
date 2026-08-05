@@ -1559,13 +1559,17 @@ export async function collectUndoableBySmid(db, smid, ownerId) {
 export async function applyUndo(db, items, actorId) {
   const undone = [];
   const affected = new Map();
+  const weightPets = new Set(); // 這次批次刪除有動到體重的貓 → 之後要回算目前體重
   for (const log of items) {
     await softDeleteLog(db, log.logId, actorId);
     undone.push(log);
     const date = String(log.eventDateTime).slice(0, 10);
     affected.set(`${log.petId}|${date}`, [log.petId, date]);
+    if (log.category === 'weight') weightPets.add(log.petId);
   }
   for (const [, [petId, date]] of affected) { try { await recomputeDay(db, petId, date); } catch (error) { /* 重算失敗不影響撤銷結果 */ } }
+  // 批次刪除含體重時，目前體重回退到真正最新的未刪除體重（規格三·批次刪除路徑）
+  for (const petId of weightPets) { try { await resyncPetWeight(db, petId); } catch (error) { /* 不影響撤銷結果 */ } }
   return undone;
 }
 
