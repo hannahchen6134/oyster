@@ -23,21 +23,21 @@ test('關鍵畫面元素 id 都在（手改 HTML 時誤刪會被抓到）', () =
   const need = [
     'appView', 'todayView', 'calendarView', 'trendView', 'settingsView',
     'calGrid', 'dayPicker', 'todayProgress', 'confirmList', 'settingsList',
-    'printReport', 'reportPrintBtn'
+    'a4Export', 'reportSaveBtn', 'reportRangeChips'
   ];
   for (const id of need) assert.ok(html.includes(`id="${id}"`), `缺少關鍵元素 #${id}`);
 });
 
-test('A4 報告：列印樣式只作用於 @media print、預設隱藏，手機/網頁版不受影響', () => {
-  // #printReport 預設 display:none（畫面上不顯示）
-  assert.ok(/#printReport\s*\{\s*display:\s*none/.test(html), '#printReport 預設必須隱藏');
-  // A4 版面尺寸只出現在 @media print 區塊內（避免 210mm 套到手機頁）
-  const printBlock = html.slice(html.indexOf('@media print'), html.indexOf('@media (max-width'));
-  assert.ok(printBlock.includes('size: A4 portrait'), 'A4 @page 設定在 @media print');
-  assert.ok(printBlock.includes('210mm') && printBlock.includes('297mm'), 'A4 尺寸在 print 區塊');
-  // 210mm 不得出現在 @media print 以外（不會套到一般畫面）
-  const nonPrint = html.replace(printBlock, '');
-  assert.ok(!nonPrint.includes('210mm'), '210mm 不得出現在列印區塊外');
-  // 模組有被引入
+test('A4 匯出：離屏容器 #a4Export 放畫面外、模組已引入、且移除列印 A4 按鈕', () => {
+  // #a4Export 必須是離屏（不影響手機/網頁版）——position:fixed + 大負左位移
+  const m = html.match(/#a4Export\s*\{[^}]*\}/);
+  assert.ok(m, '需有 #a4Export 樣式');
+  assert.ok(/position:\s*fixed/.test(m[0]) && /left:\s*-\d{5,}px/.test(m[0]), '#a4Export 必須離屏（fixed + 大負 left）');
+  // 已改為單一「存成照片給醫生」，移除「列印／下載 A4」按鈕
+  assert.ok(!html.includes('reportPrintBtn'), '不得再有列印 A4 按鈕');
+  assert.ok(html.includes('存成照片給醫生'), '保留存成照片按鈕');
+  // A4 版面模組已引入
   assert.ok(html.includes('src="/a4-report.js"'), '需引入 a4-report.js 模組');
+  // 單一統計範圍控制存在（7/14/30）
+  assert.ok(html.includes('id="reportRangeChips"') && html.includes('data-range="14"'), '單一 reportRange 控制存在');
 });

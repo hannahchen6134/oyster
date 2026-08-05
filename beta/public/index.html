@@ -1069,20 +1069,15 @@
     .ob-step.s2 .ob-num, .ob-step.s2 .ob-eg { background: #F6EAD7; color: #8A5E1E; }
     .ob-step.s3 .ob-num, .ob-step.s3 .ob-eg { background: #EFE2CE; color: #7A5518; }
     .ob-step.s4 .ob-num, .ob-step.s4 .ob-eg { background: #EDE3D6; color: #5A3617; }
-    /* A4 照護報告：畫面上不顯示，只有列印時出現（手機/網頁版完全不受這段影響）。 */
-    #printReport { display: none; }
-    @media print {
-      @page { size: A4 portrait; margin: 0; }
-      html, body { background: #fff !important; margin: 0; padding: 0; }
-      /* 列印時只留 A4 報告，隱藏整個 App UI（導覽、按鈕、選單、彈窗、Toast…） */
-      body > *:not(#printReport) { display: none !important; }
-      .shell, .toast, .modal-backdrop, .liff-splash { display: none !important; }
-      #printReport {
-        display: block;
-        font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
-        color: #2b2016;
-        -webkit-print-color-adjust: exact; print-color-adjust: exact;
-      }
+    /* A4 回診摘要版面：只在離屏容器 #a4Export 內渲染，供「存成照片給醫生」逐頁輸出 2480×3508 PNG。
+       #a4Export 放畫面外（不影響手機/網頁版）；mm/pt 以 96dpi 換算，210mm≈794px、297mm≈1123px。 */
+    #a4Export {
+      position: fixed; left: -100000px; top: 0; z-index: -1;
+      background: #FFFDF8;
+      font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+      color: #2b2016;
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
       .a4-page {
         width: 210mm; min-height: 297mm; box-sizing: border-box;
         padding: 12mm 11mm; background: #FFFDF8;
@@ -1151,7 +1146,20 @@
       .a4-foot { margin-top: 8px; border-top: 1px solid #E4D8C4; padding-top: 6px; }
       .a4-disc { font-size: 7.5pt; color: #8a7c68; line-height: 1.5; margin: 0 0 4px; }
       .a4-foot-row { display: flex; justify-content: space-between; font-size: 7.5pt; color: #9a8b7a; }
-    }
+      /* A4 版面補充樣式（新版回診摘要） */
+      .a4-head-l { display: flex; align-items: center; gap: 10px; }
+      .a4-head-meta b { font-weight: 700; color: #5A3617; }
+      .a4-avatar { width: 46px; height: 46px; border-radius: 50%; object-fit: cover; border: 1px solid #E4D8C4; }
+      .a4-metric { border: 1px solid #EFE6D6; border-radius: 8px; padding: 8px 9px; background: #FFFDF9; }
+      .a4-mnote { font-size: 8pt; font-weight: 400; color: #9a8b7a; margin-left: 6px; }
+      .a4-none { display: block; font-size: 11pt; color: #9a8b7a; }
+      .a4-sub { display: block; font-size: 8pt; color: #b3a693; margin-top: 2px; }
+      .a4-cmp { font-size: 8pt; color: #9a8b7a; margin: 7px 0 0; }
+      .a4-empty { font-size: 9.5pt; color: #9a8b7a; padding: 8px 2px; }
+      .a4-dg-time { font-size: 7.5pt; color: #b3a693; margin-top: 1px; }
+      .a4-tag.t-warn { background: #F9EBE5; color: #9a3b20; border-color: #EACEC3; }
+      .a4-tag.t-note { background: #F4EDE0; color: #7A4E20; }
+      .a4-tag.t-med, .a4-tag.t-warn2 { background: #F1E7F4; color: #6f4e86; border-color: #E2D3EA; }
 
     @media (max-width: 760px) {
       .quick-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
@@ -1346,9 +1354,17 @@
       <!-- 回診 -->
       <section class="panel hidden" id="trendView">
         <div class="report-actions cap-hide">
-          <button class="btn btn-primary" id="reportSaveBtn" type="button">📷 存成圖片給醫生</button>
-          <button class="btn btn-secondary" id="reportPrintBtn" type="button">🖨 列印／下載 A4 報告</button>
-          <p class="report-hint">截圖到相簿，或印成 A4／存 PDF 帶去回診</p>
+          <button class="btn btn-primary" id="reportSaveBtn" type="button">📷 存成照片給醫生</button>
+          <p class="report-hint">產生 A4 回診摘要照片，可存到相簿或分享給醫生</p>
+        </div>
+        <div class="report-range cap-hide">
+          <span class="report-range-label">統計範圍</span>
+          <div class="digest-seg" id="reportRangeChips">
+            <button data-range="7" type="button">7天</button>
+            <button data-range="14" type="button" class="active">14天</button>
+            <button data-range="30" type="button">30天</button>
+          </div>
+          <span class="report-range-note" id="reportRangeNote"></span>
         </div>
         <details class="block fold" open id="trendFold">
           <summary>
@@ -1389,13 +1405,6 @@
             <span class="fold-toggle">＋</span>
           </summary>
           <div class="fold-body">
-            <div class="digest-toolbar">
-              <div class="digest-seg" id="digestRangeChips">
-                <button data-drange="7" type="button">7天</button>
-                <button data-drange="14" type="button" class="active">14天</button>
-                <button data-drange="30" type="button">30天</button>
-              </div>
-            </div>
             <div id="vetHighlights"></div>
             <div class="digest-card" id="digestCard"></div>
             <p class="muted cap-hide" style="font-size:12px;margin:10px 2px 0">只列有狀況的日子，沒列出＝無特殊事件。用上方「存成圖片給醫生」就能整理成一張圖。</p>
@@ -1407,13 +1416,6 @@
             <span class="fold-toggle">＋</span>
           </summary>
           <div class="fold-body">
-            <div class="digest-toolbar">
-              <div class="digest-seg" id="compRangeChips">
-                <button data-crange="7" type="button" class="active">7天</button>
-                <button data-crange="14" type="button">14天</button>
-                <button data-crange="30" type="button">30天</button>
-              </div>
-            </div>
             <div id="compCard"></div>
             <p class="muted cap-hide" style="font-size:12px;margin:14px 2px 0">濕食＝罐頭與濕糧（含水量高，是重要補水來源）。水分分「自己喝的」與「食物內含的」；截圖即可給醫生看。</p>
           </div>
@@ -1422,16 +1424,11 @@
           <summary>
             <span class="fold-head">
               <span class="fold-title">近日健康明細<span class="fold-count" id="tableCount"></span></span>
-              <span class="fold-sub">每天一列的加總（近 30 天）</span>
+              <span class="fold-sub">每天一列的加總（依上方統計範圍）</span>
             </span>
             <span class="fold-toggle">＋</span>
           </summary>
           <div class="fold-body">
-            <div class="range-chips cap-hide" id="tableRangeChips">
-              <button data-trange="30" type="button" class="active">30 天</button>
-              <button data-trange="60" type="button">60 天</button>
-              <button data-trange="90" type="button">90 天</button>
-            </div>
             <div class="daycards" id="dayCardList"></div>
           </div>
         </details>
@@ -1482,7 +1479,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <div id="printReport" aria-hidden="true"></div>
+  <div id="a4Export" aria-hidden="true"></div>
 
   <!-- 存成圖片給醫生：同源本地檔，執行時不連外 -->
   <script src="/html-to-image.js"></script>
@@ -1501,6 +1498,7 @@
       settingsTab: '',
       visitRange: 14,
       tableDays: 30,
+      reportRange: 14,   // 回顧/回診摘要單一統計範圍（7/14/30），所有區塊＋匯出圖片共用
       foods: [],
       meds: [],
       vets: [],
@@ -3075,15 +3073,15 @@
     }
     async function loadDigest() {
       if (!state.petId) return;
-      state.digestDays = state.digestDays || 14;
-      const data = await api(`highlights?petId=${state.petId}&days=${state.digestDays}`);
+      state.reportRange = state.reportRange || 14;
+      const data = await api(`highlights?petId=${state.petId}&days=${state.reportRange}`);
       state.digestData = data;
       const items = digestItems(data);
-      const missed = missedMedDays(state.digestDays);
+      const missed = missedMedDays(state.reportRange);
       // 漏藥不在事件清單裡，補一條在最上面（醫生最在意的依從性）
       const vh = $('vetHighlights');
       if (vh) vh.innerHTML = missed.length
-        ? `<div class="vh-flags warn">⚠ 近 ${state.digestDays} 天漏藥 ${missed.length} 天（${esc(missed.map(mdLabel).join('、'))}）</div>`
+        ? `<div class="vh-flags warn">⚠ 近 ${state.reportRange} 天漏藥 ${missed.length} 天（${esc(missed.map(mdLabel).join('、'))}）</div>`
         : '';
       const dc = $('digestCount');
       const total = items.length + (missed.length ? 1 : 0);
@@ -3091,7 +3089,7 @@
       const card = $('digestCard');
       if (!card) return;
       if (!items.length) {
-        card.innerHTML = missed.length ? '' : `<div class="digest-empty">近 ${state.digestDays} 天沒有需要注意的事件 🐾</div>`;
+        card.innerHTML = missed.length ? '' : `<div class="digest-empty">近 ${state.reportRange} 天沒有需要注意的事件 🐾</div>`;
         return;
       }
       card.innerHTML = items.map((it) => `
@@ -3108,7 +3106,7 @@
       const items = digestItems(data);
       const pet = (state.pets || []).find((p) => p.petId === state.petId);
       const name = pet ? pet.petName : '貓貓';
-      const missed = missedMedDays(state.digestDays);
+      const missed = missedMedDays(state.reportRange);
       const lines = [`${name}｜回診摘要（${digestWhen(data.from)}〜${digestWhen(data.to)}）`, ''];
       lines.push('【須注意的事件】');
       if (missed.length) lines.push(`漏藥 ${missed.length} 天（${missed.map(mdLabel).join('、')}）`);
@@ -3142,9 +3140,14 @@
         ? `最近一次：${latestLab.date}｜${latestLab.text}`
         : '';
 
-      renderTrendCharts(data.rows, fromDate, to);
-      renderLabTrend();
       state.trendRows = data.rows || [];
+      // 圖表與各區塊一律用單一 reportRange 窗口（趨勢資料仍抓 30 天，讓「近7天 vs 前7天」比較有料）
+      const rDays = state.reportRange || 14;
+      const rFrom = shiftDate(to, -(rDays - 1));
+      renderTrendCharts(data.rows, rFrom, to);
+      renderLabTrend();
+      const rn = $('reportRangeNote');
+      if (rn) rn.textContent = `${rFrom.replace(/-/g, '/')}－${to.replace(/-/g, '/')}（近 ${rDays} 天）`;
       loadComposition();
       await loadDigest();
       await loadTable();
@@ -3152,7 +3155,7 @@
 
     // ── 飲食與水分組成（給醫生看）：用已載入的近 30 天資料，依所選窗口加總 ──
     function loadComposition() {
-      const days = state.compDays || 7;
+      const days = state.reportRange || 7;
       const to = todayStr();
       const from = shiftDate(to, -(days - 1));
       const rows = (state.trendRows || []).filter((r) => r.date >= from && r.date <= to);
@@ -3204,14 +3207,14 @@
     async function loadTable() {
       if (!state.petId) return;
       const to = todayStr();
-      const from = shiftDate(to, -(state.tableDays - 1));
+      const from = shiftDate(to, -(state.reportRange - 1));
       const data = await api(`summary?petId=${state.petId}&from=${from}&to=${to}`);
       // 只列有紀錄的日子（沒紀錄的空日不佔版面），新到舊
       const rows = [...data.rows].reverse().filter((row) => Number(row.entryCount) > 0);
       const tc = $('tableCount'); if (tc) tc.textContent = `（${rows.length} 天）`;
       const list = $('dayCardList');
       if (!rows.length) {
-        list.innerHTML = `<div class="hero-empty" style="border-radius:14px">近 ${state.tableDays} 天還沒有紀錄<span>記一筆吃飯、喝水或用藥就會開始統計。</span></div>`;
+        list.innerHTML = `<div class="hero-empty" style="border-radius:14px">近 ${state.reportRange} 天還沒有紀錄<span>記一筆吃飯、喝水或用藥就會開始統計。</span></div>`;
         return;
       }
       const f1 = (v) => String(Math.round(Number(v) || 0));
@@ -4138,26 +4141,13 @@
           el.classList.toggle('active', el === rangeBtn));
         return loadTrend();
       }
-      const trangeBtn = event.target.closest('#tableRangeChips [data-trange]');
-      if (trangeBtn) {
-        state.tableDays = Number(trangeBtn.dataset.trange) || 30;
-        document.querySelectorAll('#tableRangeChips [data-trange]').forEach((el) =>
-          el.classList.toggle('active', el === trangeBtn));
-        return loadTable();
-      }
-      const drangeBtn = event.target.closest('#digestRangeChips [data-drange]');
-      if (drangeBtn) {
-        state.digestDays = Number(drangeBtn.dataset.drange) || 14;
-        document.querySelectorAll('#digestRangeChips [data-drange]').forEach((el) =>
-          el.classList.toggle('active', el === drangeBtn));
-        return loadDigest();
-      }
-      const crangeBtn = event.target.closest('#compRangeChips [data-crange]');
-      if (crangeBtn) {
-        state.compDays = Number(crangeBtn.dataset.crange) || 7;
-        document.querySelectorAll('#compRangeChips [data-crange]').forEach((el) =>
-          el.classList.toggle('active', el === crangeBtn));
-        return loadComposition();
+      // 單一統計範圍：一顆鈕改 reportRange，整份報告（趨勢/組成/回診重點/明細/匯出）一起重載
+      const rrBtn = event.target.closest('#reportRangeChips [data-range]');
+      if (rrBtn) {
+        state.reportRange = Number(rrBtn.dataset.range) || 14;
+        document.querySelectorAll('#reportRangeChips [data-range]').forEach((el) =>
+          el.classList.toggle('active', el === rrBtn));
+        return loadTrend();
       }
 
       const calCell = event.target.closest('.cal-cell[data-date]');
@@ -4348,149 +4338,113 @@
       if (!(prev > 0)) return null;
       return Math.round(((curr - prev) / prev) * 100);
     }
+    // 蒐集「已算好的」report data，交給 buildA4Report 排版。全部用單一 state.reportRange 窗口，不重算、不改數值定義。
     function collectA4Data() {
       const pet = (state.pets || []).find((p) => p.petId === state.petId);
       const petName = pet ? pet.petName : (($('petTitle').textContent || '貓咪').trim());
       const to = todayStr();
-      const trend = (state.trendRows || []).slice().sort((a, b) => a.date.localeCompare(b.date));
-      const fromDate = trend.length ? trend[0].date : to;
+      const rDays = state.reportRange || 14;
+      const from = shiftDate(to, -(rDays - 1));
+      const all = (state.trendRows || []).slice().sort((a, b) => a.date.localeCompare(b.date));
+      const trend = all.filter((r) => r.date >= from && r.date <= to); // 只取 reportRange 窗口
       const dates = [];
-      for (let d = fromDate; d <= to; d = shiftDate(d, 1)) dates.push(d);
+      for (let d = from; d <= to; d = shiftDate(d, 1)) dates.push(d);
       const byDate = new Map(trend.map((r) => [r.date, r]));
       const series = (sel) => dates.map((dt) => { const r = byDate.get(dt); return r && r.entryCount ? (Number(sel(r)) || 0) : null; });
       const waterVals = series((r) => r.totalWaterMl);
       const kcalVals = series((r) => r.kcal);
       const wmap = new Map((state.weights || []).map((w) => [w.date, Number(w.amount)]).filter(([, v]) => v > 0));
       const wVals = dates.map((dt) => (wmap.has(dt) ? wmap.get(dt) : null));
+      const wCount = wVals.filter((v) => v != null).length;
       const lastNonNull = (arr) => { for (let i = arr.length - 1; i >= 0; i -= 1) if (arr[i] != null) return arr[i]; return null; };
       const pts = (arr) => dates.map((dt, i) => ({ date: dt, value: arr[i] }));
-      // 組成：與 loadComposition 完全相同算法（同一份 trendRows、同一窗口）
-      const cDays = state.compDays || 7;
-      const cFrom = shiftDate(to, -(cDays - 1));
-      const cRows = trend.filter((r) => r.date >= cFrom && r.date <= to);
-      const sum = (f) => cRows.reduce((t, r) => t + (Number(f(r)) || 0), 0);
+      // 組成：與 loadComposition 完全相同算法（同一份 trendRows、同一 reportRange 窗口）
+      const sum = (f) => trend.reduce((t, r) => t + (Number(f(r)) || 0), 0);
       const directWater = sum((r) => r.waterMl), foodWater = sum((r) => r.foodWaterMl);
       const totalWater = directWater + foodWater;
       const dry = sum((r) => r.dryFoodG), wetAsFed = sum((r) => (Number(r.wetFoodG) || 0) + (Number(r.foodWaterMl) || 0)), other = sum((r) => r.otherFoodG);
       const totalFood = dry + wetAsFed + other;
-      // 回診重點：沿用 digestItems + missedMedDays（同 state.digestData）
-      const digestDays = state.digestDays || 14;
-      const digest = state.digestData ? digestItems(state.digestData).map((it) => ({ date: it.date, typeLabel: it.label, tone: it.tone, text: it.text })) : [];
-      const missed = missedMedDays(digestDays);
-      // 每日明細：沿用 trendRows（同 30 天窗口、有紀錄者、新→舊），不另抓、不重算
+      // 回診重點：沿用 digestItems（state.digestData 已用 reportRange 抓）＋ missedMedDays（reportRange）
+      const digest = state.digestData ? digestItems(state.digestData).map((it) => ({ date: it.date, time: it.time, typeLabel: it.label, tone: it.tone, text: it.text })) : [];
+      const missed = missedMedDays(rDays);
+      // 每日明細：reportRange 窗口、有紀錄者、新→舊，不另抓、不重算
       const daily = trend.filter((r) => Number(r.entryCount) > 0).slice().reverse().map((r) => ({
         date: r.date, waterMl: r.totalWaterMl, wetG: (Number(r.wetFoodG) || 0) + (Number(r.foodWaterMl) || 0), dryG: r.dryFoodG, kcal: r.kcal, kcalEstimated: false
       }));
       const genAt = new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Taipei' }).slice(0, 16);
       return {
-        petName, source: '喵喵照護站', dateRangeLabel: `${fromDate} ~ ${to}`, generatedAt: genAt,
-        trendRangeDays: 30, compRangeDays: cDays, digestRangeDays: digestDays,
-        weight: { latest: lastNonNull(wVals), unit: 'kg', points: pts(wVals), deltaPct: a4DeltaPct(wVals, true) },
+        petName, reportName: '回診摘要', source: '喵喵照護站',
+        dateRangeLabel: `${from.replace(/-/g, '/')}－${to.replace(/-/g, '/')}（近 ${rDays} 天）`,
+        generatedAt: genAt, rangeDays: rDays,
+        weight: { latest: lastNonNull(wVals), unit: 'kg', points: pts(wVals), deltaPct: a4DeltaPct(wVals, true), count: wCount },
         water: { latest: lastNonNull(waterVals), unit: 'ml', points: pts(waterVals), deltaPct: a4DeltaPct(waterVals, false) },
         kcal: { latest: lastNonNull(kcalVals), unit: 'kcal', points: pts(kcalVals), deltaPct: a4DeltaPct(kcalVals, false), estimated: false },
         digest, missedMed: missed.length ? { count: missed.length, days: missed } : null,
-        composition: { rangeDays: cDays, hasData: totalWater > 0 || totalFood > 0, water: { total: totalWater, own: directWater, food: foodWater }, food: { total: totalFood, dry, wet: wetAsFed, other } },
+        composition: { rangeDays: rDays, hasData: totalWater > 0 || totalFood > 0, water: { total: totalWater, own: directWater, food: foodWater }, food: { total: totalFood, dry, wet: wetAsFed, other } },
         daily
       };
     }
-    $('reportPrintBtn').addEventListener('click', () => {
-      trackEvent('report_print');
-      if (typeof window.buildA4Report !== 'function') { toast('報告版型還在載入，請稍等一下再按', true); return; }
-      if (!state.trendRows) { toast('資料還在載入，請稍等一下再按', true); return; }
-      try {
-        const host = $('printReport');
-        host.innerHTML = window.buildA4Report(collectA4Data());
-        // 等兩個 frame 讓 SVG／表格版面渲染完成再叫列印
-        requestAnimationFrame(() => requestAnimationFrame(() => { window.print(); }));
-      } catch (e) { toast('產生報告時發生問題，請再試一次', true); }
-    });
-    window.addEventListener('afterprint', () => { const h = $('printReport'); if (h) h.innerHTML = ''; });
+    // 檔名安全化
+    function a4SafeName(s) { return String(s || '貓咪').replace(/[\\/:*?"<>|\s]+/g, '_'); }
+    // 把離屏 .a4-page 逐頁渲染成 2480×3508 PNG（先高倍率 toPng，再畫到固定尺寸白底畫布，保證尺寸一致、不透明、清晰）
+    async function a4RenderPages() {
+      const host = $('a4Export');
+      const built = window.buildA4Report(collectA4Data());
+      host.innerHTML = built.html;
+      if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch (e) { /* ignore */ } }
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const TARGET_W = 2480, TARGET_H = 3508;
+      const nodes = Array.from(host.querySelectorAll('.a4-page'));
+      const out = [];
+      for (const node of nodes) {
+        const w = node.offsetWidth || 794;
+        const ratio = TARGET_W / w;                       // 讓來源寬度剛好放大到 2480
+        const dataUrl = await window.htmlToImage.toPng(node, { pixelRatio: ratio, backgroundColor: '#FFFDF8', skipFonts: true });
+        const img = new Image(); img.src = dataUrl; await (img.decode ? img.decode() : new Promise((r) => { img.onload = r; }));
+        const canvas = document.createElement('canvas'); canvas.width = TARGET_W; canvas.height = TARGET_H;
+        const ctx = canvas.getContext('2d'); ctx.fillStyle = '#FFFDF8'; ctx.fillRect(0, 0, TARGET_W, TARGET_H);
+        const dh = Math.round(img.width ? img.height * (TARGET_W / img.width) : TARGET_H);
+        ctx.drawImage(img, 0, 0, TARGET_W, dh);           // 等比填滿寬度、頂端對齊；不足處留白底、超出裁掉
+        out.push(canvas.toDataURL('image/png'));
+      }
+      host.innerHTML = '';
+      return { pngs: out, pages: built.pages };
+    }
 
     $('reportSaveBtn').addEventListener('click', async () => {
       trackEvent('report_save');
-      const view = $('trendView');
       const btn = $('reportSaveBtn');
-      if (!window.htmlToImage) { toast('圖片功能還在載入，請稍等一下再按', true); return; }
-      const petName = ($('petTitle').textContent || '貓咪').trim();
+      if (!window.htmlToImage || typeof window.buildA4Report !== 'function') { toast('報告功能還在載入，請稍等一下再按', true); return; }
+      if (!state.trendRows) { toast('資料還在載入，請稍等一下再按', true); return; }
+      const pet = (state.pets || []).find((p) => p.petId === state.petId);
+      const petName = pet ? pet.petName : (($('petTitle').textContent || '貓咪').trim());
+      const rDays = state.reportRange || 14;
       const today = todayStr();
       const orig = btn.textContent;
-      btn.disabled = true;
-      btn.textContent = '產生圖片中…';
-      const loading = showLoadingOverlay(); // 一按就有全螢幕回饋，蓋住按鈕消失的空檔
-      // 展開所有（非隱藏的）摺疊區，記住原本開闔狀態，截完還原
-      const folds = Array.from(view.querySelectorAll('details')).filter((d) => !d.classList.contains('hidden'));
-      const wasOpen = folds.map((d) => d.open);
-      folds.forEach((d) => { d.open = true; });
-      // 沒有看診紀錄時，截圖不放整個空區塊（避免大片留白）
-      const visitFold = $('visitFold');
-      const hideVisit = visitFold && !(state.visits && state.visits.length);
-      if (hideVisit) visitFold.classList.add('cap-gone');
-      // 插入截圖標題（貓咪名字＋產生日期）
-      const header = document.createElement('div');
-      header.className = 'cap-header';
-      header.innerHTML = `<div class="cap-title">${esc(petName)}・照護紀錄</div>`
-        + `<div class="cap-sub">產生日期 ${esc(today)}　·　來源：喵喵照護站</div>`;
-      view.prepend(header);
-      // 圖片底部免責（給醫生看的圖也帶著，避免被當成精確醫療數據）
-      const capFooter = document.createElement('div');
-      capFooter.className = 'cap-header';
-      capFooter.innerHTML = `<div class="cap-sub">※ 飼主自行記錄，可能有誤差，僅供醫生參考。紀錄正常不代表貓咪完全健康，請以獸醫判斷為準。</div>`;
-      view.appendChild(capFooter);
-      view.classList.add('capturing');
-      // 讓瀏覽器先完成版面重排（展開多個摺疊區＋圖表），圖才不會被截到一半
-      await new Promise((resolve) => setTimeout(resolve, 200));
-      let dataUrl = '';
-      let failMsg = '';
+      btn.disabled = true; btn.textContent = '產生中…';
+      const loading = showLoadingOverlay();
       try {
-        // 報告很長時，手機瀏覽器的畫布有面積上限，太大會截成空白（且會間歇性不穩）。
-        // 依實際高度動態調整 pixelRatio：越長就用越低的倍率，穩定優先、確保整份都畫得出來。
-        const tall = view.scrollHeight || 0;
-        const pr = tall > 3600 ? 1 : (tall > 2400 ? 1.25 : 1.5);
-        // skipFonts：不抓 Google 字型內嵌（那步在受限瀏覽器會卡死）
-        // 明確帶入寬高：部分瀏覽器對很長的內容不指定尺寸會把下半截算成空白
-        const opts = { backgroundColor: '#efe9dd', pixelRatio: pr, style: { margin: '0' }, skipFonts: true, width: view.scrollWidth || undefined, height: tall || undefined };
-        const withTimeout = (p, ms) => Promise.race([
-          p, new Promise((_, reject) => setTimeout(() => reject(new Error(`逾時 ${ms / 1000} 秒`)), ms))
-        ]);
-        // iOS Safari 第一次算圖常空白 → 只有 iOS 才先暖身一次（Android 保持單次、較快）
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
-          || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-        if (isIOS) { try { await withTimeout(window.htmlToImage.toPng(view, opts), 12000); } catch (warmErr) { /* 暖身失敗不當錯誤 */ } }
-        dataUrl = await withTimeout(window.htmlToImage.toPng(view, opts), 20000);
+        const { pngs, pages } = await a4RenderPages();
+        if (!pngs.length) { loading.remove(); alert('這個瀏覽器產出的圖片是空白的，請改用一般瀏覽器（Safari／Chrome）開，或先用手機截圖。'); return; }
+        const base = `${a4SafeName(petName)}_回診摘要_近${rDays}天_${today}`;
+        // 逐頁嘗試上傳成真圖片網址（LINE 內建瀏覽器才能長按存），失敗退回 dataURL
+        const items = [];
+        for (let i = 0; i < pngs.length; i += 1) {
+          let src = pngs[i];
+          try {
+            const resp = await fetch('/shot', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + state.token }, body: JSON.stringify({ png: pngs[i] }) });
+            const j = await resp.json(); if (j && j.ok && j.url) src = j.url;
+          } catch (e) { /* 用 dataURL */ }
+          items.push({ src, dataUrl: pngs[i], name: pngs.length > 1 ? `${base}_${i + 1}.png` : `${base}.png` });
+        }
+        loading.remove();
+        showReportImages(items);
+        toast(`回診摘要已產生，可以存到相簿或分享給醫生（共 ${pages} 頁）`);
       } catch (error) {
-        failMsg = (error && error.message) ? error.message : String(error);
+        loading.remove();
+        alert('產生圖片失敗：' + (error && error.message ? error.message : error) + '\n\n（可先用手機截圖給醫生，我會依這個訊息修正）');
       } finally {
-        view.classList.remove('capturing');
-        header.remove();
-        capFooter.remove();
-        if (hideVisit) visitFold.classList.remove('cap-gone');
-        folds.forEach((d, i) => { d.open = wasOpen[i]; });
-        btn.disabled = false;
-        btn.textContent = orig;
-      }
-      // 診斷用：把真正的結果直接跳出來，才知道死在哪一步
-      if (dataUrl && dataUrl.length > 100) {
-        // 把 PNG 上傳成「真圖片網址」，LINE 內建瀏覽器才能長按儲存（data 網址常無法長按存）；
-        // 上傳失敗就退回直接用 data 網址（至少畫面看得到）。
-        let imgSrc = dataUrl;
-        try {
-          const resp = await fetch('/shot', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + state.token },
-            body: JSON.stringify({ png: dataUrl })
-          });
-          const j = await resp.json();
-          if (j && j.ok && j.url) imgSrc = j.url;
-        } catch (e) { /* 上傳失敗就用 dataURL */ }
-        loading.remove();
-        try { showReportImage(imgSrc, `${petName}_照護紀錄_${today}.png`); }
-        catch (e) { alert('圖片產生成功，但顯示時出錯：' + (e && e.message ? e.message : e)); }
-      } else if (failMsg) {
-        loading.remove();
-        alert('產生圖片失敗：' + failMsg + '\n\n（可先用手機截圖給醫生，我會依這個訊息修正）');
-      } else {
-        loading.remove();
-        alert('這個瀏覽器產出的圖片是空白的，可能不支援。請改用一般瀏覽器（Safari／Chrome）開，或先用手機截圖。');
+        btn.disabled = false; btn.textContent = orig;
       }
     });
     // 「產生中…」全螢幕轉圈：一按就給回饋，算圖＋上傳期間都顯示
@@ -4501,29 +4455,32 @@
       document.body.appendChild(box);
       return box;
     }
-    // 顯示產生好的報告圖：長按可儲存（全平台通用）；另備一顆「分享／存圖」用新的一次點擊觸發，
-    // 讓支援的手機能叫出系統分享面板（新手勢才不會被瀏覽器擋掉）。
-    function showReportImage(dataUrl, fileName) {
+    // 顯示產生好的 A4 回診摘要（可多頁）：每張長按可存相簿；「分享／存全部」一次帶出所有頁。
+    function showReportImages(items) {
       const box = document.createElement('div');
       box.className = 'imgbox';
+      const imgs = items.map((it, i) => `
+        <div style="margin:0 auto 16px;max-width:100%">
+          ${items.length > 1 ? `<div style="text-align:center;font-size:12px;color:#8a7c68;margin:6px 0 4px">第 ${i + 1}／${items.length} 頁</div>` : ''}
+          <img alt="回診摘要 ${i + 1}" src="${it.src}" style="width:100%;height:auto;display:block;border:1px solid rgba(0,0,0,.08)">
+        </div>`).join('');
       box.innerHTML = `
         <div class="imgbox-bar">
-          <div class="imgbox-hint">長按下面的圖片 → 「儲存到相簿」，看診時打開給醫生看</div>
-          <button class="imgbox-btn imgbox-share" type="button">分享／存圖</button>
+          <div class="imgbox-hint">回診摘要已產生${items.length > 1 ? `（共 ${items.length} 頁）` : ''}。長按每張圖片 → 「儲存到相簿」，看診時打開給醫生看</div>
+          <button class="imgbox-btn imgbox-share" type="button">分享／存全部</button>
           <button class="imgbox-btn imgbox-close" type="button">關閉</button>
         </div>
-        <div class="imgbox-scroll"><img alt="照護紀錄" src="${dataUrl}"></div>`;
+        <div class="imgbox-scroll">${imgs}</div>`;
       document.body.appendChild(box);
       box.querySelector('.imgbox-close').onclick = () => box.remove();
       box.querySelector('.imgbox-share').onclick = async () => {
         try {
-          const blob = await (await fetch(dataUrl)).blob();
-          const file = new File([blob], fileName, { type: 'image/png' });
-          if (navigator.canShare && navigator.canShare({ files: [file] })) {
-            await navigator.share({ files: [file] });
+          const files = [];
+          for (const it of items) { const blob = await (await fetch(it.dataUrl)).blob(); files.push(new File([blob], it.name, { type: 'image/png' })); }
+          if (navigator.canShare && navigator.canShare({ files })) {
+            await navigator.share({ files, title: '回診摘要' });
           } else {
-            // LINE 等內建瀏覽器不支援檔案分享、也擋下載 → 用 alert（會蓋過燈箱，一定看得到）教最通用的長按
-            alert('這個瀏覽器無法直接分享。\n請「長按上面的圖片 →　儲存到相簿」。\n（電腦版可對圖片按右鍵另存圖片）');
+            alert('這個瀏覽器無法直接分享。\n請「長按每一張圖片 →　儲存到相簿」。\n（電腦版可對圖片按右鍵另存圖片）');
           }
         } catch (error) {
           if (!(error && error.name === 'AbortError')) alert('請改用「長按圖片 →　儲存到相簿」。');
