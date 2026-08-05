@@ -190,37 +190,48 @@ function dailyTable(rows) {
 
 function chunk(arr, size) { const out = []; for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size)); return out; }
 
-// 回傳 { html, pages }：html 為 .a4-doc（含每頁 .a4-page），pages 為總頁數。
+// 各區塊估算高度（px，96dpi；保守略估上界，寧可稍留白也不要塞爆被裁）。用於「一頁塞滿才換頁」的貪婪打包。
+function estCompositionH(d) { const c = d.composition || {}; if (!c.hasData) return 100; return (c.food && c.food.total > 0) ? 230 : 150; }
+
+// 依內容高度把區塊「一頁塞滿才換頁」，杜絕每頁只放一區塊而下方大片空白。回傳 { html, pages }。
 export function buildA4Report(data) {
   const d = data || {};
   const digest = (Array.isArray(d.digest) ? d.digest : []).slice()
     .sort((a, b) => `${b.date} ${b.time || ''}`.localeCompare(`${a.date} ${a.time || ''}`)); // 新→舊
   const daily = (Array.isArray(d.daily) ? d.daily : []).filter((r) => r && r.date);
 
-  // 組裝各頁「內容區」（不含頁碼頁尾；頁首第1頁用完整、其餘用精簡）
-  const bodies = [];
-  bodies.push(fullHeader(d) + trendSection(d)); // 第 1 頁
-
-  // 第 2 頁起：水分/飲食組成 ＋ 回診重點（回診多筆時分頁）
+  // 1) 組出可獨立擺放的區塊（每塊 break-inside 不切開），並估算高度
+  const blocks = [];
+  blocks.push({ h: 230, html: trendSection(d) });
+  blocks.push({ h: estCompositionH(d), html: compositionSection(d) });
   const digestChunks = chunk(digest, DIGEST_PER_PAGE);
   const dParts = Math.max(1, digestChunks.length);
-  if (dParts <= 1) {
-    bodies.push(miniHeader(d) + compositionSection(d) + digestSection(d, digestChunks[0] || [], 1, 1));
-  } else {
-    bodies.push(miniHeader(d) + compositionSection(d) + digestSection(d, digestChunks[0], 1, dParts));
-    for (let i = 1; i < digestChunks.length; i += 1) bodies.push(miniHeader(d) + digestSection(d, digestChunks[i], i + 1, dParts));
-  }
-
-  // 每日照護明細（分頁）
+  (digestChunks.length ? digestChunks : [[]]).forEach((c, i) => {
+    const missedH = (i === 0 && d.missedMed && d.missedMed.count > 0) ? 46 : 0;
+    blocks.push({ h: 60 + missedH + (c.length ? c.length * 36 : 60), html: digestSection(d, c, i + 1, dParts) });
+  });
   const dayChunks = daily.length ? chunk(daily, DAILY_PER_PAGE) : [[]];
   dayChunks.forEach((c, i) => {
     const inner = c.length ? dailyTable(c) : '<div class="a4-empty">此期間尚無每日紀錄</div>';
     const suffix = dayChunks.length > 1 ? `（${i + 1}/${dayChunks.length}）` : '';
-    bodies.push(`${miniHeader(d)}<section class="a4-card"><h2 class="a4-h2 a4-h2-page">每日照護明細${suffix}<span class="a4-range">日期新→舊，單位見表頭</span></h2>${inner}</section>`);
+    blocks.push({ h: 60 + (c.length ? 30 + c.length * 31 : 70), html: `<section class="a4-card"><h2 class="a4-h2 a4-h2-page">每日照護明細${suffix}<span class="a4-range">日期新→舊，單位見表頭</span></h2>${inner}</section>` });
   });
 
-  const total = bodies.length;
-  const pages = bodies.map((inner, i) => `<div class="a4-page"><div class="a4-body">${inner}</div>${pageFooter(d, i + 1, total)}</div>`).join('');
+  // 2) 貪婪打包：一頁塞到快滿才換頁（第1頁完整頁首較高、之後精簡頁首）
+  const PAGE = 1123, PAD = 92, FOOTER = 80, HFULL = 100, HMINI = 40;
+  const cap = (isFirst) => PAGE - PAD - FOOTER - (isFirst ? HFULL : HMINI);
+  const pageBlocks = [];
+  let cur = [], curH = 0;
+  for (const b of blocks) {
+    const capNow = cap(pageBlocks.length === 0);
+    if (cur.length && curH + b.h > capNow) { pageBlocks.push(cur); cur = []; curH = 0; }
+    cur.push(b.html); curH += b.h;
+  }
+  if (cur.length) pageBlocks.push(cur);
+
+  const total = pageBlocks.length || 1;
+  const pages = (pageBlocks.length ? pageBlocks : [['']]).map((arr, i) =>
+    `<div class="a4-page"><div class="a4-body">${i === 0 ? fullHeader(d) : miniHeader(d)}${arr.join('')}</div>${pageFooter(d, i + 1, total)}</div>`).join('');
   return { html: `<div class="a4-doc">${pages}</div>`, pages: total };
 }
 

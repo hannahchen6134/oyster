@@ -120,10 +120,10 @@ test('分頁：28 天明細 → 頁尾出現 N／N 頁碼，且每頁一張 .a4-
   assert.equal(occ(html, 'class="a4-page"'), pages);
 });
 
-test('30 天大量資料 → 明細自動分成多頁（每頁一張 A4）', () => {
+test('30 天大量資料 → 明細自動分成多頁（區塊緊湊排版、少留白）', () => {
   const { html, pages } = buildA4Report(baseData({ daily: daily(30) }));
   assert.ok(occ(html, 'class="a4-daily"') >= 2, '30 天明細跨多張表');
-  assert.ok(pages >= 4);
+  assert.ok(pages >= 3);
 });
 
 test('很長症狀文字完整保留、不截斷成省略號', () => {
