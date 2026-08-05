@@ -36,8 +36,8 @@ test('A4 匯出：離屏容器 #a4Export 放畫面外、模組已引入、且移
   // 已改為單一「存成照片給醫生」，移除「列印／下載 A4」按鈕
   assert.ok(!html.includes('reportPrintBtn'), '不得再有列印 A4 按鈕');
   assert.ok(html.includes('存成照片給醫生'), '保留存成照片按鈕');
-  // A4 版面模組已引入
-  assert.ok(html.includes('src="/a4-report.js"'), '需引入 a4-report.js 模組');
+  // A4 版面模組已引入（允許帶 cache-busting 版本參數）
+  assert.ok(/src="\/a4-report\.js(\?v=[^"]*)?"/.test(html), '需引入 a4-report.js 模組');
   // 單一統計範圍控制存在（7/14/30）
   assert.ok(html.includes('id="reportRangeChips"') && html.includes('data-range="14"'), '單一 reportRange 控制存在');
 });

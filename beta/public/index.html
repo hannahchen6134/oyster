@@ -1483,7 +1483,7 @@
 
   <!-- 存成圖片給醫生：同源本地檔，執行時不連外 -->
   <script src="/html-to-image.js"></script>
-  <script type="module" src="/a4-report.js"></script>
+  <script type="module" src="/a4-report.js?v=20260805b"></script>
   <script>
     'use strict';
     const TOKEN_KEY = 'cat-care-beta-token';
@@ -4395,11 +4395,15 @@
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       const TARGET_W = 2480, TARGET_H = 3508;
       const nodes = Array.from(host.querySelectorAll('.a4-page'));
+      if (!nodes.length) { console.error('[A4] 匯出容器沒有 .a4-page 節點'); throw new Error('a4_no_pages'); }
       const out = [];
+      let maxSrcLen = 0;
       for (const node of nodes) {
         const w = node.offsetWidth || 794;
+        if (!(w > 0)) { console.error('[A4] 匯出節點寬度為 0，版面未渲染'); throw new Error('a4_zero_width'); }
         const ratio = TARGET_W / w;                       // 讓來源寬度剛好放大到 2480
         const dataUrl = await window.htmlToImage.toPng(node, { pixelRatio: ratio, backgroundColor: '#FFFDF8', skipFonts: true });
+        maxSrcLen = Math.max(maxSrcLen, (dataUrl || '').length);
         const img = new Image(); img.src = dataUrl; await (img.decode ? img.decode() : new Promise((r) => { img.onload = r; }));
         const canvas = document.createElement('canvas'); canvas.width = TARGET_W; canvas.height = TARGET_H;
         const ctx = canvas.getContext('2d'); ctx.fillStyle = '#FFFDF8'; ctx.fillRect(0, 0, TARGET_W, TARGET_H);
@@ -4407,6 +4411,8 @@
         ctx.drawImage(img, 0, 0, TARGET_W, dh);           // 等比填滿寬度、頂端對齊；不足處留白底、超出裁掉
         out.push(canvas.toDataURL('image/png'));
       }
+      // 空白報告防呆：來源圖太小＝渲染失敗（全白/只有外框），不得當成功；改丟錯讓呼叫端顯示明確錯誤
+      if (maxSrcLen < 3000) { console.error('[A4] 產出圖片疑似空白（來源長度 ' + maxSrcLen + '）'); throw new Error('a4_blank'); }
       host.innerHTML = '';
       return { pngs: out, pages: built.pages };
     }
@@ -4442,7 +4448,8 @@
         toast(`回診摘要已產生，可以存到相簿或分享給醫生（共 ${pages} 頁）`);
       } catch (error) {
         loading.remove();
-        alert('產生圖片失敗：' + (error && error.message ? error.message : error) + '\n\n（可先用手機截圖給醫生，我會依這個訊息修正）');
+        console.error('[A4] 產生回診摘要失敗：', error);   // 記 console 方便查根因（不顯示空白圖）
+        alert('報告產生失敗，請重新嘗試。');
       } finally {
         btn.disabled = false; btn.textContent = orig;
       }
@@ -4451,7 +4458,7 @@
     function showLoadingOverlay() {
       const box = document.createElement('div');
       box.className = 'imgbox';
-      box.innerHTML = `<div class="imgbox-loadwrap"><div class="imgbox-spin"></div><div class="imgbox-loadtext">正在產生給醫生看的報告圖…<br><span>約需幾秒，請稍候</span></div></div>`;
+      box.innerHTML = `<div class="imgbox-loadwrap"><div class="imgbox-spin"></div><div class="imgbox-loadtext">正在產生回診摘要，請稍候<br><span>等資料與圖表都完成才會產圖，約需幾秒</span></div></div>`;
       document.body.appendChild(box);
       return box;
     }
