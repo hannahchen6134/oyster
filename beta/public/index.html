@@ -1069,22 +1069,88 @@
     .ob-step.s2 .ob-num, .ob-step.s2 .ob-eg { background: #F6EAD7; color: #8A5E1E; }
     .ob-step.s3 .ob-num, .ob-step.s3 .ob-eg { background: #EFE2CE; color: #7A5518; }
     .ob-step.s4 .ob-num, .ob-step.s4 .ob-eg { background: #EDE3D6; color: #5A3617; }
-    /* PDF 報告：用列印產生（另存為 PDF），畫面上不顯示 */
+    /* A4 照護報告：畫面上不顯示，只有列印時出現（手機/網頁版完全不受這段影響）。 */
     #printReport { display: none; }
     @media print {
-      @page { margin: 14mm 13mm; }
-      body { background: #fff; margin: 0; }
-      .shell, .toast, .modal-backdrop { display: none !important; }
-      #printReport { display: block; font-family: "Noto Sans TC", sans-serif; color: #111; font-size: 12.5px; line-height: 1.7; }
-      #printReport h1 { font-size: 20px; margin: 0 0 2px; font-family: var(--serif); }
-      #printReport h2 { font-size: 14px; margin: 18px 0 6px; border-bottom: 1px solid #999; padding-bottom: 4px; display: block; }
-      #printReport h2::after { display: none; }
-      #printReport .pr-meta { color: #444; font-size: 11.5px; margin-bottom: 4px; }
-      #printReport pre { white-space: pre-wrap; font: 12px/1.8 "Noto Sans TC", sans-serif; margin: 0; }
-      #printReport table { border-collapse: collapse; width: 100%; font-size: 11px; }
-      #printReport th, #printReport td { border: 1px solid #bbb; padding: 4px 6px; text-align: right; }
-      #printReport th:first-child, #printReport td:first-child { text-align: left; }
-      #printReport .pr-foot { margin-top: 22px; color: #666; font-size: 10.5px; border-top: 1px solid #ccc; padding-top: 8px; }
+      @page { size: A4 portrait; margin: 0; }
+      html, body { background: #fff !important; margin: 0; padding: 0; }
+      /* 列印時只留 A4 報告，隱藏整個 App UI（導覽、按鈕、選單、彈窗、Toast…） */
+      body > *:not(#printReport) { display: none !important; }
+      .shell, .toast, .modal-backdrop, .liff-splash { display: none !important; }
+      #printReport {
+        display: block;
+        font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+        color: #2b2016;
+        -webkit-print-color-adjust: exact; print-color-adjust: exact;
+      }
+      .a4-page {
+        width: 210mm; min-height: 297mm; box-sizing: border-box;
+        padding: 12mm 11mm; background: #FFFDF8;
+        display: flex; flex-direction: column;
+        page-break-after: always; break-after: page; overflow: hidden;
+      }
+      .a4-page:last-child { page-break-after: auto; break-after: auto; }
+      .a4-body { flex: 1 1 auto; }
+      /* 頁首 */
+      .a4-head { display: flex; justify-content: space-between; align-items: flex-end;
+        border-bottom: 2px solid #734921; padding-bottom: 6px; margin-bottom: 10px; }
+      .a4-head-name { font-size: 11pt; color: #8a6a44; font-weight: 700; }
+      .a4-head-title { font-family: var(--serif); font-size: 21pt; color: #5A3617; margin: 1px 0 0; line-height: 1.1; }
+      .a4-head-meta { text-align: right; font-size: 8.5pt; color: #6b5c48; line-height: 1.55; }
+      .a4-rhead { display: flex; justify-content: space-between; align-items: baseline;
+        border-bottom: 1px solid #E4D8C4; padding-bottom: 4px; margin-bottom: 8px; font-size: 9pt; color: #6b5c48; }
+      .a4-rhead-name { font-weight: 700; color: #5A3617; }
+      /* 卡片 */
+      .a4-card { border: 1px solid #EAdfCd; border-radius: 8px; padding: 9px 11px 10px; margin-bottom: 9px;
+        background: #fff; break-inside: avoid; page-break-inside: avoid; }
+      .a4-h2 { font-family: var(--serif); font-size: 12.5pt; color: #5A3617; margin: 0 0 7px;
+        display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+        border-bottom: 1px solid #EFE6D6; padding-bottom: 4px; }
+      .a4-h2.a4-h2-page { margin-top: 2px; }
+      .a4-range { font-size: 8.5pt; font-weight: 400; color: #9a8b7a; white-space: nowrap; }
+      .a4-est { font-size: 8pt; color: #6f5aa0; margin-left: 6px; }
+      .a4-est-mark { font-size: 7pt; color: #6f5aa0; margin-left: 1px; }
+      /* 趨勢三格 */
+      .a4-metrics { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+      .a4-metric-t { font-size: 9pt; color: #6b5c48; margin-bottom: 2px; }
+      .a4-metric-val { font-size: 15pt; font-weight: 700; color: #3a2a1a; line-height: 1.2; }
+      .a4-metric-val small { font-size: 9pt; font-weight: 400; color: #9a8b7a; margin-left: 2px; }
+      .a4-delta { font-size: 8.5pt; font-weight: 700; margin-left: 4px; color: #6b5c48; }
+      .a4-delta.up { color: #b3703f; } .a4-delta.down { color: #1e7a52; }
+      .a4-spark { width: 100%; height: 44px; margin-top: 3px; }
+      .a4-empty-sm { font-size: 9pt; color: #9a8b7a; padding: 6px 0; }
+      .a4-empty-sm span { display: block; font-size: 8pt; color: #b3a693; margin-top: 2px; }
+      /* 回診重點表 */
+      .a4-flag { font-size: 9pt; color: #9a3b20; background: #F9EBE5; border: 1px solid #EAceC3;
+        border-radius: 6px; padding: 4px 8px; margin-bottom: 6px; }
+      .a4-digest { width: 100%; border-collapse: collapse; font-size: 9pt; }
+      .a4-digest td { padding: 3px 4px; vertical-align: top; border-bottom: 1px solid #F1E9DA; }
+      .a4-dg-date { white-space: nowrap; color: #6b5c48; width: 12mm; }
+      .a4-dg-type { width: 20mm; }
+      .a4-tag { display: inline-block; font-size: 8pt; padding: 1px 7px; border-radius: 999px;
+        background: #F4EDE0; color: #7A4E20; border: 1px solid #E6D9C2; }
+      .a4-dg-text { color: #33261a; line-height: 1.5; word-break: break-word; }
+      /* 組成 */
+      .a4-comp { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+      .a4-comp-h { display: flex; justify-content: space-between; align-items: baseline; font-size: 9.5pt; color: #4a3a28; margin-bottom: 4px; }
+      .a4-comp-h b { font-weight: 700; } .a4-comp-h small { font-weight: 400; color: #9a8b7a; font-size: 8pt; }
+      .a4-bar { height: 8px; border-radius: 4px; background: #F1E9DA; overflow: hidden; display: flex; margin-bottom: 5px; }
+      .a4-bar i { display: block; height: 100%; }
+      .a4-lg { display: flex; align-items: center; font-size: 8.5pt; color: #4a3a28; padding: 1.5px 0; }
+      .a4-dot { width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; flex: 0 0 auto; }
+      .a4-lg-nm { flex: 1 1 auto; } .a4-lg-v { text-align: right; min-width: 18mm; } .a4-lg-p { text-align: right; min-width: 10mm; color: #6b5c48; }
+      /* 每日明細表 */
+      .a4-daily { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
+      .a4-daily th { background: #F4EDE0; color: #5A3617; font-weight: 700; text-align: right; padding: 4px 6px; border: 1px solid #E4D8C4; }
+      .a4-daily th small { font-weight: 400; color: #9a8b7a; font-size: 7pt; margin-left: 2px; }
+      .a4-daily td { text-align: right; padding: 3px 6px; border: 1px solid #EFE6D6; color: #33261a; }
+      .a4-daily .a4-td-date { text-align: left; color: #6b5c48; white-space: nowrap; }
+      .a4-daily tbody tr { break-inside: avoid; page-break-inside: avoid; }
+      .a4-daily tbody tr:nth-child(even) td { background: #FBF7EF; }
+      /* 頁尾 */
+      .a4-foot { margin-top: 8px; border-top: 1px solid #E4D8C4; padding-top: 6px; }
+      .a4-disc { font-size: 7.5pt; color: #8a7c68; line-height: 1.5; margin: 0 0 4px; }
+      .a4-foot-row { display: flex; justify-content: space-between; font-size: 7.5pt; color: #9a8b7a; }
     }
 
     @media (max-width: 760px) {
@@ -1281,7 +1347,8 @@
       <section class="panel hidden" id="trendView">
         <div class="report-actions cap-hide">
           <button class="btn btn-primary" id="reportSaveBtn" type="button">📷 存成圖片給醫生</button>
-          <p class="report-hint">截圖到相簿，方便給醫生看</p>
+          <button class="btn btn-secondary" id="reportPrintBtn" type="button">🖨 列印／下載 A4 報告</button>
+          <p class="report-hint">截圖到相簿，或印成 A4／存 PDF 帶去回診</p>
         </div>
         <details class="block fold" open id="trendFold">
           <summary>
@@ -1419,6 +1486,7 @@
 
   <!-- 存成圖片給醫生：同源本地檔，執行時不連外 -->
   <script src="/html-to-image.js"></script>
+  <script type="module" src="/a4-report.js"></script>
   <script>
     'use strict';
     const TOKEN_KEY = 'cat-care-beta-token';
@@ -4270,6 +4338,79 @@
     // 存成圖片給醫生：把「回診」整頁（所有摺疊都展開、隱藏操作鈕）轉成一張圖，
     // 然後把圖直接顯示在畫面上讓使用者「長按儲存」——這招在 LINE 內建瀏覽器也有效，
     // 不倚賴 a[download]（內建瀏覽器常擋下載）也不倚賴檔案分享（多數 webview 不支援）。
+    // ── A4 報告：把畫面上「已算好的」report data 蒐集成一份物件，交給 buildA4Report 排版（不重算、不改數值）──
+    function a4DeltaPct(values, sparse) {
+      const nums = values.filter((v) => v != null);
+      if (nums.length < 2) return null;
+      let prev, curr;
+      if (sparse) { curr = nums[nums.length - 1]; prev = nums[nums.length - 2]; }
+      else {
+        const last = nums.slice(-7), before = nums.slice(-14, -7);
+        if (!before.length) return null;
+        const avg = (a) => a.reduce((t, x) => t + x, 0) / a.length;
+        curr = avg(last); prev = avg(before);
+      }
+      if (!(prev > 0)) return null;
+      return Math.round(((curr - prev) / prev) * 100);
+    }
+    function collectA4Data() {
+      const pet = (state.pets || []).find((p) => p.petId === state.petId);
+      const petName = pet ? pet.petName : (($('petTitle').textContent || '貓咪').trim());
+      const to = todayStr();
+      const trend = (state.trendRows || []).slice().sort((a, b) => a.date.localeCompare(b.date));
+      const fromDate = trend.length ? trend[0].date : to;
+      const dates = [];
+      for (let d = fromDate; d <= to; d = shiftDate(d, 1)) dates.push(d);
+      const byDate = new Map(trend.map((r) => [r.date, r]));
+      const series = (sel) => dates.map((dt) => { const r = byDate.get(dt); return r && r.entryCount ? (Number(sel(r)) || 0) : null; });
+      const waterVals = series((r) => r.totalWaterMl);
+      const kcalVals = series((r) => r.kcal);
+      const wmap = new Map((state.weights || []).map((w) => [w.date, Number(w.amount)]).filter(([, v]) => v > 0));
+      const wVals = dates.map((dt) => (wmap.has(dt) ? wmap.get(dt) : null));
+      const lastNonNull = (arr) => { for (let i = arr.length - 1; i >= 0; i -= 1) if (arr[i] != null) return arr[i]; return null; };
+      const pts = (arr) => dates.map((dt, i) => ({ date: dt, value: arr[i] }));
+      // 組成：與 loadComposition 完全相同算法（同一份 trendRows、同一窗口）
+      const cDays = state.compDays || 7;
+      const cFrom = shiftDate(to, -(cDays - 1));
+      const cRows = trend.filter((r) => r.date >= cFrom && r.date <= to);
+      const sum = (f) => cRows.reduce((t, r) => t + (Number(f(r)) || 0), 0);
+      const directWater = sum((r) => r.waterMl), foodWater = sum((r) => r.foodWaterMl);
+      const totalWater = directWater + foodWater;
+      const dry = sum((r) => r.dryFoodG), wetAsFed = sum((r) => (Number(r.wetFoodG) || 0) + (Number(r.foodWaterMl) || 0)), other = sum((r) => r.otherFoodG);
+      const totalFood = dry + wetAsFed + other;
+      // 回診重點：沿用 digestItems + missedMedDays（同 state.digestData）
+      const digestDays = state.digestDays || 14;
+      const digest = state.digestData ? digestItems(state.digestData).map((it) => ({ date: it.date, typeLabel: it.label, tone: it.tone, text: it.text })) : [];
+      const missed = missedMedDays(digestDays);
+      // 每日明細：沿用 trendRows（同 30 天窗口、有紀錄者、新→舊），不另抓、不重算
+      const daily = trend.filter((r) => Number(r.entryCount) > 0).slice().reverse().map((r) => ({
+        date: r.date, waterMl: r.totalWaterMl, wetG: (Number(r.wetFoodG) || 0) + (Number(r.foodWaterMl) || 0), dryG: r.dryFoodG, kcal: r.kcal, kcalEstimated: false
+      }));
+      const genAt = new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Taipei' }).slice(0, 16);
+      return {
+        petName, source: '喵喵照護站', dateRangeLabel: `${fromDate} ~ ${to}`, generatedAt: genAt,
+        trendRangeDays: 30, compRangeDays: cDays, digestRangeDays: digestDays,
+        weight: { latest: lastNonNull(wVals), unit: 'kg', points: pts(wVals), deltaPct: a4DeltaPct(wVals, true) },
+        water: { latest: lastNonNull(waterVals), unit: 'ml', points: pts(waterVals), deltaPct: a4DeltaPct(waterVals, false) },
+        kcal: { latest: lastNonNull(kcalVals), unit: 'kcal', points: pts(kcalVals), deltaPct: a4DeltaPct(kcalVals, false), estimated: false },
+        digest, missedMed: missed.length ? { count: missed.length, days: missed } : null,
+        composition: { rangeDays: cDays, hasData: totalWater > 0 || totalFood > 0, water: { total: totalWater, own: directWater, food: foodWater }, food: { total: totalFood, dry, wet: wetAsFed, other } },
+        daily
+      };
+    }
+    $('reportPrintBtn').addEventListener('click', () => {
+      trackEvent('report_print');
+      if (typeof window.buildA4Report !== 'function') { toast('報告版型還在載入，請稍等一下再按', true); return; }
+      if (!state.trendRows) { toast('資料還在載入，請稍等一下再按', true); return; }
+      try {
+        const host = $('printReport');
+        host.innerHTML = window.buildA4Report(collectA4Data());
+        // 等兩個 frame 讓 SVG／表格版面渲染完成再叫列印
+        requestAnimationFrame(() => requestAnimationFrame(() => { window.print(); }));
+      } catch (e) { toast('產生報告時發生問題，請再試一次', true); }
+    });
+    window.addEventListener('afterprint', () => { const h = $('printReport'); if (h) h.innerHTML = ''; });
+
     $('reportSaveBtn').addEventListener('click', async () => {
       trackEvent('report_save');
       const view = $('trendView');
