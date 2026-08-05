@@ -41,3 +41,36 @@ test('A4 匯出：離屏容器 #a4Export 放畫面外、模組已引入、且移
   // 單一統計範圍控制存在（7/14/30）
   assert.ok(html.includes('id="reportRangeChips"') && html.includes('data-range="14"'), '單一 reportRange 控制存在');
 });
+
+// 今日紀錄／最近／月曆單日：weight 必須顯示「數值＋單位」，不得只剩「體重」標籤（實機回報的漏值 bug）
+test('體重顯示：formatWeightKg 規則正確，且 4.27 不變 4.3、4.2 不變 4.20', () => {
+  // 從 index.html 抽出真正的 formatWeightKg 執行，驗顯示規則（非只看原始碼字串）
+  const m = html.match(/function formatWeightKg\(value\)\s*\{[\s\S]*?\n    \}/);
+  assert.ok(m, '需有 formatWeightKg helper');
+  // eslint-disable-next-line no-new-func
+  const formatWeightKg = new Function(`${m[0]}; return formatWeightKg;`)();
+  assert.equal(formatWeightKg(4.27), '4.27');
+  assert.equal(formatWeightKg(4.2), '4.2');
+  assert.equal(formatWeightKg(4.20), '4.2');
+  assert.equal(formatWeightKg(4), '4');
+  assert.equal(`${formatWeightKg(4.27)} kg`, '4.27 kg');
+  assert.notEqual(`${formatWeightKg(4.27)} kg`, '4.3 kg');
+});
+
+test('今日紀錄／最近清單：兩個 renderer 都有 weight 分支，輸出數值＋單位（不只標籤）', () => {
+  // renderLogs（今日預覽卡／查看全部／月曆單日 共用）與 renderRecent（最近）都要畫 weight 值
+  const renderLogs = html.slice(html.indexOf('function renderLogs'), html.indexOf('function renderRecent'));
+  const renderRecent = html.slice(html.indexOf('function renderRecent'), html.indexOf('function renderRecent') + 3000);
+  for (const [name, body] of [['renderLogs', renderLogs], ['renderRecent', renderRecent]]) {
+    assert.ok(/log\.category === 'weight'/.test(body), `${name} 需有 weight 分支`);
+    assert.ok(/formatWeightKg\(log\.amount\)/.test(body), `${name} weight 值需用 formatWeightKg`);
+    assert.ok(/log\.unit \|\| 'kg'/.test(body), `${name} weight 需帶單位`);
+  }
+  // 編輯／刪除按鈕仍在（只加了顯示 chip，不動操作）
+  assert.ok(/data-edit=/.test(renderLogs) && /data-del=/.test(renderLogs), 'renderLogs 仍有編輯/刪除按鈕');
+});
+
+test('describeLogFront：體重用 formatWeightKg（不再 toFixed 成一位小數）', () => {
+  const fn = html.slice(html.indexOf('function describeLogFront'), html.indexOf('function describeLogFront') + 700);
+  assert.ok(/category === 'weight'\) return `體重 \$\{formatWeightKg\(log\.amount\)\} kg`/.test(fn), '體重描述需用 formatWeightKg');
+});

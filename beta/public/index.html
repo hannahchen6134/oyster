@@ -1811,7 +1811,7 @@
         const extra = medExtra(log);
         return `用藥${label ? ` ${label}` : ''}${extra ? ` ${extra}` : ''} ${MED_LABEL(log.medStatus)}`;
       }
-      if (log.category === 'weight') return `體重 ${fmt(log.amount)} kg`;
+      if (log.category === 'weight') return `體重 ${formatWeightKg(log.amount)} kg`;
       const names = { vomit: '嘔吐', stool: '大便', urine: '尿尿', supplement: '營養補充', mood: '精神', note: '備註' };
       return `${names[log.category] || log.category}${log.note ? ` ${log.note}` : ''}`;
     }
@@ -1984,6 +1984,8 @@
           chips.push(`<span class="chip ${warn ? 'warn' : 'chip-med'}">${esc([log.medSlot, log.itemName].filter(Boolean).join(' ') || '藥')}${medExtra(log) ? ` ${esc(medExtra(log))}` : ''} ${esc(MED_LABEL(log.medStatus))}</span>`);
         }
         if (log.category === 'vomit') chips.push('<span class="chip warn">需留意</span>');
+        // 體重：類型標籤外要顯示數值＋單位（4.27 kg），精度沿用 formatWeightKg，不得只剩標籤
+        if (log.category === 'weight') chips.push(`<span class="chip chip-neutral">${formatWeightKg(log.amount)} ${esc(log.unit || 'kg')}</span>`);
         return `
           <div class="entry ${isCont ? 'cont' : ''}" data-entry="${esc(log.logId)}">
             <div class="entry-time">${isCont ? '' : esc(timeStr)}${!isCont && log.isBackfilled ? '<div class="entry-by">補登</div>' : ''}</div>
@@ -2029,6 +2031,8 @@
           chips.push(`<span class="chip ${warn ? 'warn' : 'chip-med'}">${esc([log.medSlot, log.itemName].filter(Boolean).join(' ') || '藥')}${medExtra(log) ? ` ${esc(medExtra(log))}` : ''} ${esc(MED_LABEL(log.medStatus))}</span>`);
         }
         if (log.category === 'vomit') chips.push('<span class="chip warn">需留意</span>');
+        // 體重：顯示數值＋單位（4.27 kg），與今日紀錄一致
+        if (log.category === 'weight') chips.push(`<span class="chip chip-neutral">${formatWeightKg(log.amount)} ${esc(log.unit || 'kg')}</span>`);
         const dt = String(log.eventDateTime);
         const dayLabel = `${Number(dt.slice(5, 7))}/${Number(dt.slice(8, 10))}`;
         return `
