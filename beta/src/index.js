@@ -27,7 +27,7 @@ import {
   recordTutorial, medTutorial, onboardingText, recordPrompt, backfillGuide
 } from './replies.js';
 import { getRecentLogsByPet, ensureTaskSchema, getLogsForDay, logTextInput } from './db.js';
-import { jsonResponse, taipeiToday, taipeiNowDateTime, addDays } from './util.js';
+import { jsonResponse, taipeiToday, taipeiNowDateTime, addDays, formatWeightKg } from './util.js';
 
 // 官方 LINE 加好友連結（basicId @232mjffx）——給共同照護邀請用
 const LINE_ADD_URL = 'https://line.me/R/ti/p/@232mjffx';
@@ -799,7 +799,7 @@ async function handlePending(env, event, { db, user, pet, pets, lineUserId, owne
     const site = await siteLink(env, baseUrl, lineUserId);
     await replyOrPushFlex(env, event,
       weightModifiedFlex({ pet: cardPet, oldKg, newKg: newAmount, recordDate: log.eventDateTime, logId: log.logId, siteUrl: site }),
-      `已修改${cardPet?.petName || '貓貓'}最近一次體重 ${oldKg} → ${newAmount} kg`);
+      `已修改${cardPet?.petName || '貓貓'}最近一次體重 ${formatWeightKg(oldKg)} → ${formatWeightKg(newAmount)} kg`);
     return true;
   }
 
@@ -1309,7 +1309,7 @@ async function handlePostback(event, env, baseUrl) {
     const site = await siteLink(env, baseUrl, lineUserId);
     await replyOrPushFlex(env, event,
       weightModifiedFlex({ pet: cardPet, oldKg: res.oldKg, newKg: res.newKg, recordDate: res.log.eventDateTime, logId: res.log.logId, siteUrl: site }),
-      `已修改${cardPet?.petName || '貓貓'}最近一次體重 ${res.oldKg} → ${res.newKg} kg（紀錄日期 ${String(res.log.eventDateTime).slice(0, 10)}）`);
+      `已修改${cardPet?.petName || '貓貓'}最近一次體重 ${formatWeightKg(res.oldKg)} → ${formatWeightKg(res.newKg)} kg（紀錄日期 ${String(res.log.eventDateTime).slice(0, 10)}）`);
     return;
   }
   // 確認「記為今天的新體重」：新增一筆 today weight log；冪等（同一原訊息 smid 已建過就不重複）
@@ -1332,7 +1332,7 @@ async function handlePostback(event, env, baseUrl) {
       parsedResult: JSON.stringify({ events: [{ category: 'weight', op: 'add_today', amount }], savedLogIds: [res.saved.logId], unparsedSegments: [], awaitingAction: '' })
     });
     const site = await siteLink(env, baseUrl, lineUserId);
-    await replyOrPushFlex(env, event, weightAddedFlex({ pet: chosen, amount, logId: res.saved.logId, summary: res.summary, date: res.date, siteUrl: site }), `已記錄・${chosen.petName}\n體重 ${amount} kg`);
+    await replyOrPushFlex(env, event, weightAddedFlex({ pet: chosen, amount, logId: res.saved.logId, summary: res.summary, date: res.date, siteUrl: site }), `已記錄・${chosen.petName}\n體重 ${formatWeightKg(amount)} kg`);
     return;
   }
   if (action === 'wCancel') { await replyOrPush(env, event, '好，體重先不改也不記 👌'); return; }
@@ -1736,7 +1736,7 @@ function describeParsedEvent(r) {
   if (r.category === 'vomit') return `嘔吐${r.itemName ? `（${r.itemName}）` : ''}`;
   if (r.category === 'stool') return r.itemName || '排便';
   if (r.category === 'mood') return `精神${r.itemName ? `（${r.itemName}）` : ''}`;
-  if (r.category === 'weight') return `體重 ${r.amount}kg`;
+  if (r.category === 'weight') return `體重 ${formatWeightKg(r.amount)}kg`;
   return r.itemName || r.note || r.category;
 }
 export function describeParsedEvents(text) {
@@ -2672,12 +2672,12 @@ export async function showWeightModifyConfirm(env, event, { db, pet, amount, smi
   if (!latest) {
     const keys = `amt=${amount}&petId=${pet.petId}&smid=${smidEnc}`;
     await replyOrPushFlex(env, event, weightNoRecordFlex({ pet, amount, keys }),
-      `${pet.petName}還沒有可以修改的體重紀錄，要把 ${amount}kg 記為今天的新體重嗎？`);
+      `${pet.petName}還沒有可以修改的體重紀錄，要把 ${formatWeightKg(amount)}kg 記為今天的新體重嗎？`);
     return;
   }
   const keys = `logId=${latest.logId}&old=${latest.amount}&amt=${amount}&petId=${pet.petId}&smid=${smidEnc}`;
   await replyOrPushFlex(env, event, weightModifyConfirmFlex({ pet, amount, latest, keys }),
-    `要怎麼處理${pet.petName}的 ${amount} 公斤？最近一次 ${latest.amount}kg（${String(latest.eventDateTime).slice(0, 10)}）。回覆選擇「改成 ${amount}kg／記為今天的新體重／取消」。`);
+    `要怎麼處理${pet.petName}的 ${formatWeightKg(amount)} 公斤？最近一次 ${formatWeightKg(latest.amount)}kg（${String(latest.eventDateTime).slice(0, 10)}）。回覆選擇「改成 ${formatWeightKg(amount)}kg／記為今天的新體重／取消」。`);
 }
 
 async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
@@ -2801,7 +2801,7 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
   } else if (record.category === 'deworm') {
     description = `除蟲${record.note ? `：${record.note}` : ''}`;
   } else if (record.category === 'weight') {
-    description = `體重 ${record.amount} kg`;
+    description = `體重 ${formatWeightKg(record.amount)} kg`;
     // 「目前體重」延後到 insert 之後用 resyncPetWeight 依「最新未刪除體重」回算，
     // 避免補記舊日期體重時把目前體重錯設成舊值（規格六）。
   } else {
@@ -2903,7 +2903,7 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
   if (record.category === 'weight') {
     const wSite = await siteLink(env, opts.baseUrl, lineUserId);
     const wCard = weightAddedFlex({ pet, amount: record.amount, logId: savedLog?.logId || '', summary, date: eventDate, siteUrl: wSite });
-    await replyOrPushFlex(env, event, wCard, `已記錄・${pet?.petName || '貓貓'}\n體重 ${record.amount} kg`);
+    await replyOrPushFlex(env, event, wCard, `已記錄・${pet?.petName || '貓貓'}\n體重 ${formatWeightKg(record.amount)} kg`);
     if (opts.baseUrl) {
       try { await ensurePersonalRichMenu(env, opts.baseUrl, lineUserId); } catch (error) { console.error('personal richmenu refresh failed:', error.message); }
     }

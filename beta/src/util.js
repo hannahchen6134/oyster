@@ -2,6 +2,15 @@
 
 const TAIPEI_OFFSET_MS = 8 * 60 * 60 * 1000;
 
+// 體重統一顯示規則（唯一真源）：最多兩位小數、移除尾端多餘的 0、不擅自降低使用者輸入精度。
+// 體重是健康追蹤資料——嚴禁 toFixed(1)／四捨五入到一位，4.27 必須顯示 4.27。
+// 註：public/index.html 與 public/a4-report.js 為瀏覽器包、無法 import 本檔，需各自保留同規則的複本。
+export function formatWeightKg(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '';
+  return String(Math.round(n * 100) / 100); // 例：4→"4"、4.2→"4.2"、4.20→"4.2"、4.27→"4.27"、4.25→"4.25"
+}
+
 function pad2(value) {
   return String(value).padStart(2, '0');
 }

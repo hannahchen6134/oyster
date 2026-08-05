@@ -17,6 +17,9 @@ import {
 import {
   applyWeightModify, applyWeightAddToday, handleWeightModify, showWeightModifyConfirm, applyUndo
 } from '../src/index.js';
+import { formatWeightKg } from '../src/util.js';
+import { weightAddedFlex, weightModifyConfirmFlex } from '../src/flex.js';
+import { buildA4Report } from '../public/a4-report.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SCHEMA = readFileSync(join(__dirname, '..', 'schema.sql'), 'utf8');
@@ -229,4 +232,68 @@ test('批次刪除（applyUndo）含體重最新那筆 → 目前體重回退上
   // 模擬「刪除這次 N 筆」把最新體重納入批次刪除
   await applyUndo(db, [await getLog(db, latest.logId)], 'u1');
   assert.equal((await getPet(db, 'p1')).weightKg, 5.8, 'applyUndo 後目前體重回退到 5.8');
+});
+
+// ── 體重顯示精度：4.27 不得被四捨五入成 4.3（規格補測試 1–15）──────────
+test('formatWeightKg：最多兩位、去尾端 0、不降精度（4/4.2/4.20/4.27/4.25）', () => {
+  assert.equal(formatWeightKg(4), '4');
+  assert.equal(formatWeightKg(4.2), '4.2');
+  assert.equal(formatWeightKg(4.20), '4.2');
+  assert.equal(formatWeightKg(4.27), '4.27');
+  assert.equal(formatWeightKg(4.25), '4.25');
+  assert.equal(formatWeightKg('4.27'), '4.27');
+});
+test('解析：蚵仔體重4.27 → 記 4.27；蚵仔改4.27公斤 → weightModify 4.27（精度不丟）', () => {
+  assert.equal(isWeightAdd('體重4.27'), 4.27);
+  assert.equal(isWeightAdd('體重4.20'), 4.2);
+  const m = parseMessage('改4.27公斤');
+  assert.equal(m.type, 'weightModify'); assert.equal(m.amount, 4.27);
+});
+test('新增 4.27：log.amount＝4.27、pets.weightKg＝4.27（DB 存完整小數）', async () => {
+  const db = seed(); env.DB = db;
+  const res = await applyWeightAddToday(db, { petId: 'p1', amount: 4.27, smid: 'm9', ownerId: 'u1', actorId: 'u1', nowDateTime: '2026-08-05 10:00' });
+  assert.equal(res.ok, true);
+  assert.equal((await getLog(db, res.saved.logId)).amount, 4.27, 'log.amount 保存 4.27');
+  assert.equal((await getPet(db, 'p1')).weightKg, 4.27, 'pets.weightKg 同步 4.27');
+});
+test('LINE 新增成功卡顯示 4.27kg（不出現 4.3）', () => {
+  const card = weightAddedFlex({ pet: { petName: '蚵仔' }, amount: 4.27, logId: 'x', summary: null, date: '2026-08-05' });
+  const s = JSON.stringify(card);
+  assert.ok(s.includes('4.27'), '卡片應含 4.27');
+  assert.ok(!s.includes('4.3'), '卡片不得出現四捨五入後的 4.3');
+});
+test('LINE 修改確認卡顯示完整小數（最近 4.27 / 目標 4.35）', () => {
+  const card = weightModifyConfirmFlex({ pet: { petName: '蚵仔' }, amount: 4.35, latest: { amount: 4.27, eventDateTime: '2026-08-03 09:00' }, keys: 'amt=4.35' });
+  const s = JSON.stringify(card);
+  assert.ok(s.includes('4.27') && s.includes('4.35'), '確認卡應同時保留 4.27 與 4.35');
+  assert.ok(!s.includes('4.3 ') && !s.includes('4.4'), '不得四捨五入');
+});
+test('今日紀錄用的 describeLog 規則＝formatWeightKg（4.27→4.27kg）', () => {
+  // describeLog 內部已改用 formatWeightKg；此處驗規則本身，確保今日清單顯示 4.27
+  assert.equal(`體重 ${formatWeightKg(4.27)}kg`, '體重 4.27kg');
+});
+test('回診摘要／A4：體重 4.27 顯示 4.27（不 4.3、不 4.20）', () => {
+  const mk = (latest, count) => ({ petName: '蚵仔', rangeDays: 14, daily: [], weight: { latest, unit: 'kg', points: [{ date: '2026-08-01', value: latest }, { date: '2026-08-03', value: latest }, { date: '2026-08-05', value: latest }], deltaPct: 0, count } });
+  const h1 = buildA4Report(mk(4.27, 3)).html;
+  assert.ok(h1.includes('4.27'), 'A4 應顯示 4.27');
+  assert.ok(!h1.includes('4.3<'), 'A4 不得顯示 4.3');
+  const h2 = buildA4Report(mk(4.2, 3)).html;
+  assert.ok(h2.includes('4.2<') && !h2.includes('4.20'), 'A4 顯示 4.2 而非 4.20');
+  const h3 = buildA4Report(mk(4, 3)).html;
+  assert.ok(h3.includes('4<') && !h3.includes('4.00'), 'A4 顯示 4 而非 4.00');
+});
+test('修改成 4.27 後不得變 4.3；刪除最新後回退值也保留兩位小數', async () => {
+  const db = seed(); env.DB = db;
+  const older = await addWeight(db, 'p1', 4.05, '2026-08-01 09:00');
+  const latest = await addWeight(db, 'p1', 5.0, '2026-08-04 09:00');
+  await resyncPetWeight(db, 'p1');
+  // 修改最新為 4.27
+  await applyWeightModify(db, { logId: latest.logId, amount: 4.27, ownerId: 'u1', actorId: 'u1' });
+  assert.equal((await getLog(db, latest.logId)).amount, 4.27);
+  assert.equal((await getPet(db, 'p1')).weightKg, 4.27, '修改後目前體重 4.27，不是 4.3');
+  // 刪除最新 → 回退到 older 4.05（兩位小數完整）
+  await softDeleteLog(db, latest.logId, 'u1');
+  await resyncPetWeight(db, 'p1');
+  assert.equal((await getPet(db, 'p1')).weightKg, 4.05, '回退值保留 4.05');
+  assert.equal(formatWeightKg((await getPet(db, 'p1')).weightKg), '4.05');
 });

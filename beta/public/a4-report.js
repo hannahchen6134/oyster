@@ -11,7 +11,8 @@ function esc(s) {
 }
 function n0(v) { return String(Math.round(Number(v) || 0)); }
 function n1(v) { return String(Math.round((Number(v) || 0) * 10) / 10); }
-function n2(v) { return (Number(v) || 0).toFixed(2); }
+// 體重顯示（與 src/util.js formatWeightKg 相同規則）：最多兩位小數、移除尾端 0、不降精度（4.27→4.27、4.2→4.2）
+function formatWeightKg(v) { const n = Number(v); return Number.isFinite(n) ? String(Math.round(n * 100) / 100) : ''; }
 function mmdd(date) { const s = String(date || ''); return s.length >= 10 ? `${Number(s.slice(5, 7))}/${Number(s.slice(8, 10))}` : s; }
 
 // 百分比湊 100：先各自四捨五入，再把餘數補到最大的一項，避免顯示 33%+33%+33%=99%
@@ -96,9 +97,9 @@ function trendSection(d) {
     weightCard = metricCard('體重', '<span class="a4-none">尚無體重紀錄</span><span class="a4-sub">可於照護站補充</span>', '');
   } else if ((w.count || 0) < 3) {
     const trend = w.deltaPct == null || w.deltaPct === 0 ? '體重持平' : (w.deltaPct > 0 ? '體重略升' : '體重略降');
-    weightCard = metricCard('體重', `${n2(w.latest)}<small>kg</small>`, sparkline(w.points || [], '#734921', { dotsOnly: true }), `近期紀錄 ${w.count} 筆・${trend}`);
+    weightCard = metricCard('體重', `${formatWeightKg(w.latest)}<small>kg</small>`, sparkline(w.points || [], '#734921', { dotsOnly: true }), `近期紀錄 ${w.count} 筆・${trend}`);
   } else {
-    weightCard = metricCard('體重', `${n2(w.latest)}<small>kg</small> ${deltaText(w.deltaPct)}`, sparkline(w.points || [], '#734921', { dots: true }));
+    weightCard = metricCard('體重', `${formatWeightKg(w.latest)}<small>kg</small> ${deltaText(w.deltaPct)}`, sparkline(w.points || [], '#734921', { dots: true }));
   }
   const kcalNote = kcal.estimated ? '<span class="a4-est">部分估算</span>' : '';
   return `

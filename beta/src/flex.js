@@ -5,6 +5,7 @@
 import { goalSection, recordPrompt } from './replies.js';
 import { BRAND, displayMedStatus } from './brand.js';
 import { isWetFoodType } from './summary.js';
+import { formatWeightKg } from './util.js';
 
 // 卡身：暖米白（和照護站網站同一個紙面世界，不用冷白）；標題：暖棕漸層
 const BODY_BG = '#FFFDF8';
@@ -400,12 +401,12 @@ export function undoConfirmFlex({ pet, lines = [], undoKey = '', count = 1 }) {
 export function weightModifyConfirmFlex({ pet, amount, latest, keys }) {
   const petName = pet?.petName || '貓貓';
   const latestDate = String(latest?.eventDateTime || '').slice(0, 10).replace(/-/g, '/');
-  const latestKg = fmt(latest?.amount);
+  const latestKg = formatWeightKg(latest?.amount);
   const body = {
     type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
     contents: [
       { type: 'box', layout: 'horizontal', contents: [tag('要確認一下', CATEGORY_STYLE.weight)] },
-      text(`要怎麼處理${petName}的 ${fmt(amount)} 公斤？`, { size: 'lg', weight: 'bold', color: C.ink, margin: 'md', wrap: true }),
+      text(`要怎麼處理${petName}的 ${formatWeightKg(amount)} 公斤？`, { size: 'lg', weight: 'bold', color: C.ink, margin: 'md', wrap: true }),
       { type: 'box', layout: 'vertical', backgroundColor: C.tint, cornerRadius: '10px', paddingAll: '12px', margin: 'md', spacing: 'xs',
         contents: [
           text('最近一次體重', { size: 'xs', color: C.muted }),
@@ -417,14 +418,14 @@ export function weightModifyConfirmFlex({ pet, amount, latest, keys }) {
     type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: '12px', backgroundColor: FOOTER_COLOR,
     contents: [
       { type: 'button', height: 'sm', style: 'primary', color: C.brand,
-        action: { type: 'postback', label: `改成 ${fmt(amount)}kg`, data: `action=wMod&${keys}`, displayText: `改成 ${fmt(amount)}kg` } },
+        action: { type: 'postback', label: `改成 ${formatWeightKg(amount)}kg`, data: `action=wMod&${keys}`, displayText: `改成 ${formatWeightKg(amount)}kg` } },
       { type: 'button', height: 'sm', style: 'link', color: C.brand,
         action: { type: 'postback', label: '記為今天的新體重', data: `action=wAdd&${keys}`, displayText: '記為今天的新體重' } },
       { type: 'button', height: 'sm', style: 'link', color: C.muted,
         action: { type: 'postback', label: '取消', data: 'action=wCancel', displayText: '取消' } }
     ]
   };
-  return bubble(`要怎麼處理${petName}的 ${fmt(amount)} 公斤？最近一次 ${latestKg}kg`, { type: 'bubble', size: 'mega', header: header(`體重修改・${petName}`), body, footer });
+  return bubble(`要怎麼處理${petName}的 ${formatWeightKg(amount)} 公斤？最近一次 ${latestKg}kg`, { type: 'bubble', size: 'mega', header: header(`體重修改・${petName}`), body, footer });
 }
 
 // ---------- 體重：沒有既有紀錄可改時 ----------
@@ -435,7 +436,7 @@ export function weightNoRecordFlex({ pet, amount, keys }) {
     contents: [
       { type: 'box', layout: 'horizontal', contents: [tag('體重', CATEGORY_STYLE.weight)] },
       text(`${petName}還沒有可以修改的體重紀錄`, { size: 'lg', weight: 'bold', color: C.ink, margin: 'md', wrap: true }),
-      text(`要把 ${fmt(amount)}kg 記為今天的新體重嗎？`, { size: 'sm', color: C.inkSoft, margin: 'sm', wrap: true })
+      text(`要把 ${formatWeightKg(amount)}kg 記為今天的新體重嗎？`, { size: 'sm', color: C.inkSoft, margin: 'sm', wrap: true })
     ]
   };
   const footer = {
@@ -447,7 +448,7 @@ export function weightNoRecordFlex({ pet, amount, keys }) {
         action: { type: 'postback', label: '取消', data: 'action=wCancel', displayText: '取消' } }
     ]
   };
-  return bubble(`${petName}還沒有體重紀錄，要把 ${fmt(amount)}kg 記為今天的嗎？`, { type: 'bubble', size: 'mega', header: header(`體重・${petName}`), body, footer });
+  return bubble(`${petName}還沒有體重紀錄，要把 ${formatWeightKg(amount)}kg 記為今天的嗎？`, { type: 'bubble', size: 'mega', header: header(`體重・${petName}`), body, footer });
 }
 
 // ---------- 體重：新增成功卡（改重量／刪除這筆／開啟照護站）----------
@@ -457,7 +458,7 @@ export function weightAddedFlex({ pet, amount, logId, summary, date, siteUrl = '
     type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
     contents: [
       { type: 'box', layout: 'horizontal', contents: [tag('體重', CATEGORY_STYLE.weight)] },
-      text(`體重 ${fmt(amount)} kg`, { size: 'xl', weight: 'bold', color: C.ink, margin: 'md', wrap: true }),
+      text(`體重 ${formatWeightKg(amount)} kg`, { size: 'xl', weight: 'bold', color: C.ink, margin: 'md', wrap: true }),
       ...(summary ? [
         { type: 'separator', margin: 'lg', color: SEPARATOR },
         text('今日累積', { size: 'xs', color: C.muted, margin: 'lg', weight: 'bold' }),
@@ -480,7 +481,7 @@ export function weightAddedFlex({ pet, amount, logId, summary, date, siteUrl = '
         action: siteUrl ? { type: 'uri', label: '開啟照護站', uri: siteUrl } : { type: 'message', label: '開啟照護站', text: '照護站' } }
     ]
   };
-  return bubble(`已記錄・${petName} 體重 ${fmt(amount)} kg`, { type: 'bubble', size: 'mega', header: header(`已記錄・${petName}`), body, footer });
+  return bubble(`已記錄・${petName} 體重 ${formatWeightKg(amount)} kg`, { type: 'bubble', size: 'mega', header: header(`已記錄・${petName}`), body, footer });
 }
 
 // ---------- 體重：修改成功卡（再修改／開啟照護站）----------
@@ -492,7 +493,7 @@ export function weightModifiedFlex({ pet, oldKg, newKg, recordDate, logId, siteU
     contents: [
       { type: 'box', layout: 'horizontal', contents: [tag('已修改', CATEGORY_STYLE.weight)] },
       text(`已修改${petName}最近一次體重`, { size: 'md', weight: 'bold', color: C.ink, margin: 'md', wrap: true }),
-      text(`${fmt(oldKg)} kg → ${fmt(newKg)} kg`, { size: 'xl', weight: 'bold', color: C.olive, margin: 'sm', wrap: true }),
+      text(`${formatWeightKg(oldKg)} kg → ${formatWeightKg(newKg)} kg`, { size: 'xl', weight: 'bold', color: C.olive, margin: 'sm', wrap: true }),
       text(`紀錄日期：${dateLabel}`, { size: 'xs', color: C.muted, margin: 'sm' })
     ]
   };
@@ -505,7 +506,7 @@ export function weightModifiedFlex({ pet, oldKg, newKg, recordDate, logId, siteU
         action: siteUrl ? { type: 'uri', label: '開啟照護站', uri: siteUrl } : { type: 'message', label: '開啟照護站', text: '照護站' } }
     ]
   };
-  return bubble(`已修改${petName}最近一次體重 ${fmt(oldKg)}→${fmt(newKg)} kg`, { type: 'bubble', size: 'mega', header: header(`體重已修改・${petName}`), body, footer });
+  return bubble(`已修改${petName}最近一次體重 ${formatWeightKg(oldKg)}→${formatWeightKg(newKg)} kg`, { type: 'bubble', size: 'mega', header: header(`體重已修改・${petName}`), body, footer });
 }
 
 // ---------- 今日總結卡 ----------

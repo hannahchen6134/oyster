@@ -1483,7 +1483,7 @@
 
   <!-- 存成圖片給醫生：同源本地檔，執行時不連外 -->
   <script src="/html-to-image.js"></script>
-  <script type="module" src="/a4-report.js?v=20260805b"></script>
+  <script type="module" src="/a4-report.js?v=20260805c"></script>
   <script>
     'use strict';
     const TOKEN_KEY = 'cat-care-beta-token';
@@ -1535,6 +1535,13 @@
     }
     function fmtInt(value) {
       return String(Math.round(Number(value) || 0));
+    }
+    // 體重統一顯示規則（與 src/util.js formatWeightKg 相同）：最多兩位小數、移除尾端 0、不降精度。
+    // 體重是健康資料——4.27 必須顯示 4.27，不得 toFixed(1) 變 4.3。
+    function formatWeightKg(value) {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return '';
+      return String(Math.round(n * 100) / 100);
     }
     function shiftDate(dateStr, days) {
       const [y, m, d] = dateStr.split('-').map(Number);
@@ -2617,7 +2624,8 @@
       const W = 640, H = 120, padL = 34, padR = 10, padT = 12, padB = 20;
       const innerW = W - padL - padR, innerH = H - padT - padB;
       const nums = values.filter((v) => v != null);
-      const nf = (v) => decimals > 0 ? Number(v).toFixed(decimals) : fmtInt(v);
+      // decimals>0（體重用 2）：四捨五入到該位數但移除尾端多餘的 0（4.20→4.2、4→4、4.27→4.27），不冒充精度
+      const nf = (v) => { if (decimals > 0) { const f = 10 ** decimals; return String(Math.round(Number(v) * f) / f); } return fmtInt(v); };
       // 沒有資料：顯示空狀態＋（若有）記錄按鈕，不畫空圖
       if (!nums.length) {
         const empty = document.createElement('div');
@@ -3268,7 +3276,7 @@
         ],
         render: (row) => ({
           title: `${row.petName}（${row.species}）`,
-          sub: [row.breed, row.weightKg ? `${row.weightKg} kg` : '', row.chipNumber ? `晶片 ${row.chipNumber}` : '', row.conditionNote].filter(Boolean).join('｜') || '—'
+          sub: [row.breed, row.weightKg ? `${formatWeightKg(row.weightKg)} kg` : '', row.chipNumber ? `晶片 ${row.chipNumber}` : '', row.conditionNote].filter(Boolean).join('｜') || '—'
         })
       },
       foods: {
