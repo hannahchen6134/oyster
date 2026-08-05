@@ -2317,7 +2317,7 @@
         toast(quickSavedMsg(payload, now)); // 存後回讀：貓名・品項・數量・時間，晚上補記也看得到記成幾點
         await loadDay();
         if ($('recentFold') && $('recentFold').open) await loadRecent();
-        // 在「回顧」分頁就地記錄（例如趨勢圖上的記體重）→ 刷新趨勢圖與回診重點
+        // 若正在「回顧」分頁就地記錄 → 順手刷新趨勢圖與回診重點
         if ($('trendView') && !$('trendView').classList.contains('hidden')) await loadTrend();
         // 模糊食物（只選通用類型、沒對到品項）→ 紀錄成功後才非強迫詢問「存成常用嗎？」
         if (payload.category === 'food' && !payload.foodId) maybeOfferSaveFavorite(payload);
@@ -2766,14 +2766,14 @@
       });
       const container = $('trendCharts');
       container.innerHTML = '';
-      // 體重放最上面：稀疏量測點連線、min–max 軸才看得出變化；標題列附趨勢徽章＋「＋記體重」
+      // 體重放最上面：稀疏量測點連線、min–max 軸才看得出變化；標題列只附趨勢徽章（報告頁不放記錄按鈕）
       const wmap = new Map((state.weights || []).map((w) => [w.date, Number(w.amount)]).filter(([, v]) => v > 0));
       const wValues = dates.map((d) => (wmap.has(d) ? wmap.get(d) : null));
       container.appendChild(lineChart({
         title: '體重', unit: 'kg', color: '#734921', dates, values: wValues,
         sparse: true, decimals: 2, yFrom: 'auto',
-        headerExtra: `${deltaBadge(wValues, true)}<button type="button" class="chart-add" data-quick-weight="1">＋記體重</button>`,
-        emptyHint: '還沒有體重紀錄，點右上角「＋記體重」加第一筆（之後就會畫出變化）'
+        headerExtra: `${deltaBadge(wValues, true)}`,
+        emptyHint: '目前尚無體重紀錄（可於設定或用 LINE 補一筆，之後就會畫出變化）'
       }));
       if (!rows.length) return;
       const waterVals = series((row) => row.totalWaterMl);
@@ -4240,11 +4240,6 @@
         state.foods = (await api('foods')).rows;
         state.meds = (await api(`meds?petId=${state.petId}`)).rows;
         return openLogModal(null);
-      }
-
-      // 趨勢圖上的「＋記體重」：就地記一筆體重，記完會回頭刷新趨勢圖
-      if (event.target.closest('[data-quick-weight]')) {
-        return openQuickPad('weight');
       }
 
       const editBtn = event.target.closest('[data-edit]');
