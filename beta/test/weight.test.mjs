@@ -18,7 +18,7 @@ import {
   applyWeightModify, applyWeightAddToday, handleWeightModify, showWeightModifyConfirm, applyUndo
 } from '../src/index.js';
 import { formatWeightKg } from '../src/util.js';
-import { weightAddedFlex, weightModifyConfirmFlex } from '../src/flex.js';
+import { weightAddedFlex, weightModifyConfirmFlex, weightNoRecordFlex } from '../src/flex.js';
 import { buildA4Report } from '../public/a4-report.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -311,7 +311,7 @@ test('明確修改確認卡（allowAddNew:false）：只有「改成 Xkg／取�
   assert.ok(s.includes('取消'), '要有 取消');
   assert.ok(!s.includes('記為今天的新體重'), '明確修改不得有 記為今天的新體重');
   // 只有兩個 postback 動作（改成／取消）
-  const acts = (card.contents.footer.contents || []).filter((b) => b.type === 'button');
+  const acts = (card.contents.footer.contents || []).filter((b) => b.action);
   assert.equal(acts.length, 2, '明確修改卡只有兩顆按鈕');
 });
 
@@ -319,7 +319,7 @@ test('模糊語意確認卡（allowAddNew:true）：提供三選一（含記為�
   const card = weightModifyConfirmFlex({ pet: { petName: '蚵仔' }, amount: 4.28, latest: { amount: 4.27, eventDateTime: '2026-08-01 07:44' }, keys: 'amt=4.28', allowAddNew: true });
   const s = JSON.stringify(card);
   assert.ok(s.includes('改成 4.28kg') && s.includes('記為今天的新體重') && s.includes('取消'), '模糊時三選一');
-  const acts = (card.contents.footer.contents || []).filter((b) => b.type === 'button');
+  const acts = (card.contents.footer.contents || []).filter((b) => b.action);
   assert.equal(acts.length, 3, '模糊卡三顆按鈕');
 });
 
@@ -461,4 +461,55 @@ test('不同值 4.28→4.29 正常更新；重複點同一確認卡（已是 4.2
   assert.equal(r2.unchanged, true);
   assert.equal((await getLog(db, w.logId)).updatedAt, afterFirst.updatedAt, '第二次點不動 updatedAt');
   assert.equal(db.prepare("SELECT COUNT(*) c FROM logs WHERE category='weight' AND isDeleted=0").bind().first().c, 1, '仍只有一筆');
+});
+
+// ── 確認卡按鈕可見性：主鈕文字清楚置中、取消足夠對比、label 非空、綁定正確 log/值 ──────
+// 取確認卡 footer 的每顆按鈕：可見文字＝內層 text.text；顏色/背景/對齊/postback data
+function btnsOf(card) {
+  return (card.contents.footer.contents || []).map((b) => ({
+    visible: (b.contents && b.contents[0] && b.contents[0].text) || '',
+    color: b.contents && b.contents[0] && b.contents[0].color,
+    align: b.contents && b.contents[0] && b.contents[0].align,
+    bg: b.backgroundColor,
+    data: b.action && b.action.data,
+    label: b.action && b.action.label
+  }));
+}
+
+test('確認卡按鈕：主鈕顯示「改成 4.28kg」白字置中、取消深色可見；所有 label 非空', () => {
+  const card = weightModifyConfirmFlex({ pet: { petName: '蚵仔' }, amount: 4.28, latest: { amount: 4.29, eventDateTime: '2026-08-06 07:44' }, keys: 'logId=L1&old=4.29&amt=4.28&petId=p1&smid=m1', allowAddNew: false });
+  const btns = btnsOf(card);
+  const primary = btns[0], cancel = btns[btns.length - 1];
+  // 主鈕：可見文字非空、置中、白字、棕底（高對比）
+  assert.equal(primary.visible, '改成 4.28kg');
+  assert.equal(primary.align, 'center');
+  assert.equal(primary.color, '#FFFFFF');
+  assert.equal(primary.bg, '#734921');
+  // 取消：可見文字非空、深色（非過淡的沙灰 #9A8B7A）
+  assert.equal(cancel.visible, '取消');
+  assert.notEqual(cancel.color, '#9A8B7A');
+  assert.equal(cancel.color, '#5C4A38');
+  // 所有按鈕可見文字與 action.label 皆非空
+  for (const b of btns) { assert.ok(b.visible && b.visible.trim(), '可見文字非空'); assert.ok(b.label && b.label.trim(), 'action.label 非空'); }
+  // postback 綁定正確 log 與新值
+  assert.ok(primary.data.includes('action=wMod') && primary.data.includes('logId=L1') && primary.data.includes('amt=4.28'), '主鈕綁定原 log 與 4.28');
+});
+
+test('確認卡按鈕：不同數值都正確——4.28→4.29 主鈕顯示「改成 4.29kg」、4.275 也可容納', () => {
+  const c1 = weightModifyConfirmFlex({ pet: { petName: '蚵仔' }, amount: 4.29, latest: { amount: 4.28, eventDateTime: '2026-08-06 07:44' }, keys: 'logId=L2&amt=4.29', allowAddNew: false });
+  assert.equal(btnsOf(c1)[0].visible, '改成 4.29kg');
+  const c2 = weightModifyConfirmFlex({ pet: { petName: '蚵仔' }, amount: 12.5, latest: { amount: 4.2, eventDateTime: '2026-08-06 07:44' }, keys: 'logId=L3&amt=12.5', allowAddNew: false });
+  assert.equal(btnsOf(c2)[0].visible, '改成 12.5kg'); // 寬數字也完整顯示（不截斷）
+  assert.equal(btnsOf(c2)[0].bg, '#734921'); // 仍是實心棕底
+});
+
+test('確認卡按鈕：Flex JSON 無任何空 label（主鈕與取消都有可見文字）', () => {
+  for (const allowAddNew of [false, true]) {
+    const card = weightModifyConfirmFlex({ pet: { petName: '蚵仔' }, amount: 4.28, latest: { amount: 4.29, eventDateTime: '2026-08-01 07:44' }, keys: 'logId=L1&amt=4.28', allowAddNew });
+    for (const b of btnsOf(card)) assert.ok(b.visible && b.visible.trim(), `allowAddNew=${allowAddNew} 每顆鈕可見文字非空`);
+  }
+  // 無既有紀錄卡也一樣
+  for (const b of btnsOf(weightNoRecordFlex({ pet: { petName: '蚵仔' }, amount: 4.28, keys: 'amt=4.28' }))) {
+    assert.ok(b.visible && b.visible.trim(), '無紀錄卡每顆鈕可見文字非空');
+  }
 });

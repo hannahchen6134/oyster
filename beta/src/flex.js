@@ -173,6 +173,27 @@ function bubble(altText, contents) {
   return { type: 'flex', altText: altText.slice(0, 390), contents };
 }
 
+// 自繪動作鈕：用 box＋置中 text 而非 style:primary 的 button——文字顏色與置中完全可控，
+// 避免某些 LINE 版本對 primary 鈕自動上色時把含「空格＋數字」的 label（如「改成 4.28kg」）
+// 渲染成看不見。box 的 action 帶 postback（label 非空、供無障礙/displayText），可見字來自內層 text。
+function solidActionBtn(label, data, { bg = C.brand, fg = '#FFFFFF' } = {}) {
+  return {
+    type: 'box', layout: 'vertical', backgroundColor: bg, cornerRadius: '8px',
+    paddingTop: '11px', paddingBottom: '11px', paddingStart: '12px', paddingEnd: '12px',
+    action: { type: 'postback', label: String(label || ' '), data, displayText: String(label || ' ') },
+    contents: [text(label, { color: fg, weight: 'bold', size: 'md', align: 'center', wrap: false })]
+  };
+}
+function outlineActionBtn(label, data, { fg = C.inkSoft, border = '#D9CBB6' } = {}) {
+  return {
+    type: 'box', layout: 'vertical', backgroundColor: '#FFFFFF', cornerRadius: '8px',
+    borderColor: border, borderWidth: '1px',
+    paddingTop: '11px', paddingBottom: '11px', paddingStart: '12px', paddingEnd: '12px',
+    action: { type: 'postback', label: String(label || ' '), data, displayText: String(label || ' ') },
+    contents: [text(label, { color: fg, weight: 'bold', size: 'md', align: 'center', wrap: false })]
+  };
+}
+
 // ---------- 記錄確認卡 ----------
 export function recordFlex({ pet, categoryKey, mainText, subText, summary, date, logId, hints = [], title = '', tip = '', siteUrl = '', warnNoKcal = false, foodType = '', estimated = false, estKcalPerG = 0, addedWaterMl = 0, undoData = '', undoCount = 1 }) {
   const style = CATEGORY_STYLE[categoryKey] || CATEGORY_STYLE.note;
@@ -417,16 +438,16 @@ export function weightModifyConfirmFlex({ pet, amount, latest, keys, allowAddNew
         ] }
     ]
   };
+  const modLabel = `改成 ${formatWeightKg(amount)}kg`;
   const footer = {
     type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: '12px', backgroundColor: FOOTER_COLOR,
     contents: [
-      { type: 'button', height: 'sm', style: 'primary', color: C.brand,
-        action: { type: 'postback', label: `改成 ${formatWeightKg(amount)}kg`, data: `action=wMod&${keys}`, displayText: `改成 ${formatWeightKg(amount)}kg` } },
+      // 主鈕（自繪 box，保證「改成 4.28kg」置中白字清楚可見）
+      solidActionBtn(modLabel, `action=wMod&${keys}`),
       // 只有模糊語意（且最近一筆非今天）才給「記為今天的新體重」；明確「改」不顯示，杜絕同日重複
-      ...(allowAddNew ? [{ type: 'button', height: 'sm', style: 'link', color: C.brand,
-        action: { type: 'postback', label: '記為今天的新體重', data: `action=wAdd&${keys}`, displayText: '記為今天的新體重' } }] : []),
-      { type: 'button', height: 'sm', style: 'link', color: C.muted,
-        action: { type: 'postback', label: '取消', data: 'action=wCancel', displayText: '取消' } }
+      ...(allowAddNew ? [outlineActionBtn('記為今天的新體重', `action=wAdd&${keys}`, { fg: C.brand })] : []),
+      // 取消（自繪 box，深色文字足夠對比，不再過淡）
+      outlineActionBtn('取消', 'action=wCancel')
     ]
   };
   return bubble(`${title}最近一次 ${latestKg}kg`, { type: 'bubble', size: 'mega', header: header(`體重修改・${petName}`), body, footer });
@@ -446,10 +467,8 @@ export function weightNoRecordFlex({ pet, amount, keys }) {
   const footer = {
     type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: '12px', backgroundColor: FOOTER_COLOR,
     contents: [
-      { type: 'button', height: 'sm', style: 'primary', color: C.brand,
-        action: { type: 'postback', label: '記為今天體重', data: `action=wAdd&${keys}`, displayText: '記為今天體重' } },
-      { type: 'button', height: 'sm', style: 'link', color: C.muted,
-        action: { type: 'postback', label: '取消', data: 'action=wCancel', displayText: '取消' } }
+      solidActionBtn('記為今天體重', `action=wAdd&${keys}`),
+      outlineActionBtn('取消', 'action=wCancel')
     ]
   };
   return bubble(`${petName}還沒有體重紀錄，要把 ${formatWeightKg(amount)}kg 記為今天的嗎？`, { type: 'bubble', size: 'mega', header: header(`體重・${petName}`), body, footer });
