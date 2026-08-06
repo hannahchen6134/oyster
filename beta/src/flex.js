@@ -396,17 +396,20 @@ export function undoConfirmFlex({ pet, lines = [], undoKey = '', count = 1 }) {
 }
 
 // ---------- 體重：修改確認卡 ----------
-// 「炭吉改6公斤」不直接動資料，先問清楚：改最近一筆、還是記為今天新的。keys 帶 logId／old／amt／smid，
-// 讓確認鈕的行為冪等（重複點不會改兩次或多記一筆）。
-export function weightModifyConfirmFlex({ pet, amount, latest, keys }) {
+// 明確修改語意（改／改成／修正…）＝allowAddNew:false → 只給「改成 Xkg／取消」，不給「記為今天的新體重」，
+// 避免同一天因修錯字多記一筆。只有語意模糊、且最近一筆非今天時（allowAddNew:true）才提供三選一。
+// keys 帶 logId／old／amt／smid，讓確認鈕的行為冪等（重複點不會改兩次或多記一筆）。
+export function weightModifyConfirmFlex({ pet, amount, latest, keys, allowAddNew = false }) {
   const petName = pet?.petName || '貓貓';
   const latestDate = String(latest?.eventDateTime || '').slice(0, 10).replace(/-/g, '/');
   const latestKg = formatWeightKg(latest?.amount);
+  // 明確修改：標題直接寫「改成」；模糊二選一：問「要怎麼處理」
+  const title = allowAddNew ? `要怎麼處理${petName}的 ${formatWeightKg(amount)} 公斤？` : `把${petName}最近一次體重改成 ${formatWeightKg(amount)} kg？`;
   const body = {
     type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
     contents: [
       { type: 'box', layout: 'horizontal', contents: [tag('要確認一下', CATEGORY_STYLE.weight)] },
-      text(`要怎麼處理${petName}的 ${formatWeightKg(amount)} 公斤？`, { size: 'lg', weight: 'bold', color: C.ink, margin: 'md', wrap: true }),
+      text(title, { size: 'lg', weight: 'bold', color: C.ink, margin: 'md', wrap: true }),
       { type: 'box', layout: 'vertical', backgroundColor: C.tint, cornerRadius: '10px', paddingAll: '12px', margin: 'md', spacing: 'xs',
         contents: [
           text('最近一次體重', { size: 'xs', color: C.muted }),
@@ -419,13 +422,14 @@ export function weightModifyConfirmFlex({ pet, amount, latest, keys }) {
     contents: [
       { type: 'button', height: 'sm', style: 'primary', color: C.brand,
         action: { type: 'postback', label: `改成 ${formatWeightKg(amount)}kg`, data: `action=wMod&${keys}`, displayText: `改成 ${formatWeightKg(amount)}kg` } },
-      { type: 'button', height: 'sm', style: 'link', color: C.brand,
-        action: { type: 'postback', label: '記為今天的新體重', data: `action=wAdd&${keys}`, displayText: '記為今天的新體重' } },
+      // 只有模糊語意（且最近一筆非今天）才給「記為今天的新體重」；明確「改」不顯示，杜絕同日重複
+      ...(allowAddNew ? [{ type: 'button', height: 'sm', style: 'link', color: C.brand,
+        action: { type: 'postback', label: '記為今天的新體重', data: `action=wAdd&${keys}`, displayText: '記為今天的新體重' } }] : []),
       { type: 'button', height: 'sm', style: 'link', color: C.muted,
         action: { type: 'postback', label: '取消', data: 'action=wCancel', displayText: '取消' } }
     ]
   };
-  return bubble(`要怎麼處理${petName}的 ${formatWeightKg(amount)} 公斤？最近一次 ${latestKg}kg`, { type: 'bubble', size: 'mega', header: header(`體重修改・${petName}`), body, footer });
+  return bubble(`${title}最近一次 ${latestKg}kg`, { type: 'bubble', size: 'mega', header: header(`體重修改・${petName}`), body, footer });
 }
 
 // ---------- 體重：沒有既有紀錄可改時 ----------

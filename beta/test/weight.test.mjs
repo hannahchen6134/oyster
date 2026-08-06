@@ -33,15 +33,17 @@ class Stmt {
 }
 class D1 { constructor() { this.sdb = new DatabaseSync(':memory:'); this.sdb.exec(SCHEMA); } prepare(s) { return new Stmt(this.sdb, s); } }
 
-// LINE API 靜默＋擷取送出的卡片（altText）供「顯示哪張卡」斷言
+// LINE API 靜默＋擷取送出的訊息：sentAlt＝altText/text（看哪張卡）、sentJson＝整包（看按鈕標籤）
 let sentAlt = [];
+let sentJson = '';
 globalThis.fetch = async (url, opts) => {
   try {
     const body = JSON.parse(opts?.body || '{}');
-    for (const m of body.messages || []) sentAlt.push(m.altText || m.text || '');
+    for (const m of body.messages || []) { sentAlt.push(m.altText || m.text || ''); sentJson += JSON.stringify(m); }
   } catch { /* ignore */ }
   return { ok: true, status: 200, json: async () => ({}), text: async () => '' };
 };
+const resetSent = () => { sentAlt = []; sentJson = ''; };
 
 function seed({ multi = false } = {}) {
   const db = new D1();
@@ -103,23 +105,24 @@ test('罐頭改6g 不得誤判成體重（維持食物流程）；乾糧2公斤 
 test('多貓＋「改6公斤」無指定貓 → 先選貓（不直接動資料）', async () => {
   const db = seed({ multi: true }); env.DB = db;
   await addWeight(db, 'p1', 5.8, '2026-08-03 09:00');
-  sentAlt = [];
+  resetSent();
   await handleWeightModify(env, mkEvent(), { db, pet: await getPet(db, 'p1'), pets: [await getPet(db, 'p1'), await getPet(db, 'p2')], explicitPet: false, amount: 6, lineUserId: 'u1', ownerId: 'u1', smid: 'm1', baseUrl: '' });
   assert.ok(sentAlt.some((t) => t.includes('要修改哪隻貓')), `應請先選貓，實得 ${JSON.stringify(sentAlt)}`);
   // 沒有新增任何體重、也沒改動
   const n = db.prepare("SELECT COUNT(*) c FROM logs WHERE category='weight'").bind().first().c;
   assert.equal(n, 1);
 });
-test('單貓＋「改6公斤」→ 顯示修改確認卡（有既有體重）', async () => {
+test('單貓＋明確「改6公斤」→ 修改確認卡（含最近體重），且不提供「記為今天的新體重」', async () => {
   const db = seed(); env.DB = db;
   await addWeight(db, 'p1', 5.8, '2026-08-03 09:00');
-  sentAlt = [];
+  resetSent();
   await handleWeightModify(env, mkEvent(), { db, pet: await getPet(db, 'p1'), pets: [await getPet(db, 'p1')], explicitPet: false, amount: 6, lineUserId: 'u1', ownerId: 'u1', smid: 'm1', baseUrl: '' });
-  assert.ok(sentAlt.some((t) => t.includes('要怎麼處理') && t.includes('5.8')), `應顯示確認卡含最近體重，實得 ${JSON.stringify(sentAlt)}`);
+  assert.ok(sentAlt.some((t) => t.includes('改成 6') && t.includes('5.8')), `應顯示改成 6、含最近體重，實得 ${JSON.stringify(sentAlt)}`);
+  assert.ok(!sentJson.includes('記為今天的新體重'), `明確修改不得出現「記為今天的新體重」，實得 `);
 });
 test('沒有既有體重時「改6公斤」→ 詢問是否記為今天（不假裝修改成功）', async () => {
   const db = seed(); env.DB = db;
-  sentAlt = [];
+  resetSent();
   await showWeightModifyConfirm(env, mkEvent(), { db, pet: await getPet(db, 'p1'), amount: 6, smid: 'm1' });
   assert.ok(sentAlt.some((t) => t.includes('還沒有體重紀錄') && t.includes('記為今天')), `應詢問是否新增，實得 ${JSON.stringify(sentAlt)}`);
 });
@@ -296,4 +299,51 @@ test('修改成 4.27 後不得變 4.3；刪除最新後回退值也保留兩位�
   await resyncPetWeight(db, 'p1');
   assert.equal((await getPet(db, 'p1')).weightKg, 4.05, '回退值保留 4.05');
   assert.equal(formatWeightKg((await getPet(db, 'p1')).weightKg), '4.05');
+});
+
+// ── 確認卡簡化：明確「改」＝兩鈕、模糊才三選一、同日護欄收回新增（產品調整）──────
+import { taipeiToday } from '../src/util.js';
+
+test('明確修改確認卡（allowAddNew:false）：只有「改成 Xkg／取消」，無「記為今天的新體重」', () => {
+  const card = weightModifyConfirmFlex({ pet: { petName: '蚵仔' }, amount: 4.28, latest: { amount: 4.27, eventDateTime: '2026-08-06 07:44' }, keys: 'amt=4.28', allowAddNew: false });
+  const s = JSON.stringify(card);
+  assert.ok(s.includes('改成 4.28kg'), '要有 改成 4.28kg');
+  assert.ok(s.includes('取消'), '要有 取消');
+  assert.ok(!s.includes('記為今天的新體重'), '明確修改不得有 記為今天的新體重');
+  // 只有兩個 postback 動作（改成／取消）
+  const acts = (card.contents.footer.contents || []).filter((b) => b.type === 'button');
+  assert.equal(acts.length, 2, '明確修改卡只有兩顆按鈕');
+});
+
+test('模糊語意確認卡（allowAddNew:true）：提供三選一（含記為今天的新體重）', () => {
+  const card = weightModifyConfirmFlex({ pet: { petName: '蚵仔' }, amount: 4.28, latest: { amount: 4.27, eventDateTime: '2026-08-01 07:44' }, keys: 'amt=4.28', allowAddNew: true });
+  const s = JSON.stringify(card);
+  assert.ok(s.includes('改成 4.28kg') && s.includes('記為今天的新體重') && s.includes('取消'), '模糊時三選一');
+  const acts = (card.contents.footer.contents || []).filter((b) => b.type === 'button');
+  assert.equal(acts.length, 3, '模糊卡三顆按鈕');
+});
+
+test('showWeightModifyConfirm：明確修改（ambiguous 預設 false）→ 卡片無「記為今天的新體重」', async () => {
+  const db = seed(); env.DB = db;
+  await addWeight(db, 'p1', 4.27, `${taipeiToday()} 07:44`); // 最近一筆就是今天
+  resetSent();
+  await showWeightModifyConfirm(env, mkEvent(), { db, pet: await getPet(db, 'p1'), amount: 4.28, smid: 'm1' });
+  assert.ok(sentAlt.some((t) => t.includes('改成 4.28')), '要問改成 4.28');
+  assert.ok(!sentJson.includes('記為今天的新體重'), '不得出現記為今天的新體重');
+});
+
+test('同日護欄：即使 ambiguous:true，最近一筆是今天 → 仍收回「記為今天的新體重」', async () => {
+  const db = seed(); env.DB = db;
+  await addWeight(db, 'p1', 4.27, `${taipeiToday()} 07:44`);
+  resetSent();
+  await showWeightModifyConfirm(env, mkEvent(), { db, pet: await getPet(db, 'p1'), amount: 4.28, smid: 'm1', ambiguous: true });
+  assert.ok(!sentJson.includes('記為今天的新體重'), '同日不得提供新增選項（避免重複）');
+});
+
+test('模糊且最近一筆非今天：ambiguous:true → 提供「記為今天的新體重」', async () => {
+  const db = seed(); env.DB = db;
+  await addWeight(db, 'p1', 4.27, '2026-08-01 07:44'); // 舊日期
+  resetSent();
+  await showWeightModifyConfirm(env, mkEvent(), { db, pet: await getPet(db, 'p1'), amount: 4.28, smid: 'm1', ambiguous: true });
+  assert.ok(sentJson.includes('記為今天的新體重'), '模糊且非今天時應提供新增選項');
 });

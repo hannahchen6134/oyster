@@ -2665,8 +2665,11 @@ export async function handleWeightModify(env, event, { db, pet, pets, explicitPe
   await showWeightModifyConfirm(env, event, { db, pet, amount, smid });
 }
 
-// 顯示體重修改確認卡：有既有體重→問「改最近一筆／記為今天」；沒有→問是否記為今天（規格一、二）。
-export async function showWeightModifyConfirm(env, event, { db, pet, amount, smid }) {
+// 顯示體重修改確認卡。
+//  - 沒有既有體重 → 問是否記為今天（規格二）。
+//  - 明確修改語意（ambiguous=false，預設）→ 只給「改成 Xkg／取消」，不給新增（規格一、四）。
+//  - 語意模糊（ambiguous=true）且最近一筆非今天 → 才給三選一；最近一筆是今天則收回新增選項（同日護欄）。
+export async function showWeightModifyConfirm(env, event, { db, pet, amount, smid, ambiguous = false }) {
   const latest = await getLatestWeightLog(db, pet.petId);
   const smidEnc = encodeURIComponent(smid || '');
   if (!latest) {
@@ -2675,9 +2678,13 @@ export async function showWeightModifyConfirm(env, event, { db, pet, amount, smi
       `${pet.petName}還沒有可以修改的體重紀錄，要把 ${formatWeightKg(amount)}kg 記為今天的新體重嗎？`);
     return;
   }
+  const latestIsToday = String(latest.eventDateTime).slice(0, 10) === taipeiToday();
+  const allowAddNew = ambiguous && !latestIsToday; // 明確修改一律 false；模糊但最近一筆是今天也 false（不製造同日重複）
   const keys = `logId=${latest.logId}&old=${latest.amount}&amt=${amount}&petId=${pet.petId}&smid=${smidEnc}`;
-  await replyOrPushFlex(env, event, weightModifyConfirmFlex({ pet, amount, latest, keys }),
-    `要怎麼處理${pet.petName}的 ${formatWeightKg(amount)} 公斤？最近一次 ${formatWeightKg(latest.amount)}kg（${String(latest.eventDateTime).slice(0, 10)}）。回覆選擇「改成 ${formatWeightKg(amount)}kg／記為今天的新體重／取消」。`);
+  const fallback = allowAddNew
+    ? `要怎麼處理${pet.petName}的 ${formatWeightKg(amount)} 公斤？最近一次 ${formatWeightKg(latest.amount)}kg（${String(latest.eventDateTime).slice(0, 10)}）。回覆「改成 ${formatWeightKg(amount)}kg／記為今天的新體重／取消」。`
+    : `把${pet.petName}最近一次體重（${formatWeightKg(latest.amount)}kg）改成 ${formatWeightKg(amount)}kg？回覆「改成 ${formatWeightKg(amount)}kg／取消」。`;
+  await replyOrPushFlex(env, event, weightModifyConfirmFlex({ pet, amount, latest, keys, allowAddNew }), fallback);
 }
 
 async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
