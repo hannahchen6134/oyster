@@ -27,7 +27,7 @@ import {
   recordTutorial, medTutorial, onboardingText, recordPrompt, backfillGuide
 } from './replies.js';
 import { getRecentLogsByPet, ensureTaskSchema, getLogsForDay, logTextInput } from './db.js';
-import { jsonResponse, taipeiToday, taipeiNowDateTime, addDays, formatWeightKg } from './util.js';
+import { jsonResponse, taipeiToday, taipeiNowDateTime, addDays, formatWeightKg, weightEquals } from './util.js';
 
 // 官方 LINE 加好友連結（basicId @232mjffx）——給共同照護邀請用
 const LINE_ADD_URL = 'https://line.me/R/ti/p/@232mjffx';
@@ -785,21 +785,16 @@ async function handlePending(env, event, { db, user, pet, pets, lineUserId, owne
     const m = text.match(/^([0-9]+(?:\.[0-9]+)?)\s*(?:kg|公斤)?$/i);
     if (!m) { await clear(); return false; }
     await clear();
-    const log = await getLog(db, logId);
-    if (!log || log.lineUserId !== ownerId || log.isDeleted || log.category !== 'weight') {
-      await replyOrPush(env, event, '找不到那筆體重紀錄了。');
-      return true;
-    }
-    const oldKg = log.amount;
     const newAmount = Number(m[1]);
-    await updateLog(db, logId, { amount: newAmount }, lineUserId);
-    await recomputeDay(db, log.petId, String(log.eventDateTime).slice(0, 10));
-    await resyncPetWeight(db, log.petId);
-    const cardPet = await getPet(db, log.petId);
+    // 沿用 applyWeightModify（含相同值護欄）：相同值不更新、不動 updatedAt，只回讀
+    const res = await applyWeightModify(db, { logId, amount: newAmount, ownerId, actorId: lineUserId });
+    if (!res.ok) { await replyOrPush(env, event, res.reason === 'bad_amount' ? '體重數字看起來怪怪的，請重新輸入一次。' : '找不到那筆體重紀錄了。'); return true; }
+    if (res.unchanged) { await replyOrPush(env, event, `這筆體重已經是 ${formatWeightKg(res.newKg)}kg。`); return true; }
+    const cardPet = await getPet(db, res.log.petId);
     const site = await siteLink(env, baseUrl, lineUserId);
     await replyOrPushFlex(env, event,
-      weightModifiedFlex({ pet: cardPet, oldKg, newKg: newAmount, recordDate: log.eventDateTime, logId: log.logId, siteUrl: site }),
-      `已修改${cardPet?.petName || '貓貓'}最近一次體重 ${formatWeightKg(oldKg)} → ${formatWeightKg(newAmount)} kg`);
+      weightModifiedFlex({ pet: cardPet, oldKg: res.oldKg, newKg: res.newKg, recordDate: res.log.eventDateTime, logId: res.log.logId, siteUrl: site }),
+      `已修改${cardPet?.petName || '貓貓'}最近一次體重 ${formatWeightKg(res.oldKg)} → ${formatWeightKg(res.newKg)} kg`);
     return true;
   }
 
@@ -1297,6 +1292,11 @@ async function handlePostback(event, env, baseUrl) {
     const res = await applyWeightModify(db, { logId: data.get('logId') || '', amount: Number(data.get('amt')) || 0, ownerId, actorId: lineUserId });
     if (!res.ok) {
       await replyOrPush(env, event, res.reason === 'bad_amount' ? '體重數字看起來怪怪的，請重新輸入一次。' : '找不到可以修改的體重紀錄了，可能已被刪除。');
+      return;
+    }
+    // 重複點同一張確認卡、資料已是該值 → 不再更新、不動 updatedAt，只回讀（冪等）
+    if (res.unchanged) {
+      await replyOrPush(env, event, `這筆體重已經是 ${formatWeightKg(res.newKg)}kg。`);
       return;
     }
     // 規格五：補記修改結果（沿用同一 sourceMessageId 串起 raw→結果）
@@ -2628,6 +2628,8 @@ export async function applyWeightModify(db, { logId, amount, ownerId, actorId })
   if (!log || log.lineUserId !== ownerId || log.isDeleted || log.category !== 'weight') return { ok: false, reason: 'not_found' };
   if (!(Number(amount) > 0)) return { ok: false, reason: 'bad_amount' };
   const oldKg = log.amount;
+  // 冪等／相同值：目標值與現值相同（標準化）→ 不重複更新、不動 updatedAt、不 resync
+  if (weightEquals(oldKg, amount)) return { ok: true, unchanged: true, log, oldKg, newKg: Number(amount) };
   await updateLog(db, log.logId, { amount: Number(amount) }, actorId || ownerId);
   await recomputeDay(db, log.petId, String(log.eventDateTime).slice(0, 10));
   await resyncPetWeight(db, log.petId); // 改舊紀錄時，目前體重仍取真正最新那筆
@@ -2676,6 +2678,11 @@ export async function showWeightModifyConfirm(env, event, { db, pet, amount, smi
     const keys = `amt=${amount}&petId=${pet.petId}&smid=${smidEnc}`;
     await replyOrPushFlex(env, event, weightNoRecordFlex({ pet, amount, keys }),
       `${pet.petName}還沒有可以修改的體重紀錄，要把 ${formatWeightKg(amount)}kg 記為今天的新體重嗎？`);
+    return;
+  }
+  // 相同值護欄：新值與最近一筆相同（標準化比較）→ 無效修改，不進確認、不動 log/updatedAt/pets、不 resync
+  if (weightEquals(latest.amount, amount)) {
+    await replyOrPush(env, event, `${pet.petName}最近一次體重已經是 ${formatWeightKg(latest.amount)}kg，不需要修改。`);
     return;
   }
   const latestIsToday = String(latest.eventDateTime).slice(0, 10) === taipeiToday();

@@ -11,6 +11,14 @@ export function formatWeightKg(value) {
   return String(Math.round(n * 100) / 100); // 例：4→"4"、4.2→"4.2"、4.20→"4.2"、4.27→"4.27"、4.25→"4.25"
 }
 
+// 體重相等比較（標準化到兩位小數）：4.2 與 4.20 相同、4.27 與 4.270 相同，不因字串格式誤判。
+// 用於「相同值不需修改」護欄與確認鈕冪等（避免無效修改、不動 updatedAt）。
+export function weightEquals(a, b) {
+  const x = Number(a), y = Number(b);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+  return Math.round(x * 100) === Math.round(y * 100);
+}
+
 function pad2(value) {
   return String(value).padStart(2, '0');
 }

@@ -402,3 +402,63 @@ test('自然語意修改：精度 4.28 保留、確認卡只有「改成／取�
   assert.equal((await getLog(db, w.logId)).amount, 4.28);
   assert.equal(db.prepare("SELECT COUNT(*) c FROM logs WHERE category='weight' AND isDeleted=0").bind().first().c, 1, '不新增第二筆');
 });
+
+// ── 相同值護欄：無效修改不進確認、不動資料；確認鈕冪等 ─────────────────────
+import { weightEquals } from '../src/util.js';
+
+test('weightEquals：4.2≡4.20、4.27≡4.270、4.28≠4.29（標準化比較）', () => {
+  assert.equal(weightEquals(4.2, 4.20), true);
+  assert.equal(weightEquals(4.27, 4.270), true);
+  assert.equal(weightEquals('4.2', 4.2), true);
+  assert.equal(weightEquals(4.28, 4.29), false);
+});
+
+test('相同值：最近一次已是 4.28，輸入改 4.28 → 不進確認卡、不動 log/pets、回「已經是」', async () => {
+  const db = seed(); env.DB = db;
+  const w = await addWeight(db, 'p1', 4.28, '2026-08-06 07:44');
+  await resyncPetWeight(db, 'p1');
+  const before = await getLog(db, w.logId);
+  resetSent();
+  await showWeightModifyConfirm(env, mkEvent(), { db, pet: await getPet(db, 'p1'), amount: 4.28, smid: 'm1' });
+  assert.ok(sentAlt.some((t) => t.includes('已經是 4.28kg') && t.includes('不需要修改')), `應回「已經是 4.28kg，不需要修改」，實得 ${JSON.stringify(sentAlt)}`);
+  assert.ok(!sentJson.includes('改成 4.28kg'), '不得出現確認卡');
+  const after = await getLog(db, w.logId);
+  assert.equal(after.amount, 4.28);
+  assert.equal(after.updatedAt, before.updatedAt, 'updatedAt 不變（沒有寫入）');
+  assert.equal(db.prepare("SELECT COUNT(*) c FROM logs WHERE category='weight' AND isDeleted=0").bind().first().c, 1, '不新增');
+});
+
+test('相同值標準化：最近 4.2，輸入改 4.20 → 視為相同、不需修改', async () => {
+  const db = seed(); env.DB = db;
+  await addWeight(db, 'p1', 4.2, '2026-08-06 07:44');
+  resetSent();
+  await showWeightModifyConfirm(env, mkEvent(), { db, pet: await getPet(db, 'p1'), amount: 4.20, smid: 'm1' });
+  assert.ok(sentAlt.some((t) => t.includes('已經是 4.2kg')), `4.2≡4.20 應視為相同，實得 ${JSON.stringify(sentAlt)}`);
+});
+
+test('applyWeightModify：相同值 → { unchanged:true }，不動 updatedAt、不新增', async () => {
+  const db = seed(); env.DB = db;
+  const w = await addWeight(db, 'p1', 4.29, '2026-08-06 07:44');
+  const before = await getLog(db, w.logId);
+  const res = await applyWeightModify(db, { logId: w.logId, amount: 4.29, ownerId: 'u1', actorId: 'u1' });
+  assert.equal(res.ok, true); assert.equal(res.unchanged, true);
+  const after = await getLog(db, w.logId);
+  assert.equal(after.updatedAt, before.updatedAt, 'updatedAt 不變');
+  assert.equal(db.prepare("SELECT COUNT(*) c FROM logs WHERE category='weight' AND isDeleted=0").bind().first().c, 1);
+});
+
+test('不同值 4.28→4.29 正常更新；重複點同一確認卡（已是 4.29）→ 不再更新、回冪等訊息', async () => {
+  const db = seed(); env.DB = db;
+  const w = await addWeight(db, 'p1', 4.28, '2026-08-06 07:44');
+  await resyncPetWeight(db, 'p1');
+  const r1 = await applyWeightModify(db, { logId: w.logId, amount: 4.29, ownerId: 'u1', actorId: 'u1' });
+  assert.equal(r1.ok, true); assert.notEqual(r1.unchanged, true);
+  assert.equal((await getLog(db, w.logId)).amount, 4.29);
+  assert.equal((await getPet(db, 'p1')).weightKg, 4.29);
+  const afterFirst = await getLog(db, w.logId);
+  // 重複點同一張「改成 4.29」→ 資料已是 4.29 → unchanged、updatedAt 不再變、不新增
+  const r2 = await applyWeightModify(db, { logId: w.logId, amount: 4.29, ownerId: 'u1', actorId: 'u1' });
+  assert.equal(r2.unchanged, true);
+  assert.equal((await getLog(db, w.logId)).updatedAt, afterFirst.updatedAt, '第二次點不動 updatedAt');
+  assert.equal(db.prepare("SELECT COUNT(*) c FROM logs WHERE category='weight' AND isDeleted=0").bind().first().c, 1, '仍只有一筆');
+});
