@@ -347,3 +347,58 @@ test('模糊且最近一筆非今天：ambiguous:true → 提供「記為今天�
   await showWeightModifyConfirm(env, mkEvent(), { db, pet: await getPet(db, 'p1'), amount: 4.28, smid: 'm1', ambiguous: true });
   assert.ok(sentJson.includes('記為今天的新體重'), '模糊且非今天時應提供新增選項');
 });
+
+// ── 體重修改自然語意（修正／記錯）＋ 安全護欄（需體重/公斤/kg 訊號）──────────────
+const parseMod = (s) => { const r = parseMessage(s); return r.type === 'weightModify' ? r.amount : null; };
+const leadOf = (s, pets = ['蚵仔', '炭吉']) => analyzeLeading(s, pets);
+
+test('自然語意修改：修正為／修正／記錯了改／記錯 ＋ 值 → weightModify（貓名前綴正確剝離）', () => {
+  // 剝掉貓名後的字串（analyzeLeading named.rest）應解析為 weightModify
+  assert.equal(parseMod('體重修正為4.28'), 4.28);
+  assert.equal(parseMod('體重修正4.28'), 4.28);
+  assert.equal(parseMod('體重記錯了 改成4.28'), 4.28);
+  assert.equal(parseMod('體重記錯4.28'), 4.28);
+  assert.equal(parseMod('體重修正成4.28公斤'), 4.28);
+  // 兩個數字時取「改」後那個
+  assert.equal(parseMod('4.27公斤記錯了 改4.28公斤'), 4.28);
+});
+test('貓名前綴（含「把」）：把蚵仔體重修正成4.28公斤 / 蚵仔4.27公斤記錯了改4.28公斤 → named＋weightModify', () => {
+  // 「把」由 index.js 剝除；這裡驗剝除後可辨識
+  assert.equal(parseMessage('體重修正成4.28公斤').type, 'weightModify');
+  const l = leadOf('蚵仔4.27公斤記錯了 改4.28公斤');
+  assert.equal(l.kind, 'named'); assert.equal(l.petName, '蚵仔');
+  assert.equal(parseMod(l.rest), 4.28);
+});
+test('安全護欄：無體重/公斤/kg 訊號的「記錯了改X」不得判為體重', () => {
+  assert.equal(parseMod('水記錯了 改28'), null);
+  assert.equal(parseMod('罐頭記錯了 改28克'), null);
+  assert.equal(parseMod('剛才記錯了 改28'), null);
+  assert.equal(parseMod('藥記錯了'), null);
+  assert.equal(parseMod('皇家記錯了 改希爾斯'), null);
+});
+test('多貓＋無指定「體重記錯了改4.28公斤」→ analyzeLeading clean（交 weightModify，dispatch 先選貓）', async () => {
+  // clean → dispatch 走 parseMessage=weightModify → handleWeightModify（多貓 explicitPet:false → 先選貓）
+  assert.equal(leadOf('體重記錯了 改4.28公斤').kind, 'clean');
+  assert.equal(parseMod('體重記錯了 改4.28公斤'), 4.28);
+  const db = seed({ multi: true }); env.DB = db;
+  await addWeight(db, 'p1', 4.27, '2026-08-05 09:00');
+  resetSent();
+  await handleWeightModify(env, mkEvent(), { db, pet: await getPet(db, 'p1'), pets: [await getPet(db, 'p1'), await getPet(db, 'p2')], explicitPet: false, amount: 4.28, lineUserId: 'u1', ownerId: 'u1', smid: 'm1', baseUrl: '' });
+  assert.ok(sentAlt.some((t) => t.includes('要修改哪隻貓')), '多貓應先選貓');
+  assert.equal(db.prepare("SELECT COUNT(*) c FROM logs WHERE category='weight'").bind().first().c, 1, '先選貓前不動資料');
+});
+test('自然語意修改：精度 4.28 保留、確認卡只有「改成／取消」、修改不新增第二筆', async () => {
+  const db = seed(); env.DB = db;
+  const w = await addWeight(db, 'p1', 4.27, '2026-08-06 07:44');
+  // 明確修改確認卡（ambiguous 預設 false）
+  resetSent();
+  await showWeightModifyConfirm(env, mkEvent(), { db, pet: await getPet(db, 'p1'), amount: 4.28, smid: 'm1' });
+  assert.ok(sentAlt.some((t) => t.includes('4.28')), '卡片保留 4.28');
+  assert.ok(!sentJson.includes('4.3') || sentJson.includes('4.28'), '不得出現 4.3');
+  assert.ok(!sentJson.includes('記為今天的新體重'), '明確修改無新增選項');
+  // 套用修改 → 同筆更新、不新增
+  const res = await applyWeightModify(db, { logId: w.logId, amount: 4.28, ownerId: 'u1', actorId: 'u1' });
+  assert.equal(res.ok, true);
+  assert.equal((await getLog(db, w.logId)).amount, 4.28);
+  assert.equal(db.prepare("SELECT COUNT(*) c FROM logs WHERE category='weight' AND isDeleted=0").bind().first().c, 1, '不新增第二筆');
+});

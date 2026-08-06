@@ -411,12 +411,21 @@ export function parseMessage(rawText) {
     record: { category: 'weight', amount, unit: 'kg', itemName: '', foodType: '', addedWaterMl: 0, medStatus: '', medSlot: '', note: '', dayOffset: 0, time: '' }
   });
   let wm;
-  // 修改最近一次體重：改體重6 / 改體重6.2公斤 / 體重改6 / 體重改成6公斤 / 改6公斤 / 改6kg。
-  //   規則：要嘛帶「體重」關鍵字，要嘛「改」後帶「公斤/kg」單位；純「改6」（無體重/公斤）不算，維持既有改數量。
-  if ((wm = compact.match(new RegExp(`^改(?:成)?體重${W_NUM}${W_UNIT}?$`, 'i')))
-    || (wm = compact.match(new RegExp(`^體重改(?:成)?${W_NUM}${W_UNIT}?$`, 'i')))
-    || (wm = compact.match(new RegExp(`^改(?:成)?${W_NUM}${W_UNIT}$`, 'i')))) {
-    return { type: 'weightModify', amount: Number(wm[1]) };
+  // 修改最近一次體重（自然語意）：改／改成／修正／修正為／修正成／更正／記錯 ＋ 新數值。
+  //   支援：改6公斤、改體重6、體重改6、體重改成6、體重修正為4.28、體重記錯了改成4.28、
+  //         4.27公斤記錯了改4.28公斤…。新值＝最後一個修改詞之後的數字（有兩個數字時取「改」後那個）。
+  //   安全護欄（規格二）：整句必須帶「體重／公斤／kg」訊號才可判為體重修改，否則沿用各自流程——
+  //   水記錯了改28、罐頭記錯了改28克、剛才記錯了改28、藥記錯了、皇家記錯了改希爾斯 都不會被搶走。
+  const wHasSignal = /(體重|公斤|kg)/i.test(compact);
+  const wModKw = /(改成|改為|改|修正為|修正成|修正|更正|記錯)/g;
+  if (wHasSignal && wModKw.test(compact)) {
+    wModKw.lastIndex = 0;
+    let lastEnd = -1, km;
+    while ((km = wModKw.exec(compact))) lastEnd = km.index + km[0].length; // 取最後一個修改詞
+    let numStr = null;
+    if (lastEnd >= 0) { const after = compact.slice(lastEnd).match(/(\d+(?:\.\d+)?)/); if (after) numStr = after[1]; }
+    if (numStr == null) { const all = compact.match(/\d+(?:\.\d+)?/g); if (all) numStr = all[all.length - 1]; }
+    if (numStr != null) return { type: 'weightModify', amount: Number(numStr) };
   }
   // 新增體重（明確帶「體重」字）：體重6 / 記體重6 / 補體重6 / 今天體重6 / 體重6公斤 / 記體重6.25kg。
   if ((wm = compact.match(new RegExp(`^(?:記|補|今天|今日)?體重${W_NUM}${W_UNIT}?$`, 'i')))) {
@@ -886,6 +895,11 @@ export function analyzeLeading(rawText, petNames = []) {
       // 其餘（純文字、非食物非數量）→ 交回既有流程當一般 unknown
     }
   }
+
+  // 1.5) 沒有貓名前綴、但整句本身就是「體重修改」（體重記錯了改4.28公斤）→ clean，
+  //      交由 dispatch 的 parseMessage→weightModify 處理（多貓由 handleWeightModify 自行先選貓）。
+  //      放在貓名前綴之後：有貓名者已由上面回 named，不受影響。
+  if (parseMessage(norm).type === 'weightModify') return { kind: 'clean' };
 
   // 2) 不明句首 + 後段可解析 → 交由呼叫端問要記哪隻貓（不得靜默寫預設貓）
   const lead = findLeadingUnknown(norm);
