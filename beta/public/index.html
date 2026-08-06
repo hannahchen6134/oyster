@@ -4505,11 +4505,12 @@
         <div style="margin:0 auto 20px;max-width:100%">
           ${multi ? `<div style="text-align:center;font-size:13px;font-weight:600;color:#8a7c68;margin:6px 0 6px">第 ${i + 1} 頁／共 ${items.length} 頁</div>` : ''}
           <img alt="回診摘要 第${i + 1}頁" src="${it.src}" style="width:100%;height:auto;display:block;border:1px solid rgba(0,0,0,.08)">
-          <button class="btn btn-secondary btn-sm imgbox-savepage" data-idx="${i}" type="button" style="width:100%;margin-top:8px">${multi ? `儲存第 ${i + 1} 張` : '儲存這張'}</button>
+          <button class="btn btn-secondary btn-sm imgbox-savepage" data-idx="${i}" type="button" style="width:100%;margin-top:8px">${multi ? `分享／儲存第 ${i + 1} 張` : '分享／儲存這張'}</button>
         </div>`).join('');
+      // navigator.share 會開系統分享面板（不一定直接寫相簿），文案用「分享／儲存」較不誤導
       const hint = multi
-        ? `這份報告共有 ${items.length} 張，請分別儲存每一頁，或按「一次分享全部」。`
-        : '按「儲存這張」，或長按圖片存到相簿。';
+        ? `這份報告共有 ${items.length} 張，請分別「分享／儲存」每一頁，或按「一次分享全部」。若分享面板沒有直接存相簿，可長按圖片存到相簿。`
+        : '按「分享／儲存這張」，或長按圖片存到相簿。';
       box.innerHTML = `
         <div class="imgbox-bar">
           <div class="imgbox-hint">${hint}</div>
@@ -4537,11 +4538,11 @@
           const r = await window.a4ShareAll(items, deps);
           if (r.needManual) {
             alert(multi
-              ? `你的手機需要分頁儲存，請依序按下方的「儲存第 1 張」到「儲存第 ${items.length} 張」。`
-              : '這支手機無法直接分享，請按「儲存這張」，或長按圖片存到相簿。');
+              ? `你的手機需要分頁處理，請依序按下方的「分享／儲存第 1 張」到「分享／儲存第 ${items.length} 張」。`
+              : '這支手機無法直接分享，請按「分享／儲存這張」，或長按圖片存到相簿。');
           }
         } catch (error) {
-          if (!(error && error.name === 'AbortError')) alert('分享沒有成功，請改用每一頁的「儲存」按鈕。');
+          if (!(error && error.name === 'AbortError')) alert('分享沒有成功，請改用每一頁的「分享／儲存」按鈕。');
         }
       };
     }

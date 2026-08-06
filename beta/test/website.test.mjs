@@ -96,16 +96,16 @@ test('編輯表單：collectLogForm 對 weight 擋空/0/負/非數字，並存�
 // 多頁 A4 存圖／分享：每頁自己的儲存鈕（綁 data-idx，走 a4SharePage(items, idx)）＋一次分享全部；
 // 不得只留單一模糊按鈕、不得共用 items[0]、不得把多頁合成一張長圖。
 test('A4 存圖：每頁有「儲存第N張」鈕綁 data-idx，逐頁用 a4SharePage(items, idx)，非固定 items[0]', () => {
-  const fn = html.slice(html.indexOf('function showReportImages'), html.indexOf('function showReportImages') + 2600);
+  const fn = html.slice(html.indexOf('function showReportImages'), html.indexOf('function showReportImages') + 3400);
   assert.ok(/imgbox-savepage/.test(fn) && /data-idx="\$\{i\}"/.test(fn), '每頁需有 儲存第N張 鈕、綁 data-idx');
   assert.ok(/Number\(b\.dataset\.idx\)/.test(fn), '點擊讀自己的 pageIndex');
   assert.ok(/a4SharePage\(items, idx/.test(fn), '逐頁走 a4SharePage(items, idx)，不共用 items[0]');
   assert.ok(/a4ShareAll\(items/.test(fn), '一次分享全部走 a4ShareAll(items)');
   assert.ok(/第 \$\{i \+ 1\} 頁／共 \$\{items\.length\} 頁/.test(fn), '多頁標示第N頁／共M頁');
-  // 文案：單頁 vs 多頁
-  assert.ok(/儲存這張/.test(fn) && /儲存第 \$\{i \+ 1\} 張/.test(fn), '單頁「儲存這張」、多頁「儲存第N張」');
+  // 文案：navigator.share 會開系統分享面板，用「分享／儲存」較不誤導；單頁 vs 多頁
+  assert.ok(/分享／儲存這張/.test(fn) && /分享／儲存第 \$\{i \+ 1\} 張/.test(fn), '單頁「分享／儲存這張」、多頁「分享／儲存第N張」');
   assert.ok(/一次分享全部/.test(fn), '多頁主鈕「一次分享全部」');
-  assert.ok(/請依序按下方的/.test(fn), '不支援多檔分享時要明確要求逐頁儲存（不假裝成功）');
+  assert.ok(/請依序按下方的/.test(fn), '不支援多檔分享時要明確要求逐頁分享／儲存（不假裝成功）');
   // 不得把兩頁合成一張長圖：仍是每個 .a4-page 各自渲染成 2480×3508
   assert.ok(/TARGET_W = 2480, TARGET_H = 3508/.test(html), '每頁固定 2480×3508');
   assert.ok(/for \(const node of nodes\)/.test(html), '逐頁節點各自產圖，不合成長圖');
