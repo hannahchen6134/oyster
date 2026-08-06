@@ -236,4 +236,39 @@ export function buildA4Report(data) {
   return { html: `<div class="a4-doc">${pages}</div>`, pages: total };
 }
 
-if (typeof window !== 'undefined') window.buildA4Report = buildA4Report;
+// 多頁報告的檔名：單頁＝base.png；多頁＝base_1.png、base_2.png…（每頁獨立、可辨識頁碼）
+export function a4PageFilenames(base, total) {
+  const b = String(base || '報告');
+  const n = Math.max(1, Number(total) || 1);
+  if (n === 1) return [`${b}.png`];
+  return Array.from({ length: n }, (_, i) => `${b}_${i + 1}.png`);
+}
+
+// 一次分享全部：把每一頁各自的 dataUrl → 獨立 Blob/File，全部交給系統分享面板。
+// 以相依注入（deps）讓瀏覽器 API 可測：{ fetchBlob(dataUrl)->Blob, makeFile(blob,name)->File,
+// canShare(files)->bool, share(files)->Promise }。支援多檔才分享；不支援回 needManual（不假裝成功）。
+export async function a4ShareAll(items, deps) {
+  const list = Array.isArray(items) ? items : [];
+  if (!list.length) return { shared: 0, pages: 0, needManual: false };
+  const files = [];
+  for (const it of list) files.push(deps.makeFile(await deps.fetchBlob(it.dataUrl), it.name));
+  if (deps.canShare(files)) { await deps.share(files); return { shared: files.length, pages: list.length, needManual: false }; }
+  return { shared: 0, pages: list.length, needManual: true }; // 裝置不支援多檔分享 → 請改用每頁儲存
+}
+
+// 儲存/分享「單一頁」：必須用該 pageIndex 自己的 dataUrl/檔名，不得永遠指向第 1 頁。
+export async function a4SharePage(items, idx, deps) {
+  const list = Array.isArray(items) ? items : [];
+  const it = list[idx];
+  if (!it) return { shared: 0, needManual: false, error: 'no_such_page' };
+  const file = deps.makeFile(await deps.fetchBlob(it.dataUrl), it.name);
+  if (deps.canShare([file])) { await deps.share([file]); return { shared: 1, name: it.name, needManual: false }; }
+  return { shared: 0, name: it.name, needManual: true }; // 不支援分享 → 提示長按這一頁
+}
+
+if (typeof window !== 'undefined') {
+  window.buildA4Report = buildA4Report;
+  window.a4PageFilenames = a4PageFilenames;
+  window.a4ShareAll = a4ShareAll;
+  window.a4SharePage = a4SharePage;
+}

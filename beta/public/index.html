@@ -1483,7 +1483,7 @@
 
   <!-- 存成圖片給醫生：同源本地檔，執行時不連外 -->
   <script src="/html-to-image.js"></script>
-  <script type="module" src="/a4-report.js?v=20260805c"></script>
+  <script type="module" src="/a4-report.js?v=20260806a"></script>
   <script>
     'use strict';
     const TOKEN_KEY = 'cat-care-beta-token';
@@ -4455,8 +4455,11 @@
       try {
         const { pngs, pages } = await a4RenderPages();
         if (!pngs.length) { loading.remove(); alert('這個瀏覽器產出的圖片是空白的，請改用一般瀏覽器（Safari／Chrome）開，或先用手機截圖。'); return; }
+        // 頁數與實際產出張數要一致；有頁沒產出來就不假裝「已產生 N 張」（規格六）
+        if (pngs.length < pages) { loading.remove(); console.error('[A4] 頁數不符 pages=' + pages + ' pngs=' + pngs.length); alert(`第 ${pngs.length + 1} 頁產生失敗，請重新產生報告。`); return; }
         const base = `${a4SafeName(petName)}_回診摘要_近${rDays}天_${today}`;
-        // 逐頁嘗試上傳成真圖片網址（LINE 內建瀏覽器才能長按存），失敗退回 dataURL
+        const names = window.a4PageFilenames(base, pngs.length); // 單頁 base.png；多頁 base_1.png、base_2.png…
+        // 逐頁嘗試上傳成真圖片網址（LINE 內建瀏覽器才能長按存），失敗退回 dataURL。每頁各自綁定 dataUrl／檔名。
         const items = [];
         for (let i = 0; i < pngs.length; i += 1) {
           let src = pngs[i];
@@ -4464,11 +4467,11 @@
             const resp = await fetch('/shot', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + state.token }, body: JSON.stringify({ png: pngs[i] }) });
             const j = await resp.json(); if (j && j.ok && j.url) src = j.url;
           } catch (e) { /* 用 dataURL */ }
-          items.push({ src, dataUrl: pngs[i], name: pngs.length > 1 ? `${base}_${i + 1}.png` : `${base}.png` });
+          items.push({ src, dataUrl: pngs[i], name: names[i] });
         }
         loading.remove();
         showReportImages(items);
-        toast(`回診摘要已產生，可以存到相簿或分享給醫生（共 ${pages} 頁）`);
+        toast(items.length > 1 ? `回診摘要共 ${items.length} 頁，請逐頁儲存或一次分享全部` : '回診摘要已產生，可存到相簿或分享給醫生');
       } catch (error) {
         loading.remove();
         console.error('[A4] 產生回診摘要失敗：', error);   // 記 console 方便查根因（不顯示空白圖）
@@ -4485,35 +4488,60 @@
       document.body.appendChild(box);
       return box;
     }
-    // 顯示產生好的 A4 回診摘要（可多頁）：每張長按可存相簿；「分享／存全部」一次帶出所有頁。
+    // 顯示產生好的 A4 回診摘要（可多頁）。每頁各自：頁碼標示＋自己的圖＋自己的「儲存第N張」按鈕
+    // （綁定自己的 pageIndex，不共用 items[0]）；多頁另給「一次分享全部」。單頁給「儲存這張／分享給醫生」。
     function showReportImages(items) {
+      const multi = items.length > 1;
+      // 分享的相依：真實瀏覽器 API（可測版本在 a4-report.js，用注入 deps）
+      const deps = {
+        fetchBlob: async (dataUrl) => (await fetch(dataUrl)).blob(),
+        makeFile: (blob, name) => new File([blob], name, { type: 'image/png' }),
+        canShare: (files) => !!(navigator.canShare && navigator.canShare({ files })),
+        share: (files) => navigator.share({ files, title: '回診摘要' })
+      };
       const box = document.createElement('div');
       box.className = 'imgbox';
-      const imgs = items.map((it, i) => `
-        <div style="margin:0 auto 16px;max-width:100%">
-          ${items.length > 1 ? `<div style="text-align:center;font-size:12px;color:#8a7c68;margin:6px 0 4px">第 ${i + 1}／${items.length} 頁</div>` : ''}
-          <img alt="回診摘要 ${i + 1}" src="${it.src}" style="width:100%;height:auto;display:block;border:1px solid rgba(0,0,0,.08)">
+      const pageBlocks = items.map((it, i) => `
+        <div style="margin:0 auto 20px;max-width:100%">
+          ${multi ? `<div style="text-align:center;font-size:13px;font-weight:600;color:#8a7c68;margin:6px 0 6px">第 ${i + 1} 頁／共 ${items.length} 頁</div>` : ''}
+          <img alt="回診摘要 第${i + 1}頁" src="${it.src}" style="width:100%;height:auto;display:block;border:1px solid rgba(0,0,0,.08)">
+          <button class="btn btn-secondary btn-sm imgbox-savepage" data-idx="${i}" type="button" style="width:100%;margin-top:8px">${multi ? `儲存第 ${i + 1} 張` : '儲存這張'}</button>
         </div>`).join('');
+      const hint = multi
+        ? `這份報告共有 ${items.length} 張，請分別儲存每一頁，或按「一次分享全部」。`
+        : '按「儲存這張」，或長按圖片存到相簿。';
       box.innerHTML = `
         <div class="imgbox-bar">
-          <div class="imgbox-hint">回診摘要已產生${items.length > 1 ? `（共 ${items.length} 頁）` : ''}。長按每張圖片 → 「儲存到相簿」，看診時打開給醫生看</div>
-          <button class="imgbox-btn imgbox-share" type="button">分享／存全部</button>
+          <div class="imgbox-hint">${hint}</div>
+          <button class="imgbox-btn imgbox-shareall" type="button">${multi ? '一次分享全部' : '分享給醫生'}</button>
           <button class="imgbox-btn imgbox-close" type="button">關閉</button>
         </div>
-        <div class="imgbox-scroll">${imgs}</div>`;
+        <div class="imgbox-scroll">${pageBlocks}</div>`;
       document.body.appendChild(box);
       box.querySelector('.imgbox-close').onclick = () => box.remove();
-      box.querySelector('.imgbox-share').onclick = async () => {
+      // 每頁「儲存第N張」：用自己的 pageIndex 分享/儲存該頁；不支援分享就提示長按這一頁
+      box.querySelectorAll('.imgbox-savepage').forEach((b) => {
+        b.onclick = async () => {
+          const idx = Number(b.dataset.idx);
+          try {
+            const r = await window.a4SharePage(items, idx, deps);
+            if (r.needManual) alert(`這支手機無法直接分享，請長按上方第 ${idx + 1} 張圖片 →「儲存到相簿」。`);
+          } catch (error) {
+            if (!(error && error.name === 'AbortError')) alert(`請長按第 ${idx + 1} 張圖片 →「儲存到相簿」。`);
+          }
+        };
+      });
+      // 主要操作：單頁＝分享這張；多頁＝一次分享全部（裝置不支援多檔分享就明確要求逐頁儲存，不假裝成功）
+      box.querySelector('.imgbox-shareall').onclick = async () => {
         try {
-          const files = [];
-          for (const it of items) { const blob = await (await fetch(it.dataUrl)).blob(); files.push(new File([blob], it.name, { type: 'image/png' })); }
-          if (navigator.canShare && navigator.canShare({ files })) {
-            await navigator.share({ files, title: '回診摘要' });
-          } else {
-            alert('這個瀏覽器無法直接分享。\n請「長按每一張圖片 →　儲存到相簿」。\n（電腦版可對圖片按右鍵另存圖片）');
+          const r = await window.a4ShareAll(items, deps);
+          if (r.needManual) {
+            alert(multi
+              ? `你的手機需要分頁儲存，請依序按下方的「儲存第 1 張」到「儲存第 ${items.length} 張」。`
+              : '這支手機無法直接分享，請按「儲存這張」，或長按圖片存到相簿。');
           }
         } catch (error) {
-          if (!(error && error.name === 'AbortError')) alert('請改用「長按圖片 →　儲存到相簿」。');
+          if (!(error && error.name === 'AbortError')) alert('分享沒有成功，請改用每一頁的「儲存」按鈕。');
         }
       };
     }

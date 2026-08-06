@@ -3,7 +3,7 @@
 // 圖片實際 2480×3508 像素/清晰度屬瀏覽器渲染，需人工在手機（含 LINE LIFF）驗證，不假裝自動化。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildA4Report } from '../public/a4-report.js';
+import { buildA4Report, a4PageFilenames, a4ShareAll, a4SharePage } from '../public/a4-report.js';
 
 function daily(nDays) {
   const rows = [];
@@ -145,4 +145,70 @@ test('空資料整體：不丟例外，仍輸出頁首/免責/「尚無」文字
   assert.ok(html.includes('此期間尚無每日紀錄') || html.includes('此期間無紀錄'));
   assert.ok(html.includes('不作為診斷依據'));
   assert.ok(pages >= 1);
+});
+
+// ── 多頁存圖／分享：每頁獨立 Blob/檔名、逐頁綁定自己的 pageIndex、一次分享含全部 File ──
+// 用注入 deps 測真實分享編排（不需瀏覽器）；記錄實際交給 share 的檔名，驗不是只送 files[0]。
+function mockDeps(canShareMultiple) {
+  const calls = [];
+  return {
+    calls,
+    fetchBlob: async (dataUrl) => ({ __blobOf: dataUrl }),
+    makeFile: (blob, name) => ({ name, blob }),
+    canShare: (files) => canShareMultiple || files.length === 1,
+    share: async (files) => { calls.push(files.map((f) => f.name)); }
+  };
+}
+
+test('多頁檔名：單頁 base.png；兩頁 base_1/base_2；三頁 base_1/2/3（各自可辨識頁碼）', () => {
+  assert.deepEqual(a4PageFilenames('R', 1), ['R.png']);
+  assert.deepEqual(a4PageFilenames('R', 2), ['R_1.png', 'R_2.png']);
+  assert.deepEqual(a4PageFilenames('R', 3), ['R_1.png', 'R_2.png', 'R_3.png']);
+});
+
+test('兩頁：pages=2、不同 dataUrl、不同檔名（不得共用同一張）', () => {
+  const names = a4PageFilenames('蚵仔_回診摘要', 2);
+  const items = [{ dataUrl: 'DATA_1', name: names[0] }, { dataUrl: 'DATA_2', name: names[1] }];
+  assert.equal(items.length, 2);
+  assert.notEqual(items[0].dataUrl, items[1].dataUrl, '兩頁 Blob 來源不同');
+  assert.notEqual(items[0].name, items[1].name, '兩頁檔名不同');
+});
+
+test('一次分享全部（支援多檔）：navigator.share 收到 2 個 File，不是只有 files[0]', async () => {
+  const items = [{ dataUrl: 'D1', name: 'p_1.png' }, { dataUrl: 'D2', name: 'p_2.png' }];
+  const deps = mockDeps(true);
+  const r = await a4ShareAll(items, deps);
+  assert.equal(r.shared, 2); assert.equal(r.needManual, false);
+  assert.deepEqual(deps.calls, [['p_1.png', 'p_2.png']], 'share 一次收到 2 個 File');
+});
+
+test('儲存第 1 張取得第 1 頁、儲存第 2 張取得第 2 頁（不得兩顆都取第 1 頁）', async () => {
+  const items = [{ dataUrl: 'D1', name: 'p_1.png' }, { dataUrl: 'D2', name: 'p_2.png' }];
+  const d0 = mockDeps(false); await a4SharePage(items, 0, d0);
+  const d1 = mockDeps(false); await a4SharePage(items, 1, d1);
+  assert.deepEqual(d0.calls, [['p_1.png']], '第 1 張＝第 1 頁');
+  assert.deepEqual(d1.calls, [['p_2.png']], '第 2 張＝第 2 頁（非 files[0]）');
+});
+
+test('裝置不支援多檔分享：a4ShareAll 回 needManual、pages=2（不假裝成功、不只送一張）', async () => {
+  const items = [{ dataUrl: 'D1', name: 'p_1.png' }, { dataUrl: 'D2', name: 'p_2.png' }];
+  const deps = mockDeps(false);
+  const r = await a4ShareAll(items, deps);
+  assert.equal(r.needManual, true); assert.equal(r.shared, 0); assert.equal(r.pages, 2);
+  assert.deepEqual(deps.calls, [], '不支援時完全不呼叫 share（不會只送一張假裝成功）');
+});
+
+test('單頁分享：只含 1 個 File', async () => {
+  const items = [{ dataUrl: 'D1', name: 'r.png' }];
+  const deps = mockDeps(false);
+  const r = await a4ShareAll(items, deps);
+  assert.equal(r.shared, 1);
+  assert.deepEqual(deps.calls, [['r.png']]);
+});
+
+test('三頁：一次分享包含 3 個 File；每頁也可分別儲存', async () => {
+  const items = [{ dataUrl: 'A', name: 'a.png' }, { dataUrl: 'B', name: 'b.png' }, { dataUrl: 'C', name: 'c.png' }];
+  const all = mockDeps(true); const r = await a4ShareAll(items, all);
+  assert.equal(r.shared, 3); assert.deepEqual(all.calls, [['a.png', 'b.png', 'c.png']]);
+  for (let i = 0; i < 3; i += 1) { const d = mockDeps(false); await a4SharePage(items, i, d); assert.deepEqual(d.calls, [[items[i].name]], `第 ${i + 1} 張綁定自己那頁`); }
 });
