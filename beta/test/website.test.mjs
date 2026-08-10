@@ -117,7 +117,7 @@ test('A4 存圖：每頁有「儲存第N張」鈕綁 data-idx，逐頁用 a4Shar
 // 傳完整報告到 LINE（liff.sendMessages 主流程）：主按鈕、防連點、snapshot、上傳全成才送、fallback、preview
 test('傳完整報告到 LINE：主按鈕文案、防連點鎖、snapshot 資料渲染、送前再驗家庭', () => {
   assert.ok(html.includes('傳完整報告到我的 LINE'), '主按鈕＝傳完整報告到我的 LINE');
-  const fn = html.slice(html.indexOf("$('reportSaveBtn').addEventListener"), html.indexOf("$('reportSaveBtn').addEventListener") + 4200);
+  const fn = html.slice(html.indexOf("$('reportSaveBtn').addEventListener"), html.indexOf("$('reportSaveBtn').addEventListener") + 5400);
   // 防連點
   assert.ok(/let reportSending = false/.test(html) && /if \(reportSending\) return/.test(fn), '需有防連點鎖');
   assert.ok(/reportSending = true/.test(fn) && /reportSending = false/.test(fn), '處理中鎖定、完成後解除');
@@ -131,19 +131,27 @@ test('傳完整報告到 LINE：主按鈕文案、防連點鎖、snapshot 資料
 });
 
 test('傳完整報告：先全部上傳、再用 a4SendReport 一次送；deps 綁 liff.sendMessages＋fallback', () => {
-  const fn = html.slice(html.indexOf("$('reportSaveBtn').addEventListener"), html.indexOf("$('reportSaveBtn').addEventListener") + 4200);
+  const fn = html.slice(html.indexOf("$('reportSaveBtn').addEventListener"), html.indexOf("$('reportSaveBtn').addEventListener") + 5400);
   // 全部頁上傳完成才送（迴圈 push items 後才呼叫 a4SendReport）
-  assert.ok(/for \(let i = 0; i < pngs\.length/.test(fn) && /a4UploadShot\(pngs\[i\]\)/.test(fn), '逐頁上傳');
+  assert.ok(/for \(let i = 0; i < pngs\.length/.test(fn) && /a4UploadShot\(png\)/.test(fn), '逐頁上傳');
   assert.ok(/window\.a4SendReport\(items, deps\)/.test(fn), '用 a4SendReport 一次送全部');
   // deps：sendMessages 主、shareTargetPicker 次、showReportImages 最後
-  assert.ok(/canSend: \(\) =>[^\n]*state\.liff\.canSendMessages/.test(fn), 'canSend 依 state.liff.canSendMessages');
-  assert.ok(/send: \(messages\) => window\.liff\.sendMessages\(messages\)/.test(fn), 'send＝liff.sendMessages');
+  // canSend 綜合判斷（inClient＋非 external＋授權非 unavailable），不得用 isApiAvailable('sendMessages')
+  assert.ok(/canSend: \(\) =>[^\n]*inClient[^\n]*ctxType !== 'external'[^\n]*chatWrite !== 'unavailable'/.test(fn), 'canSend 綜合判斷');
+  assert.ok(!/isApiAvailable\('sendMessages'\)/.test(html), '不得用 isApiAvailable(sendMessages)（官方不支援此 apiName）');
+  assert.ok(/send: \(messages\) => window\.liff\.sendMessages\(messages\)/.test(fn), 'send＝liff.sendMessages（最終以實際呼叫為準）');
   assert.ok(/share: \(messages\) => window\.liff\.shareTargetPicker\(messages\)/.test(fn), 'fallback＝shareTargetPicker');
   assert.ok(/manual: \(its\) => showReportImages\(its\)/.test(fn), '最後 fallback＝頁面長按');
-  // preview 保險：>1MB 才另產
-  assert.ok(/a4NeedsSmallerPreview\(pngs\[i\]\)/.test(fn) && /a4MakePreview\(pngs\[i\]\)/.test(fn), 'preview 僅在 >1MB 時另產');
-  // LIFF init 有捕捉 sendMessages 可用性
-  assert.ok(/canSendMessages: apiOk\('sendMessages'\)/.test(html), 'init 捕捉 sendMessages availability');
+  // preview 保險：>1MB 才產，且實測 <=1MB（a4BuildPreview 逐步縮＋a4WithinPreviewLimit）；縮不下去→oversize→manual
+  assert.ok(/a4NeedsSmallerPreview\(png\)/.test(fn) && /a4BuildPreview\(png\)/.test(fn), 'preview 僅在 >1MB 時另產');
+  assert.ok(/a4WithinPreviewLimit\(window\.dataUrlBytes\(small\)\)/.test(html), 'preview 產出後實測 <=1MB');
+  assert.ok(/a4WithinOriginalLimit\(window\.dataUrlBytes\(png\)\)/.test(fn), 'original >10MB → 不送 LINE');
+  assert.ok(/oversize: true/.test(fn), '超規格頁標記 oversize（轉 manual）');
+  // 結果文案：>5 頁 too_many_pages、圖過大 image_too_large 都明確要求改用分享
+  assert.ok(/too_many_pages/.test(fn) && /image_too_large/.test(fn), '超上限/過大都有明確提示');
+  assert.ok(/請從下方分享完整報告/.test(fn), '超上限提示改用分享完整報告');
+  // LIFF init：用 permission.query('chat_message.write') 取授權狀態，不用 isApiAvailable('sendMessages')
+  assert.ok(/permission\.query\('chat_message\.write'\)/.test(html), 'init 用 permission.query 取 chat_message.write 授權');
 });
 
 // /shot 6 小時失效

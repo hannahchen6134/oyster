@@ -1483,7 +1483,7 @@
 
   <!-- 存成圖片給醫生：同源本地檔，執行時不連外 -->
   <script src="/html-to-image.js"></script>
-  <script type="module" src="/a4-report.js?v=20260806b"></script>
+  <script type="module" src="/a4-report.js?v=20260806c"></script>
   <script>
     'use strict';
     const TOKEN_KEY = 'cat-care-beta-token';
@@ -4027,7 +4027,13 @@
         try { sessionStorage.removeItem('liffTries_h'); } catch (error) { /* ignore */ }
         const apiOk = (name) => { try { return !!(liff.isApiAvailable && liff.isApiAvailable(name)); } catch (e) { return false; } };
         let ctxType = ''; try { ctxType = (liff.getContext && liff.getContext() || {}).type || ''; } catch (e) { /* ignore */ }
-        state.liff = { ready: true, inClient: liff.isInClient(), canShare: apiOk('shareTargetPicker'), canSendMessages: apiOk('sendMessages'), ctxType };
+        // sendMessages 授權狀態（best-effort；SDK 無此 API 就 unknown）。注意：liff.isApiAvailable 不支援 'sendMessages'，
+        // 不可用它判斷 sendMessages；最終以實際呼叫 liff.sendMessages() 成功/失敗為準。
+        let chatWrite = 'unknown';
+        try {
+          if (liff.permission && liff.permission.query) { const q = await liff.permission.query('chat_message.write'); chatWrite = (q && q.state) || 'unknown'; }
+        } catch (e) { chatWrite = 'unknown'; }
+        state.liff = { ready: true, inClient: liff.isInClient(), canShare: apiOk('shareTargetPicker'), ctxType, chatWrite };
         // 在 LINE 內已登入：拿 access token 向後端換發本人 session（和機器人同 Provider，身分一致）
         if (liff.isLoggedIn()) {
           const accessToken = liff.getAccessToken && liff.getAccessToken();
@@ -4473,32 +4479,47 @@
         if (pngs.length < pages) { loading.remove(); console.error('[A4] 頁數不符 pages=' + pages + ' pngs=' + pngs.length); alert(`第 ${pngs.length + 1} 頁產生失敗，請重新產生報告。`); return; }
         const base = `${a4SafeName(petName)}_回診摘要_近${snap.rangeDays}天_${snap.today}`;
         const names = window.a4PageFilenames(base, pngs.length);
-        // 先把「所有頁」都上傳完成（original，>1MB 才另產較小 preview），全部處理完才送 LINE：不邊傳邊送、不缺頁、保序
+        // 先把「所有頁」都上傳完成，全部處理完才送 LINE：不邊傳邊送、不缺頁、保序。
+        // 逐頁驗證檔案規格：original<=10MB、preview<=1MB（超過就縮，縮不下去→oversize→轉 manual）。
         const items = [];
         for (let i = 0; i < pngs.length; i += 1) {
-          const url = await a4UploadShot(pngs[i]);
-          let previewUrl = '';
-          if (url && window.a4NeedsSmallerPreview(pngs[i])) {
-            const small = await a4MakePreview(pngs[i]);
-            previewUrl = await a4UploadShot(small);              // preview 上傳失敗 → 送訊息時 fallback 用 original
+          const png = pngs[i];
+          if (!window.a4WithinOriginalLimit(window.dataUrlBytes(png))) {   // original >10MB → 不送 LINE
+            items.push({ url: '', oversize: true, dataUrl: png, name: names[i], src: png });
+            continue;
           }
-          items.push({ url, previewUrl, dataUrl: pngs[i], name: names[i], src: url ? (location.origin + url) : pngs[i] });
+          const url = await a4UploadShot(png);
+          let previewUrl = '';
+          let oversize = false;
+          if (url && window.a4NeedsSmallerPreview(png)) {                  // original >1MB 才另產 preview（<=1MB 直接共用）
+            const pv = await a4BuildPreview(png);                          // 逐步縮，實測 <=1MB 才用
+            if (pv.ok) previewUrl = await a4UploadShot(pv.dataUrl);
+            else oversize = true;                                          // 縮到最小仍 >1MB → 無法當 preview → 轉 manual
+          }
+          items.push({ url: oversize ? '' : url, previewUrl, oversize, dataUrl: png, name: names[i], src: url ? (location.origin + url) : png });
         }
         loading.remove();
         // 送出前再次驗證 snapshot 的貓仍屬本家庭（避免產圖中切換毛孩導致傳錯）
         if (!(state.pets || []).some((p) => p.petId === snap.petId)) { alert('偵測到貓咪已切換，為避免傳錯，請重新產生報告。'); return; }
         const deps = {
           origin: location.origin,
-          canSend: () => !!(window.liff && state.liff && state.liff.inClient && state.liff.canSendMessages),
+          // sendMessages 值得嘗試的情境（在 LINE App 內、非外部瀏覽器、授權非明確 unavailable）；
+          // 最終以實際呼叫成功/失敗為準（a4SendReport 內 try/catch，403/LiffError 會落 fallback）。
+          canSend: () => { const L = state.liff || {}; return !!(window.liff && L.inClient && L.ctxType !== 'external' && L.chatWrite !== 'unavailable'); },
           send: (messages) => window.liff.sendMessages(messages),
           canShare: () => !!(window.liff && state.liff && state.liff.inClient && state.liff.canShare),
           share: (messages) => window.liff.shareTargetPicker(messages),
           manual: (its) => showReportImages(its)          // 最後 fallback：頁面多頁圖片、長按/分享儲存（保留全部頁）
         };
         const r = await window.a4SendReport(items, deps);
-        if (r.ok && r.method === 'send') toast(`完整報告已傳到聊天室${r.truncated ? `（本次先傳前 ${r.pages} 頁）` : ''}`);
+        if (r.ok && r.method === 'send') toast('完整報告已傳到聊天室');
         else if (r.ok && r.method === 'share') toast('已開啟分享面板，請選擇要傳送的對象');
-        else if (r.method === 'manual') toast(r.reason === 'upload_incomplete' ? '部分頁面上傳未完成，已改用逐頁儲存' : '這支手機無法直接傳到聊天室，已顯示每一頁供長按／分享儲存');
+        else if (r.method === 'manual') {
+          if (r.reason === 'too_many_pages') toast('報告超過 LINE 單次傳送上限（5 頁），請從下方分享完整報告', true);
+          else if (r.reason === 'image_too_large') toast('部分頁面圖片過大無法直接傳 LINE，請從下方分享完整報告', true);
+          else if (r.reason === 'upload_incomplete') toast('部分頁面上傳未完成，已改用逐頁儲存', true);
+          else toast('這支手機無法直接傳到聊天室，已顯示每一頁供長按／分享儲存');
+        }
         else if (r.reason === 'aborted') { /* 使用者自行取消，不打擾 */ }
       } catch (error) {
         loading.remove();
@@ -4524,14 +4545,22 @@
       } catch (e) { /* 失敗回空字串 */ }
       return '';
     }
-    // 只有 original PNG >1MB 才呼叫：縮到寬 1240（維持 A4 直式比例）的 PNG 供 previewImageUrl（不動 original 品質）
-    async function a4MakePreview(dataUrl) {
+    // 把 A4 PNG 縮到指定寬度（維持 A4 直式比例），回傳較小 PNG dataURL（不動 original 品質）
+    async function a4Downscale(dataUrl, targetW) {
       const img = new Image(); img.src = dataUrl; await (img.decode ? img.decode() : new Promise((r) => { img.onload = r; }));
-      const W = 1240, H = Math.round(W * 3508 / 2480);
+      const W = targetW, H = Math.round(W * 3508 / 2480);
       const c = document.createElement('canvas'); c.width = W; c.height = H;
       const ctx = c.getContext('2d'); ctx.fillStyle = '#FFFDF8'; ctx.fillRect(0, 0, W, H);
       ctx.drawImage(img, 0, 0, W, H);
       return c.toDataURL('image/png');
+    }
+    // 產 previewImageUrl 用的較小圖：逐步縮寬，實測 dataUrlBytes 必須 <=1MB 才採用；都超過就回 { ok:false }（轉 manual）
+    async function a4BuildPreview(dataUrl) {
+      for (const W of [1240, 992, 794, 620, 480]) {
+        const small = await a4Downscale(dataUrl, W);
+        if (window.a4WithinPreviewLimit(window.dataUrlBytes(small))) return { ok: true, dataUrl: small };
+      }
+      return { ok: false, dataUrl: '' };
     }
     // 顯示產生好的 A4 回診摘要（可多頁）。每頁各自：頁碼標示＋自己的圖＋自己的「儲存第N張」按鈕
     // （綁定自己的 pageIndex，不共用 items[0]）；多頁另給「一次分享全部」。單頁給「儲存這張／分享給醫生」。

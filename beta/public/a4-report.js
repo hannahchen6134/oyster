@@ -294,35 +294,50 @@ export function a4BuildImageMessages(items, origin) {
     previewImageUrl: abs(it.previewUrl || it.url)
   }));
 }
-// 超過 LINE 上限時「靜默截斷」（保序，取前 max 則）。
-export function a4CapMessages(messages, max = A4_SEND_MAX) {
-  const arr = Array.isArray(messages) ? messages : [];
-  return arr.length > max ? arr.slice(0, max) : arr;
+// 圖片大小上限（LINE 規格）：originalContentUrl <= 10MB、previewImageUrl <= 1MB。
+export const A4_ORIGINAL_MAX_BYTES = 10 * 1024 * 1024;
+export function a4WithinOriginalLimit(bytes) { return Number(bytes) <= A4_ORIGINAL_MAX_BYTES; }
+export function a4WithinPreviewLimit(bytes) { return Number(bytes) <= A4_PREVIEW_MAX_BYTES; }
+
+// shareTargetPicker 結果是否代表「使用者取消」：官方在取消時 Promise 多半 resolve 但不回 success 物件
+// （undefined／null），也可能丟 AbortError。這裡把「resolve 出非成功值」視為取消。
+export function a4ShareResultCancelled(result) {
+  if (result === undefined || result === null) return true;
+  if (typeof result === 'object' && result && 'status' in result) return result.status !== 'success';
+  return false;
 }
 
 // 傳送編排（可測，deps 注入 LIFF/瀏覽器行為）：
 //  deps = { origin, canSend()->bool, send(messages)->Promise, canShare()->bool, share(messages)->Promise, manual(items)->void }
-// 順序：sendMessages → shareTargetPicker → 手機頁面圖片（長按）。任一頁沒 url（上傳失敗）一律不宣稱成功、直接進 manual。
+// 順序：sendMessages → shareTargetPicker → 手機頁面圖片（長按）。
+//  - 任一頁沒 url（上傳失敗）→ 不送 LINE、進 manual（保留全部頁，不只送第一張）。
+//  - 任一頁 oversize（original>10MB 或 preview 無法 <=1MB）→ 進 manual（reason image_too_large）。
+//  - 超過 5 頁（LINE 單次上限）→ 不截斷、不假裝完整，進 manual（reason too_many_pages）。
 export async function a4SendReport(items, deps) {
   const list = Array.isArray(items) ? items : [];
   if (!list.length) return { ok: false, method: 'none', reason: 'no_pages' };
-  // 每頁都要有 HTTPS url 才能給 LINE 抓；任一頁缺 → 不送 LINE、進 manual（保留全部頁、不只送第一張）
-  if (!list.every((it) => it && it.url)) {
-    if (deps.manual) deps.manual(list);
-    return { ok: false, method: 'manual', reason: 'upload_incomplete', pages: list.length };
-  }
-  const messages = a4CapMessages(a4BuildImageMessages(list, deps.origin), A4_SEND_MAX);
-  const truncated = messages.length < list.length;
+  const toManual = (reason) => { if (deps.manual) deps.manual(list); return { ok: false, method: 'manual', reason, pages: list.length }; };
+  if (list.some((it) => it && it.oversize)) return toManual('image_too_large');   // 檔案超規格 → 不送 LINE
+  if (!list.every((it) => it && it.url)) return toManual('upload_incomplete');     // 有頁沒 URL → 不送
+  if (list.length > A4_SEND_MAX) return toManual('too_many_pages');                // >5 頁 → 不截斷、走 manual 保留全部頁
+  const messages = a4BuildImageMessages(list, deps.origin);                        // 1~5 頁：完整送出，不截斷
   if (deps.canSend && deps.canSend()) {
-    try { await deps.send(messages); return { ok: true, method: 'send', pages: messages.length, truncated }; }
-    catch (error) { if (error && error.name === 'AbortError') return { ok: false, method: 'send', reason: 'aborted' }; /* 落下一個 */ }
+    // 最終以實際呼叫為準：sendMessages 若因 scope/情境失敗（403/LiffError）→ 落 shareTargetPicker
+    try { await deps.send(messages); return { ok: true, method: 'send', pages: messages.length }; }
+    catch (error) { /* 任何錯誤（含 403/LiffError）→ 往下 fallback，不永遠跳過但也不誤報成功 */ }
   }
   if (deps.canShare && deps.canShare()) {
-    try { await deps.share(messages); return { ok: true, method: 'share', pages: messages.length, truncated }; }
-    catch (error) { if (error && error.name === 'AbortError') return { ok: false, method: 'share', reason: 'aborted' }; /* 落 manual */ }
+    try {
+      const res = await deps.share(messages);
+      if (a4ShareResultCancelled(res)) return { ok: false, method: 'share', reason: 'aborted' }; // 取消：不成功、不跳 manual
+      return { ok: true, method: 'share', pages: messages.length };
+    } catch (error) {
+      if (error && error.name === 'AbortError') return { ok: false, method: 'share', reason: 'aborted' };
+      /* 其他錯誤 → 落 manual */
+    }
   }
   if (deps.manual) deps.manual(list);
-  return { ok: true, method: 'manual', pages: list.length, truncated };
+  return { ok: true, method: 'manual', pages: list.length };
 }
 
 if (typeof window !== 'undefined') {
@@ -332,7 +347,9 @@ if (typeof window !== 'undefined') {
   window.a4SharePage = a4SharePage;
   window.dataUrlBytes = dataUrlBytes;
   window.a4NeedsSmallerPreview = a4NeedsSmallerPreview;
+  window.a4WithinOriginalLimit = a4WithinOriginalLimit;
+  window.a4WithinPreviewLimit = a4WithinPreviewLimit;
   window.a4BuildImageMessages = a4BuildImageMessages;
-  window.a4CapMessages = a4CapMessages;
+  window.a4ShareResultCancelled = a4ShareResultCancelled;
   window.a4SendReport = a4SendReport;
 }

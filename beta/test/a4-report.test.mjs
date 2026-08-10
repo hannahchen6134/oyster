@@ -3,7 +3,7 @@
 // 圖片實際 2480×3508 像素/清晰度屬瀏覽器渲染，需人工在手機（含 LINE LIFF）驗證，不假裝自動化。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildA4Report, a4PageFilenames, a4ShareAll, a4SharePage, dataUrlBytes, a4NeedsSmallerPreview, a4BuildImageMessages, a4CapMessages, a4SendReport } from '../public/a4-report.js';
+import { buildA4Report, a4PageFilenames, a4ShareAll, a4SharePage, dataUrlBytes, a4NeedsSmallerPreview, a4WithinOriginalLimit, a4WithinPreviewLimit, a4BuildImageMessages, a4ShareResultCancelled, a4SendReport } from '../public/a4-report.js';
 
 function daily(nDays) {
   const rows = [];
@@ -217,14 +217,15 @@ test('三頁：一次分享包含 3 個 File；每頁也可分別儲存', async 
 const itemsN = (n) => Array.from({ length: n }, (_, i) => ({ url: `/shot/p${i + 1}`, previewUrl: '', dataUrl: `d${i + 1}`, name: `r_${i + 1}.png` }));
 function sendMock(over = {}) {
   const calls = { send: [], share: [], manual: [] };
-  const deps = {
+  const shareResult = 'shareResult' in over ? over.shareResult : { status: 'success' }; // 預設分享成功
+  const base = {
     origin: 'https://cat.dev',
     canSend: () => false, canShare: () => false,
     send: async (m) => { calls.send.push(m); },
-    share: async (m) => { calls.share.push(m); },
-    manual: (its) => { calls.manual.push(its); },
-    ...over
+    share: async (m) => { calls.share.push(m); return shareResult; },
+    manual: (its) => { calls.manual.push(its); }
   };
+  const deps = { ...base, ...over }; delete deps.shareResult;
   return { deps, calls };
 }
 
@@ -246,10 +247,17 @@ test('3 頁 → 一次送 3 個 image', async () => {
   await a4SendReport(itemsN(3), deps);
   assert.equal(calls.send[0].length, 3);
 });
-test('超過 LINE 上限（>5 頁）→ 靜默截斷成 5 則，並回報 truncated', async () => {
+test('5 頁 → 完整送 5 則（上限內不截斷）', async () => {
   const { deps, calls } = sendMock({ canSend: () => true });
-  const r = await a4SendReport(itemsN(7), deps);
-  assert.equal(calls.send[0].length, 5); assert.equal(r.pages, 5); assert.equal(r.truncated, true);
+  const r = await a4SendReport(itemsN(5), deps);
+  assert.equal(r.method, 'send'); assert.equal(calls.send[0].length, 5);
+});
+test('超過 5 頁 → 不截斷、不宣稱完整，走 manual（too_many_pages），保留全部頁；第 6 頁不被遺失', async () => {
+  const { deps, calls } = sendMock({ canSend: () => true });
+  const r = await a4SendReport(itemsN(6), deps);
+  assert.equal(r.ok, false); assert.equal(r.method, 'manual'); assert.equal(r.reason, 'too_many_pages'); assert.equal(r.pages, 6);
+  assert.equal(calls.send.length, 0, '完全不呼叫 sendMessages（不送前 5 頁假裝完整）');
+  assert.equal(calls.manual[0].length, 6, 'manual 收到全部 6 頁');
 });
 test('任一頁 upload 失敗（url 空）→ 不送 LINE、不宣稱成功，改走 manual（保留全部頁）', async () => {
   const items = itemsN(2); items[1].url = '';
@@ -274,12 +282,48 @@ test('sendMessages unavailable 但可 share → 走 share（不是直接 manual�
   const r = await a4SendReport(itemsN(2), deps);
   assert.equal(r.method, 'share'); assert.equal(calls.share[0].length, 2);
 });
-test('使用者取消 sendMessages（AbortError）→ 回 aborted、不再落 fallback', async () => {
-  const err = new Error('cancel'); err.name = 'AbortError';
-  const { deps, calls } = sendMock({ canSend: () => true, canShare: () => true, send: async () => { throw err; } });
+test('sendMessages 因 scope/情境失敗（403/LiffError）→ 落 shareTargetPicker（不永遠跳過、也不誤報成功）', async () => {
+  const e = new Error('need chat_message.write'); e.name = 'LiffError';
+  const { deps, calls } = sendMock({ canSend: () => true, canShare: () => true, send: async () => { throw e; } });
   const r = await a4SendReport(itemsN(2), deps);
-  assert.equal(r.ok, false); assert.equal(r.reason, 'aborted');
-  assert.equal(calls.share.length, 0, '取消後不再開分享面板');
+  assert.equal(r.method, 'share'); assert.equal(r.ok, true); assert.equal(calls.share[0].length, 2);
+});
+test('shareTargetPicker 取消語意：resolve undefined／null／AbortError → aborted（不成功、不跳 manual、不打擾）', async () => {
+  for (const res of [undefined, null]) {
+    const { deps, calls } = sendMock({ canShare: () => true, shareResult: res });
+    const r = await a4SendReport(itemsN(2), deps);
+    assert.equal(r.ok, false); assert.equal(r.reason, 'aborted');
+    assert.equal(calls.manual.length, 0, '取消不跳 manual');
+  }
+  const err = new Error('cancel'); err.name = 'AbortError';
+  const { deps, calls } = sendMock({ canShare: () => true, share: async () => { throw err; } });
+  const r = await a4SendReport(itemsN(2), deps);
+  assert.equal(r.reason, 'aborted'); assert.equal(calls.manual.length, 0);
+});
+test('shareTargetPicker 成功（resolve {status:success}）→ ok share', async () => {
+  const { deps } = sendMock({ canShare: () => true, shareResult: { status: 'success' } });
+  const r = await a4SendReport(itemsN(2), deps);
+  assert.equal(r.ok, true); assert.equal(r.method, 'share');
+});
+test('a4ShareResultCancelled：undefined／null／{status:cancel} 皆取消；{status:success} 非取消', () => {
+  assert.equal(a4ShareResultCancelled(undefined), true);
+  assert.equal(a4ShareResultCancelled(null), true);
+  assert.equal(a4ShareResultCancelled({ status: 'cancel' }), true);
+  assert.equal(a4ShareResultCancelled({ status: 'success' }), false);
+});
+test('檔案規格：original>10MB 或 preview 縮不到 <=1MB（oversize）→ 不送 LINE、走 manual（image_too_large）', async () => {
+  const items = itemsN(2); items[1].oversize = true;
+  const { deps, calls } = sendMock({ canSend: () => true });
+  const r = await a4SendReport(items, deps);
+  assert.equal(r.ok, false); assert.equal(r.method, 'manual'); assert.equal(r.reason, 'image_too_large');
+  assert.equal(calls.send.length, 0, '有超規格頁 → 完全不送 LINE');
+  assert.equal(calls.manual[0].length, 2);
+});
+test('大小上限工具：original<=10MB、preview<=1MB 邊界', () => {
+  assert.equal(a4WithinOriginalLimit(10 * 1024 * 1024), true);
+  assert.equal(a4WithinOriginalLimit(10 * 1024 * 1024 + 1), false);
+  assert.equal(a4WithinPreviewLimit(1024 * 1024), true);
+  assert.equal(a4WithinPreviewLimit(1024 * 1024 + 1), false);
 });
 test('多頁順序：page1 → page2 → page3 順序不變', async () => {
   const msgs = a4BuildImageMessages(itemsN(3), 'https://cat.dev');
