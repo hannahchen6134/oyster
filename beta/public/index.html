@@ -1786,7 +1786,7 @@
           <span class="hero-title">${isToday ? '今日累計' : '當日累計'}</span>
         </div>
         ${bar('總水分', 'ml', s.totalWaterMl, pet?.goalWaterMl)}
-        ${bar('總熱量', 'kcal', s.kcal, pet?.goalKcal)}
+        ${bar(s.kcalEstimated ? '總熱量（粗估）' : '總熱量', 'kcal', s.kcal, pet?.goalKcal)}
         ${(!Number(pet?.goalWaterMl) && !Number(pet?.goalKcal)) ? '<div class="pg-hint" style="margin-top:12px">設定每日目標，就能看到「還差多少」 · <a data-goto-goal="1">去設定</a></div>' : ''}`;
     }
 
@@ -1802,6 +1802,18 @@
       if (!n) return t;
       if (!t) return n;
       return n.includes(t) ? n : `${t}${sep}${n}`;
+    }
+    // P0-3：與後端 isKcalEstimated 一致——沒有品牌自訂每克熱量、且類型有預設 → 這筆熱量是「類型預設估算」
+    var EST_KCAL_TYPES = ['乾糧', '罐頭', '濕食', '濕糧', '生食', '主食罐', '副食罐'];
+    function kcalEstimatedFront(log) {
+      if (!(Number(log.kcal) > 0)) return false;
+      if (Number(log.foodKcalPerGram) > 0) return false;
+      return EST_KCAL_TYPES.indexOf(String(log.foodType)) >= 0;
+    }
+    // 熱量 chip：估算時標「約 …（粗估）」，精確就照常
+    function kcalChip(log) {
+      const est = kcalEstimatedFront(log);
+      return `<span class="chip chip-kcal">${est ? '約 ' : ''}${fmt(log.kcal)} kcal${est ? '（粗估）' : ''}</span>`;
     }
     function describeLogFront(log) {
       if (log.category === 'water') return `喝水 ${fmt(log.waterMl || log.amount)}ml`;
@@ -1880,7 +1892,7 @@
       const parts = [
         `${dateStr} ${pet ? pet.petName : ''} 總水分 ${fmt(s.totalWaterMl)} ml（喝水 ${fmt(s.waterMl)}＋食物 ${fmt(s.foodWaterMl)}）`,
         `食物 ${fmt(totalFood)} g`,
-        `熱量 ${fmt(s.kcal)} kcal`,
+        `熱量 ${fmt(s.kcal)} kcal${s.kcalEstimated ? '（粗估）' : ''}`,
         medText ? `藥：${medText}` : '今天尚未看到用藥紀錄',
         s.vomitNotes.length ? `嘔吐：${s.vomitNotes.join('；')}` : '沒有嘔吐紀錄',
         s.stoolNotes.length ? `便便：${s.stoolNotes.join('；')}` : '沒有便便備註'
@@ -1976,7 +1988,7 @@
         if (log.category === 'water') chips.push(`<span class="chip chip-water">${fmt(log.waterMl || log.amount)} ml</span>`);
         if (log.category === 'food') {
           chips.push(`<span class="chip ${foodChipClass}">${esc(foodLabel(log.foodType, log.itemName, ' ・ '))} ${fmt(log.amount)} g</span>`);
-          if (log.kcal) chips.push(`<span class="chip chip-kcal">${fmt(log.kcal)} kcal</span>`);
+          if (log.kcal) chips.push(kcalChip(log));
           if (log.waterMl) chips.push(`<span class="chip chip-foodwater">含水 ${fmt(log.waterMl)} ml</span>`);
         }
         if (log.category === 'med') {
@@ -2023,7 +2035,7 @@
         if (log.category === 'water') chips.push(`<span class="chip chip-water">${fmt(log.waterMl || log.amount)} ml</span>`);
         if (log.category === 'food') {
           chips.push(`<span class="chip ${foodChipClass}">${esc(foodLabel(log.foodType, log.itemName, ' ・ '))} ${fmt(log.amount)} g</span>`);
-          if (log.kcal) chips.push(`<span class="chip chip-kcal">${fmt(log.kcal)} kcal</span>`);
+          if (log.kcal) chips.push(kcalChip(log));
           if (log.waterMl) chips.push(`<span class="chip chip-foodwater">含水 ${fmt(log.waterMl)} ml</span>`);
         }
         if (log.category === 'med') {
@@ -4400,7 +4412,7 @@
       const missed = missedMedDays(rDays);
       // 每日明細：reportRange 窗口、有紀錄者、新→舊，不另抓、不重算
       const daily = trend.filter((r) => Number(r.entryCount) > 0).slice().reverse().map((r) => ({
-        date: r.date, waterMl: r.totalWaterMl, wetG: (Number(r.wetFoodG) || 0) + (Number(r.foodWaterMl) || 0), dryG: r.dryFoodG, kcal: r.kcal, kcalEstimated: false
+        date: r.date, waterMl: r.totalWaterMl, wetG: (Number(r.wetFoodG) || 0) + (Number(r.foodWaterMl) || 0), dryG: r.dryFoodG, kcal: r.kcal, kcalEstimated: !!Number(r.kcalEstimated)
       }));
       const genAt = new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Taipei' }).slice(0, 16);
       return {
@@ -4409,7 +4421,7 @@
         generatedAt: genAt, rangeDays: rDays,
         weight: { latest: lastNonNull(wVals), unit: 'kg', points: pts(wVals), deltaPct: a4DeltaPct(wVals, true), count: wCount },
         water: { latest: lastNonNull(waterVals), unit: 'ml', points: pts(waterVals), deltaPct: a4DeltaPct(waterVals, false) },
-        kcal: { latest: lastNonNull(kcalVals), unit: 'kcal', points: pts(kcalVals), deltaPct: a4DeltaPct(kcalVals, false), estimated: false },
+        kcal: { latest: lastNonNull(kcalVals), unit: 'kcal', points: pts(kcalVals), deltaPct: a4DeltaPct(kcalVals, false), estimated: trend.some((r) => Number(r.kcalEstimated)) },
         digest, missedMed: missed.length ? { count: missed.length, days: missed } : null,
         composition: { rangeDays: rDays, hasData: totalWater > 0 || totalFood > 0, water: { total: totalWater, own: directWater, food: foodWater }, food: { total: totalFood, dry, wet: wetAsFed, other } },
         daily

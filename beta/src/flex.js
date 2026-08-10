@@ -100,6 +100,8 @@ function statCell(label, value, unit, accent) {
 // 類別色（水＝藍綠、食物＝琥珀、熱量＝棕），與網站一致
 // 與照護站網站同一套色票：水＝湖水綠、食物＝麥色、熱量＝藕紫
 const STAT_ACCENT = { water: '#2B7A66', food: '#886722', kcal: '#5A4A84' };
+// P0-3：熱量含「類型預設估算」時，單位標「粗估」（誠實呈現、不假裝精確；設定品項每克熱量後就變精確）
+const kcalUnit = (estimated) => (estimated ? 'kcal・粗估' : 'kcal');
 
 function statCellRow(cells) {
   return { type: 'box', layout: 'horizontal', spacing: 'md', margin: 'md', contents: cells };
@@ -152,7 +154,7 @@ function goalContents(pet, summary, date, showEncourage = true) {
     text('今日目標', { size: 'xs', color: C.muted, margin: 'lg', weight: 'bold' })
   ];
   if (goalWater > 0) contents.push(progressBar(`水分 ${fmt(summary.totalWaterMl)} / ${fmt(goalWater)} ml`, summary.totalWaterMl, goalWater));
-  if (goalKcal > 0) contents.push(progressBar(`熱量 ${fmt(summary.kcal)} / ${fmt(goalKcal)} kcal`, summary.kcal, goalKcal));
+  if (goalKcal > 0) contents.push(progressBar(`熱量 ${fmt(summary.kcal)} / ${fmt(goalKcal)} kcal${summary.kcalEstimated ? '（粗估）' : ''}`, summary.kcal, goalKcal));
   if (slots.length) {
     const doneSlots = new Set((summary.meds || []).filter((m) => m.status === '已吃').map((m) => m.slot));
     const parts = slots.map((slot) => `${slot} ${doneSlots.has(slot) ? '✓' : '未記'}`).join('　');
@@ -231,7 +233,7 @@ export function recordFlex({ pet, categoryKey, mainText, subText, summary, date,
       statCellRow([
         statCell('水分', fmt(summary.totalWaterMl), 'ml', STAT_ACCENT.water),
         statCell('食物', fmt((Number(summary.dryFoodG) || 0) + (Number(summary.wetFoodG) || 0) + (Number(summary.otherFoodG) || 0)), 'g', STAT_ACCENT.food),
-        statCell('熱量', fmt(summary.kcal), 'kcal', STAT_ACCENT.kcal)
+        statCell('熱量', fmt(summary.kcal), kcalUnit(summary.kcalEstimated), STAT_ACCENT.kcal)
       ]),
       ...goalContents(pet, summary, date, false),
       ...hints.filter(Boolean).map((hint) =>
@@ -287,7 +289,7 @@ export function recordFlexCompact({ pet, categoryKey, mainText, subText, summary
         text(mainText, { size: 'md', weight: 'bold', color: C.ink, wrap: true, flex: 1 })
       ] },
       ...(subText ? [text(subText, { size: 'xxs', color: C.muted, wrap: true })] : []),
-      text(`今日　水 ${fmt(summary.totalWaterMl)} ml・食 ${fmt(foodG)} g・熱 ${fmt(summary.kcal)} kcal`,
+      text(`今日　水 ${fmt(summary.totalWaterMl)} ml・食 ${fmt(foodG)} g・熱 ${fmt(summary.kcal)} kcal${summary.kcalEstimated ? '（粗估）' : ''}`,
         { size: 'xxs', color: C.inkSoft, wrap: true, margin: 'sm' })
     ]
   };
@@ -368,7 +370,7 @@ export function multiRecordFlex(pet, lines, summary, date, siteUrl = '', undoDat
       statCellRow([
         statCell('水分', fmt(summary.totalWaterMl), 'ml', STAT_ACCENT.water),
         statCell('食物', fmt(foodG), 'g', STAT_ACCENT.food),
-        statCell('熱量', fmt(summary.kcal), 'kcal', STAT_ACCENT.kcal)
+        statCell('熱量', fmt(summary.kcal), kcalUnit(summary.kcalEstimated), STAT_ACCENT.kcal)
       ]),
       ...goalContents(pet, summary, date)
     ]
@@ -488,7 +490,7 @@ export function weightAddedFlex({ pet, amount, logId, summary, date, siteUrl = '
         statCellRow([
           statCell('水分', fmt(summary.totalWaterMl), 'ml', STAT_ACCENT.water),
           statCell('食物', fmt((Number(summary.dryFoodG) || 0) + (Number(summary.wetFoodG) || 0) + (Number(summary.otherFoodG) || 0)), 'g', STAT_ACCENT.food),
-          statCell('熱量', fmt(summary.kcal), 'kcal', STAT_ACCENT.kcal)
+          statCell('熱量', fmt(summary.kcal), kcalUnit(summary.kcalEstimated), STAT_ACCENT.kcal)
         ])
       ] : [])
     ]
@@ -553,7 +555,7 @@ export function todayFlex({ pet, date, summary, dateLabel, siteUrl = '' }) {
       statCellRow([
         statCell('水分', fmt(summary.totalWaterMl), 'ml', STAT_ACCENT.water),
         statCell('食物', fmt(totalFood), 'g', STAT_ACCENT.food),
-        statCell('熱量', fmt(summary.kcal), 'kcal', STAT_ACCENT.kcal)
+        statCell('熱量', fmt(summary.kcal), kcalUnit(summary.kcalEstimated), STAT_ACCENT.kcal)
       ]),
       // 藥：有設定早/晚時段的貓，交給下方「今日目標」顯示（早/晚 ✓）＝不重複；
       // 沒設時段的貓才在這裡用膠囊列顯示，避免完全看不到用藥狀況
@@ -573,7 +575,7 @@ export function todayFlex({ pet, date, summary, dateLabel, siteUrl = '' }) {
     ]
   };
   return bubble(
-    `${dateLabel}（${pet?.petName}）水分 ${fmt(summary.totalWaterMl)} ml・熱量 ${fmt(summary.kcal)} kcal`,
+    `${dateLabel}（${pet?.petName}）水分 ${fmt(summary.totalWaterMl)} ml・熱量 ${fmt(summary.kcal)} kcal${summary.kcalEstimated ? '（粗估）' : ''}`,
     { type: 'bubble', size: 'mega', header: header(`${dateLabel}・${pet?.petName || '貓貓'}`), body, footer }
   );
 }
@@ -599,7 +601,7 @@ export function handoffFlex(pet, dateLabel, data) {
       statCellRow([
         statCell('水分', fmt(data.totals.waterMl), 'ml', STAT_ACCENT.water),
         statCell('食物', fmt(data.totals.foodG), 'g', STAT_ACCENT.food),
-        statCell('熱量', fmt(data.totals.kcal), 'kcal', STAT_ACCENT.kcal)
+        statCell('熱量', fmt(data.totals.kcal), kcalUnit(data.totals.kcalEstimated), STAT_ACCENT.kcal)
       ]),
       ...(data.medTotal ? [statRow('用藥', `${data.medDone}/${data.medTotal} 已完成`)] : []),
       { type: 'separator', margin: 'lg', color: SEPARATOR },
@@ -774,7 +776,7 @@ export function careNotifyFlex(who, petName, desc, logId, siteUrl, summary = nul
     statCellRow([
       statCell('水分', fmt(summary.totalWaterMl), 'ml', STAT_ACCENT.water),
       statCell('食物', fmt((Number(summary.dryFoodG) || 0) + (Number(summary.wetFoodG) || 0) + (Number(summary.otherFoodG) || 0)), 'g', STAT_ACCENT.food),
-      statCell('熱量', fmt(summary.kcal), 'kcal', STAT_ACCENT.kcal)
+      statCell('熱量', fmt(summary.kcal), kcalUnit(summary.kcalEstimated), STAT_ACCENT.kcal)
     ])
   ] : [];
   const body = {
@@ -1176,7 +1178,7 @@ export function weekFlex(petName, rows) {
       { type: 'separator', margin: 'xl', color: SEPARATOR },
       statCellRow([
         statCell('日均水分', fmt(avg((row) => row.totalWaterMl)), 'ml', STAT_ACCENT.water),
-        statCell('日均熱量', fmt(avg((row) => row.kcal)), 'kcal', STAT_ACCENT.kcal)
+        statCell('日均熱量', fmt(avg((row) => row.kcal)), kcalUnit(rows.some((r) => r.kcalEstimated)), STAT_ACCENT.kcal)
       ])
     ]
   };

@@ -34,6 +34,17 @@ export const TYPE_WATER_DEFAULT = { '乾糧': 0, '罐頭': 0.8, '濕食': 0.75, 
 export const ESTIMABLE_FOOD_TYPES = Object.keys(TYPE_KCAL_DEFAULT);
 export const isEstimableType = (foodType) => Number(TYPE_KCAL_DEFAULT[foodType]) > 0;
 
+// P0-3：一筆食物 log 的熱量是不是「用類型預設估算」的？
+//  - 有品牌自訂每克熱量（food.kcalPerGram>0 或 log.foodKcalPerGram>0）→ 精確，不算估算。
+//  - 否則若類型有預設（乾糧/罐頭/主食罐…）→ 這筆熱量是估的。零食/其他沒預設 → 不算（本來就 0 或待補）。
+// 不新增 kcalSource 欄位，一律由 foodId＋kcalPerGram 推導。
+export function isKcalEstimated(log, food) {
+  if (!(toNumber(log?.kcal) > 0)) return false;
+  const brandKcal = Number(food?.kcalPerGram) > 0 || Number(log?.foodKcalPerGram) > 0;
+  if (brandKcal) return false;
+  return isEstimableType(log?.foodType);
+}
+
 export function deriveFoodFields(grams, foodType, food) {
   const g = toNumber(grams);
   const hasRealKcal = Number(food?.kcalPerGram) > 0;
@@ -69,6 +80,7 @@ export function computeDailySummary(logs) {
     wetFoodG: 0,
     otherFoodG: 0,
     kcal: 0,
+    kcalEstimated: false, // P0-3：當日總熱量是否含「用類型預設估算」的食物筆
     meds: [],
     medTakenCount: 0,
     medIssueCount: 0,
@@ -107,6 +119,7 @@ export function computeDailySummary(logs) {
         else summary.otherFoodG += grams;
         summary.foodWaterMl += toNumber(log.waterMl);
         summary.kcal += toNumber(log.kcal);
+        if (isKcalEstimated(log)) summary.kcalEstimated = true; // 這筆用類型預設估 → 當日標「含估算」
         break;
       }
       case 'med': {
@@ -199,7 +212,8 @@ export function buildHandoff(pet, logs = [], tasks = []) {
   const totals = {
     waterMl: s.totalWaterMl,
     foodG: round1((Number(s.dryFoodG) || 0) + (Number(s.wetFoodG) || 0) + (Number(s.otherFoodG) || 0)),
-    kcal: s.kcal
+    kcal: s.kcal,
+    kcalEstimated: s.kcalEstimated
   };
 
   const slots = parseSlots(pet);

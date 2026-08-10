@@ -453,6 +453,8 @@ export async function ensureTaskSchema(db) {
     // P0-2：食物調整用的「原餵量／剩餘量」欄位（可為 NULL、向後相容；沒有 D1 遷移權限也能上線）
     try { await db.prepare('ALTER TABLE logs ADD COLUMN servedAmount REAL').run(); } catch (error) { /* 已存在 */ }
     try { await db.prepare('ALTER TABLE logs ADD COLUMN leftoverAmount REAL').run(); } catch (error) { /* 已存在 */ }
+    // P0-3：當日總熱量是否含估算（1＝含估算），畫面標「粗估」；向後相容、下次重算即補值
+    try { await db.prepare('ALTER TABLE daily_summary ADD COLUMN kcalEstimated INTEGER NOT NULL DEFAULT 0').run(); } catch (error) { /* 已存在 */ }
     await db.prepare(
       "CREATE UNIQUE INDEX IF NOT EXISTS idx_logs_sourcetask ON logs(sourceTaskId) WHERE sourceTaskId != '' AND isDeleted = 0"
     ).run();
@@ -582,19 +584,25 @@ export async function cancelTask(db, taskId) {
 
 // 最近 n 筆紀錄（新到舊），供 LINE「回顧」清單使用
 export async function getRecentLogsByPet(db, petId, limit = 10) {
+  // 帶出品項的每克熱量（foodKcalPerGram）供「熱量是否為估算」判斷；只讀不改 food_items
   const { results } = await db
-    .prepare('SELECT * FROM logs WHERE petId = ? AND isDeleted = 0 ORDER BY eventDateTime DESC, createdAt DESC LIMIT ?')
+    .prepare(`SELECT logs.*, fi.kcalPerGram AS foodKcalPerGram FROM logs
+       LEFT JOIN food_items fi ON fi.foodId = logs.foodId AND logs.foodId != ''
+       WHERE logs.petId = ? AND logs.isDeleted = 0
+       ORDER BY logs.eventDateTime DESC, logs.createdAt DESC LIMIT ?`)
     .bind(petId, limit)
     .all();
   return results || [];
 }
 
 export async function getLogsForDay(db, petId, date) {
+  // 帶出品項的每克熱量（foodKcalPerGram）供「熱量是否為估算」判斷；只讀不改 food_items
   const { results } = await db
     .prepare(
-      `SELECT * FROM logs
-       WHERE petId = ? AND isDeleted = 0 AND substr(eventDateTime, 1, 10) = ?
-       ORDER BY eventDateTime, createdAt`
+      `SELECT logs.*, fi.kcalPerGram AS foodKcalPerGram FROM logs
+       LEFT JOIN food_items fi ON fi.foodId = logs.foodId AND logs.foodId != ''
+       WHERE logs.petId = ? AND logs.isDeleted = 0 AND substr(logs.eventDateTime, 1, 10) = ?
+       ORDER BY logs.eventDateTime, logs.createdAt`
     )
     .bind(petId, date)
     .all();
@@ -665,8 +673,8 @@ export async function recomputeDay(db, petId, date) {
     .prepare(
       `INSERT INTO daily_summary (petId, date, waterMl, foodWaterMl, totalWaterMl, dryFoodG, wetFoodG,
         otherFoodG, kcal, medJson, medTakenCount, medIssueCount, vomitCount, stoolCount,
-        abnormalFlags, entryCount, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        abnormalFlags, entryCount, kcalEstimated, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(petId, date) DO UPDATE SET
         waterMl = excluded.waterMl,
         foodWaterMl = excluded.foodWaterMl,
@@ -682,6 +690,7 @@ export async function recomputeDay(db, petId, date) {
         stoolCount = excluded.stoolCount,
         abnormalFlags = excluded.abnormalFlags,
         entryCount = excluded.entryCount,
+        kcalEstimated = excluded.kcalEstimated,
         updatedAt = excluded.updatedAt`
     )
     .bind(
@@ -701,6 +710,7 @@ export async function recomputeDay(db, petId, date) {
       summary.stoolCount,
       JSON.stringify(summary.abnormalFlags),
       summary.entryCount,
+      summary.kcalEstimated ? 1 : 0,
       nowIso()
     )
     .run();
