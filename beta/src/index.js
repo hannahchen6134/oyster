@@ -610,6 +610,20 @@ function doneCard(petName) {
   });
 }
 
+// P0-1：新增貓咪只要名字就完成，立刻可記錄。體重／生日／食物等改為選填、之後在照護站補（不阻塞）。
+function petAddedCard(petName) {
+  return onboardCard({
+    title: `${petName}加入完成 🐱`,
+    subtitle: '現在就可以開始記錄照護，不用先填其他資料',
+    rows: [
+      [menuCell('開始記錄', '點按鈕記，不用打字', '紀錄', true)],
+      [menuCell('補完整資料', '體重・生日・常吃食物，之後再補', '補資料')]
+    ],
+    hint: '體重、生日、品種、疾病、醫院、常吃食物、目標都可以之後在照護站補；沒有體重也能先記吃喝、用藥、嘔吐等。',
+    alt: `${petName}加入完成，現在就可以開始記錄`
+  });
+}
+
 function namePromptCard() {
   return onboardCard({
     step: '第 1 步・共 3 步',
@@ -696,9 +710,9 @@ async function handlePending(env, event, { db, user, pet, pets, lineUserId, owne
       newPet = await createPet(db, ownerId, { petName: text });
       if (!pets.length) await updateUser(db, lineUserId, { defaultPetId: newPet.petId });
     }
-    // 最小門檻：建檔後先問目前體重（必填），再進食物設定
-    await updateUser(db, lineUserId, { pendingAction: 'weight-onboard' });
-    await replyOrPushFlex(env, event, weightOnboardCard(newPet.petName), `已幫「${newPet.petName}」建立檔案！先告訴我${newPet.petName}現在幾公斤？直接打數字，例如 4.2`);
+    // P0-1：只要名字就完成，立刻可記錄；體重／食物不再阻塞，之後可到照護站補
+    await clear();
+    await replyOrPushFlex(env, event, petAddedCard(newPet.petName), `${newPet.petName}加入完成，現在就可以開始記錄！之後想補體重、生日或常吃食物，打「補資料」或開照護站即可。`);
     return true;
   }
 
@@ -2061,9 +2075,9 @@ async function handleTextMessage(event, env, baseUrl) {
       }
       const newPet = await createPet(db, ownerId, { petName: intent.name });
       if (!pets.length) await updateUser(db, lineUserId, { defaultPetId: newPet.petId });
-      // 最小門檻：建檔後先問目前體重（必填），再進食物設定
-      await updateUser(db, lineUserId, { pendingAction: 'weight-onboard' });
-      await replyOrPushFlex(env, event, weightOnboardCard(newPet.petName), `已幫「${intent.name}」建立檔案！先告訴我${intent.name}現在幾公斤？直接打數字，例如 4.2`);
+      // P0-1：只要名字就完成（第 2、3 隻貓同樣不阻塞）；體重／食物改為選填、之後補
+      await updateUser(db, lineUserId, { pendingAction: '' });
+      await replyOrPushFlex(env, event, petAddedCard(newPet.petName), `${intent.name}加入完成，現在就可以開始記錄！之後想補體重、生日或常吃食物，打「補資料」或開照護站即可。`);
       return;
     }
 
