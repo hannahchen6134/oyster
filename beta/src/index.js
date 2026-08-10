@@ -1040,7 +1040,7 @@ async function welcomeMsg(db, lineUserId, ownerId) {
 const RECORD_L2 = {
   water: { prompt: '喝了多少 ml？點一下就記好', items: () => [...[10, 20, 30, 50, 80].map((n) => qrMsg(String(n), `水 ${n}`)), qrPost('其他', 'action=rec&k=water_other', '其他數字')] },
   med: { prompt: '這次的藥？點一下就記好', items: () => [qrMsg('早·已吃', '藥 早 已吃'), qrMsg('晚·已吃', '藥 晚 已吃'), qrMsg('中午·已吃', '藥 中午 已吃'), qrMsg('未餵', '藥 未餵')] },
-  food: { prompt: '吃哪一種？', items: () => [qrPost('罐頭', 'action=rec2&t=罐頭', '罐頭'), qrPost('乾糧', 'action=rec2&t=乾糧', '乾糧'), qrPost('濕食', 'action=rec2&t=濕食', '濕食'), qrPost('生食', 'action=rec2&t=生食', '生食'), qrPost('零食', 'action=rec2&t=零食', '零食')] },
+  food: { prompt: '吃哪一種？', items: () => [qrPost('罐頭', 'action=rec2&t=罐頭', '罐頭'), qrPost('主食罐', 'action=rec2&t=主食罐', '主食罐'), qrPost('副食罐', 'action=rec2&t=副食罐', '副食罐'), qrPost('乾糧', 'action=rec2&t=乾糧', '乾糧'), qrPost('濕食', 'action=rec2&t=濕食', '濕食'), qrPost('生食', 'action=rec2&t=生食', '生食'), qrPost('零食', 'action=rec2&t=零食', '零食')] },
   vomit: { prompt: '吐了什麼？點一個，或自己打描述', items: () => [qrMsg('透明泡沫', '吐 透明泡沫'), qrMsg('黃色液體', '吐 黃色液體'), qrMsg('食物或毛', '吐 食物或毛'), qrMsg('只是吐了', '吐了')] },
   stool: { prompt: '大小便情況？點一個就好', items: () => [qrMsg('正常便', '大便 正常'), qrMsg('軟便', '軟便'), qrMsg('拉肚子', '拉肚子'), qrMsg('尿尿正常', '尿尿 正常')] },
   mood: { prompt: '今天精神如何？', items: () => [qrMsg('活力好', '精神 活力好'), qrMsg('普通', '精神 普通'), qrMsg('懶懶的', '精神 懶懶的'), qrMsg('沒精神', '精神 沒精神')] },
@@ -2842,10 +2842,12 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
     if (matched) {
       log.foodId = matched.foodId;
       log.itemName = matched.displayName;
-      const derived = deriveFoodFields(record.amount, record.foodType, matched);
+      // 對到既有品牌 → 沿用該品牌原本的類型與 foodId（不重複建立、也不把既有罐頭品牌在這筆改標成主食罐/副食罐）
+      log.foodType = matched.foodType || record.foodType;
+      const derived = deriveFoodFields(record.amount, log.foodType, matched);
       log.kcal = derived.kcal;
       log.waterMl = derived.waterMl;
-      description = `${foodLabel(record.foodType, matched.displayName)} ${record.amount} g`;
+      description = `${foodLabel(log.foodType, matched.displayName)} ${record.amount} g`;
       // 品項有對到、但還沒填精確每克熱量 → 用類型預設估算，畫面標「估算」＋提醒可設定
       if (derived.estimated) { estimated = true; estKcalPerG = derived.estKcalPerG; }
       else if (!(derived.kcal > 0)) noKcal = true; // 零食/其他這種沒有預設值的才維持「未計入」

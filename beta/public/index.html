@@ -1515,10 +1515,10 @@
     // 這裡的值必須和 worker 的 src/summary.js 一致；由 test/parity.test.mjs 自動比對，
     // 兩邊只要不一致，測試就會變紅（擋掉「改了一邊、漏改另一邊」的低級錯誤）。
     const FOOD = {
-      TYPES: ['乾糧', '罐頭', '濕糧', '濕食', '生食', '零食', '其他'],
-      WET: ['罐頭', '濕食', '濕糧', '生食'],
-      KCAL: { '乾糧': 3.7, '罐頭': 0.9, '濕食': 1.0, '濕糧': 1.0, '生食': 1.5 },
-      WATER: { '乾糧': 0, '罐頭': 0.8, '濕食': 0.75, '濕糧': 0.75, '生食': 0.7 }
+      TYPES: ['乾糧', '罐頭', '主食罐', '副食罐', '濕糧', '濕食', '生食', '零食', '其他'],
+      WET: ['罐頭', '主食罐', '副食罐', '濕食', '濕糧', '生食'],
+      KCAL: { '乾糧': 3.7, '罐頭': 0.9, '主食罐': 1.0, '副食罐': 0.4, '濕食': 1.0, '濕糧': 1.0, '生食': 1.5 },
+      WATER: { '乾糧': 0, '罐頭': 0.8, '主食罐': 0.78, '副食罐': 0.82, '濕食': 0.75, '濕糧': 0.75, '生食': 0.7 }
     };
     const isWetType = (t) => FOOD.WET.includes(t);
 
@@ -2260,7 +2260,7 @@
     const QUICK_PAD = {
       water: { title: '喝水', kind: 'values', unit: 'ml', values: [10, 20, 30, 50, 80], payload: (n) => ({ category: 'water', amount: n, unit: 'ml', waterMl: n }) },
       med: { title: '用藥', kind: 'opts', opts: [['早·已吃', { category: 'med', medSlot: '早', medStatus: '已吃' }], ['晚·已吃', { category: 'med', medSlot: '晚', medStatus: '已吃' }], ['中午·已吃', { category: 'med', medSlot: '中午', medStatus: '已吃' }], ['未餵', { category: 'med', medStatus: '漏餵' }]] },
-      food: { title: '吃飯', kind: 'food', types: ['罐頭', '乾糧', '濕食', '生食', '零食'] },
+      food: { title: '吃飯', kind: 'food', types: ['罐頭', '主食罐', '副食罐', '乾糧', '濕食', '生食', '零食'] },
       vomit: { title: '嘔吐', kind: 'chips', chips: [['透明泡沫', { category: 'vomit', note: '透明泡沫' }], ['黃色液體', { category: 'vomit', note: '黃色液體' }], ['食物或毛', { category: 'vomit', note: '食物或毛' }], ['只是吐了', { category: 'vomit', note: '' }]] },
       stool: { title: '大小便', kind: 'chips', chips: [['正常便', { category: 'stool', note: '正常' }], ['軟便', { category: 'stool', note: '軟便' }], ['拉肚子', { category: 'stool', note: '拉肚子' }], ['尿尿正常', { category: 'urine', note: '正常' }]] },
       mood: { title: '精神', kind: 'chips', chips: [['活力好', { category: 'mood', note: '活力好' }], ['普通', { category: 'mood', note: '普通' }], ['懶懶的', { category: 'mood', note: '懶懶的' }], ['沒精神', { category: 'mood', note: '沒精神' }]] },
@@ -2275,7 +2275,7 @@
     function foodGramPresets(foodType) {
       if (foodType === '乾糧') return [5, 10, 15, 20];
       if (foodType === '零食') return [3, 5, 10];
-      if (['罐頭', '濕食', '生食'].includes(foodType)) return [20, 40, 60, 80];
+      if (['罐頭', '主食罐', '副食罐', '濕食', '濕糧', '生食'].includes(foodType)) return [20, 40, 60, 80];
       return [10, 20, 30];
     }
     function renderQuickPad(category, foodType, foodId, showAll) {
