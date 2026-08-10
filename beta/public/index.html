@@ -1354,8 +1354,8 @@
       <!-- 回診 -->
       <section class="panel hidden" id="trendView">
         <div class="report-actions cap-hide">
-          <button class="btn btn-primary" id="reportSaveBtn" type="button">📷 存成照片給醫生</button>
-          <p class="report-hint">產生 A4 回診摘要照片，可存到相簿或分享給醫生</p>
+          <button class="btn btn-primary" id="reportSaveBtn" type="button">📤 傳完整報告到我的 LINE</button>
+          <p class="report-hint">按一次就把完整 A4 回診摘要（可能多頁）傳回你的 LINE 聊天室，長按或轉傳給醫生</p>
         </div>
         <div class="report-range cap-hide">
           <span class="report-range-label">統計範圍</span>
@@ -1483,7 +1483,7 @@
 
   <!-- 存成圖片給醫生：同源本地檔，執行時不連外 -->
   <script src="/html-to-image.js"></script>
-  <script type="module" src="/a4-report.js?v=20260806a"></script>
+  <script type="module" src="/a4-report.js?v=20260806b"></script>
   <script>
     'use strict';
     const TOKEN_KEY = 'cat-care-beta-token';
@@ -4025,7 +4025,9 @@
           new Promise((_, reject) => setTimeout(() => reject(new Error('init-timeout')), 6000))
         ]);
         try { sessionStorage.removeItem('liffTries_h'); } catch (error) { /* ignore */ }
-        state.liff = { ready: true, inClient: liff.isInClient(), canShare: liff.isApiAvailable('shareTargetPicker') };
+        const apiOk = (name) => { try { return !!(liff.isApiAvailable && liff.isApiAvailable(name)); } catch (e) { return false; } };
+        let ctxType = ''; try { ctxType = (liff.getContext && liff.getContext() || {}).type || ''; } catch (e) { /* ignore */ }
+        state.liff = { ready: true, inClient: liff.isInClient(), canShare: apiOk('shareTargetPicker'), canSendMessages: apiOk('sendMessages'), ctxType };
         // 在 LINE 內已登入：拿 access token 向後端換發本人 session（和機器人同 Provider，身分一致）
         if (liff.isLoggedIn()) {
           const accessToken = liff.getAccessToken && liff.getAccessToken();
@@ -4410,9 +4412,10 @@
     // 檔名安全化
     function a4SafeName(s) { return String(s || '貓咪').replace(/[\\/:*?"<>|\s]+/g, '_'); }
     // 把離屏 .a4-page 逐頁渲染成 2480×3508 PNG（先高倍率 toPng，再畫到固定尺寸白底畫布，保證尺寸一致、不透明、清晰）
-    async function a4RenderPages() {
+    async function a4RenderPages(snapshotData) {
       const host = $('a4Export');
-      const built = window.buildA4Report(collectA4Data());
+      // 用產圖當下 snapshot 的資料渲染（避免產圖/上傳期間切換毛孩混入別隻貓）；沒帶就即時收集
+      const built = window.buildA4Report(snapshotData || collectA4Data());
       host.innerHTML = built.html;
       if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch (e) { /* ignore */ } }
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
@@ -4440,53 +4443,95 @@
       return { pngs: out, pages: built.pages };
     }
 
+    // 主流程：按一次「傳完整報告到我的 LINE」→ 產生所有 A4 頁 → 全部上傳 /shot → 一次 liff.sendMessages 傳回聊天室。
+    // 防連點、pet/owner snapshot、全部上傳成功才送、fallback（shareTargetPicker→頁面長按），皆在此。
+    let reportSending = false;
     $('reportSaveBtn').addEventListener('click', async () => {
-      trackEvent('report_save');
+      if (reportSending) return;                    // 防連點：處理中忽略後續點擊（不重複產圖/上傳/傳送）
       const btn = $('reportSaveBtn');
       if (!window.htmlToImage || typeof window.buildA4Report !== 'function') { toast('報告功能還在載入，請稍等一下再按', true); return; }
       if (!state.trendRows) { toast('資料還在載入，請稍等一下再按', true); return; }
-      const pet = (state.pets || []).find((p) => p.petId === state.petId);
-      const petName = pet ? pet.petName : (($('petTitle').textContent || '貓咪').trim());
-      const rDays = state.reportRange || 14;
-      const today = todayStr();
+      // ── snapshot：同步固定本次的 petId／範圍／日期／資料，整個產圖・上傳・傳送都用它（產圖中切換毛孩也不混用）──
+      const snap = {
+        petId: state.petId,
+        rangeDays: state.reportRange || 14,
+        today: todayStr(),
+        genId: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
+        data: collectA4Data()
+      };
+      const snapPet = (state.pets || []).find((p) => p.petId === snap.petId);
+      if (!snapPet) { toast('找不到目前的貓咪資料，請重新整理再試', true); return; }
+      const petName = snapPet.petName;
+      reportSending = true;
+      trackEvent('report_send_line');
       const orig = btn.textContent;
-      btn.disabled = true; btn.textContent = '產生中…';
-      const loading = showLoadingOverlay();
+      btn.disabled = true; btn.textContent = '整理中…';
+      const loading = showLoadingOverlay('正在整理完整報告⋯');
       try {
-        const { pngs, pages } = await a4RenderPages();
+        const { pngs, pages } = await a4RenderPages(snap.data);   // 用 snapshot 資料渲染，不吃後續 state 變動
         if (!pngs.length) { loading.remove(); alert('這個瀏覽器產出的圖片是空白的，請改用一般瀏覽器（Safari／Chrome）開，或先用手機截圖。'); return; }
-        // 頁數與實際產出張數要一致；有頁沒產出來就不假裝「已產生 N 張」（規格六）
         if (pngs.length < pages) { loading.remove(); console.error('[A4] 頁數不符 pages=' + pages + ' pngs=' + pngs.length); alert(`第 ${pngs.length + 1} 頁產生失敗，請重新產生報告。`); return; }
-        const base = `${a4SafeName(petName)}_回診摘要_近${rDays}天_${today}`;
-        const names = window.a4PageFilenames(base, pngs.length); // 單頁 base.png；多頁 base_1.png、base_2.png…
-        // 逐頁嘗試上傳成真圖片網址（LINE 內建瀏覽器才能長按存），失敗退回 dataURL。每頁各自綁定 dataUrl／檔名。
+        const base = `${a4SafeName(petName)}_回診摘要_近${snap.rangeDays}天_${snap.today}`;
+        const names = window.a4PageFilenames(base, pngs.length);
+        // 先把「所有頁」都上傳完成（original，>1MB 才另產較小 preview），全部處理完才送 LINE：不邊傳邊送、不缺頁、保序
         const items = [];
         for (let i = 0; i < pngs.length; i += 1) {
-          let src = pngs[i];
-          try {
-            const resp = await fetch('/shot', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + state.token }, body: JSON.stringify({ png: pngs[i] }) });
-            const j = await resp.json(); if (j && j.ok && j.url) src = j.url;
-          } catch (e) { /* 用 dataURL */ }
-          items.push({ src, dataUrl: pngs[i], name: names[i] });
+          const url = await a4UploadShot(pngs[i]);
+          let previewUrl = '';
+          if (url && window.a4NeedsSmallerPreview(pngs[i])) {
+            const small = await a4MakePreview(pngs[i]);
+            previewUrl = await a4UploadShot(small);              // preview 上傳失敗 → 送訊息時 fallback 用 original
+          }
+          items.push({ url, previewUrl, dataUrl: pngs[i], name: names[i], src: url ? (location.origin + url) : pngs[i] });
         }
         loading.remove();
-        showReportImages(items);
-        toast(items.length > 1 ? `回診摘要共 ${items.length} 頁，請逐頁儲存或一次分享全部` : '回診摘要已產生，可存到相簿或分享給醫生');
+        // 送出前再次驗證 snapshot 的貓仍屬本家庭（避免產圖中切換毛孩導致傳錯）
+        if (!(state.pets || []).some((p) => p.petId === snap.petId)) { alert('偵測到貓咪已切換，為避免傳錯，請重新產生報告。'); return; }
+        const deps = {
+          origin: location.origin,
+          canSend: () => !!(window.liff && state.liff && state.liff.inClient && state.liff.canSendMessages),
+          send: (messages) => window.liff.sendMessages(messages),
+          canShare: () => !!(window.liff && state.liff && state.liff.inClient && state.liff.canShare),
+          share: (messages) => window.liff.shareTargetPicker(messages),
+          manual: (its) => showReportImages(its)          // 最後 fallback：頁面多頁圖片、長按/分享儲存（保留全部頁）
+        };
+        const r = await window.a4SendReport(items, deps);
+        if (r.ok && r.method === 'send') toast(`完整報告已傳到聊天室${r.truncated ? `（本次先傳前 ${r.pages} 頁）` : ''}`);
+        else if (r.ok && r.method === 'share') toast('已開啟分享面板，請選擇要傳送的對象');
+        else if (r.method === 'manual') toast(r.reason === 'upload_incomplete' ? '部分頁面上傳未完成，已改用逐頁儲存' : '這支手機無法直接傳到聊天室，已顯示每一頁供長按／分享儲存');
+        else if (r.reason === 'aborted') { /* 使用者自行取消，不打擾 */ }
       } catch (error) {
         loading.remove();
-        console.error('[A4] 產生回診摘要失敗：', error);   // 記 console 方便查根因（不顯示空白圖）
-        alert('報告產生失敗，請重新嘗試。');
+        console.error('[A4] 傳送完整報告失敗：', error);
+        alert('報告傳送失敗，請重新嘗試。');
       } finally {
-        btn.disabled = false; btn.textContent = orig;
+        btn.disabled = false; btn.textContent = orig; reportSending = false;
       }
     });
-    // 「產生中…」全螢幕轉圈：一按就給回饋，算圖＋上傳期間都顯示
-    function showLoadingOverlay() {
+    // 全螢幕轉圈：一按就給回饋，算圖＋上傳＋傳送期間都顯示
+    function showLoadingOverlay(mainText) {
       const box = document.createElement('div');
       box.className = 'imgbox';
-      box.innerHTML = `<div class="imgbox-loadwrap"><div class="imgbox-spin"></div><div class="imgbox-loadtext">正在產生回診摘要，請稍候<br><span>等資料與圖表都完成才會產圖，約需幾秒</span></div></div>`;
+      box.innerHTML = `<div class="imgbox-loadwrap"><div class="imgbox-spin"></div><div class="imgbox-loadtext">${esc(mainText || '正在整理完整報告⋯')}<br><span>等資料、圖表與上傳都完成才會傳送，約需幾秒</span></div></div>`;
       document.body.appendChild(box);
       return box;
+    }
+    // 上傳一張 PNG（dataURL）到 /shot，成功回相對 URL（/shot/xxx），失敗回 ''（呼叫端據此判斷是否可送 LINE）
+    async function a4UploadShot(dataUrl) {
+      try {
+        const resp = await fetch('/shot', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + state.token }, body: JSON.stringify({ png: dataUrl }) });
+        const j = await resp.json(); if (j && j.ok && j.url) return j.url;
+      } catch (e) { /* 失敗回空字串 */ }
+      return '';
+    }
+    // 只有 original PNG >1MB 才呼叫：縮到寬 1240（維持 A4 直式比例）的 PNG 供 previewImageUrl（不動 original 品質）
+    async function a4MakePreview(dataUrl) {
+      const img = new Image(); img.src = dataUrl; await (img.decode ? img.decode() : new Promise((r) => { img.onload = r; }));
+      const W = 1240, H = Math.round(W * 3508 / 2480);
+      const c = document.createElement('canvas'); c.width = W; c.height = H;
+      const ctx = c.getContext('2d'); ctx.fillStyle = '#FFFDF8'; ctx.fillRect(0, 0, W, H);
+      ctx.drawImage(img, 0, 0, W, H);
+      return c.toDataURL('image/png');
     }
     // 顯示產生好的 A4 回診摘要（可多頁）。每頁各自：頁碼標示＋自己的圖＋自己的「儲存第N張」按鈕
     // （綁定自己的 pageIndex，不共用 items[0]）；多頁另給「一次分享全部」。單頁給「儲存這張／分享給醫生」。

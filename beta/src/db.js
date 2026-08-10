@@ -335,7 +335,7 @@ export async function saveReportShot(db, ownerLineUserId, base64png) {
 }
 export async function getReportShot(db, id) {
   try {
-    return await db.prepare('SELECT png FROM report_shots WHERE id = ?').bind(String(id || '')).first();
+    return await db.prepare('SELECT png, createdAt FROM report_shots WHERE id = ?').bind(String(id || '')).first();
   } catch (error) { return null; }
 }
 export async function purgeOldShots(db, olderThanIso) {

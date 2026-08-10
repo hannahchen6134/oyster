@@ -27,7 +27,7 @@ import {
   recordTutorial, medTutorial, onboardingText, recordPrompt, backfillGuide
 } from './replies.js';
 import { getRecentLogsByPet, ensureTaskSchema, getLogsForDay, logTextInput } from './db.js';
-import { jsonResponse, taipeiToday, taipeiNowDateTime, addDays, formatWeightKg, weightEquals } from './util.js';
+import { jsonResponse, taipeiToday, taipeiNowDateTime, addDays, formatWeightKg, weightEquals, shotExpired } from './util.js';
 
 // 官方 LINE 加好友連結（basicId @232mjffx）——給共同照護邀請用
 const LINE_ADD_URL = 'https://line.me/R/ti/p/@232mjffx';
@@ -125,6 +125,8 @@ export default {
       const id = url.pathname.slice('/shot/'.length);
       const row = await getReportShot(env.DB, id);
       if (!row || !row.png) return new Response('not found', { status: 404 });
+      // 6 小時失效：即使 cron 尚未實體清除，過期就不再供圖（回 410 Gone）
+      if (shotExpired(row.createdAt)) return new Response('gone', { status: 410 });
       try {
         const bin = Uint8Array.from(atob(row.png), (c) => c.charCodeAt(0));
         return new Response(bin, { headers: { 'content-type': 'image/png', 'cache-control': 'private, max-age=3600', 'x-robots-tag': 'noindex' } });

@@ -266,9 +266,73 @@ export async function a4SharePage(items, idx, deps) {
   return { shared: 0, name: it.name, needManual: true }; // 不支援分享 → 提示長按這一頁
 }
 
+// ── 傳完整報告到 LINE（liff.sendMessages 主流程）的可測純函式 ──────────────────
+const A4_SEND_MAX = 5;                 // LINE 一次 sendMessages/shareTargetPicker 上限
+const A4_PREVIEW_MAX_BYTES = 1024 * 1024; // previewImageUrl 上限 1MB
+
+// 由 data:URL(base64) 估算實際位元組數（不含 header），供 preview 是否需縮圖判斷。
+export function dataUrlBytes(dataUrl) {
+  const s = String(dataUrl || '');
+  const i = s.indexOf('base64,');
+  if (i < 0) return 0;
+  const b64 = s.slice(i + 7);
+  const pad = b64.endsWith('==') ? 2 : (b64.endsWith('=') ? 1 : 0);
+  return Math.max(0, Math.floor(b64.length * 3 / 4) - pad);
+}
+// original 是否超過 preview 規格（>1MB）→ 需另產較小 preview；否則沿用 original（不多產一份）。
+export function a4NeedsSmallerPreview(dataUrl, limitBytes = A4_PREVIEW_MAX_BYTES) {
+  return dataUrlBytes(dataUrl) > limitBytes;
+}
+
+// 把每頁 items（含 HTTPS 相對路徑 url／previewUrl）組成 LINE image message 陣列（絕對網址、保序）。
+// previewUrl 空＝與 original 共用。需要每頁都有 url（上傳成功）；缺頁請呼叫端先擋掉。
+export function a4BuildImageMessages(items, origin) {
+  const abs = (u) => (/^https?:\/\//i.test(u) ? u : `${String(origin || '').replace(/\/$/, '')}${u}`);
+  return (Array.isArray(items) ? items : []).map((it) => ({
+    type: 'image',
+    originalContentUrl: abs(it.url),
+    previewImageUrl: abs(it.previewUrl || it.url)
+  }));
+}
+// 超過 LINE 上限時「靜默截斷」（保序，取前 max 則）。
+export function a4CapMessages(messages, max = A4_SEND_MAX) {
+  const arr = Array.isArray(messages) ? messages : [];
+  return arr.length > max ? arr.slice(0, max) : arr;
+}
+
+// 傳送編排（可測，deps 注入 LIFF/瀏覽器行為）：
+//  deps = { origin, canSend()->bool, send(messages)->Promise, canShare()->bool, share(messages)->Promise, manual(items)->void }
+// 順序：sendMessages → shareTargetPicker → 手機頁面圖片（長按）。任一頁沒 url（上傳失敗）一律不宣稱成功、直接進 manual。
+export async function a4SendReport(items, deps) {
+  const list = Array.isArray(items) ? items : [];
+  if (!list.length) return { ok: false, method: 'none', reason: 'no_pages' };
+  // 每頁都要有 HTTPS url 才能給 LINE 抓；任一頁缺 → 不送 LINE、進 manual（保留全部頁、不只送第一張）
+  if (!list.every((it) => it && it.url)) {
+    if (deps.manual) deps.manual(list);
+    return { ok: false, method: 'manual', reason: 'upload_incomplete', pages: list.length };
+  }
+  const messages = a4CapMessages(a4BuildImageMessages(list, deps.origin), A4_SEND_MAX);
+  const truncated = messages.length < list.length;
+  if (deps.canSend && deps.canSend()) {
+    try { await deps.send(messages); return { ok: true, method: 'send', pages: messages.length, truncated }; }
+    catch (error) { if (error && error.name === 'AbortError') return { ok: false, method: 'send', reason: 'aborted' }; /* 落下一個 */ }
+  }
+  if (deps.canShare && deps.canShare()) {
+    try { await deps.share(messages); return { ok: true, method: 'share', pages: messages.length, truncated }; }
+    catch (error) { if (error && error.name === 'AbortError') return { ok: false, method: 'share', reason: 'aborted' }; /* 落 manual */ }
+  }
+  if (deps.manual) deps.manual(list);
+  return { ok: true, method: 'manual', pages: list.length, truncated };
+}
+
 if (typeof window !== 'undefined') {
   window.buildA4Report = buildA4Report;
   window.a4PageFilenames = a4PageFilenames;
   window.a4ShareAll = a4ShareAll;
   window.a4SharePage = a4SharePage;
+  window.dataUrlBytes = dataUrlBytes;
+  window.a4NeedsSmallerPreview = a4NeedsSmallerPreview;
+  window.a4BuildImageMessages = a4BuildImageMessages;
+  window.a4CapMessages = a4CapMessages;
+  window.a4SendReport = a4SendReport;
 }

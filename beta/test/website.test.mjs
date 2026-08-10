@@ -35,7 +35,7 @@ test('A4 匯出：離屏容器 #a4Export 放畫面外、模組已引入、且移
   assert.ok(/position:\s*fixed/.test(m[0]) && /left:\s*-\d{5,}px/.test(m[0]), '#a4Export 必須離屏（fixed + 大負 left）');
   // 已改為單一「存成照片給醫生」，移除「列印／下載 A4」按鈕
   assert.ok(!html.includes('reportPrintBtn'), '不得再有列印 A4 按鈕');
-  assert.ok(html.includes('存成照片給醫生'), '保留存成照片按鈕');
+  assert.ok(html.includes('傳完整報告到我的 LINE'), '主按鈕＝傳完整報告到我的 LINE');
   // A4 版面模組已引入（允許帶 cache-busting 版本參數）
   assert.ok(/src="\/a4-report\.js(\?v=[^"]*)?"/.test(html), '需引入 a4-report.js 模組');
   // 單一統計範圍控制存在（7/14/30）
@@ -112,4 +112,47 @@ test('A4 存圖：每頁有「儲存第N張」鈕綁 data-idx，逐頁用 a4Shar
   // 頁數與實際張數不符時不假裝已產生 N 張（規格六）
   assert.ok(/pngs\.length < pages/.test(html), '頁數不符時報錯，不假裝已產生');
   assert.ok(/a4PageFilenames\(base, pngs\.length\)/.test(html), '用 a4PageFilenames 產生每頁檔名');
+});
+
+// 傳完整報告到 LINE（liff.sendMessages 主流程）：主按鈕、防連點、snapshot、上傳全成才送、fallback、preview
+test('傳完整報告到 LINE：主按鈕文案、防連點鎖、snapshot 資料渲染、送前再驗家庭', () => {
+  assert.ok(html.includes('傳完整報告到我的 LINE'), '主按鈕＝傳完整報告到我的 LINE');
+  const fn = html.slice(html.indexOf("$('reportSaveBtn').addEventListener"), html.indexOf("$('reportSaveBtn').addEventListener") + 4200);
+  // 防連點
+  assert.ok(/let reportSending = false/.test(html) && /if \(reportSending\) return/.test(fn), '需有防連點鎖');
+  assert.ok(/reportSending = true/.test(fn) && /reportSending = false/.test(fn), '處理中鎖定、完成後解除');
+  // snapshot：同步 collectA4Data + 用 snap.data 渲染（不吃後續 state 切換）
+  assert.ok(/const snap = \{/.test(fn) && /data: collectA4Data\(\)/.test(fn), '需 snapshot petId/資料');
+  assert.ok(/a4RenderPages\(snap\.data\)/.test(fn), '用 snapshot 資料渲染');
+  // 送前再次確認 snapshot 的貓仍屬本家庭
+  assert.ok(/some\(\(p\) => p\.petId === snap\.petId\)/.test(fn), '送出前再驗貓仍在家庭');
+  // 處理中/成功文案
+  assert.ok(/正在整理完整報告/.test(fn) && /完整報告已傳到聊天室/.test(fn), '處理中與成功文案');
+});
+
+test('傳完整報告：先全部上傳、再用 a4SendReport 一次送；deps 綁 liff.sendMessages＋fallback', () => {
+  const fn = html.slice(html.indexOf("$('reportSaveBtn').addEventListener"), html.indexOf("$('reportSaveBtn').addEventListener") + 4200);
+  // 全部頁上傳完成才送（迴圈 push items 後才呼叫 a4SendReport）
+  assert.ok(/for \(let i = 0; i < pngs\.length/.test(fn) && /a4UploadShot\(pngs\[i\]\)/.test(fn), '逐頁上傳');
+  assert.ok(/window\.a4SendReport\(items, deps\)/.test(fn), '用 a4SendReport 一次送全部');
+  // deps：sendMessages 主、shareTargetPicker 次、showReportImages 最後
+  assert.ok(/canSend: \(\) =>[^\n]*state\.liff\.canSendMessages/.test(fn), 'canSend 依 state.liff.canSendMessages');
+  assert.ok(/send: \(messages\) => window\.liff\.sendMessages\(messages\)/.test(fn), 'send＝liff.sendMessages');
+  assert.ok(/share: \(messages\) => window\.liff\.shareTargetPicker\(messages\)/.test(fn), 'fallback＝shareTargetPicker');
+  assert.ok(/manual: \(its\) => showReportImages\(its\)/.test(fn), '最後 fallback＝頁面長按');
+  // preview 保險：>1MB 才另產
+  assert.ok(/a4NeedsSmallerPreview\(pngs\[i\]\)/.test(fn) && /a4MakePreview\(pngs\[i\]\)/.test(fn), 'preview 僅在 >1MB 時另產');
+  // LIFF init 有捕捉 sendMessages 可用性
+  assert.ok(/canSendMessages: apiOk\('sendMessages'\)/.test(html), 'init 捕捉 sendMessages availability');
+});
+
+// /shot 6 小時失效
+test('/shot 6h 失效：shotExpired 規則（5h59m 可讀、>6h 不可讀），GET 端已接上', async () => {
+  const { shotExpired } = await import('../src/util.js');
+  const now = Date.parse('2026-08-06T12:00:00Z');
+  assert.equal(shotExpired('2026-08-06T06:01:00Z', now), false, '5h59m 內可讀');
+  assert.equal(shotExpired('2026-08-06T05:59:00Z', now), true, '>6h 不可讀');
+  assert.equal(shotExpired('', now), true, '缺 createdAt → 視為過期（安全）');
+  // GET /shot/:id 已接上 shotExpired → 回 410
+  assert.ok(/if \(shotExpired\(row\.createdAt\)\) return new Response\('gone', \{ status: 410 \}\)/.test(readFileSync(join(dir, '../src/index.js'), 'utf8')), 'GET /shot 過期回 410');
 });
