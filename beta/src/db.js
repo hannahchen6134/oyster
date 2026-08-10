@@ -450,6 +450,9 @@ export async function ensureTaskSchema(db) {
     try {
       await db.prepare("ALTER TABLE logs ADD COLUMN sourceTaskId TEXT NOT NULL DEFAULT ''").run();
     } catch (error) { /* 欄位已存在就略過 */ }
+    // P0-2：食物調整用的「原餵量／剩餘量」欄位（可為 NULL、向後相容；沒有 D1 遷移權限也能上線）
+    try { await db.prepare('ALTER TABLE logs ADD COLUMN servedAmount REAL').run(); } catch (error) { /* 已存在 */ }
+    try { await db.prepare('ALTER TABLE logs ADD COLUMN leftoverAmount REAL').run(); } catch (error) { /* 已存在 */ }
     await db.prepare(
       "CREATE UNIQUE INDEX IF NOT EXISTS idx_logs_sourcetask ON logs(sourceTaskId) WHERE sourceTaskId != '' AND isDeleted = 0"
     ).run();
@@ -600,7 +603,7 @@ export async function getLogsForDay(db, petId, date) {
 
 export async function updateLog(db, logId, fields, updatedBy) {
   const allowedText = ['eventDateTime', 'category', 'itemName', 'foodType', 'foodId', 'unit', 'medStatus', 'medSlot', 'doseText', 'medForm', 'beforeMeal', 'note'];
-  const allowedNumber = ['amount', 'waterMl', 'kcal'];
+  const allowedNumber = ['amount', 'waterMl', 'kcal', 'servedAmount', 'leftoverAmount'];
   const sets = [];
   const values = [];
 

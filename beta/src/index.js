@@ -1542,6 +1542,17 @@ async function handlePostback(event, env, baseUrl) {
     }
     return;
   }
+
+  // P0-2：「改 品名 N」多餐符合時，使用者從確認卡選定要改哪一餐 → 改成 N
+  if (action === 'fixPick') {
+    await ensureTaskSchema(db);
+    const logId = data.get('logId') || '';
+    const amt = Number(data.get('amt')) || 0;
+    const log = logId ? await getLog(db, logId) : null;
+    if (!log || log.isDeleted || log.lineUserId !== ownerId) { await replyOrPush(env, event, '找不到那筆紀錄，可能已被刪除或修改。'); return; }
+    await applyAdjustToLog(env, event, db, log, { mode: 'set', amount: amt }, lineUserId);
+    return;
+  }
 }
 
 // 撤銷核心（可單測）：挑出「屬於這個家庭、還沒刪」的可撤銷筆。ids 不可信 → 先 parseUndoIds。
@@ -2360,11 +2371,13 @@ async function handleTextMessage(event, env, baseUrl) {
     }
 
     case 'fixLast': {
-      await handleFixLast(env, event, ownerId, intent, lineUserId);
+      if (!explicitPet && needsCatPick(user, pets)) { await askWhichCat(env, event, pets); return; }
+      await handleFixLast(env, event, pet, intent, lineUserId);
       return;
     }
 
     case 'fixMatch': {
+      if (!explicitPet && needsCatPick(user, pets)) { await askWhichCat(env, event, pets); return; }
       await handleFixMatch(env, event, pet, intent, lineUserId);
       return;
     }
@@ -2439,7 +2452,7 @@ async function handleTextMessage(event, env, baseUrl) {
     }
 
     case 'fixHint': {
-      await replyOrPush(env, event, '要修正紀錄：\n改 54（改最後一筆）\n改 皇家罐頭 24（指定品名改）\n剩 20（沒吃完扣掉）\n刪除（整筆刪掉）');
+      await replyOrPush(env, event, '要修正紀錄：\n改成 54（把最近一餐改成實吃 54）\n改 皇家罐頭 24（指定品名／類型改）\n剩 20（這餐剩 20，其餘算吃掉，保留原餵量）\n扣 20（從實吃量再扣掉 20）\n刪除（整筆刪掉）');
       return;
     }
 
@@ -2521,46 +2534,85 @@ function describeLog(log) {
 }
 
 // 「改 54」「剩 20」：修正最近一筆的數量
-async function handleFixLast(env, event, lineUserId, intent, actorId = lineUserId) {
+// 由「原紀錄＋調整意圖」算出實吃／實喝量與（剩餘語意時的）原餵量／剩餘量。
+//  - set（改成 N）：實量＝N。
+//  - leftover（剩 N）：原餵量取「已記的 servedAmount，沒有就用目前 amount」，實量＝原餵量−N，並保留 served/leftover。
+//  - subtract（扣/減 N）：實量＝目前 amount−N（相對扣減，不記剩餘量）。
+export function computeAdjust(target, intent) {
+  const old = Number(target.amount) || 0;
+  const hadServed = target.servedAmount != null && Number(target.servedAmount) > 0;
+  const servedBase = hadServed ? Number(target.servedAmount) : old;
+  let served = null;
+  let leftover = null;
+  let consumed;
+  if (intent.mode === 'set') {
+    consumed = intent.amount;
+  } else if (intent.mode === 'leftover') {
+    served = servedBase;
+    leftover = intent.amount;
+    consumed = Math.round((served - leftover) * 10) / 10;
+  } else { // subtract
+    consumed = Math.round((old - intent.amount) * 10) / 10;
+  }
+  return { consumed, served, leftover, servedBase, alreadyAdjusted: hadServed };
+}
+
+// P0-2：把「剩/扣/改成」對到「正確的那一餐」再調整——以貓為範圍找最近一筆食物（沒食物才退回最近喝水），
+// 不再用 getLastLogByUser（可能抓到別隻貓或非食物紀錄）。amount 一律＝實吃量、統計語意不變；
+// 剩餘語意會保留 servedAmount／leftoverAmount。實量<0 不寫、請使用者確認；=0 也會提示整份沒吃/喝。
+export async function handleFixLast(env, event, pet, intent, actorId) {
   const db = env.DB;
-  const last = await getLastLogByUser(db, lineUserId);
-  if (!last) {
-    await replyOrPush(env, event, '找不到可以修改的紀錄，\n先記一筆吧！');
-    return;
-  }
-  if (!['water', 'food'].includes(last.category)) {
-    await replyOrPush(env, event, `上一筆是「${describeLog(last)}」，\n沒有數量可以改。\n輸入「刪除」可整筆刪掉。`);
+  await ensureTaskSchema(db); // 內含 servedAmount／leftoverAmount 欄位的冪等建立
+  if (!pet) { await replyOrPush(env, event, '找不到可以調整的食物紀錄'); return; }
+  const recent = (await getRecentLogsByPet(db, pet.petId, 30)) || [];
+  const foods = recent.filter((l) => l.category === 'food');
+
+  // 找目標：明確講「沒喝完」→ 最近一筆喝水；否則預設最近一餐食物；沒有食物但最近一筆是喝水 → 退回調整喝水
+  let target = null;
+  if (intent.target === 'water') target = recent.find((l) => l.category === 'water') || null;
+  if (!target) target = foods[0] || null;
+  if (!target && recent[0]?.category === 'water') target = recent[0];
+  if (!target) { await replyOrPush(env, event, '找不到可以調整的食物紀錄'); return; }
+
+  await applyAdjustToLog(env, event, db, target, intent, actorId);
+}
+
+// 對「已鎖定的那一筆」套用調整（fixLast 找到最近一餐、fixMatch 選定品項、或歧義確認後的 postback 共用）。
+export async function applyAdjustToLog(env, event, db, target, intent, actorId) {
+  const isWater = target.category === 'water';
+  const { consumed, served, leftover, servedBase, alreadyAdjusted } = computeAdjust(target, intent);
+
+  if (consumed < 0) {
+    const base = isWater ? '喝' : '吃';
+    await replyOrPush(env, event, `這樣算出來會變成負的（原本${isWater ? '倒' : '餵'} ${servedBase}、${intent.mode === 'leftover' ? `剩 ${intent.amount}` : `扣 ${intent.amount}`}）。\n請確認數字，或直接打「改成 N」重設實際${base}掉的量。`);
     return;
   }
 
-  let newAmount = intent.mode === 'set'
-    ? intent.amount
-    : Math.round((Number(last.amount) - intent.amount) * 10) / 10;
-  if (newAmount < 0) newAmount = 0;
-
-  const fields = { amount: newAmount };
-  if (last.category === 'water') {
-    fields.waterMl = newAmount;
-  } else if (last.category === 'food') {
-    const food = last.foodId ? await getFood(db, last.foodId) : null;
-    const derived = deriveFoodFields(newAmount, last.foodType, food);
+  const fields = { amount: consumed };
+  if (isWater) {
+    fields.waterMl = consumed;
+  } else {
+    const food = target.foodId ? await getFood(db, target.foodId) : null;
+    const derived = deriveFoodFields(consumed, target.foodType, food);
     fields.kcal = derived.kcal;
     fields.waterMl = derived.waterMl;
   }
+  if (intent.mode === 'leftover') { fields.servedAmount = served; fields.leftoverAmount = leftover; }
 
-  const updated = await updateLog(db, last.logId, fields, actorId);
+  const updated = await updateLog(db, target.logId, fields, actorId);
   const eventDate = String(updated.eventDateTime).slice(0, 10);
   const summary = await recomputeDay(db, updated.petId, eventDate);
   const cardPet = await getPet(db, updated.petId);
 
   const subParts = [];
-  if (updated.kcal) subParts.push(`${updated.kcal} kcal`);
-  if (updated.category === 'food' && updated.waterMl) subParts.push(`水 ${updated.waterMl} ml`);
-  if (intent.mode === 'subtract') subParts.push(`已扣掉沒吃完的 ${intent.amount}`);
+  if (!isWater && updated.kcal) subParts.push(`${updated.kcal} kcal`);
+  if (!isWater && updated.waterMl) subParts.push(`水 ${updated.waterMl} ml`);
+  if (intent.mode === 'leftover') subParts.push(`原${isWater ? '倒' : '餵'} ${servedBase}・剩 ${leftover}`);
+  else if (intent.mode === 'subtract') subParts.push(`扣掉 ${intent.amount}`);
+  if (consumed === 0) subParts.push(`整份沒${isWater ? '喝' : '吃'}`);
+  if (alreadyAdjusted && intent.mode === 'leftover') subParts.push('（已依原餵量重算）');
 
-  const categoryKey = updated.category === 'food'
-    ? (updated.foodType === '乾糧' ? 'dry' : 'wet')
-    : updated.category;
+  const categoryKey = isWater ? 'water' : (isWetFoodType(updated.foodType) ? 'wet' : 'dry');
   const fallbackText = recordReply(describeLog(updated), cardPet, summary, [], eventDate);
   const card = recordFlex({
     pet: cardPet, categoryKey,
@@ -2573,36 +2625,34 @@ async function handleFixLast(env, event, lineUserId, intent, actorId = lineUserI
   await replyOrPushFlex(env, event, card, fallbackText);
 }
 
-// 「改 皇家罐頭 24」：找最近一筆符合品名/類型的食物，改它的克數（連帶重算熱量/含水）
-async function handleFixMatch(env, event, pet, intent, actorId) {
+// 「改 皇家罐頭 24」：找最近一筆符合品名/類型的食物，改它的克數（連帶重算熱量/含水）。
+// P0-2：以貓為範圍找符合品名/類型的食物；若有「多筆都對得上」→ 不亂猜、出確認卡讓使用者選是哪一餐。
+export async function handleFixMatch(env, event, pet, intent, actorId) {
   const db = env.DB;
-  if (!pet) { await replyOrPush(env, event, '找不到可以修改的紀錄，\n先記一筆吧！'); return; }
+  await ensureTaskSchema(db);
+  if (!pet) { await replyOrPush(env, event, '找不到可以調整的食物紀錄'); return; }
   const q = intent.query;
   const recent = (await getRecentLogsByPet(db, pet.petId, 30)) || [];
   const foods = recent.filter((l) => l.category === 'food' && !l.isDeleted);
-  // 先比品名，再比類型；取最近一筆
-  let match = foods.find((l) => l.itemName && (l.itemName.includes(q) || q.includes(l.itemName)));
-  if (!match) match = foods.find((l) => l.foodType && (l.foodType.includes(q) || q.includes(l.foodType)));
-  if (!match) {
-    await replyOrPush(env, event, `找不到「${q}」的食物紀錄可以改。\n・想改最後一筆：直接打「改 ${intent.amount}」\n・或到照護站點那筆改`);
+  // 先比品名，全都對不上再比類型；蒐集「所有」符合的，判斷是否需要選餐
+  let matches = foods.filter((l) => l.itemName && (l.itemName.includes(q) || q.includes(l.itemName)));
+  if (!matches.length) matches = foods.filter((l) => l.foodType && (l.foodType.includes(q) || q.includes(l.foodType)));
+  if (!matches.length) {
+    await replyOrPush(env, event, `找不到可以調整的食物紀錄（「${q}」）。\n・想改最近一餐：直接打「改 ${intent.amount}」\n・或到照護站點那筆改`);
     return;
   }
-  const food = match.foodId ? await getFood(db, match.foodId) : null;
-  const derived = deriveFoodFields(intent.amount, match.foodType, food);
-  const updated = await updateLog(db, match.logId, { amount: intent.amount, kcal: derived.kcal, waterMl: derived.waterMl }, actorId);
-  const eventDate = String(updated.eventDateTime).slice(0, 10);
-  const summary = await recomputeDay(db, updated.petId, eventDate);
-  const cardPet = await getPet(db, updated.petId);
-  const subParts = [];
-  if (updated.kcal) subParts.push(`${updated.kcal} kcal`);
-  if (updated.waterMl) subParts.push(`含水 ${updated.waterMl} ml`);
-  const card = recordFlex({
-    pet: cardPet, categoryKey: updated.foodType === '乾糧' ? 'dry' : 'wet',
-    mainText: describeLog(updated), subText: subParts.join('・'),
-    summary, date: eventDate, logId: updated.logId,
-    title: `✓ 已更新・${cardPet?.petName || '貓貓'}`
+  const setIntent = { mode: 'set', amount: intent.amount };
+  if (matches.length === 1) {
+    await applyAdjustToLog(env, event, db, matches[0], setIntent, actorId);
+    return;
+  }
+  // 多筆都對得上 → 出快速選單，點哪一餐就改哪一餐（不亂猜）
+  const btns = matches.slice(0, 8).map((l) => {
+    const t = String(l.eventDateTime).slice(11, 16) || String(l.eventDateTime).slice(5, 10);
+    const label = `${t} ${l.itemName || l.foodType} ${Math.round(Number(l.amount) || 0)}g`;
+    return qrPost(label.slice(0, 20), `action=fixPick&logId=${encodeURIComponent(l.logId)}&amt=${intent.amount}`, label);
   });
-  await replyOrPushFlex(env, event, card, recordReply(describeLog(updated), cardPet, summary, [], eventDate));
+  await replyOrPushQuick(env, event, `有 ${matches.length} 餐都對得上「${q}」，要改哪一餐成 ${intent.amount}？`, btns);
 }
 
 // 「刪除」：刪掉最近一筆

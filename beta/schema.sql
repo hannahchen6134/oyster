@@ -125,7 +125,10 @@ CREATE TABLE IF NOT EXISTS logs (
   createdAt TEXT NOT NULL,
   updatedAt TEXT NOT NULL,
   updatedBy TEXT NOT NULL DEFAULT '',
-  sourceTaskId TEXT NOT NULL DEFAULT ''
+  sourceTaskId TEXT NOT NULL DEFAULT '',
+  -- P0-2 食物調整：保留「原本餵的量」與「剩下的量」（可為 NULL、向後相容）；amount 一律＝實際吃掉量（統計語意不變）
+  servedAmount REAL,
+  leftoverAmount REAL
 );
 CREATE INDEX IF NOT EXISTS idx_logs_pet_event ON logs(petId, eventDateTime, isDeleted);
 CREATE INDEX IF NOT EXISTS idx_logs_message ON logs(sourceMessageId);

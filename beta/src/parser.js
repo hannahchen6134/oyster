@@ -453,9 +453,15 @@ export function parseMessage(rawText) {
   if (['刪除', '刪掉', '刪除上一筆', '刪上一筆', '刪除剛剛', '刪掉剛剛'].includes(compact)) {
     return { type: 'deleteLast' };
   }
+  // 剩下 N＝「這餐剩了 N、其餘吃掉」：實吃＝原餵量−剩餘，並保留原餵量／剩餘量（不是把 amount 當扣減）
   const leftoverFix = compact.match(/^(?:沒吃完|沒喝完)?剩下?(\d+(?:\.\d+)?)(?:g|克|公克|ml|毫升|cc)?$/i);
   if (leftoverFix) {
-    return { type: 'fixLast', mode: 'subtract', amount: Number(leftoverFix[1]) };
+    return { type: 'fixLast', mode: 'leftover', amount: Number(leftoverFix[1]), target: /^沒喝完/.test(compact) ? 'water' : 'food' };
+  }
+  // 扣掉／減掉 N＝直接從實吃量扣掉 N（相對調整，不記剩餘量）
+  const deductFix = compact.match(/^(?:扣掉?|減掉?)(\d+(?:\.\d+)?)(?:g|克|公克|ml|毫升|cc)?$/i);
+  if (deductFix) {
+    return { type: 'fixLast', mode: 'subtract', amount: Number(deductFix[1]) };
   }
   const editFix = compact.match(/^(?:改成?|修改|更正)(\d+(?:\.\d+)?)(?:g|克|公克|ml|毫升|cc)?$/i);
   if (editFix) {
