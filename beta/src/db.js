@@ -453,8 +453,10 @@ export async function ensureTaskSchema(db) {
     // P0-2：食物調整用的「原餵量／剩餘量」欄位（可為 NULL、向後相容；沒有 D1 遷移權限也能上線）
     try { await db.prepare('ALTER TABLE logs ADD COLUMN servedAmount REAL').run(); } catch (error) { /* 已存在 */ }
     try { await db.prepare('ALTER TABLE logs ADD COLUMN leftoverAmount REAL').run(); } catch (error) { /* 已存在 */ }
-    // P0-3：當日總熱量是否含估算（1＝含估算），畫面標「粗估」；向後相容、下次重算即補值
-    try { await db.prepare('ALTER TABLE daily_summary ADD COLUMN kcalEstimated INTEGER NOT NULL DEFAULT 0').run(); } catch (error) { /* 已存在 */ }
+    // P0-3：當日總熱量是否含估算（1＝含估算、0＝全精準）。刻意「可為 NULL、無預設」：
+    // 既有列加欄後為 NULL＝「未知」，讀取時（getSummaries）再由當天底層 logs 安全推導，不會被當成精準。
+    // （若給 NOT NULL DEFAULT 0，既有歷史列會被回填 0＝精準，導致粗估日誤標成精準。）
+    try { await db.prepare('ALTER TABLE daily_summary ADD COLUMN kcalEstimated INTEGER').run(); } catch (error) { /* 已存在 */ }
     await db.prepare(
       "CREATE UNIQUE INDEX IF NOT EXISTS idx_logs_sourcetask ON logs(sourceTaskId) WHERE sourceTaskId != '' AND isDeleted = 0"
     ).run();
@@ -723,7 +725,19 @@ export async function getSummaries(db, petId, from, to) {
     .prepare('SELECT * FROM daily_summary WHERE petId = ? AND date >= ? AND date <= ? ORDER BY date')
     .bind(petId, from, to)
     .all();
-  return results || [];
+  const rows = results || [];
+  // 向後相容（集中處理，LINE／網站／週月／A4 共用同一份結果）：
+  // 部署前既有列的 kcalEstimated 可能為 NULL＝「未知」（欄位剛加、尚未 recompute）。
+  // 此時「絕不可當成精準」，改由當天底層食物 logs＋food_items 用同一套 computeDailySummary 安全推導。
+  // 只讀不寫：不寫回 daily_summary、不批次重算、不動 food_items／logs（避免無限重算與副作用）。
+  for (const row of rows) {
+    if (row.kcalEstimated === null || row.kcalEstimated === undefined) {
+      row.kcalEstimated = Number(row.kcal) > 0
+        ? (computeDailySummary(await getLogsForDay(db, petId, row.date)).kcalEstimated ? 1 : 0)
+        : 0; // 當天沒有熱量 → 不可能是估算
+    }
+  }
+  return rows;
 }
 
 // 近 n 天（含今天）的總結列，缺少的日期補零列
@@ -757,9 +771,13 @@ export function emptySummaryRow(petId, date) {
     stoolCount: 0,
     abnormalFlags: '[]',
     entryCount: 0,
+    kcalEstimated: 0, // 空白日沒有熱量 → 一律非估算（避免補零列被誤判）
     updatedAt: ''
   };
 }
+
+// 測試用：重置 ensureTaskSchema 的「本 isolate 已跑過」旗標，讓測試能模擬「多個 request 各自第一次觸發 ALTER」。
+export function _resetTaskSchemaReadyForTest() { taskSchemaReady = false; }
 
 // ---------- vets / visits ----------
 

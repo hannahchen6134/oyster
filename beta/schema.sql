@@ -153,8 +153,9 @@ CREATE TABLE IF NOT EXISTS daily_summary (
   stoolCount INTEGER NOT NULL DEFAULT 0,
   abnormalFlags TEXT NOT NULL DEFAULT '[]',
   entryCount INTEGER NOT NULL DEFAULT 0,
-  -- P0-3：當日總熱量是否含「用類型預設估算」的食物筆（1＝含估算），畫面標「粗估」
-  kcalEstimated INTEGER NOT NULL DEFAULT 0,
+  -- P0-3：當日總熱量是否含「用類型預設估算」的食物筆（1＝含估算、0＝全精準）。
+  -- 可為 NULL＝「未知」（部署前既有列、欄位剛加尚未 recompute）；讀取時由當天底層 logs 安全推導，不當成精準。
+  kcalEstimated INTEGER,
   updatedAt TEXT NOT NULL,
   PRIMARY KEY (petId, date)
 );
