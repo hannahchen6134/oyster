@@ -1543,14 +1543,19 @@ async function handlePostback(event, env, baseUrl) {
     return;
   }
 
-  // P0-2：「改 品名 N」多餐符合時，使用者從確認卡選定要改哪一餐 → 改成 N
+  // 「乾乾-N／主食-N」的短確認卡「不是」：不動任何紀錄，明確回讀讓使用者安心。
+  if (action === 'adjustCancel') { await replyOrPush(env, event, '好，沒有改動任何紀錄 👌'); return; }
+
+  // P0-2：「改 品名 N」多餐符合時，使用者從確認卡選定要改哪一餐 → 改成 N。
+  // mode=subtract 時（超口語「別名減N／別名-N」的確認）改為從實吃量扣掉 N，其餘一律預設改成 N。
   if (action === 'fixPick') {
     await ensureTaskSchema(db);
     const logId = data.get('logId') || '';
     const amt = Number(data.get('amt')) || 0;
+    const mode = data.get('mode') === 'subtract' ? 'subtract' : 'set';
     const log = logId ? await getLog(db, logId) : null;
     if (!log || log.isDeleted || log.lineUserId !== ownerId) { await replyOrPush(env, event, '找不到那筆紀錄，可能已被刪除或修改。'); return; }
-    await applyAdjustToLog(env, event, db, log, { mode: 'set', amount: amt }, lineUserId);
+    await applyAdjustToLog(env, event, db, log, { mode, amount: amt }, lineUserId);
     return;
   }
 }
@@ -2382,6 +2387,12 @@ async function handleTextMessage(event, env, baseUrl) {
       return;
     }
 
+    case 'foodAdjust': {
+      if (!explicitPet && needsCatPick(user, pets)) { await askWhichCat(env, event, pets); return; }
+      await handleFoodAdjust(env, event, pet, intent, lineUserId);
+      return;
+    }
+
     case 'deleteLast': {
       await handleDeleteLast(env, event, ownerId, lineUserId);
       return;
@@ -2653,6 +2664,50 @@ export async function handleFixMatch(env, event, pet, intent, actorId) {
     return qrPost(label.slice(0, 20), `action=fixPick&logId=${encodeURIComponent(l.logId)}&amt=${intent.amount}`, label);
   });
   await replyOrPushQuick(env, event, `有 ${matches.length} 餐都對得上「${q}」，要改哪一餐成 ${intent.amount}？`, btns);
+}
+
+// 超口語調整「乾乾減5克 / 主食扣3 / 主食-3」：以貓為範圍、只找該 foodType 的近期食物紀錄再扣減。
+// 安全定位（沿用 fixMatch 精神）：先鎖貓（呼叫端已做）→ 只看該貓、未刪、同 foodType 的食物 →
+//   confirm=false（有明確動詞）：唯一候選直接扣、多筆出選餐確認卡。
+//   confirm=true（-N 過度簡略）：即使唯一候選也先出短確認卡（對，扣 N 克／不是），確認後才 update。
+// 一律不碰別隻貓、不碰其他 foodType、不新增紀錄。
+export async function handleFoodAdjust(env, event, pet, intent, actorId) {
+  const db = env.DB;
+  await ensureTaskSchema(db);
+  if (!pet) { await replyOrPush(env, event, '找不到可以調整的食物紀錄'); return; }
+  const foodType = intent.foodType;
+  const amount = intent.amount;
+  const recent = (await getRecentLogsByPet(db, pet.petId, 30)) || [];
+  const matches = recent.filter((l) => l.category === 'food' && !l.isDeleted && l.foodType === foodType);
+
+  if (!matches.length) {
+    await replyOrPush(env, event, `找不到可以調整的${foodType}紀錄。\n・想改最近一餐：直接打「扣 ${amount}」\n・或到照護站點那筆改`);
+    return;
+  }
+
+  // 過度簡略（-N）或多筆候選 → 一律先確認/選餐，確認後才透過 fixPick(mode=subtract) 落地；不直接寫入。
+  if (intent.confirm || matches.length > 1) {
+    if (matches.length === 1) {
+      const l = matches[0];
+      const btns = [
+        qrPost(`對，扣 ${amount} 克`, `action=fixPick&logId=${encodeURIComponent(l.logId)}&amt=${amount}&mode=subtract`, `扣 ${amount} 克`),
+        qrPost('不是', 'action=adjustCancel', '不是')
+      ];
+      await replyOrPushQuick(env, event, `你是要把最近一筆${foodType}扣 ${amount} 克嗎？`, btns);
+      return;
+    }
+    // 多筆合理候選：先列出候選餐次讓使用者選是哪一筆；每個按鈕已載明「扣 N 克」＝選定即確認。
+    const btns = matches.slice(0, 8).map((l) => {
+      const t = String(l.eventDateTime).slice(11, 16) || String(l.eventDateTime).slice(5, 10);
+      const label = `${t} ${l.itemName || l.foodType} ${Math.round(Number(l.amount) || 0)}g`;
+      return qrPost(label.slice(0, 20), `action=fixPick&logId=${encodeURIComponent(l.logId)}&amt=${amount}&mode=subtract`, label);
+    });
+    await replyOrPushQuick(env, event, `有 ${matches.length} 筆${foodType}都對得上，你要調整哪一筆？（扣 ${amount} 克）`, btns);
+    return;
+  }
+
+  // 明確動詞＋唯一候選 → 直接扣減
+  await applyAdjustToLog(env, event, db, matches[0], { mode: 'subtract', amount }, actorId);
 }
 
 // 「刪除」：刪掉最近一筆

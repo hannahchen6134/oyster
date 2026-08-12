@@ -14,9 +14,10 @@ const WATER_WORDS = new Set(['水', '喝水', '飲水', '喝', '喝了', '喝水
 
 const FOOD_TYPE_WORDS = [
   { type: '乾糧', words: ['乾糧', '飼料', '乾乾'] },
-  // 主食罐／副食罐＝獨立類型（熱量預設不同）；比「罐頭」長，偵測時會優先命中，不會被當成一般罐頭
-  { type: '主食罐', words: ['主食罐'] },
-  { type: '副食罐', words: ['副食罐'] },
+  // 主食罐／副食罐＝獨立類型（熱量預設不同）；比「罐頭」長，偵測時會優先命中，不會被當成一般罐頭。
+  // 口語簡稱「主食／副食」也視為對應罐型：食物類型已明確，不需再要求補「罐」或「克」。
+  { type: '主食罐', words: ['主食罐', '主食'] },
+  { type: '副食罐', words: ['副食罐', '副食'] },
   { type: '罐頭', words: ['罐頭', '罐罐'] },
   { type: '濕糧', words: ['濕糧'] },
   { type: '濕食', words: ['濕食', '鮮食', '餐包', '肉泥'] },
@@ -24,6 +25,17 @@ const FOOD_TYPE_WORDS = [
   { type: '零食', words: ['零食', '點心'] },
   { type: '其他', words: ['其他'] }
 ];
+
+// 食物別名（含口語簡稱）→ 正規 foodType 的集中對照，供「別名＋減/扣/-N」調整語法共用。
+// 刻意由 FOOD_TYPE_WORDS 動態產生：日後新增口語別名只要往上面加字，不必再複製任何 regex。
+// FOOD_ALIAS_RE 長字排前面，確保「主食罐」不會先被「主食」吃掉；正則字元一律跳脫。
+const FOOD_ALIAS_PAIRS = FOOD_TYPE_WORDS.flatMap(({ type, words }) => words.map((w) => [w, type]));
+const FOOD_ALIAS_MAP = new Map(FOOD_ALIAS_PAIRS);
+const FOOD_ALIAS_RE = FOOD_ALIAS_PAIRS
+  .map(([w]) => w)
+  .sort((a, b) => b.length - a.length)
+  .map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  .join('|');
 
 const MED_WORDS = new Set(['藥', '用藥', '餵藥', '吃藥', '吃藥了', '餵藥了', '有吃藥']);
 const VOMIT_WORDS = new Set(['吐', '嘔吐', '吐了', '嘔吐了']);
@@ -477,6 +489,28 @@ export function parseMessage(rawText) {
   }
   if (['記錯', '記錯了', '打錯', '打錯了', '輸入錯誤', '修改'].includes(compact)) {
     return { type: 'fixHint' };
+  }
+
+  // ── 食物別名＋調整語法（P0：超口語調整）──────────────────────────────
+  // 一律比對 compact（normalizeText 後再移除所有空白），因此空白數量完全不影響判斷：
+  // 「乾乾減5 / 乾乾 減 5 / 乾乾   減   5」與「主食-3 / 主食 - 3」各自都收斂成同一個字串。
+  //
+  // (1) 明確扣減動詞（減／扣／減掉／減去）＋正數＝語意足夠明確 → 直接進 subtract。
+  //     仍由 handler 走安全定位：先鎖貓 → 只找該貓近期同 foodType → 唯一才執行、多筆出確認卡。
+  const foodDeduct = compact.match(
+    new RegExp(`^(${FOOD_ALIAS_RE})(?:減掉|減去|扣掉|減|扣)(\\d+(?:\\.\\d+)?)(?:克|公克|g)?$`, 'i')
+  );
+  if (foodDeduct && Number(foodDeduct[2]) > 0) {
+    return { type: 'foodAdjust', foodType: FOOD_ALIAS_MAP.get(foodDeduct[1]), mode: 'subtract', amount: Number(foodDeduct[2]), confirm: false };
+  }
+  // (2) 食物別名＋「-」＋正數，但沒有明確動詞＝過度簡略 → possibleSubtract：confirm=true，
+  //     即使唯一候選也先出短確認卡（對，扣 N 克／不是），確認後才 update；不直接改資料。
+  //     半形「-」與全形「－」皆可。負向（-3／今天-3／35-3／主食-／主食-abc／體重-3）因缺「別名／正數」自然不命中。
+  const foodDash = compact.match(
+    new RegExp(`^(${FOOD_ALIAS_RE})[-－](\\d+(?:\\.\\d+)?)(?:克|公克|g)?$`, 'i')
+  );
+  if (foodDash && Number(foodDash[2]) > 0) {
+    return { type: 'foodAdjust', foodType: FOOD_ALIAS_MAP.get(foodDash[1]), mode: 'subtract', amount: Number(foodDash[2]), confirm: true };
   }
 
   // 保守處理語音連接詞（然後/接著/再）：只有後方緊接一個事件詞時，才把它當段落分隔
