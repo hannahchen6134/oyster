@@ -612,24 +612,23 @@ function doneCard(petName) {
 }
 
 // P0-1：新增貓咪只要名字就完成，立刻可記錄。體重／生日／食物等改為選填、之後在照護站補（不阻塞）。
-function petAddedCard(petName) {
+export function petAddedCard(petName) {
   return onboardCard({
     title: `${petName}加入完成 🐱`,
-    subtitle: '現在就可以開始記錄照護，不用先填其他資料',
+    subtitle: `現在就可以用了！直接打一句話試試看：\n乾乾5　·　喝水30　·　嘔吐 白沫`,
     rows: [
-      [menuCell('開始記錄', '點按鈕記，不用打字', '紀錄', true)],
-      [menuCell('補完整資料', '體重・生日・常吃食物，之後再補', '補資料')]
+      [menuCell('用按鈕記也可以', '不想打字就點這', '紀錄', true)],
+      [menuCell('讓紀錄更準', '想更準可補常吃食物與熱量（選填）', '補資料')]
     ],
-    hint: '體重、生日、品種、疾病、醫院、常吃食物、目標都可以之後在照護站補；沒有體重也能先記吃喝、用藥、嘔吐等。',
-    alt: `${petName}加入完成，現在就可以開始記錄`
+    hint: '沒設定也能一直用；體重、生日、常吃食物、目標都可以之後在照護站補。',
+    alt: `${petName}加入完成，直接打「乾乾5」就能記`
   });
 }
 
-function namePromptCard() {
+export function namePromptCard() {
   return onboardCard({
-    step: '第 1 步・共 3 步',
     title: '貓貓叫什麼名字？',
-    subtitle: '直接打名字送出就好',
+    subtitle: '打名字送出就好——之後就能直接記錄，其他資料都能晚點再補',
     skip: { label: '稍後再說', send: '稍後再說' },
     alt: '貓貓叫什麼名字？'
   });
@@ -1013,18 +1012,17 @@ async function quickShortcuts(db, petId) {
   return cmds.slice(0, 9).map((c) => qrMsg(c, c));
 }
 // 看不懂客戶輸入時的引導：不當死路，教打字 ＋ 這隻貓的一鍵捷徑，順手就能記
-async function guideUnknown(env, event, petId) {
+export async function guideUnknown(env, event, petId) {
   const items = [
     ...await quickShortcuts(env.DB, petId),
     TEACH_BTN,
     qrPost('其他狀況（吐/便…）', 'action=recmore', '其他狀況')
   ];
   await replyOrPushQuick(env, event,
-    '咦？這句我看不懂 🙏\n\n'
-    + '記錄可以直接打字 👇\n'
-    + '· 喝水 → 水 20\n'
-    + '· 吃飯 → 罐頭 30／乾糧 5\n'
-    + '· 餵藥 → 藥 早 已吃\n\n'
+    '我還沒聽懂這句 🙏\n'
+    + '可以試著這樣說：\n'
+    + '乾乾5、喝水30、嘔吐 白沫、最近吃什麼\n'
+    + '（不用學格式，照平常講話就好）\n\n'
     + '或點下面你常記的，一下就好：',
     items);
 }

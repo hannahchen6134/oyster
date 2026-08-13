@@ -871,13 +871,20 @@ export function welcomeFlex() {
   const body = {
     type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
     contents: [
-      text(BRAND.tagline, { size: 'md', weight: 'bold', color: '#3F2B18', wrap: true, align: 'center' }),
-      text('像聊天一樣打字就記好，\n回診時一鍵整理給醫生看。', { size: 'sm', color: C.inkSoft, wrap: true, margin: 'md', align: 'center' }),
-      { type: 'box', layout: 'horizontal', margin: 'xl', contents: [menuCell('幫貓貓建檔', '3 個小問題・30 秒', '幫貓貓建檔', true)] },
-      { type: 'box', layout: 'horizontal', margin: 'md', contents: [menuCell('先看看怎麼用', '安心上手小教學', '安心上手')] }
+      text('不用先設定，照平常說話就能記', { size: 'md', weight: 'bold', color: '#3F2B18', wrap: true, align: 'center' }),
+      text('像聊天一樣打一句，我就幫你記好；\n回診時再一鍵整理給醫生看。', { size: 'sm', color: C.inkSoft, wrap: true, margin: 'md', align: 'center' }),
+      // 先讓人看到「原來這麼簡單」——三個一看就懂的例子（吃飯／喝水／狀況）
+      { type: 'box', layout: 'vertical', backgroundColor: C.tint, cornerRadius: '10px', paddingAll: '12px', margin: 'lg', spacing: 'xs',
+        contents: [
+          text('之後想記，直接打：', { size: 'xs', color: C.muted, wrap: true }),
+          text('乾乾5　·　喝水30　·　嘔吐 白沫', { size: 'sm', weight: 'bold', color: C.brand, wrap: true })
+        ] },
+      // 唯一要先做的一步＝告訴我貓咪名字（不是「3 個小問題」）
+      { type: 'box', layout: 'horizontal', margin: 'lg', contents: [menuCell('幫貓貓取名開始', '打個名字就能用了', '幫貓貓建檔', true)] },
+      { type: 'box', layout: 'horizontal', margin: 'md', contents: [menuCell('先看看怎麼用', '更多可以怎麼說', '安心上手')] }
     ]
   };
-  return bubble(`歡迎加入${BRAND.name}！點「幫貓貓建檔」開始`, { type: 'bubble', size: 'mega', header: header('歡迎加入'), body });
+  return bubble(`歡迎加入${BRAND.name}！先幫貓貓取個名字就能開始記`, { type: 'bubble', size: 'mega', header: header('歡迎加入'), body });
 }
 
 // ---------- 說明選單卡 ----------
