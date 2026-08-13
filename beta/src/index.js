@@ -14,7 +14,7 @@ import { isBetaAllowed, normalizeCode, gateText } from './plan.js';
 import {
   ensureUser, updateUser, getUser, listPets, createPet, resolveDefaultPet, getPet, updatePetFields, createFoodItem, createMedItem,
   listFoods, getFood, insertLog, getLog, getLastLogByUser, softDeleteLog, updateLog,
-  getFoodHistory,
+  getFoodHistory, resolveDefaultFood,
   getLatestWeightLog, resyncPetWeight,
   recomputeDay, getRecentSummaries,
   upcomingVisits, listVetsByOwner, createSession,
@@ -2845,7 +2845,7 @@ export async function handleBrandOnly(env, event, db, pet, ownerId, rawText) {
   return false;
 }
 
-async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
+export async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
   const db = env.DB;
   const hints = [];
   let noKcal = false; // 食物「完全沒有熱量可算」（零食/其他且沒設公式）→ 確認卡提示未計入
@@ -2893,9 +2893,15 @@ async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
     description = `水 ${record.amount} ml`;
   } else if (record.category === 'food') {
     const foods = await listFoods(db, lineUserId);
-    let matched = matchFood(foods, record.itemName, record.foodType);
+    let matched = matchFood(foods, record.itemName, record.foodType); // ①句中明確品牌永遠優先
     const sameType = foods.filter((food) => !food.isDeleted && food.foodType === record.foodType);
-    // 沒寫品名時，若該類型只建了一種品項就自動套用（例如乾糧只有一種 → 直接用它的公式）
+    // ②沒指定品牌（itemName 空／沒匹配）時，若家庭有為這個 foodType 設定「預設品項」→ 直接套用它，
+    //   不出品牌確認卡、不改用系統粗估值。失效預設（已刪／跨家庭／類型不符）由 resolveDefaultFood 回 null 安全略過。
+    if (!matched && !record.itemName) {
+      const def = await resolveDefaultFood(db, lineUserId, record.foodType);
+      if (def) matched = def;
+    }
+    // ③沒預設、該類型只建了一種品項就自動套用（例如乾糧只有一種 → 直接用它的公式）
     if (!matched && !record.itemName && sameType.length === 1) matched = sameType[0];
     // multiRecord（deferDisambig）：打了品名卻對不到 → 不 silent 猜、不寫入，回報「這一段」需確認，
     // 讓呼叫端只對這一段出品項確認卡（同句其他已成功片段照記）。

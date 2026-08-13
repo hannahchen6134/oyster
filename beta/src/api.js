@@ -4,7 +4,7 @@
 import { planStatus } from './plan.js';
 import {
   getUser, updateUser, listPets, getPet, createPet,
-  listFoods, getFood,
+  listFoods, getFood, resolveDefaultFood, setDefaultFood, clearDefaultFood, listDefaultFoods,
   insertLog, getLog, getLogsForDay, updateLog, softDeleteLog, resyncPetWeight,
   recomputeDay, getSummaries, getSessionUser, getRecentLogsByPet,
   resolveDataOwner, createCareInvite, listCareMembers, track, healFoodKcal,
@@ -15,6 +15,9 @@ import { displayMedStatus, displayMedSlot } from './brand.js';
 import { computeDailySummary, deriveFoodFields, computeTodayBoard } from './summary.js';
 import { matchFood } from './parser.js';
 import { jsonResponse, newId, nowIso, isValidDate, isValidDateTime, taipeiNowDateTime, taipeiToday } from './util.js';
+
+// 支援「設為預設」的食物類型（各自獨立，不共用）：主食罐≠副食罐≠罐頭。
+const DEFAULT_FOOD_TYPES = ['乾糧', '主食罐', '副食罐', '罐頭', '零食'];
 
 const RESOURCES = {
   pets: {
@@ -222,6 +225,27 @@ export async function handleApi(request, env, url) {
 
     if (resource === 'care') {
       return handleCare(db, url, method, resourceId, dataOwnerId, lineUserId);
+    }
+
+    // 每個 foodType 的「家庭預設品項」（顯式設定，存 app_kv；不改 schema、不動 food_items）。
+    // owner scope（dataOwnerId），不接受前端指定其他 owner；設定時驗證品項屬本家庭、未刪、類型相符。
+    if (resource === 'default-food') {
+      if (method === 'GET') {
+        return jsonResponse({ ok: true, defaults: await listDefaultFoods(db, dataOwnerId, DEFAULT_FOOD_TYPES) });
+      }
+      if (method === 'POST') {
+        const body = await request.json().catch(() => ({}));
+        const foodType = String(body.foodType || '');
+        const foodId = String(body.foodId || '');
+        if (!DEFAULT_FOOD_TYPES.includes(foodType)) return jsonResponse({ ok: false, message: '不支援的食物類型' }, 400);
+        if (!foodId) { await clearDefaultFood(db, dataOwnerId, foodType); return jsonResponse({ ok: true, cleared: true }); }
+        const food = await getFood(db, foodId); // 已排除 isDeleted
+        if (!food || String(food.ownerLineUserId) !== String(dataOwnerId)) return forbidden(); // 找不到／已刪／跨家庭
+        if (String(food.foodType) !== foodType) return jsonResponse({ ok: false, message: '品項類型與預設類型不符' }, 400);
+        await setDefaultFood(db, dataOwnerId, foodType, foodId);
+        return jsonResponse({ ok: true, foodType, foodId });
+      }
+      return jsonResponse({ ok: false, message: 'Method not allowed' }, 405);
     }
 
     if (RESOURCES[resource]) {
@@ -505,10 +529,13 @@ async function applyDerivedFields(db, log) {
     // 這樣在網站只選了「乾糧／罐頭」也能算出熱量，不會顯示 0。
     if (!food) {
       const foods = await listFoods(db, result.lineUserId);
-      food = matchFood(foods, result.itemName, result.foodType);
+      food = matchFood(foods, result.itemName, result.foodType); // ①句中明確品牌優先
       if (!food && !String(result.itemName || '').trim()) {
-        const sameType = foods.filter((item) => !item.isDeleted && item.foodType === result.foodType);
-        if (sameType.length === 1) food = sameType[0];
+        food = await resolveDefaultFood(db, result.lineUserId, result.foodType); // ②家庭該類型預設品項
+        if (!food) {
+          const sameType = foods.filter((item) => !item.isDeleted && item.foodType === result.foodType);
+          if (sameType.length === 1) food = sameType[0]; // ③該類型唯一品項
+        }
       }
       if (food) result.foodId = food.foodId; // 綁定公式，之後編輯或重算才會持續正確
     }

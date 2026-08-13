@@ -282,8 +282,14 @@ export async function purgeOldTextInputs(db, days = 90) {
 
 // ---------- app_kv（一般鍵值：目前存 LINE 自動換發權杖）----------
 export async function appKvGet(db, key) {
-  const row = await db.prepare('SELECT v FROM app_kv WHERE k = ?').bind(String(key)).first();
-  return row ? row.v : null;
+  // 防禦性讀取：app_kv 由 migration 建立；萬一該環境尚未建表，視為「查無此鍵」回 null（走正常 fallback），
+  // 不讓一次 KV 讀取失敗連帶擋掉記錄等主流程。
+  try {
+    const row = await db.prepare('SELECT v FROM app_kv WHERE k = ?').bind(String(key)).first();
+    return row ? row.v : null;
+  } catch (error) {
+    return null;
+  }
 }
 
 export async function appKvSet(db, key, value) {
@@ -294,6 +300,43 @@ export async function appKvSet(db, key, value) {
     )
     .bind(String(key), String(value ?? ''), nowIso())
     .run();
+}
+
+export async function appKvDelete(db, key) {
+  await db.prepare('DELETE FROM app_kv WHERE k = ?').bind(String(key)).run();
+}
+
+// ---------- 每個 foodType 的「家庭預設品項」（照護站顯式設定，存 app_kv；不改 schema、不複製品牌/熱量資料）----------
+// key：defaultFood:<ownerLineUserId>:<foodType> → value：foodId。owner scope（不做 per-pet）。
+const defaultFoodKey = (ownerId, foodType) => `defaultFood:${ownerId}:${foodType}`;
+export async function getDefaultFoodId(db, ownerId, foodType) {
+  return (await appKvGet(db, defaultFoodKey(ownerId, foodType))) || '';
+}
+export async function setDefaultFood(db, ownerId, foodType, foodId) {
+  await appKvSet(db, defaultFoodKey(ownerId, foodType), String(foodId || ''));
+}
+export async function clearDefaultFood(db, ownerId, foodType) {
+  await appKvDelete(db, defaultFoodKey(ownerId, foodType));
+}
+// 解析家庭該 foodType 的「有效」預設品項；失效（找不到／已刪／跨家庭／類型不符）一律回 null → 走正常 fallback，
+// 絕不套用錯的或別家的 food_item。只讀（getFood 已排除 isDeleted），不改 food_items。
+export async function resolveDefaultFood(db, ownerId, foodType) {
+  const id = await getDefaultFoodId(db, ownerId, foodType);
+  if (!id) return null;
+  const f = await getFood(db, id);
+  if (!f) return null;                                     // 找不到／已刪
+  if (String(f.ownerLineUserId) !== String(ownerId)) return null; // 跨家庭不得套用
+  if (String(f.foodType) !== String(foodType)) return null;       // 類型不符
+  return f;
+}
+// 列出家庭所有已設定的預設（給照護站 UI 標示），回 { <foodType>: foodId }。
+export async function listDefaultFoods(db, ownerId, foodTypes = []) {
+  const out = {};
+  for (const ft of foodTypes) {
+    const id = await getDefaultFoodId(db, ownerId, ft);
+    if (id) out[ft] = id;
+  }
+  return out;
 }
 
 // 訊息冪等：第一次看到某 message.id → 原子性寫入並回 true（該處理）；
