@@ -649,6 +649,7 @@
     .list-item .info { flex: 1; min-width: 0; }
     .list-item .title { font-weight: 600; font-size: 14.5px; }
     .list-item .sub { color: var(--muted); font-size: 13px; margin-top: 2px; line-height: 1.55; }
+    .pill-default { display: inline-block; font-size: 11px; font-weight: 600; color: var(--brand); background: var(--brand-tint, rgba(179,112,63,.12)); border-radius: 999px; padding: 1px 8px; margin-left: 6px; vertical-align: middle; }
 
     /* Modal：小張的紙，同樣頂規線，影子更深 */
     .modal-backdrop {
@@ -1520,6 +1521,10 @@
       KCAL: { '乾糧': 3.7, '罐頭': 0.9, '主食罐': 1.0, '副食罐': 0.4, '濕食': 1.0, '濕糧': 1.0, '生食': 1.5 },
       WATER: { '乾糧': 0, '罐頭': 0.8, '主食罐': 0.78, '副食罐': 0.82, '濕食': 0.75, '濕糧': 0.75, '生食': 0.7 }
     };
+    // 支援「設為預設」的食物類型（與後端 DEFAULT_FOOD_TYPES 一致；各類型獨立、一個類型只有一個預設）。
+    const DEFAULT_FOOD_TYPES = ['乾糧', '主食罐', '副食罐', '罐頭', '零食'];
+    // 依類型換一句貼近的說明（§8）：讓使用者理解「平常只打『乾乾3／主食3』時要用哪一款」。
+    const DEFAULT_HINT_EG = { '乾糧': '乾乾3', '主食罐': '主食3', '副食罐': '副食2', '罐頭': '罐罐10', '零食': '零食1' };
     const isWetType = (t) => FOOD.WET.includes(t);
 
     // ---------- 基本工具 ----------
@@ -3309,9 +3314,9 @@
       },
       foods: {
         title: '食物',
-        hint: '填「名稱＋類型＋熱量」就能用；在 LINE 打這個名字就會對應到它。水分比例收在進階裡，通常不用改。',
+        hint: '把常吃的食物存起來，記錄更快、熱量也更準。有填每克熱量會優先用這款的實際數值；乾糧沒填熱量會先用 3.7 kcal/g 粗估，零食沒填熱量則不自動估算、會標示未計入。把常吃的一款「設為預設」，之後在 LINE 只打「乾乾3／主食5」就會自動套用這款；沒設定也能用（唯一品項自動套、多款會問你）。水分比例收在進階裡，通常不用改。',
         fields: [
-          { name: 'displayName', label: '食物名稱（在 LINE 打這個名字就能記）', required: true },
+          { name: 'displayName', label: '食物名稱（填你自己認得的就好，例如：希爾斯乾糧、巔峰羊；在 LINE 打這個名字就能記）', required: true },
           { name: 'foodType', label: '類型', type: 'select', options: FOOD.TYPES },
           { name: 'kcalPerGram', label: '熱量（照包裝填，不用自己換算）', type: 'kcalInput' },
           { name: 'isPrescription', label: '處方食品', type: 'select', options: [['0', '否'], ['1', '是']] },
@@ -3853,7 +3858,7 @@
 
       let rows = [];
       if (state.settingsTab === 'pets') { rows = (await api('me')).pets; state.pets = rows; }
-      if (state.settingsTab === 'foods') { rows = (await api('foods')).rows; state.foods = rows; }
+      if (state.settingsTab === 'foods') { rows = (await api('foods')).rows; state.foods = rows; state.foodDefaults = (await api('default-food')).defaults || {}; }
       if (state.settingsTab === 'meds') { rows = (await api(`meds?petId=${state.petId}`)).rows; state.meds = rows; }
       if (state.settingsTab === 'vets') { rows = (await api('vets')).rows; state.vets = rows; }
       if (state.settingsTab === 'visits') {
@@ -3871,9 +3876,22 @@
       container.innerHTML = rows.map((row) => {
         const view = spec.render(row, ctx);
         const id = row.petId || row.foodId || row.medId || row.vetId || row.visitId;
+        // 食物：每個支援的類型可指定一個「預設品項」——之後在 LINE 只打「乾乾3／主食5」就自動套這款。
+        let defaultCtl = '';
+        let defaultBadge = '';
+        if (state.settingsTab === 'foods' && DEFAULT_FOOD_TYPES.includes(row.foodType)) {
+          const isDef = (state.foodDefaults || {})[row.foodType] === row.foodId;
+          if (isDef) {
+            defaultBadge = ' <span class="pill-default">預設</span>';
+            defaultCtl = `<button class="btn btn-secondary btn-sm" data-food-default-clear="${esc(row.foodType)}" type="button">取消預設</button>`;
+          } else {
+            defaultCtl = `<button class="btn btn-secondary btn-sm" data-food-default="${esc(row.foodId)}" data-food-type="${esc(row.foodType)}" type="button">設為預設</button>`;
+          }
+        }
         return `
           <div class="list-item">
-            <div class="info"><div class="title">${esc(view.title)}</div><div class="sub">${esc(view.sub)}</div></div>
+            <div class="info"><div class="title">${esc(view.title)}${defaultBadge}</div><div class="sub">${esc(view.sub)}</div></div>
+            ${defaultCtl}
             <button class="btn btn-secondary btn-sm" data-edit="${esc(id)}" type="button">編輯</button>
             <button class="btn btn-danger btn-sm" data-del="${esc(id)}" type="button">刪除</button>
           </div>`;
@@ -4303,6 +4321,27 @@
         const wasOpen = entryRow.classList.contains('open');
         document.querySelectorAll('.entry.open').forEach((el) => el.classList.remove('open'));
         if (!wasOpen) entryRow.classList.add('open');
+        return;
+      }
+
+      const setDefBtn = event.target.closest('[data-food-default]');
+      if (setDefBtn) {
+        const ft = setDefBtn.dataset.foodType;
+        try {
+          await api('default-food', { method: 'POST', body: JSON.stringify({ foodType: ft, foodId: setDefBtn.dataset.foodDefault }) });
+          // 依類型補一句效果說明（§8）：讓使用者理解「預設 = 之後可以少打品牌名稱」
+          toast(DEFAULT_HINT_EG[ft] ? `已設為預設，之後在 LINE 只打「${DEFAULT_HINT_EG[ft]}」就會自動套這款` : '已設為預設');
+          await loadSettings();
+        } catch (error) { toast(error.message, true); }
+        return;
+      }
+      const clrDefBtn = event.target.closest('[data-food-default-clear]');
+      if (clrDefBtn) {
+        try {
+          await api('default-food', { method: 'POST', body: JSON.stringify({ foodType: clrDefBtn.dataset.foodDefaultClear, foodId: '' }) });
+          toast('已取消預設');
+          await loadSettings();
+        } catch (error) { toast(error.message, true); }
         return;
       }
 
