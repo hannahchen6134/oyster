@@ -2491,6 +2491,8 @@ async function handleTextMessage(event, env, baseUrl) {
     }
 
     default: {
+      // §10 純品牌名（沒有數字）剛好命中已建立品項 → 問份量，不當死路、也不亂記成 0g
+      if (await handleBrandOnly(env, event, db, pet, ownerId, text)) return;
       // 看不懂不當死路：教打字 ＋ 這隻貓的一鍵捷徑，順手就能記
       await logTextInput(db, { lineUserId, ownerId, petId: '', rawText: event.message?.text || '', parseStatus: 'unknown', failReason: 'unrecognized', sourceMessageId: String(event.message?.id || ''), resolvedPetId: '', linkedLogId: '', parsedResult: JSON.stringify({ events: [], savedLogIds: [], unparsedSegments: [event.message?.text || ''], awaitingAction: '' }) });
       await guideUnknown(env, event, pet?.petId || '');
@@ -2813,6 +2815,33 @@ export async function showWeightModifyConfirm(env, event, { db, pet, amount, smi
     ? `要怎麼處理${pet.petName}的 ${formatWeightKg(amount)} 公斤？最近一次 ${formatWeightKg(latest.amount)}kg（${String(latest.eventDateTime).slice(0, 10)}）。回覆「改成 ${formatWeightKg(amount)}kg／記為今天的新體重／取消」。`
     : `把${pet.petName}最近一次體重（${formatWeightKg(latest.amount)}kg）改成 ${formatWeightKg(amount)}kg？回覆「改成 ${formatWeightKg(amount)}kg／取消」。`;
   await replyOrPushFlex(env, event, weightModifyConfirmFlex({ pet, amount, latest, keys, allowAddNew }), fallback);
+}
+
+// §10 只有品牌名、沒有數字（例如「巔峰羊」）：若整句剛好精確命中已建立品項 → 直接問份量，
+// 複用既有 recFoodG 克數快捷（唯一）／pickFood 選品項（多個同名），不把品牌名硬記成 0g、也不亂猜。
+// 只在「精確命中已存在 food_item」時觸發（exactFoodMatches），所以不會把任意中文當品牌（見 §20 負向）。
+// 回傳 true＝已接手回覆；false＝不是純品牌名，交回原本的 unknown 引導。
+export async function handleBrandOnly(env, event, db, pet, ownerId, rawText) {
+  const name = String(rawText || '').trim();
+  if (!pet || !name) return false;
+  if (/\d/.test(name)) return false; // 帶數字 → 交給 item_lookup／record，不歸這裡
+  const foods = await listFoods(db, ownerId);
+  const hits = exactFoodMatches(foods, name);
+  if (hits.length === 1) {
+    const f = hits[0];
+    const items = [
+      ...[5, 10, 15, 20, 30].map((n) => qrPost(String(n), `action=recFoodG&foodId=${f.foodId}&g=${n}`, `${f.displayName} ${n}g`)),
+      qrPost('其他克數', `action=recFoodGother&foodId=${f.foodId}`, '其他克數')
+    ];
+    await replyOrPushQuick(env, event, `「${f.displayName}」這次吃了多少？點一下就記好（或直接打數字）`, items);
+    return true;
+  }
+  if (hits.length > 1) {
+    const btns = hits.slice(0, 10).map((f) => qrPost(String(f.displayName).slice(0, 20), `action=pickFood&foodId=${f.foodId}`, f.displayName));
+    await replyOrPushQuick(env, event, '你是指哪一個？選好再問份量：', btns);
+    return true;
+  }
+  return false;
 }
 
 async function handleRecord(env, event, pet, record, lineUserId, opts = {}) {
