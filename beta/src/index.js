@@ -14,7 +14,7 @@ import { isBetaAllowed, normalizeCode, gateText } from './plan.js';
 import {
   ensureUser, updateUser, getUser, listPets, createPet, resolveDefaultPet, getPet, updatePetFields, createFoodItem, createMedItem,
   listFoods, getFood, insertLog, getLog, getLastLogByUser, softDeleteLog, updateLog,
-  getFoodHistory, resolveDefaultFood,
+  getFoodHistory, getFoodTimeline, resolveDefaultFood,
   getLatestWeightLog, resyncPetWeight,
   recomputeDay, getRecentSummaries,
   upcomingVisits, listVetsByOwner, createSession,
@@ -1546,6 +1546,21 @@ async function handlePostback(event, env, baseUrl) {
 
   // 「乾乾-N／主食-N」的短確認卡「不是」：不動任何紀錄，明確回讀讓使用者安心。
   if (action === 'adjustCancel') { await replyOrPush(env, event, '好，沒有改動任何紀錄 👌'); return; }
+
+  // 食物時間軸「你是指哪一款？」選定某品項 → 顯示該品項的逐筆時間軸（唯讀；只查所選貓與該 foodId）。
+  if (action === 'foodTimelinePick') {
+    const foodId = data.get('foodId') || '';
+    const petId = data.get('petId') || '';
+    const days = Number(data.get('days')) || 0;
+    const food = foodId ? await getFood(db, foodId) : null;
+    if (!food || String(food.ownerLineUserId) !== String(ownerId)) { await replyOrPush(env, event, '找不到那個品項，可能已被刪除。'); return; }
+    const pets = await listPets(db, ownerId);
+    const pet = pets.find((p) => p.petId === petId) || (await resolveDefaultPet(db, await getUser(db, lineUserId), pets));
+    if (!pet) { await replyOrPush(env, event, '找不到貓貓資料。'); return; }
+    const rows = await getFoodTimeline(db, pet.petId, { sinceDays: days || null, foodId });
+    await replyFoodTimeline(env, event, baseUrl, lineUserId, rows, { scope: days ? 'recent' : 'all', sinceDays: days || null, label: food.displayName, petName: pet.petName });
+    return;
+  }
 
   // P0-2：「改 品名 N」多餐符合時，使用者從確認卡選定要改哪一餐 → 改成 N。
   // mode=subtract 時（超口語「別名減N／別名-N」的確認）改為從實吃量扣掉 N，其餘一律預設改成 N。
@@ -3183,6 +3198,44 @@ async function ensurePersonalRichMenu(env, baseUrl, lineUserId) {
 
 // 食物歷史 LINE 回覆（§13）：簡短、依類型分組、每組最多幾項＋總數，太多就導去照護站看完整。
 // 純函式，方便單測；「查看完整」連結由 handleQuery 依 siteLink 補上。
+// 品牌／品項名比對（給時間軸「品牌多候選」用）：顯示名／品牌／產品名任一含查詢字（或反向包含）即命中。
+export function foodNameHit(food, q) {
+  const qq = String(q || '').toLowerCase();
+  if (!qq) return false;
+  return [food.displayName, food.brand, food.productName].some((v) => {
+    const s = String(v || '').toLowerCase();
+    return s && (s.includes(qq) || qq.includes(s));
+  });
+}
+
+// 食物時間軸 LINE 回覆（§4）：短、可掃視、逐筆（M/D HH:MM　名稱　實吃 g；有原餵/剩則附註）。最多先顯示 8 筆。
+export function buildFoodTimelineResult(rows, { scope = 'recent', sinceDays = 30, label = '食物', petName = '' } = {}) {
+  const who = petName ? `${petName} ` : '';
+  const range = scope === 'all' ? '全部' : (Number(sinceDays) === 30 || !sinceDays ? '最近 30 天' : `最近 ${sinceDays} 天`);
+  if (!rows.length) return `${who}${range}沒有找到${label}紀錄。`;
+  const MAX = 8;
+  const lines = [`${who}${range}的${label}紀錄：`];
+  for (const r of rows.slice(0, MAX)) {
+    const at = String(r.at || '');
+    const md = at.length >= 10 ? `${Number(at.slice(5, 7))}/${Number(at.slice(8, 10))}` : at.slice(0, 10);
+    const hm = at.slice(11, 16);
+    const amt = `${Math.round(Number(r.amount) || 0)}g`;
+    const served = Number(r.servedAmount) > 0
+      ? `（原 ${Math.round(Number(r.servedAmount))}g，剩 ${Math.round(Number(r.leftoverAmount) || 0)}g）`
+      : '';
+    lines.push(`${md}${hm ? ' ' + hm : ''}　${r.name}　${amt}${served}`);
+  }
+  if (rows.length > MAX) lines.push('…還有更多，完整看照護站');
+  return lines.join('\n');
+}
+
+// 送出食物時間軸回覆＋（有資料時）附照護站連結；目前沒有專屬「食物足跡」頁，先深連到照護站。
+async function replyFoodTimeline(env, event, baseUrl, lineUserId, rows, opts) {
+  const body = buildFoodTimelineResult(rows, opts);
+  const url = rows.length ? await siteLink(env, baseUrl, lineUserId) : '';
+  await replyOrPush(env, event, url ? `${body}\n\n查看更多紀錄：${url}` : body);
+}
+
 export function buildFoodHistoryResult(rows, { scope = 'recent', sinceDays = 30, foodType = '', petName = '' } = {}) {
   const who = petName ? `${petName} ` : '';
   const rangeLabel = scope === 'all' ? '以前' : (Number(sinceDays) === 30 || !sinceDays ? '最近 30 天' : `最近 ${sinceDays} 天`);
@@ -3217,11 +3270,38 @@ async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId, ow
   const today = taipeiToday();
 
   if (query === 'foodHistory') {
-    if (!pet) { await replyOrPush(env, event, '還沒有貓咪資料，先幫貓貓建個檔吧！'); return; }
+    if (!pet) { await replyOrPush(env, event, '還沒有貓貓資料，先幫貓貓建個檔吧！'); return; }
     const rows = await getFoodHistory(db, pet.petId, { sinceDays: intent.sinceDays, foodType: intent.foodType || '' });
     const body = buildFoodHistoryResult(rows, { scope: intent.scope || 'recent', sinceDays: intent.sinceDays, foodType: intent.foodType || '', petName: pet.petName });
     const url = rows.length ? await siteLink(env, baseUrl, lineUserId) : '';
     await replyOrPush(env, event, url ? `${body}\n\n查看完整吃過紀錄：${url}` : body);
+    return;
+  }
+
+  // 食物「時間軸」（何時吃什麼，逐筆）——與 foodHistory 聚合分流；只查 logs、多貓只查該貓。
+  if (query === 'foodTimeline') {
+    if (!pet) { await replyOrPush(env, event, '還沒有貓貓資料，先幫貓貓建個檔吧！'); return; }
+    const scope = intent.scope || 'recent';
+    const sinceDays = intent.sinceDays;
+    const nameQuery = String(intent.nameQuery || '');
+    // 品牌／品項名：先看家庭 food_items 是否有多款符合 → 多款不猜、先問是哪一款
+    if (nameQuery) {
+      const foods = await listFoods(db, ownerId);
+      const hits = foods.filter((f) => !f.isDeleted && foodNameHit(f, nameQuery));
+      if (hits.length > 1) {
+        const btns = hits.slice(0, 8).map((f) => qrPost(String(f.displayName).slice(0, 20), `action=foodTimelinePick&foodId=${encodeURIComponent(f.foodId)}&petId=${encodeURIComponent(pet.petId)}&days=${Number(sinceDays) || 0}`, f.displayName));
+        await replyOrPushQuick(env, event, `「${nameQuery}」有幾款，你是指哪一款？`, btns);
+        return;
+      }
+      const foodId = hits.length === 1 ? hits[0].foodId : '';
+      const label = hits.length === 1 ? hits[0].displayName : nameQuery;
+      const rows = await getFoodTimeline(db, pet.petId, { sinceDays, foodId, nameQuery: foodId ? '' : nameQuery });
+      await replyFoodTimeline(env, event, baseUrl, lineUserId, rows, { scope, sinceDays, label, petName: pet.petName });
+      return;
+    }
+    const foodType = intent.foodType || '';
+    const rows = await getFoodTimeline(db, pet.petId, { sinceDays, foodType });
+    await replyFoodTimeline(env, event, baseUrl, lineUserId, rows, { scope, sinceDays, label: foodType || '食物', petName: pet.petName });
     return;
   }
 

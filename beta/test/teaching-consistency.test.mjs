@@ -28,6 +28,8 @@ test('C LINE 教學告知：可在照護站設「預設」，之後簡短紀錄'
   const t = recordTutorial();
   assert.ok(/預設/.test(t) && /照護站/.test(t), '第二層教學應提到照護站可設預設');
   assert.ok(t.includes('乾乾3') || t.includes('主食5'), '應示範設預設後的簡短紀錄');
+  // 時間軸（何時吃哪款）例句放第二層
+  assert.ok(t.includes('最近乾糧吃什麼') || t.includes('希爾斯什麼時候吃'), '第二層應含時間軸例句');
 });
 
 test('D 照護站含「設為預設」的效果說明（自動套用這款）', () => {
@@ -57,7 +59,8 @@ test('H 教學示範句全部可被 parser 解析（不放尚未實作的語句�
     ['乾乾減5', 'foodAdjust', '乾糧'], ['主食扣3', 'foodAdjust', '主食罐'],
     ['罐罐剩10', 'foodAdjust', '罐頭'], ['剩10', 'fixLast', null], ['主食改成20', 'record', '主食罐'],
     ['今天喝多少', 'query', null], ['今天吃多少', 'query', null],
-    ['最近吃什麼', 'query', null], ['之前吃過哪些罐頭', 'query', null]
+    ['最近吃什麼', 'query', null], ['之前吃過哪些罐頭', 'query', null],
+    ['最近乾糧吃什麼', 'query', null], ['希爾斯什麼時候吃', 'query', null]
   ];
   for (const [text, type, ft] of cases) {
     const r = parseMessage(text);

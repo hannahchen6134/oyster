@@ -672,6 +672,35 @@ export async function getFoodHistory(db, petId, { sinceDays = null, foodType = '
   return results || [];
 }
 
+// 食物「時間軸」（§B「何時吃什麼」，逐筆，非聚合）：一律查 logs（實際吃過的），LEFT JOIN food_items 只補顯示名。
+// 可依 foodType／foodId／品牌品項名（nameQuery，比對 food_items 顯示名或 log 自打名）過濾；sinceDays 給值＝近 N 天。
+// 顯示名優先序（§7）：food_items.displayName > productName > brand > log.itemName > foodType。回最近在前。
+export async function getFoodTimeline(db, petId, { sinceDays = null, foodType = '', foodId = '', nameQuery = '', limit = 20 } = {}) {
+  const where = ["logs.petId = ?", "logs.category = 'food'", 'logs.isDeleted = 0'];
+  const params = [petId];
+  if (Number(sinceDays) > 0) { where.push('logs.eventDateTime >= ?'); params.push(`${addDays(taipeiToday(), -Number(sinceDays))} 00:00`); }
+  if (foodType) { where.push('logs.foodType = ?'); params.push(foodType); }
+  if (foodId) { where.push('logs.foodId = ?'); params.push(foodId); }
+  else if (nameQuery) {
+    const like = `%${nameQuery}%`;
+    where.push('(fi.displayName LIKE ? OR fi.brand LIKE ? OR fi.productName LIKE ? OR logs.itemName LIKE ?)');
+    params.push(like, like, like, like);
+  }
+  const { results } = await db
+    .prepare(
+      `SELECT logs.eventDateTime AS at, logs.foodType AS foodType, logs.amount AS amount,
+              logs.servedAmount AS servedAmount, logs.leftoverAmount AS leftoverAmount,
+              COALESCE(NULLIF(fi.displayName, ''), NULLIF(fi.productName, ''), NULLIF(fi.brand, ''), NULLIF(logs.itemName, ''), logs.foodType) AS name
+         FROM logs LEFT JOIN food_items fi ON fi.foodId = logs.foodId AND logs.foodId != ''
+        WHERE ${where.join(' AND ')}
+        ORDER BY logs.eventDateTime DESC
+        LIMIT ?`
+    )
+    .bind(...params, limit)
+    .all();
+  return results || [];
+}
+
 export async function getLogsForDay(db, petId, date) {
   // 帶出品項的每克熱量（foodKcalPerGram）供「熱量是否為估算」判斷；只讀不改 food_items
   const { results } = await db

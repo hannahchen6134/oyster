@@ -345,6 +345,39 @@ function parseItemLookupCandidate(tokens, dayOffset, time) {
   return { type: 'item_lookup_candidate', itemName, amount, unit: 'g', addedWaterMl, dayOffset, time };
 }
 
+// 共用時間語意：最近／這陣子＝近 30 天、之前／以前＝全歷史、最近N天＝N。回 {scope, sinceDays} 或 null。
+function parseTimeScope(t) {
+  let m;
+  if ((m = t.match(/(?:最近|近)(\d{1,3})天/))) return { scope: 'recent', sinceDays: Math.max(1, Number(m[1])) };
+  if (/(最近|這陣子|近期|近來)/.test(t)) return { scope: 'recent', sinceDays: 30 };
+  if (/上個?月/.test(t)) return { scope: 'recent', sinceDays: 30 };
+  if (/(之前|以前|過去|曾經|歷來)/.test(t)) return { scope: 'all', sinceDays: null };
+  return null;
+}
+
+// 食物「時間軸」查詢（「何時吃什麼」，逐筆）——與 aggregate 的「吃過什麼」分流：
+//   時間軸＝主語（類型／品牌）在「吃」之前，或明講「什麼時候／哪天吃」：最近罐頭吃什麼、希爾斯什麼時候吃。
+//   aggregate＝「吃哪些/吃什麼牌子」，類型在「吃」之後：最近吃哪些罐頭（維持原邏輯，見 parseFoodHistoryQuery）。
+// 回傳 { type:'query', query:'foodTimeline', scope, sinceDays, foodType, nameQuery } 或 null。
+export function parseFoodTimelineQuery(compact) {
+  const t = String(compact || '');
+  const time = parseTimeScope(t);
+  // A) 「…什麼時候吃／哪天吃／哪幾天吃／什麼時候餵」→ 主語＝前面那段（品牌或類型）
+  const whenM = t.match(/^(.*?)(?:是)?(?:什麼時候|哪一?天|哪幾天)(?:吃|餵)/);
+  if (whenM) {
+    const scope = time || { scope: 'recent', sinceDays: 30 }; // 沒寫時間但明顯問「何時」→ 預設近 30 天
+    let core = String(whenM[1] || '').replace(/最近|這陣子|近期|近來|之前|以前|過去|曾經|歷來|上個?月|近\d{1,3}天|最近\d{1,3}天|都$/g, '').trim();
+    const aliasType = FOOD_ALIAS_MAP.get(core);
+    return { type: 'query', query: 'foodTimeline', scope: scope.scope, sinceDays: scope.sinceDays, foodType: aliasType || '', nameQuery: aliasType ? '' : core };
+  }
+  // B) 「<time>?<類型別名>(都)?吃(什麼/哪款/哪一款/哪個/哪幾款)」→ 該 foodType 時間軸（類型在「吃」之前）
+  const typeM = t.match(new RegExp(`(${FOOD_ALIAS_RE})(?:最近|這陣子|近期|近來)?(?:都)?吃(?:什麼|哪款|哪一款|哪個|哪幾款|什麼款)`));
+  if (typeM && time) {
+    return { type: 'query', query: 'foodTimeline', scope: time.scope, sinceDays: time.sinceDays, foodType: FOOD_ALIAS_MAP.get(typeM[1]) || '', nameQuery: '' };
+  }
+  return null;
+}
+
 // 食物歷史口語查詢（§11-13）：辨識「最近／這陣子／之前／以前… 吃什麼／吃過／吃哪些／牌子」。
 // 時間語意：最近／這陣子＝近 30 天（不再追問「最近是多久」）、之前／以前＝全歷史；「最近N天」沿用 N。
 // 需「時間範圍語意 + 吃／牌子的提問」同時成立才命中，避免誤觸（今天吃多少、純數字… 都不會命中）。
@@ -391,7 +424,10 @@ export function parseMessage(rawText) {
       return { type: 'query', query: entry.query };
     }
   }
-  // 食物歷史口語查詢（最近吃什麼／之前吃過哪些罐頭…）——放在固定查詢詞之後，避免蓋掉既有查詢
+  // 食物「時間軸」查詢（最近罐頭吃什麼／希爾斯什麼時候吃…）——先於 aggregate，語意是「何時吃什麼」逐筆
+  const foodTl = parseFoodTimelineQuery(compact);
+  if (foodTl) return foodTl;
+  // 食物歷史口語查詢（最近吃什麼／之前吃過哪些罐頭…）——aggregate「吃過什麼」，放在固定查詢詞之後
   const foodHist = parseFoodHistoryQuery(compact);
   if (foodHist) return foodHist;
 
@@ -964,8 +1000,9 @@ export function analyzeLeading(rawText, petNames = []) {
       if (!rest) return { kind: 'clean' };
       // 剝出貓名後能可靠解析 → named（可寫入該貓）
       if (parsesToRecord(rest)) return { kind: 'named', petName: name, rest };
-      // 剝出貓名後是「食物歷史查詢」（唯讀，例：蚵仔最近吃什麼）→ 也視為 named，安全歸給該貓
-      if (parseFoodHistoryQuery(String(rest).replace(/ /g, '')) ) return { kind: 'named', petName: name, rest };
+      // 剝出貓名後是「食物歷史／時間軸查詢」（唯讀，例：蚵仔最近吃什麼／蚵仔最近罐頭吃什麼）→ 也視為 named，安全歸給該貓
+      const restCompact = String(rest).replace(/ /g, '');
+      if (parseFoodTimelineQuery(restCompact) || parseFoodHistoryQuery(restCompact)) return { kind: 'named', petName: name, rest };
       // 剝出貓名、但後段像「食物名＋份量」卻無法可靠解析（如 希爾斯罐頭23g）→ partial：
       // 辨認到貓、但「不寫入、不降級成通用罐頭」；交第二階段用 food_item 精確比對／澄清。
       // 加「像食物/有數量」條件，避免把「蚵仔你好嗎」這種閒聊也當 partial。
