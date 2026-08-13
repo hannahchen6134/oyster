@@ -14,6 +14,7 @@ import { isBetaAllowed, normalizeCode, gateText } from './plan.js';
 import {
   ensureUser, updateUser, getUser, listPets, createPet, resolveDefaultPet, getPet, updatePetFields, createFoodItem, createMedItem,
   listFoods, getFood, insertLog, getLog, getLastLogByUser, softDeleteLog, updateLog,
+  getFoodHistory,
   getLatestWeightLog, resyncPetWeight,
   recomputeDay, getRecentSummaries,
   upcomingVisits, listVetsByOwner, createSession,
@@ -2358,7 +2359,7 @@ async function handleTextMessage(event, env, baseUrl) {
     }
 
     case 'query': {
-      await handleQuery(env, event, user, pet, intent.query, baseUrl, lineUserId, ownerId);
+      await handleQuery(env, event, user, pet, intent.query, baseUrl, lineUserId, ownerId, intent);
       return;
     }
 
@@ -3171,9 +3172,49 @@ async function ensurePersonalRichMenu(env, baseUrl, lineUserId) {
   await appKvSet(db, kvKey, JSON.stringify({ menuId, token, v: RICHMENU_VERSION }));
 }
 
-async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId, ownerId = lineUserId) {
+// 食物歷史 LINE 回覆（§13）：簡短、依類型分組、每組最多幾項＋總數，太多就導去照護站看完整。
+// 純函式，方便單測；「查看完整」連結由 handleQuery 依 siteLink 補上。
+export function buildFoodHistoryResult(rows, { scope = 'recent', sinceDays = 30, foodType = '', petName = '' } = {}) {
+  const who = petName ? `${petName} ` : '';
+  const rangeLabel = scope === 'all' ? '以前' : (Number(sinceDays) === 30 || !sinceDays ? '最近 30 天' : `最近 ${sinceDays} 天`);
+  const typeLabel = foodType ? `的${foodType}` : '';
+  if (!rows.length) {
+    return `${who}${rangeLabel}${typeLabel}還沒有吃東西的紀錄喔 🐟\n記一筆試試：主食3、乾乾10、巔峰羊35`;
+  }
+  const order = [];
+  const groups = new Map();
+  for (const r of rows) {
+    if (!groups.has(r.foodType)) { groups.set(r.foodType, []); order.push(r.foodType); }
+    groups.get(r.foodType).push(r);
+  }
+  const MAX_PER_GROUP = 5;
+  const lines = [`${who}${rangeLabel}${typeLabel}吃過：`];
+  let truncated = 0;
+  for (const ft of order) {
+    const items = groups.get(ft);
+    lines.push('', ft);
+    for (const it of items.slice(0, MAX_PER_GROUP)) {
+      const times = Number(it.times) > 1 ? `（${it.times} 次）` : '';
+      lines.push(`・${it.name}${times}`);
+    }
+    if (items.length > MAX_PER_GROUP) truncated += items.length - MAX_PER_GROUP;
+  }
+  if (truncated > 0) lines.push('', `…還有 ${truncated} 項，完整清單看照護站`);
+  return lines.join('\n');
+}
+
+async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId, ownerId = lineUserId, intent = {}) {
   const db = env.DB;
   const today = taipeiToday();
+
+  if (query === 'foodHistory') {
+    if (!pet) { await replyOrPush(env, event, '還沒有貓咪資料，先幫貓貓建個檔吧！'); return; }
+    const rows = await getFoodHistory(db, pet.petId, { sinceDays: intent.sinceDays, foodType: intent.foodType || '' });
+    const body = buildFoodHistoryResult(rows, { scope: intent.scope || 'recent', sinceDays: intent.sinceDays, foodType: intent.foodType || '', petName: pet.petName });
+    const url = rows.length ? await siteLink(env, baseUrl, lineUserId) : '';
+    await replyOrPush(env, event, url ? `${body}\n\n查看完整吃過紀錄：${url}` : body);
+    return;
+  }
 
   if (query === 'website') {
     const url = await siteLink(env, baseUrl, lineUserId);

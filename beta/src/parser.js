@@ -343,6 +343,28 @@ function parseItemLookupCandidate(tokens, dayOffset, time) {
   return { type: 'item_lookup_candidate', itemName, amount, unit: 'g', addedWaterMl, dayOffset, time };
 }
 
+// 食物歷史口語查詢（§11-13）：辨識「最近／這陣子／之前／以前… 吃什麼／吃過／吃哪些／牌子」。
+// 時間語意：最近／這陣子＝近 30 天（不再追問「最近是多久」）、之前／以前＝全歷史；「最近N天」沿用 N。
+// 需「時間範圍語意 + 吃／牌子的提問」同時成立才命中，避免誤觸（今天吃多少、純數字… 都不會命中）。
+// 可選類型過濾（最近吃哪些罐頭／以前吃過哪些乾糧／最近吃哪些主食）沿用食物別名對照。
+// 回傳 { type:'query', query:'foodHistory', scope:'recent'|'all', sinceDays, foodType } 或 null。
+export function parseFoodHistoryQuery(compact) {
+  const t = String(compact || '');
+  if (!/(吃什麼|吃過|吃哪|都吃|吃的|牌子|品牌|哪些)/.test(t)) return null; // 必須像在「問吃了什麼」
+  let scope = null;
+  let sinceDays = null;
+  let m;
+  if ((m = t.match(/(?:最近|近)(\d{1,3})天/))) { scope = 'recent'; sinceDays = Math.max(1, Number(m[1])); }
+  else if (/(最近|這陣子|近期|近來)/.test(t)) { scope = 'recent'; sinceDays = 30; }
+  else if (/上個?月/.test(t)) { scope = 'recent'; sinceDays = 30; }
+  else if (/(之前|以前|過去|曾經|歷來)/.test(t)) { scope = 'all'; sinceDays = null; }
+  if (!scope) return null;
+  let foodType = '';
+  const tm = t.match(new RegExp(`(${FOOD_ALIAS_RE})`));
+  if (tm) foodType = FOOD_ALIAS_MAP.get(tm[1]) || '';
+  return { type: 'query', query: 'foodHistory', scope, sinceDays, foodType };
+}
+
 export function parseMessage(rawText) {
   const text = normalizeText(rawText);
   if (!text) return { type: 'unknown' };
@@ -367,6 +389,9 @@ export function parseMessage(rawText) {
       return { type: 'query', query: entry.query };
     }
   }
+  // 食物歷史口語查詢（最近吃什麼／之前吃過哪些罐頭…）——放在固定查詢詞之後，避免蓋掉既有查詢
+  const foodHist = parseFoodHistoryQuery(compact);
+  if (foodHist) return foodHist;
 
   // 「新增貓咪」為主，保留「新增毛孩」「新增貓貓」相容
   const addPetMatch = text.match(/^新增(?:貓咪|貓貓|毛孩)\s*(.+)$/);
@@ -929,6 +954,8 @@ export function analyzeLeading(rawText, petNames = []) {
       if (!rest) return { kind: 'clean' };
       // 剝出貓名後能可靠解析 → named（可寫入該貓）
       if (parsesToRecord(rest)) return { kind: 'named', petName: name, rest };
+      // 剝出貓名後是「食物歷史查詢」（唯讀，例：蚵仔最近吃什麼）→ 也視為 named，安全歸給該貓
+      if (parseFoodHistoryQuery(String(rest).replace(/ /g, '')) ) return { kind: 'named', petName: name, rest };
       // 剝出貓名、但後段像「食物名＋份量」卻無法可靠解析（如 希爾斯罐頭23g）→ partial：
       // 辨認到貓、但「不寫入、不降級成通用罐頭」；交第二階段用 food_item 精確比對／澄清。
       // 加「像食物/有數量」條件，避免把「蚵仔你好嗎」這種閒聊也當 partial。

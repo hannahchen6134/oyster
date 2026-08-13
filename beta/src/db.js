@@ -2,7 +2,7 @@
 // 規則：所有刪除都是 isDeleted 軟刪除；logs 有任何變動就重算該日 daily_summary。
 
 import { computeDailySummary, deriveFoodFields } from './summary.js';
-import { newId, newToken, nowIso, addDays, taipeiNowDateTime } from './util.js';
+import { newId, newToken, nowIso, addDays, taipeiNowDateTime, taipeiToday } from './util.js';
 
 // ---------- users ----------
 
@@ -593,6 +593,38 @@ export async function getRecentLogsByPet(db, petId, limit = 10) {
        WHERE logs.petId = ? AND logs.isDeleted = 0
        ORDER BY logs.eventDateTime DESC, logs.createdAt DESC LIMIT ?`)
     .bind(petId, limit)
+    .all();
+  return results || [];
+}
+
+// 食物歷史（§11-13）：查「實際吃過」——一律從 logs 出發，不是把 food_items 全列出來。
+// 依「實際吃到的品項」聚合（有 foodId 用 foodId、否則用 itemName），JOIN food_items 只為補
+// 顯示名稱／品牌（唯讀，不改 food_items）。sinceDays 給值＝近 N 天；不給＝全歷史。foodType 可選過濾。
+// 回傳每個吃過的品項一列：{ foodType, foodId, name, brand, productName, lastAt, times }，最近吃的在前。
+export async function getFoodHistory(db, petId, { sinceDays = null, foodType = '' } = {}) {
+  const where = ["logs.petId = ?", "logs.category = 'food'", 'logs.isDeleted = 0'];
+  const params = [petId];
+  if (Number(sinceDays) > 0) {
+    where.push('logs.eventDateTime >= ?');
+    params.push(`${addDays(taipeiToday(), -Number(sinceDays))} 00:00`);
+  }
+  if (foodType) { where.push('logs.foodType = ?'); params.push(foodType); }
+  const { results } = await db
+    .prepare(
+      `SELECT logs.foodType AS foodType,
+              logs.foodId AS foodId,
+              COALESCE(NULLIF(fi.displayName, ''), NULLIF(logs.itemName, ''), logs.foodType) AS name,
+              COALESCE(fi.brand, '') AS brand,
+              COALESCE(fi.productName, '') AS productName,
+              MAX(logs.eventDateTime) AS lastAt,
+              COUNT(*) AS times
+         FROM logs
+         LEFT JOIN food_items fi ON fi.foodId = logs.foodId AND logs.foodId != ''
+        WHERE ${where.join(' AND ')}
+        GROUP BY logs.foodType, CASE WHEN logs.foodId != '' THEN logs.foodId ELSE logs.itemName END
+        ORDER BY lastAt DESC`
+    )
+    .bind(...params)
     .all();
   return results || [];
 }
