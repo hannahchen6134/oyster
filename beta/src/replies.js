@@ -15,13 +15,21 @@ export function shortDate(date) {
   return `${Number(value.slice(5, 7))}月${Number(value.slice(8, 10))}日`;
 }
 
+// 熱量文字：不完整（有食物熱量未計入）不呈現成完整精準值——全無熱量→「未設定」；有一部分→「150+（尚有未計）」。
+export function kcalText(kcal, summary = {}) {
+  if (summary.kcalIncomplete && !(Number(kcal) > 0)) return '熱量 未設定';
+  const suffix = summary.kcalIncomplete ? '（尚有未計）' : (summary.kcalEstimated ? '（粗估）' : '');
+  const plus = summary.kcalIncomplete && Number(kcal) > 0 ? '+' : '';
+  return `熱量 ${formatNumber(kcal)}${plus} kcal${suffix}`;
+}
+
 export function summaryBlock(summary) {
   const lines = [];
   lines.push(`水分 ${formatNumber(summary.totalWaterMl)} ml`);
 
   const totalFood = (Number(summary.dryFoodG) || 0) + (Number(summary.wetFoodG) || 0) + (Number(summary.otherFoodG) || 0);
   lines.push(`食物 ${formatNumber(totalFood)} g`);
-  lines.push(`熱量 ${formatNumber(summary.kcal)} kcal`);
+  lines.push(kcalText(summary.kcal, summary));
 
   const meds = summary.meds || [];
   if (!meds.length) {
@@ -59,7 +67,7 @@ export function lightRecordReply(description, category, summary, isToday = true)
   if (category === 'water') {
     lines.push(`${day}水分 ${formatNumber(summary.totalWaterMl)} ml`);
   } else if (category === 'food') {
-    lines.push(`${day}熱量 ${formatNumber(summary.kcal)} kcal・水分 ${formatNumber(summary.totalWaterMl)} ml`);
+    lines.push(`${day}${kcalText(summary.kcal, summary)}・水分 ${formatNumber(summary.totalWaterMl)} ml`);
   }
   // 藥／嘔吐／便便等：只確認，不附累積（想看整體點「今日記錄」）
   return lines.join('\n');
@@ -148,7 +156,8 @@ export function todayReply(pet, date, summary) {
 export function handoffReply(pet, dateLabel, data) {
   const petName = pet?.petName || '貓貓';
   const lines = [`${petName}・今日交班　${dateLabel}`, '', '〔今日總計〕',
-    `水分 ${formatNumber(data.totals.waterMl)} ml・食物 ${formatNumber(data.totals.foodG)} g・熱量 ${formatNumber(data.totals.kcal)} kcal`];
+    `水分 ${formatNumber(data.totals.waterMl)} ml・食物 ${formatNumber(data.totals.foodG)} g・${kcalText(data.totals.kcal, data.totals)}`];
+  if (data.totals.kcalIncomplete) lines.push(`（有 ${data.totals.unknownKcalCount} 筆食物尚未設定熱量，未計入）`);
   if (data.medTotal) lines.push(`用藥 ${data.medDone}/${data.medTotal} 已完成`);
   lines.push('', '〔還沒做〕');
   if (data.pending.length) for (const p of data.pending) lines.push(`・${p.title}${p.at ? '（' + p.at + '）' : ''}`);
@@ -167,7 +176,8 @@ export function weekReply(petName, rows) {
       lines.push(`${day} —`);
       continue;
     }
-    const parts = [`水${formatNumber(row.totalWaterMl)}`, `熱${formatNumber(row.kcal)}`, `藥${row.medTakenCount}`];
+    const kcalCell = row.kcalIncomplete ? (Number(row.kcal) > 0 ? `熱${formatNumber(row.kcal)}+` : '熱未設定') : `熱${formatNumber(row.kcal)}`;
+    const parts = [`水${formatNumber(row.totalWaterMl)}`, kcalCell, `藥${row.medTakenCount}`];
     if (row.vomitCount > 0) parts.push(`吐${row.vomitCount}`);
     if (row.medIssueCount > 0) parts.push(`藥留意${row.medIssueCount}`);
     lines.push(`${day} ${parts.join('・')}`);

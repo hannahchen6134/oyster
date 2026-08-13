@@ -101,7 +101,7 @@ function trendSection(d) {
   } else {
     weightCard = metricCard('體重', `${formatWeightKg(w.latest)}<small>kg</small> ${deltaText(w.deltaPct)}`, sparkline(w.points || [], '#734921', { dots: true }));
   }
-  const kcalNote = kcal.estimated ? '<span class="a4-est">部分估算</span>' : '';
+  const kcalNote = kcal.incomplete ? '<span class="a4-est">部分未計入</span>' : (kcal.estimated ? '<span class="a4-est">部分估算</span>' : '');
   return `
     <section class="a4-card">
       <h2 class="a4-h2">體重・飲水・熱量趨勢<span class="a4-range">近 ${esc(String(d.rangeDays || 14))} 天</span></h2>
@@ -184,7 +184,7 @@ function dailyTable(rows) {
     <th class="a4-td-date">日期</th><th>水分<small>ml</small></th><th>濕食/罐頭<small>g</small></th><th>乾糧<small>g</small></th><th>熱量<small>kcal</small></th>
   </tr></thead>`;
   const body = rows.map((r) => `<tr>
-    <td class="a4-td-date">${esc(mmdd(r.date))}</td><td>${n0(r.waterMl)}</td><td>${n0(r.wetG)}</td><td>${n0(r.dryG)}</td><td>${n0(r.kcal)}${r.kcalEstimated ? '<sup class="a4-est-mark">估</sup>' : ''}</td>
+    <td class="a4-td-date">${esc(mmdd(r.date))}</td><td>${n0(r.waterMl)}</td><td>${n0(r.wetG)}</td><td>${n0(r.dryG)}</td><td>${r.kcalIncomplete && !(Number(r.kcal) > 0) ? '未設定' : n0(r.kcal)}${r.kcalIncomplete ? (Number(r.kcal) > 0 ? '+' : '') + '<sup class="a4-est-mark">未計</sup>' : (r.kcalEstimated ? '<sup class="a4-est-mark">估</sup>' : '')}</td>
   </tr>`).join('');
   return `<table class="a4-daily">${head}<tbody>${body}</tbody></table>`;
 }

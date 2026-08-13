@@ -763,11 +763,19 @@ export async function getSummaries(db, petId, from, to) {
   // 此時「絕不可當成精準」，改由當天底層食物 logs＋food_items 用同一套 computeDailySummary 安全推導。
   // 只讀不寫：不寫回 daily_summary、不批次重算、不動 food_items／logs（避免無限重算與副作用）。
   for (const row of rows) {
-    if (row.kcalEstimated === null || row.kcalEstimated === undefined) {
-      row.kcalEstimated = Number(row.kcal) > 0
-        ? (computeDailySummary(await getLogsForDay(db, petId, row.date)).kcalEstimated ? 1 : 0)
-        : 0; // 當天沒有熱量 → 不可能是估算
+    const needEstFallback = (row.kcalEstimated === null || row.kcalEstimated === undefined);
+    // 「熱量不完整」＝當天有食物熱量無法計算（零食／其他無品牌熱量）。daily_summary 沒有這個欄位（不改 schema），
+    // 一律讀時衍生：只有「其他食物」桶>0 的日子才可能有未知熱量 → 才需查當天 logs，避免每列都查（省成本）。
+    const mayBeIncomplete = Number(row.otherFoodG) > 0;
+    let daySummary = null;
+    if ((needEstFallback && Number(row.kcal) > 0) || mayBeIncomplete) {
+      daySummary = computeDailySummary(await getLogsForDay(db, petId, row.date));
     }
+    if (needEstFallback) {
+      row.kcalEstimated = (Number(row.kcal) > 0 && daySummary) ? (daySummary.kcalEstimated ? 1 : 0) : 0; // 當天沒有熱量 → 不可能是估算
+    }
+    row.unknownKcalCount = (mayBeIncomplete && daySummary) ? daySummary.unknownKcalCount : 0;
+    row.kcalIncomplete = row.unknownKcalCount > 0;
   }
   return rows;
 }
@@ -804,6 +812,8 @@ export function emptySummaryRow(petId, date) {
     abnormalFlags: '[]',
     entryCount: 0,
     kcalEstimated: 0, // 空白日沒有熱量 → 一律非估算（避免補零列被誤判）
+    unknownKcalCount: 0,
+    kcalIncomplete: false,
     updatedAt: ''
   };
 }

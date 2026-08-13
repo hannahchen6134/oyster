@@ -46,6 +46,17 @@ export function isKcalEstimated(log, food) {
   return isEstimableType(log?.foodType);
 }
 
+// 一筆食物 log「熱量無法計算」＝有份量、卻既沒有品牌每克熱量、其類型也沒有安全預設（零食／其他）。
+// 這種 log 底層 kcal 會是 0，但語意是「未知、尚未計入」，不能被當成真的 0 kcal——否則當日總熱量
+// 會看起來像完整精準值。判斷來源：food log 存在 ＋ 無有效 kcalPerGram ＋ foodType 不在 TYPE_KCAL_DEFAULT。
+export function isKcalUnknown(log, food) {
+  if (log?.category !== 'food' || log?.isDeleted) return false;
+  if (!(toNumber(log?.amount) > 0)) return false;
+  const brandKcal = Number(food?.kcalPerGram) > 0 || Number(log?.foodKcalPerGram) > 0;
+  if (brandKcal) return false; // 有品牌每克熱量 → 算得出來，不是未知
+  return !isEstimableType(log?.foodType); // 類型有安全預設（乾糧/罐頭/主食罐…）→ 可估，不是未知
+}
+
 export function deriveFoodFields(grams, foodType, food) {
   const g = toNumber(grams);
   const hasRealKcal = Number(food?.kcalPerGram) > 0;
@@ -82,6 +93,8 @@ export function computeDailySummary(logs) {
     otherFoodG: 0,
     kcal: 0,
     kcalEstimated: false, // P0-3：當日總熱量是否含「用類型預設估算」的食物筆
+    unknownKcalCount: 0,  // 當天有幾筆食物「熱量無法計算」（零食／其他無品牌熱量）→ 尚未計入總熱量
+    kcalIncomplete: false, // 有未計入熱量的食物 → 總熱量「不完整」，不可呈現成完整精準值
     meds: [],
     medTakenCount: 0,
     medIssueCount: 0,
@@ -121,6 +134,7 @@ export function computeDailySummary(logs) {
         summary.foodWaterMl += toNumber(log.waterMl);
         summary.kcal += toNumber(log.kcal);
         if (isKcalEstimated(log)) summary.kcalEstimated = true; // 這筆用類型預設估 → 當日標「含估算」
+        if (isKcalUnknown(log)) summary.unknownKcalCount += 1; // 這筆熱量未知（零食/其他無熱量）→ 尚未計入
         break;
       }
       case 'med': {
@@ -182,6 +196,7 @@ export function computeDailySummary(logs) {
   summary.wetFoodG = round1(summary.wetFoodG);
   summary.otherFoodG = round1(summary.otherFoodG);
   summary.kcal = round1(summary.kcal);
+  summary.kcalIncomplete = summary.unknownKcalCount > 0; // 有未知熱量食物 → 總熱量不完整
 
   if (summary.vomitCount > 0) summary.abnormalFlags.push('vomit');
   if (summary.medIssueCount > 0) summary.abnormalFlags.push('medIssue');
@@ -214,7 +229,9 @@ export function buildHandoff(pet, logs = [], tasks = []) {
     waterMl: s.totalWaterMl,
     foodG: round1((Number(s.dryFoodG) || 0) + (Number(s.wetFoodG) || 0) + (Number(s.otherFoodG) || 0)),
     kcal: s.kcal,
-    kcalEstimated: s.kcalEstimated
+    kcalEstimated: s.kcalEstimated,
+    unknownKcalCount: s.unknownKcalCount,
+    kcalIncomplete: s.kcalIncomplete
   };
 
   const slots = parseSlots(pet);
