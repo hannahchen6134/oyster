@@ -55,7 +55,7 @@ test('H 教學示範句全部可被 parser 解析（不放尚未實作的語句�
     ['主食3', 'record', '主食罐'], ['副食5', 'record', '副食罐'], ['乾乾10', 'record', '乾糧'],
     ['乾乾 10', 'record', '乾糧'], ['罐罐20', 'record', '罐頭'], ['零食3', 'record', '零食'],
     ['乾乾減5', 'foodAdjust', '乾糧'], ['主食扣3', 'foodAdjust', '主食罐'],
-    ['剩10', 'fixLast', null], ['主食改成20', 'record', '主食罐'],
+    ['罐罐剩10', 'foodAdjust', '罐頭'], ['剩10', 'fixLast', null], ['主食改成20', 'record', '主食罐'],
     ['今天喝多少', 'query', null], ['今天吃多少', 'query', null],
     ['最近吃什麼', 'query', null], ['之前吃過哪些罐頭', 'query', null]
   ];

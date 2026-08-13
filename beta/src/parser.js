@@ -530,6 +530,14 @@ export function parseMessage(rawText) {
   if (foodDeduct && Number(foodDeduct[2]) > 0) {
     return { type: 'foodAdjust', foodType: FOOD_ALIAS_MAP.get(foodDeduct[1]), mode: 'subtract', amount: Number(foodDeduct[2]), confirm: false };
   }
+  // (1b) 明確「剩」＝這一類最近合理的一餐剩下 N 克沒吃完（leftover，不是新增一筆）。
+  //      實吃＝原餵量−剩；沿用 servedAmount／leftoverAmount 語意。同樣走安全定位（唯一才執行、多筆出確認卡）。
+  const foodLeftover = compact.match(
+    new RegExp(`^(${FOOD_ALIAS_RE})(?:沒吃完)?剩下?(\\d+(?:\\.\\d+)?)(?:克|公克|g)?$`, 'i')
+  );
+  if (foodLeftover && Number(foodLeftover[2]) > 0) {
+    return { type: 'foodAdjust', foodType: FOOD_ALIAS_MAP.get(foodLeftover[1]), mode: 'leftover', amount: Number(foodLeftover[2]), confirm: false };
+  }
   // (2) 食物別名＋「-」＋正數，但沒有明確動詞＝過度簡略 → possibleSubtract：confirm=true，
   //     即使唯一候選也先出短確認卡（對，扣 N 克／不是），確認後才 update；不直接改資料。
   //     半形「-」與全形「－」皆可。負向（-3／今天-3／35-3／主食-／主食-abc／體重-3）因缺「別名／正數」自然不命中。
