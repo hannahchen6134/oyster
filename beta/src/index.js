@@ -2942,7 +2942,9 @@ export async function handleRecord(env, event, pet, record, lineUserId, opts = {
       await replyOrPushFlex(env, event, foodDisambigFlex({
         pet, foodType: record.foodType, typedName: record.itemName || record.foodType,
         grams: Number(record.amount) || 0, addedWaterMl: Number(record.addedWaterMl) || 0,
-        smid: String(event.message?.id || ''), options: sameType, guessId: guess?.foodId || ''
+        smid: String(event.message?.id || ''), options: sameType, guessId: guess?.foodId || '',
+        // 只輸入類型／口語別名（沒打品名）＝這時能到這裡代表沒有預設可套 → 顯示「設預設免選＋粗估說明」引導
+        bareType: !record.itemName
       }), `「${record.itemName || record.foodType}」對不到已建立的品項，請選正確的${record.foodType}，熱量才算得到。`);
       return { disambiguated: true };
     }

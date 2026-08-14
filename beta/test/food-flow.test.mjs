@@ -87,8 +87,8 @@ test('part四：先記後的結果卡必須清楚標示「估算」——不得�
     pet: { petName: '蚵仔' }, categoryKey: 'wet', mainText: '罐頭 15g', summary: {}, logId: 'L1',
     foodType: '罐頭', estimated: true, estKcalPerG: 0.9
   }));
-  assert.ok(json.includes('熱量是估算的'), '結果卡明確標示熱量為估算');
-  assert.ok(json.includes('設定') && json.includes('自動補算'), '提示可設定精確每克熱量、之後自動補算');
+  assert.ok(json.includes('系統粗估值'), '結果卡明確標示熱量為系統粗估值（非精準品牌熱量）');
+  assert.ok(json.includes('照護站') && json.includes('自動補算'), '提示可到照護站設定品牌與實際熱量、之後自動補算');
 });
 
 test('part四：長品項名稱 → Flex JSON 合法、主訊息用 wrap 可換行、按鈕 label 不超過 20 字（不爆版）', () => {

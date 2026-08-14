@@ -4,7 +4,7 @@
 
 import { goalSection, recordPrompt } from './replies.js';
 import { BRAND, displayMedStatus } from './brand.js';
-import { isWetFoodType } from './summary.js';
+import { isWetFoodType, isEstimableType } from './summary.js';
 import { formatWeightKg } from './util.js';
 
 // 卡身：暖米白（和照護站網站同一個紙面世界，不用冷白）；標題：暖棕漸層
@@ -211,8 +211,8 @@ export function recordFlex({ pet, categoryKey, mainText, subText, summary, date,
     type: 'box', layout: 'vertical', backgroundColor: C.tint, cornerRadius: '10px',
     paddingAll: '12px', margin: 'md', spacing: 'xs',
     contents: [
-      text('這類要自己填熱量（包裝上有）', { size: 'sm', weight: 'bold', color: C.brand, wrap: true }),
-      text('零食／其他每家熱量差很多，沒辦法估。這筆先記份量了；填一次每克熱量，以後這個就會自動算。', { size: 'xxs', color: C.inkSoft, wrap: true })
+      text('熱量未設定（零食沒有系統粗估值）', { size: 'sm', weight: 'bold', color: C.brand, wrap: true }),
+      text('零食每家熱量差很多，不亂估、也不計入總熱量。這筆先記份量了；到照護站補品牌與實際熱量，之後就會自動算。', { size: 'xxs', color: C.inkSoft, wrap: true })
     ]
   }] : [];
   // 熱量用「類型預設」估算時：溫和標示（不是錯，是待補），並提醒可設定精確值
@@ -220,8 +220,8 @@ export function recordFlex({ pet, categoryKey, mainText, subText, summary, date,
     type: 'box', layout: 'vertical', backgroundColor: C.tint, cornerRadius: '10px',
     paddingAll: '12px', margin: 'md', spacing: 'xs',
     contents: [
-      text(`≈ 熱量是估算的（${foodType || '食物'}每克約 ${estKcalPerG} kcal）`, { size: 'sm', weight: 'bold', color: C.brand, wrap: true }),
-      text('想更準，可以設定這個品項的精確每克熱量；設定後這筆會自動補算。', { size: 'xxs', color: C.inkSoft, wrap: true })
+      text(`≈ 熱量先用系統粗估值（${foodType || '食物'}每克約 ${estKcalPerG} kcal）`, { size: 'sm', weight: 'bold', color: C.brand, wrap: true }),
+      text('想更準？可到照護站設定這款食物的品牌與實際熱量；設定後這筆會自動補算。', { size: 'xxs', color: C.inkSoft, wrap: true })
     ]
   }] : [];
   const body = {
@@ -316,7 +316,10 @@ export function recordFlexCompact({ pet, categoryKey, mainText, subText, summary
 
 // ②③ 打了品名卻對不到已建立的品項時：不默默記 0 熱量，先回這張卡讓使用者選正確品項（熱量才算得到）。
 // guessId＝模糊比對猜到最接近的品項 foodId，排最前面並標「最接近」。
-export function foodDisambigFlex({ pet, foodType, typedName, grams, addedWaterMl = 0, smid = '', pid = '', options = [], guessId = '' }) {
+// 純類型／口語別名輸入時的例句（下次只打這個就不用再選）：乾糧→乾乾、主食罐→主食…
+const FOODTYPE_ALIAS_EG = { '乾糧': '乾乾', '主食罐': '主食', '副食罐': '副食', '罐頭': '罐罐', '零食': '零食' };
+
+export function foodDisambigFlex({ pet, foodType, typedName, grams, addedWaterMl = 0, smid = '', pid = '', options = [], guessId = '', bareType = false }) {
   const styleKey = foodType === '乾糧' ? 'dry' : isWetFoodType(foodType) ? 'wet' : 'note';
   const style = CATEGORY_STYLE[styleKey] || CATEGORY_STYLE.note;
   const g = Number(grams) || 0;
@@ -357,6 +360,18 @@ export function foodDisambigFlex({ pet, foodType, typedName, grams, addedWaterMl
       { type: 'button', height: 'sm', style: 'link', color: C.inkSoft,
         action: { type: 'postback', label: `先記${foodType} ${g}g（熱量先估算）`.slice(0, 20), data: `action=recFoodRaw&t=${encodeURIComponent(foodType)}&g=${g}&name=${encodeURIComponent(typedName)}${carry}`, displayText: `先記${foodType} ${g}g（熱量先估算）` } },
       text(`先依${foodType}平均熱量估算，之後設定正確品項，可再補上較精確的熱量。`, { size: 'xxs', color: C.muted, wrap: true, margin: 'none' }),
+      // 只輸入類型／口語別名（沒指定品牌）＋這個類型沒設預設食物時：溫和說明「設預設下次免選」＋「粗估值」＋照護站入口。
+      // 明確品牌輸入、已有預設、或打了品名對不到的情境都不顯示（bareType=false）。不強迫設定：上面「先記」隨時能直接完成。
+      ...(bareType ? [
+        { type: 'separator', margin: 'md', color: SEPARATOR },
+        text(`常吃固定同一款？到照護站設成「預設食物」，下次只打「${(FOODTYPE_ALIAS_EG[foodType] || foodType)}${Number(grams) || 0}」就不用再選。`, { size: 'xxs', color: C.brand, wrap: true, margin: 'none' }),
+        text(isEstimableType(foodType)
+          ? '未設定實際熱量時，會先用系統粗估值；沒設定也能先記，想更準可到照護站補品牌與實際熱量。'
+          : '零食沒設熱量會標示「未計入」；沒設定也能先記，想更準可到照護站補品牌與實際熱量。',
+          { size: 'xxs', color: C.muted, wrap: true, margin: 'none' }),
+        { type: 'button', height: 'sm', style: 'link', color: C.brand,
+          action: { type: 'message', label: '到照護站設定品牌／熱量', text: '照護站' } }
+      ] : []),
       { type: 'separator', margin: 'md', color: SEPARATOR },
       { type: 'button', height: 'sm', style: 'link', color: C.muted,
         action: { type: 'postback', label: '取消', data: `action=foodCancel&smid=${encodeURIComponent(String(smid || ''))}${pid ? `&pid=${encodeURIComponent(String(pid))}` : ''}`, displayText: '取消' } }
