@@ -366,8 +366,8 @@ export function foodDisambigFlex({ pet, foodType, typedName, grams, addedWaterMl
         { type: 'separator', margin: 'md', color: SEPARATOR },
         text(`常吃固定同一款？到照護站設成「預設食物」，下次只打「${(FOODTYPE_ALIAS_EG[foodType] || foodType)}${Number(grams) || 0}」就不用再選。`, { size: 'xxs', color: C.brand, wrap: true, margin: 'none' }),
         text(isEstimableType(foodType)
-          ? '未設定實際熱量時，會先用系統粗估值；沒設定也能先記，想更準可到照護站補品牌與實際熱量。'
-          : '零食沒設熱量會標示「未計入」；沒設定也能先記，想更準可到照護站補品牌與實際熱量。',
+          ? '若這款尚未設定實際熱量，會先用系統粗估值（已設定的品項就用實際熱量）；想讓品牌與熱量更準，可到照護站補設定，沒設定也能先記。'
+          : '若這款尚未設定實際熱量，零食會標示「未計入」（已設定的就用實際熱量）；想更準可到照護站補品牌與實際熱量，沒設定也能先記。',
           { size: 'xxs', color: C.muted, wrap: true, margin: 'none' }),
         { type: 'button', height: 'sm', style: 'link', color: C.brand,
           action: { type: 'message', label: '到照護站設定品牌／熱量', text: '照護站' } }
@@ -744,10 +744,10 @@ export function onboardingCarousel(petName = '') {
   const b2 = {
     type: 'bubble', size: 'mega', header: stepHead(t2.grad, '2', '記第一筆', '挑一個你最近做的'),
     body: { type: 'box', layout: 'vertical', paddingAll: '16px', backgroundColor: t2.body, contents: [
-      text('點一句會帶進輸入框，改好數字再送出', { size: 'xxs', color: C.muted, wrap: true }),
-      line(t2, '水 20', '喝水'),
-      line(t2, '罐頭 30', '吃飯（罐頭幾克）'),
-      line(t2, '藥 早 已吃', '餵藥'),
+      text('不用學格式，照平常說就好。點一句會帶進輸入框，改好再送出', { size: 'xxs', color: C.muted, wrap: true }),
+      line(t2, '乾乾5', '吃飯（不用寫「克」）'),
+      line(t2, '喝水30', '喝水'),
+      line(t2, '嘔吐 白沫', '狀況＋描述'),
       hintBox(t2, '送出後會跳一張卡，顯示今天累計多少\n熱量沒設公式會先「估算」（標 ≈），到照護站設定每克熱量就變精確')
     ] }
   };
@@ -762,7 +762,7 @@ export function onboardingCarousel(petName = '') {
     ] }
   };
   return bubble(
-    '喵爸媽安心上手：① 新增貓咪 ② 記第一筆（水 20／罐頭 30／藥 早 已吃）③ 打「今天」看狀況、「給醫生看」給醫生',
+    '喵爸媽安心上手：① 新增貓咪 ② 記第一筆（乾乾5／喝水30／嘔吐 白沫）③ 打「今天」看狀況、「給醫生看」給醫生',
     { type: 'carousel', contents: [b1, b2, b3] }
   );
 }
@@ -953,13 +953,13 @@ export function exampleCard() {
   const body = {
     type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
     contents: [
-      text('直接打字最快，照著點點看就懂了', { size: 'xs', color: C.muted, align: 'center', wrap: true }),
-      line('水 60', '記一筆喝水 60 ml'),
-      line('罐頭 皇家 30', '食物＋品牌＋幾克'),
-      line('藥 早 已吃', '記早上的藥已經餵了'),
-      line('水20 乾糧4 藥早已吃', '一句話一次記三筆'),
+      text('不用學格式，照平常說就好；點一句就記給你看', { size: 'xs', color: C.muted, align: 'center', wrap: true }),
+      line('主食3', '吃飯（不用寫「克」）'),
+      line('喝水30', '記喝水 30 ml'),
+      line('嘔吐 白沫', '記狀況＋描述'),
+      line('最近吃什麼', '回頭查吃過什麼'),
       { type: 'separator', margin: 'xl', color: SEPARATOR },
-      text('品牌、換貓、加水、補登… 打「如何記錄」看完整記法',
+      text('沒吃完可打「乾乾減5」「罐罐剩10」；更多說法打「完整記法」',
         { size: 'xxs', color: C.brand, align: 'center', wrap: true, margin: 'lg' })
     ]
   };
@@ -972,8 +972,8 @@ export function exampleCard() {
         action: { type: 'message', label: '改用按鈕', text: '按鈕記錄' } }
     ]
   };
-  return bubble('怎麼記：水 60、罐頭 30、藥 早 已吃、水20 乾糧4 藥早已吃',
-    { type: 'bubble', size: 'mega', header: header('怎麼記？打字最快'), body, footer });
+  return bubble('怎麼記：主食3、喝水30、嘔吐 白沫、最近吃什麼',
+    { type: 'bubble', size: 'mega', header: header('怎麼記？照平常說就好'), body, footer });
 }
 
 // ---------- 完整記法教學卡（固定小字、短句不換行） ----------
@@ -994,17 +994,24 @@ export function recordTutorialFlex() {
     rows.push(line);
   };
 
-  rows.push(text('照著打就會記，數字是幾克或幾 ml', { size: 'xs', color: C.muted, wrap: true }));
+  rows.push(text('不用學格式，照平常說就好；「克」可省略、空格有沒有都行', { size: 'xs', color: C.muted, wrap: true }));
+
+  sec('吃飯（直接說）');
+  cmd('主食3');
+  cmd('副食5');
+  cmd('乾乾10');
+  cmd('罐罐20');
+  cmd('零食3');
+  cmd('希爾斯10', '有建品牌就直接打名字');
+  cmd('罐頭 30 加水 10', '另外加水');
+
+  sec('沒吃完・要修正');
+  cmd('乾乾減5');
+  cmd('罐罐剩10');
+  cmd('主食改成20', '改最近一筆');
 
   sec('喝水');
-  cmd('水 60');
-
-  sec('吃飯（可帶品牌）');
-  cmd('乾糧 4');
-  cmd('罐頭 30');
-  cmd('罐頭 皇家 30', '帶品牌');
-  cmd('乾糧 希爾斯 20', '帶品牌');
-  cmd('罐頭 30 加水 10', '另外加水');
+  cmd('喝水30');
 
   sec('用藥');
   cmd('藥 早 已吃');
@@ -1012,28 +1019,26 @@ export function recordTutorialFlex() {
   cmd('已吃／未餵／吐掉／拒吃');
 
   sec('症狀・精神');
-  cmd('吐 白色泡沫');
+  cmd('嘔吐 白沫');
   cmd('大便 偏軟');
   cmd('尿尿');
-  cmd('營養補充 益生菌');
+  cmd('益生菌');
   cmd('精神 活動力差');
   cmd('備註 今天梳毛');
 
-  sec('一次記多筆');
-  cmd('水20 乾糧4 藥早已吃', '一句記三筆');
+  sec('回頭查');
+  cmd('今天吃多少');
+  cmd('今天喝多少');
+  cmd('最近吃什麼');
+  cmd('之前吃過哪些罐頭');
 
   sec('補登・指定時間');
-  cmd('昨天 21:30 水 20');
-  cmd('14:30 水 20');
+  cmd('昨天 21:30 喝水30');
+  cmd('14:30 喝水30');
 
   sec('多隻貓');
   cmd('蚵仔', '打名字＝之後都記牠');
-  cmd('冠關 水 20', '只記一筆給別隻');
-
-  sec('記錯了');
-  cmd('改 54', '改上一筆數量');
-  cmd('剩 20', '沒吃完扣掉');
-  cmd('刪除', '刪掉上一筆');
+  cmd('冠關 喝水30', '只記一筆給別隻');
 
   const body = {
     type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
@@ -1042,12 +1047,12 @@ export function recordTutorialFlex() {
   const footer = {
     type: 'box', layout: 'vertical', paddingAll: '14px', paddingStart: '20px', paddingEnd: '20px', backgroundColor: FOOTER_COLOR,
     contents: [
-      text('先到照護站設好「常吃的食物」，之後打品牌就會自動算熱量與水分。',
+      text('想更準？到照護站存「常吃食物」、設「預設食物」，之後只打「乾乾3」「主食5」就自動套用。沒設定也可以先記；沒有品牌實際熱量時，系統會先用粗估值並標示。',
         { size: 'xxs', color: C.brand, wrap: true })
     ]
   };
-  return bubble('完整記法：水 60、罐頭 皇家 30、藥 早 已吃、水20 乾糧4 藥早已吃、昨天 21:30 水 20',
-    { type: 'bubble', size: 'mega', header: header('完整記法・照著打就會'), body, footer });
+  return bubble('完整記法：主食3、乾乾10、乾乾減5、罐罐剩10、最近吃什麼、之前吃過哪些罐頭',
+    { type: 'bubble', size: 'mega', header: header('完整記法・照平常說就好'), body, footer });
 }
 
 // 如何記錄：左右滑動的分類卡，三類用不同色系明確區隔（常用／進階記法／進階功能）
@@ -1088,13 +1093,13 @@ export function quickRecordCarousel(opts = {}) {
   const bubble1 = {
     type: 'bubble', size: 'mega', header: catHeader(t1.grad, '1', '常用', '每天這樣打就好'),
     body: { type: 'box', layout: 'vertical', paddingAll: '16px', backgroundColor: t1.body, contents: [
-      text('點一句會帶進輸入框，改好數字再送出', { size: 'xxs', color: C.muted, wrap: true }),
-      line(t1, '水 60', '喝水'),
-      line(t1, '罐頭 皇家 30', '食物＋品牌＋幾克'),
-      line(t1, '藥 早 已吃', '餵藥'),
-      line(t1, '嘔吐 吐了乾乾', '症狀＋描述'),
-      line(t1, '備註 精神比較好', '自由觀察'),
-      line(t1, '水20 乾糧4 藥早已吃', '一次記多筆'),
+      text('不用學格式，照平常說就好。點一句會帶進輸入框，改好再送出', { size: 'xxs', color: C.muted, wrap: true }),
+      line(t1, '主食3', '吃飯（不用寫「克」）'),
+      line(t1, '乾乾10', '吃乾糧'),
+      line(t1, '喝水30', '喝水'),
+      line(t1, '嘔吐 白沫', '狀況＋描述'),
+      line(t1, '乾乾減5', '沒吃完／要修正'),
+      line(t1, '最近吃什麼', '回頭查'),
       text('症狀多寫幾個字，會自動整理進回顧的「給醫生的注意事項」', { size: 'xxs', color: C.muted, wrap: true, margin: 'md' })
     ] }
   };
@@ -1103,10 +1108,11 @@ export function quickRecordCarousel(opts = {}) {
     type: 'bubble', size: 'mega', header: catHeader(t2.grad, '2', '進階記法', '品牌・加水・補登・換貓'),
     body: { type: 'box', layout: 'vertical', paddingAll: '16px', backgroundColor: t2.body, contents: [
       text('需要時再用，記得更完整', { size: 'xxs', color: C.muted, wrap: true }),
-      line(t2, '乾糧 希爾斯 20', '指定品牌'),
-      line(t2, '罐頭 30 加水 10', '罐頭另外加水'),
-      line(t2, '昨天 21:30 水 20', '補登・指定時間'),
-      line(t2, opts.petName || '貓貓名字', '換一隻貓記（打名字）', opts.petName || '')
+      line(t2, '希爾斯10', '有建品牌就直接打名字'),
+      line(t2, '罐罐剩10', '沒吃完剩多少'),
+      line(t2, '昨天 21:30 喝水30', '補登・指定時間'),
+      line(t2, opts.petName || '貓貓名字', '換一隻貓記（打名字）', opts.petName || ''),
+      text('常吃固定一款？到照護站設成「預設食物」，之後只打「乾乾3」就自動套用；沒設定也能先記，沒有品牌實際熱量時系統會標示粗估。', { size: 'xxs', color: C.muted, wrap: true, margin: 'md' })
     ] },
     footer: { type: 'box', layout: 'horizontal', paddingAll: '10px', backgroundColor: FOOTER_COLOR, contents: [
       { type: 'button', height: 'sm', style: 'primary', color: t2.grad.endColor,
@@ -1131,7 +1137,7 @@ export function quickRecordCarousel(opts = {}) {
       featBtn('💻 用電腦登入', '電腦登入')
     ] }
   };
-  return bubble('如何記錄：① 常用打字（水 60・罐頭 皇家 30・藥 早 已吃）② 進階記法（品牌・補登・換貓）③ 進階功能（電腦登入・多人照護）',
+  return bubble('怎麼記：① 直接說（主食3・喝水30・嘔吐 白沫・最近吃什麼）② 進階（品牌・剩多少・補登・換貓）③ 照護站・多人照護',
     { type: 'carousel', contents: [bubble1, bubble2, bubble3] });
 }
 
@@ -1164,8 +1170,8 @@ export function recordMenuFlex(introText = '想記哪一種？點一下就開始
       row([cell('嘔吐', '顏色與內容', '記嘔吐'), cell('精神', '活動力如何', '記精神')]),
       row([cell('其他備註', '想補充的小事', '記備註')]),
       { type: 'separator', margin: 'xl', color: SEPARATOR },
-      text('熟了就直接打字更快：水 60・罐頭 30・藥 早 已吃', { size: 'xxs', color: C.brand, align: 'center', wrap: true, margin: 'lg' }),
-      text('補登昨天：昨天 21:30 水 20', { size: 'xxs', color: C.muted, align: 'center', margin: 'sm' })
+      text('熟了就直接打字更快：主食3・喝水30・嘔吐 白沫', { size: 'xxs', color: C.brand, align: 'center', wrap: true, margin: 'lg' }),
+      text('補登昨天：昨天 21:30 喝水30', { size: 'xxs', color: C.muted, align: 'center', margin: 'sm' })
     ]
   };
   return bubble(headerTitle, { type: 'bubble', size: 'mega', header: header(headerTitle), body });

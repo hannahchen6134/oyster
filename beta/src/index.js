@@ -561,7 +561,7 @@ function stepMedCard(petName, step = '') {
 }
 
 // 上手最小門檻：名字＋目前體重（給醫生看與每日喝水量目標都靠體重）。刻意不放「跳過」按鈕。
-function weightOnboardCard(petName, step = '第 2 步・共 3 步') {
+function weightOnboardCard(petName, step = '') {
   return onboardCard({
     step,
     title: `${petName}現在幾公斤？`,
@@ -570,7 +570,7 @@ function weightOnboardCard(petName, step = '第 2 步・共 3 步') {
   });
 }
 
-function stepFoodCard(step = '第 3 步・共 3 步', subtitle = '建了記錄就自動算熱量（乾乾、罐罐都可）') {
+function stepFoodCard(step = '', subtitle = '建了記錄就自動算熱量（乾乾、罐罐都可）') {
   return onboardCard({
     step,
     title: '最常吃哪一種？',
@@ -734,7 +734,7 @@ async function handlePending(env, event, { db, user, pet, pets, lineUserId, owne
     if (!m) { await clear(); return false; }
     await updatePetFields(db, pet.petId, { weightKg: Number(m[1]) });
     await clear();
-    await replyOrPushFlex(env, event, stepFoodCard('第 3 步・共 3 步', `已記下 ${pet.petName} ${m[1]} kg！最常吃哪一種？建好記錄就自動算熱量和水分（也可先跳過，直接開始記）`), `已記下體重 ${m[1]} kg。接下來可建常吃的食物：輸入「設定罐頭」「設定乾糧」，或直接開始記錄`);
+    await replyOrPushFlex(env, event, stepFoodCard('', `已記下 ${pet.petName} ${m[1]} kg！最常吃哪一種？建好記錄就自動算熱量和水分（也可先跳過，直接開始記）`), `已記下體重 ${m[1]} kg。接下來可建常吃的食物：輸入「設定罐頭」「設定乾糧」，或直接開始記錄`);
     return true;
   }
 
@@ -1095,13 +1095,12 @@ async function handlePostback(event, env, baseUrl) {
   if (action === 'howtype') {
     await track(db, lineUserId, 'howtype');
     await replyOrPushQuick(env, event,
-      '熟了之後，直接打字最快 👇（不用先點）\n\n'
-      + '· 喝水 → 打「水 20」\n'
-      + '· 吃飯 → 打「罐頭 30」或「乾糧 5」\n'
-      + '· 餵藥 → 打「藥 早 已吃」\n'
-      + '· 嘔吐 → 打「吐 黃液」\n'
-      + '· 一次記多筆 → 「水20 乾糧5 藥早已吃」\n'
-      + '· 補昨天 → 「昨天 21:30 水 20」',
+      '不用學格式，照平常說就好 👇（「克」可省略、空格隨意）\n\n'
+      + '· 吃飯 → 打「主食3」「乾乾10」\n'
+      + '· 喝水 → 打「喝水30」\n'
+      + '· 狀況 → 打「嘔吐 白沫」\n'
+      + '· 沒吃完 → 打「乾乾減5」「罐罐剩10」\n'
+      + '· 回頭查 → 打「今天吃多少」「最近吃什麼」',
       [qrMsg('看完整記法', '完整記法'), qrMsg('先記一筆', '快速記錄')]);
     return;
   }
@@ -2113,7 +2112,7 @@ async function handleTextMessage(event, env, baseUrl) {
     }
 
     case 'exampleMenu': {
-      await replyOrPushFlex(env, event, exampleCard(), '怎麼記：\n水 60（記喝水）\n罐頭 30（記食物）\n藥 早 已吃\n吐了');
+      await replyOrPushFlex(env, event, exampleCard(), '怎麼記：\n主食3（吃飯）\n喝水30（喝水）\n嘔吐 白沫（狀況）\n最近吃什麼（回頭查）');
       return;
     }
 
@@ -3328,9 +3327,9 @@ async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId, ow
     const items = [...shortcuts, ...(beginner ? [TEACH_BTN] : []), qrPost('其他狀況（吐/便…）', 'action=recmore', '其他狀況')];
     const text = beginner
       ? '記錄超快，兩種都行 👇\n\n'
-        + '① 直接打字（最快）：\n　水 20・罐頭 30・藥 早 已吃\n　一次多筆：水20 乾糧5 藥早已吃\n\n'
+        + '① 直接說（最快，不用學格式）：\n　主食3・喝水30・嘔吐 白沫\n　沒吃完：乾乾減5\n\n'
         + '② 或點下面你常記的，一下就好：'
-      : '點你常記的，一下就好 👇\n（也可直接打字：水 20・罐頭 30・藥 早 已吃）';
+      : '點你常記的，一下就好 👇\n（也可直接說：主食3・喝水30・嘔吐 白沫）';
     await replyOrPushQuick(env, event, text, items);
     return;
   }

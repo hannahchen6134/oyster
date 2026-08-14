@@ -57,7 +57,10 @@ test('1) 兩個乾糧、無預設：乾乾5 → 品牌選擇卡含「設成預�
   assert.equal(foodCount(db), 0, '選之前不寫入');
   assert.ok(j.includes('預設食物'), '含「設成預設」引導');
   assert.ok(j.includes('乾乾5'), '含乾糧例句「乾乾5」');
+  // 粗估說明必須是「條件式」——候選品項可能已有品牌熱量，不得寫成「這次一定用系統粗估值」
   assert.ok(j.includes('系統粗估值'), '含系統粗估值說明');
+  assert.ok(j.includes('若這款尚未設定實際熱量'), '粗估說明必須是條件式（尚未設定實際熱量時才用）');
+  assert.ok(j.includes('實際熱量'), '說明選了已設定品項會用實際熱量');
   assert.ok(j.includes('到照護站設定品牌／熱量'), '含照護站入口');
 });
 
