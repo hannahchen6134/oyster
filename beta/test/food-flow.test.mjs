@@ -88,7 +88,7 @@ test('part四：先記後的結果卡必須清楚標示「估算」——不得�
     foodType: '罐頭', estimated: true, estKcalPerG: 0.9
   }));
   assert.ok(json.includes('系統粗估值'), '結果卡明確標示熱量為系統粗估值（非精準品牌熱量）');
-  assert.ok(json.includes('照護站') && json.includes('自動補算'), '提示可到照護站設定品牌與實際熱量、之後自動補算');
+  assert.ok(json.includes('照護站') && json.includes('之後的紀錄會自動套用'), '提示可到照護站設定品牌／實際熱量，之後的紀錄會自動套用（不宣稱回補這一筆）');
 });
 
 test('part四：長品項名稱 → Flex JSON 合法、主訊息用 wrap 可換行、按鈕 label 不超過 20 字（不爆版）', () => {
