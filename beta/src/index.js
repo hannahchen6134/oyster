@@ -2916,8 +2916,9 @@ export async function handleRecord(env, event, pet, record, lineUserId, opts = {
       const def = await resolveDefaultFood(db, lineUserId, record.foodType);
       if (def) matched = def;
     }
-    // ③沒預設、該類型只建了一種品項就自動套用（例如乾糧只有一種 → 直接用它的公式）
-    if (!matched && !record.itemName && sameType.length === 1) matched = sameType[0];
+    // ③（產品規則）只輸入類型／口語別名（沒指定品牌）且沒有預設 → 不猜品牌：直接記 generic 類型、用系統粗估值。
+    //   刻意「不再」因為該類型剛好有 1 個或多個 food_items 就自動套或強迫選——自動帶品牌只由「預設食物」負責。
+    //   （下方 deferDisambig／品牌確認卡都改為只在「有打品名 record.itemName」時才觸發。）
     // multiRecord（deferDisambig）：打了品名卻對不到 → 不 silent 猜、不寫入，回報「這一段」需確認，
     // 讓呼叫端只對這一段出品項確認卡（同句其他已成功片段照記）。
     if (!matched && opts.deferDisambig && record.itemName && sameType.length >= 1) {
@@ -2934,17 +2935,16 @@ export async function handleRecord(env, event, pet, record, lineUserId, opts = {
     // 其他 silent 來源（pickcatFor 多筆）沒辦法互動確認 → 用保守模糊比對自動對應最接近的同類型品項，
     // 避免整批卡住（卡片仍會顯示對應到的品名可核對）。
     if (!matched && opts.silent && sameType.length >= 1) matched = guessFood(sameType, record.itemName, record.foodType);
-    // ②③ 打了品名卻對不到、但這個類型有可選品項 → 先停下來問是哪一個，別默默記成 0 熱量。
+    // 打了品名/品牌卻對不到、但這個類型有可選品項 → 先停下來問是哪一個（品牌歧義），別默默記錯品牌。
+    //   ★只在「有打品名 record.itemName」時才問；純類型輸入（乾乾5）不走這裡，改記 generic（見上方 ③）。
     //     forceRaw＝使用者已在確認卡按「就先記著不算熱量」；silent＝一則多筆，不做互動式確認。
-    if (!matched && !record.forceRaw && !opts.silent && sameType.length >= 1) {
+    if (!matched && record.itemName && !record.forceRaw && !opts.silent && sameType.length >= 1) {
       const guess = guessFood(sameType, record.itemName, record.foodType);
       await replyOrPushFlex(env, event, foodDisambigFlex({
-        pet, foodType: record.foodType, typedName: record.itemName || record.foodType,
+        pet, foodType: record.foodType, typedName: record.itemName,
         grams: Number(record.amount) || 0, addedWaterMl: Number(record.addedWaterMl) || 0,
-        smid: String(event.message?.id || ''), options: sameType, guessId: guess?.foodId || '',
-        // 只輸入類型／口語別名（沒打品名）＝這時能到這裡代表沒有預設可套 → 顯示「設預設免選＋粗估說明」引導
-        bareType: !record.itemName
-      }), `「${record.itemName || record.foodType}」對不到已建立的品項，請選正確的${record.foodType}，熱量才算得到。`);
+        smid: String(event.message?.id || ''), options: sameType, guessId: guess?.foodId || ''
+      }), `「${record.itemName}」對不到已建立的品項，請選正確的${record.foodType}，熱量才算得到。`);
       return { disambiguated: true };
     }
     if (matched) {

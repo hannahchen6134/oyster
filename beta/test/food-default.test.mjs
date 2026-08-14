@@ -92,24 +92,27 @@ test('D 切換預設：希爾斯 → 皇家後，乾乾1 直接用皇家', async
   assert.equal(res.savedLog.foodId, royal.foodId);
 });
 
-test('E 取消預設：清掉後有兩個乾糧品項 → 乾乾1 回確認卡、不寫入', async () => {
+test('E 取消預設：清掉後有兩個乾糧品項 → 乾乾1 直接記 generic（不出確認卡、不猜品牌）', async () => {
   const { db, pet } = await seed();
   const hill = await createFoodItem(db, 'u1', { displayName: '希爾斯乾糧', foodType: '乾糧', kcalPerGram: 3.8 });
   await createFoodItem(db, 'u1', { displayName: '皇家乾糧', foodType: '乾糧', kcalPerGram: 3.6 });
   await setDefaultFood(db, 'u1', '乾糧', hill.foodId);
   await clearDefaultFood(db, 'u1', '乾糧');
   assert.equal(await getDefaultFoodId(db, 'u1', '乾糧'), '');
-  const res = await handleRecord({ DB: db }, mkEvent(), pet, parseMessage('乾乾1').record, 'u1', { actorId: 'u1' });
-  assert.ok(res && res.disambiguated, '多品項無預設 → 出確認卡');
-  assert.equal(foodLogs(db).length, 0, '確認前不得寫入任何食物紀錄');
+  const res = await logText(db, pet, '乾乾1');
+  assert.ok(!(res && res.disambiguated), '純類型輸入無預設 → 不出確認卡');
+  assert.equal(res.savedLog.foodId, '', 'generic：不綁品牌');
+  assert.equal(res.savedLog.kcal, 3.7, '用系統乾糧粗估 3.7');
+  assert.equal(foodLogs(db).length, 1, '直接完成一筆 generic 紀錄');
 });
 
-test('F 唯一品項 fallback：沒預設、只有希爾斯一個乾糧 → 乾乾1 自動套希爾斯', async () => {
+test('F 單一品項、無預設：乾乾1 記 generic（不自動套唯一品項；自動帶品牌只由預設負責）', async () => {
   const { db, pet } = await seed();
-  const hill = await createFoodItem(db, 'u1', { displayName: '希爾斯乾糧', foodType: '乾糧', kcalPerGram: 3.8 });
+  await createFoodItem(db, 'u1', { displayName: '希爾斯乾糧', foodType: '乾糧', kcalPerGram: 3.8 });
   const res = await logText(db, pet, '乾乾1');
-  assert.equal(res.savedLog.foodId, hill.foodId);
-  assert.equal(res.savedLog.kcal, 3.8);
+  assert.ok(!(res && res.disambiguated));
+  assert.equal(res.savedLog.foodId, '', '沒明確品牌／沒預設 → 不猜品項');
+  assert.equal(res.savedLog.kcal, 3.7);
 });
 
 test('G 系統預設 fallback：沒預設、沒有任何乾糧品項 → 乾乾1 用 3.7、estimated（foodId 空）', async () => {
@@ -119,16 +122,17 @@ test('G 系統預設 fallback：沒預設、沒有任何乾糧品項 → 乾乾1
   assert.equal(res.savedLog.kcal, 3.7, '用系統乾糧預設 3.7');
 });
 
-test('H 失效預設：app_kv 指向已刪品項 → 不套用、走正常 fallback（剩一個品項則自動套那個）', async () => {
+test('H 失效預設：app_kv 指向已刪品項 → 不套用、走 generic（不猜其他品項）', async () => {
   const { db, pet } = await seed();
   const hill = await createFoodItem(db, 'u1', { displayName: '希爾斯乾糧', foodType: '乾糧', kcalPerGram: 3.8 });
-  const royal = await createFoodItem(db, 'u1', { displayName: '皇家乾糧', foodType: '乾糧', kcalPerGram: 3.6 });
+  await createFoodItem(db, 'u1', { displayName: '皇家乾糧', foodType: '乾糧', kcalPerGram: 3.6 });
   await setDefaultFood(db, 'u1', '乾糧', hill.foodId);
   // 直接把預設品項標記刪除（模擬失效）
   db.prepare('UPDATE food_items SET isDeleted = 1 WHERE foodId = ?').bind(hill.foodId).run();
   assert.equal(await resolveDefaultFood(db, 'u1', '乾糧'), null, '失效預設 → 視為沒設定');
   const res = await logText(db, pet, '乾乾1');
-  assert.equal(res.savedLog.foodId, royal.foodId, '不套失效的希爾斯，改自動套剩下的皇家');
+  assert.equal(res.savedLog.foodId, '', '失效預設又沒明確品牌 → generic，不改套皇家');
+  assert.equal(res.savedLog.kcal, 3.7);
 });
 
 test('I 跨家庭：A 家 app_kv 不得套用到 B 家（resolveDefaultFood 以 owner scope 驗證）', async () => {

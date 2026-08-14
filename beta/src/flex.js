@@ -220,8 +220,8 @@ export function recordFlex({ pet, categoryKey, mainText, subText, summary, date,
     type: 'box', layout: 'vertical', backgroundColor: C.tint, cornerRadius: '10px',
     paddingAll: '12px', margin: 'md', spacing: 'xs',
     contents: [
-      text(`≈ 熱量先用系統粗估值（${foodType || '食物'}每克約 ${estKcalPerG} kcal）`, { size: 'sm', weight: 'bold', color: C.brand, wrap: true }),
-      text('想更準？可到照護站設定這款食物的品牌與實際熱量；設定後這筆會自動補算。', { size: 'xxs', color: C.inkSoft, wrap: true })
+      text(`≈ 目前用系統粗估值（${foodType || '食物'}每克約 ${estKcalPerG} kcal）`, { size: 'sm', weight: 'bold', color: C.brand, wrap: true }),
+      text('想記品牌、讓熱量更準？到照護站設定「常吃食物」，設定後這筆會自動補算。', { size: 'xxs', color: C.inkSoft, wrap: true })
     ]
   }] : [];
   const body = {
