@@ -9,7 +9,7 @@ import { handleApi } from './api.js';
 import { verifyLineSignature, replyOrPush, replyOrPushQuick, replyOrPushFlex, replyMessages, pushText, pushMessages, getProfile, getAccessToken, checkAccessToken } from './line.js';
 import { hasAnyReminder, parseReminderSettings, buildReminderLines, reminderMessage, visitReminderMessage } from './reminders.js';
 import { shortDate } from './replies.js';
-import { recordFlex, recordFlexCompact, foodDisambigFlex, multiRecordFlex, undoConfirmFlex, todayFlex, handoffFlex, websiteFlex, menuFlex, recordMenuFlex, recordTutorialFlex, quickRecordCarousel, weekFlex, monthFlex, recentFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, onboardingCarousel, menuCell, exampleCard, petDataFlex, deletedCard, confirmDeleteFlex, careNotifyFlex, careInviteFlex, weightModifyConfirmFlex, weightNoRecordFlex, weightAddedFlex, weightModifiedFlex } from './flex.js';
+import { recordFlex, recordFlexCompact, foodDisambigFlex, multiRecordFlex, undoConfirmFlex, todayFlex, handoffFlex, websiteFlex, menuFlex, recordMenuFlex, recordTutorialFlex, quickRecordCarousel, weekFlex, monthFlex, recentFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, onboardingCarousel, menuCell, exampleCard, petDataFlex, deletedCard, confirmDeleteFlex, careNotifyFlex, careInviteFlex, weightModifyConfirmFlex, weightNoRecordFlex, weightAddedFlex, weightModifiedFlex, foodTimelineFlex, foodEditMenuFlex, foodBrandPickFlex } from './flex.js';
 import { isBetaAllowed, normalizeCode, gateText } from './plan.js';
 import {
   ensureUser, updateUser, getUser, listPets, createPet, resolveDefaultPet, getPet, updatePetFields, createFoodItem, createMedItem,
@@ -824,19 +824,8 @@ async function handlePending(env, event, { db, user, pet, pets, lineUserId, owne
       await replyOrPush(env, event, '找不到那筆紀錄了');
       return true;
     }
-    const newAmount = Number(m[1]);
-    const fields = { amount: newAmount };
-    if (log.category === 'water') {
-      fields.waterMl = newAmount;
-    } else if (log.category === 'food') {
-      const food = log.foodId ? await getFood(db, log.foodId) : null;
-      const derived = deriveFoodFields(newAmount, log.foodType, food);
-      fields.kcal = derived.kcal;
-      fields.waterMl = derived.waterMl;
-    }
-    const updated = await updateLog(db, logId, fields, lineUserId);
+    const { updated, summary } = await applyLogAmountEdit(db, log, Number(m[1]), lineUserId);
     const eventDate = String(updated.eventDateTime).slice(0, 10);
-    const summary = await recomputeDay(db, updated.petId, eventDate);
     const cardPet = await getPet(db, updated.petId);
     const subParts = [];
     if (updated.kcal) subParts.push(`${updated.kcal} kcal`);
@@ -1559,6 +1548,48 @@ async function handlePostback(event, env, baseUrl) {
     return;
   }
 
+  // ── 從「吃過的食物」時間軸選一筆 → 修改選單（§2/§3/§4）。每步都用 logId 重新驗證，不信任 postback。 ──
+  // 改份量沿用 editAmount、刪除沿用 delAsk；改品牌為新流程 foodBrandAsk/foodBrandSet。
+  if (action === 'foodEdit') {
+    const log = await loadEditableFoodLog(db, data.get('logId') || '', ownerId);
+    if (!log) { await replyOrPush(env, event, '找不到那筆紀錄了，可能已刪除或修改。'); return; }
+    const url = await siteLink(env, baseUrl, lineUserId, 'eaten');
+    const { name, whenLabel, eatenText } = await foodLogDisplay(db, log);
+    await replyOrPushFlex(env, event, foodEditMenuFlex({ logId: log.logId, name, whenLabel, eatenText, siteUrl: url }),
+      `要修改「${name}（${whenLabel}・${eatenText}）」的什麼？回覆「份量」「品牌」或「刪除」。`);
+    return;
+  }
+  // 改品牌／品項：只列目前家庭「同 foodType」的既有 active 品項；不建立新品項、不改 food_items（§6）。
+  if (action === 'foodBrandAsk') {
+    const log = await loadEditableFoodLog(db, data.get('logId') || '', ownerId);
+    if (!log) { await replyOrPush(env, event, '找不到那筆紀錄了，可能已刪除或修改。'); return; }
+    const foods = (await listFoods(db, ownerId)).filter((f) => !f.isDeleted && f.foodType === log.foodType);
+    const { name } = await foodLogDisplay(db, log);
+    const url = await siteLink(env, baseUrl, lineUserId, 'settings');
+    await replyOrPushFlex(env, event, foodBrandPickFlex({ logId: log.logId, foodType: log.foodType, currentName: name, foods, siteUrl: url }),
+      foods.length ? `要把「${name}」改成哪一款？` : `還沒有建立${log.foodType}的品項，可到照護站新增。`);
+    return;
+  }
+  // 套用改品牌：重新驗證 log 與所選品項都屬本家庭且同類型 → 更新 foodId/itemName/kcal，重算當日（§9/§10）。
+  if (action === 'foodBrandSet') {
+    const log = await loadEditableFoodLog(db, data.get('logId') || '', ownerId);
+    if (!log) { await replyOrPush(env, event, '找不到那筆紀錄了，可能已刪除或修改。'); return; }
+    const food = await getFood(db, data.get('foodId') || '');
+    if (!food || String(food.ownerLineUserId) !== String(ownerId) || food.isDeleted) { await replyOrPush(env, event, '找不到那個品項，可能已被刪除。'); return; }
+    if (String(food.foodType) !== String(log.foodType)) { await replyOrPush(env, event, '品項類型和這筆不同，請改選同類型的品項。'); return; }
+    const { updated, summary } = await applyFoodBrandChange(db, log, food, lineUserId); // 用該品牌實際每克熱量重算（§6/§9）
+    const eventDate = String(updated.eventDateTime).slice(0, 10);
+    const cardPet = await getPet(db, updated.petId);
+    const subParts = [];
+    if (updated.kcal) subParts.push(`${updated.kcal} kcal`);
+    if (updated.waterMl) subParts.push(`含水 ${updated.waterMl} ml`);
+    await replyOrPushFlex(env, event, recordFlex({
+      pet: cardPet, categoryKey: isWetFoodType(updated.foodType) ? 'wet' : 'dry', mainText: describeLog(updated),
+      subText: subParts.join('・'), summary, date: eventDate, logId: updated.logId, title: `✓ 已改品牌・${cardPet?.petName || '貓貓'}`
+    }), recordReply(describeLog(updated), cardPet, summary, [], eventDate));
+    return;
+  }
+
   // P0-2：「改 品名 N」多餐符合時，使用者從確認卡選定要改哪一餐 → 改成 N。
   // mode=subtract 時（超口語「別名減N／別名-N」的確認）改為從實吃量扣掉 N，其餘一律預設改成 N。
   if (action === 'fixPick') {
@@ -1617,6 +1648,70 @@ export async function applyUndo(db, items, actorId) {
   // 批次刪除含體重時，目前體重回退到真正最新的未刪除體重（規格三·批次刪除路徑）
   for (const petId of weightPets) { try { await resyncPetWeight(db, petId); } catch (error) { /* 不影響撤銷結果 */ } }
   return undone;
+}
+
+// 時間軸修改共用的安全載入（§3/§4）：logId 不可信，server 端每次重新確認——
+// 存在、未刪、category='food'、屬本家庭（沿用既有 log.lineUserId===ownerId 權限，不發明新規則）。
+export async function loadEditableFoodLog(db, logId, ownerId) {
+  if (!logId) return null;
+  const log = await getLog(db, logId);
+  if (!log || log.isDeleted) return null;
+  if (log.category !== 'food') return null;
+  if (String(log.lineUserId) !== String(ownerId)) return null;
+  return log;
+}
+
+// 修改選單顯示用（§11：不露 logId/foodId）。名稱：有 foodId→品項 displayName；否則 itemName；再否則只顯示類型（generic 不猜品牌，§9）。
+async function foodLogDisplay(db, log) {
+  let name = String(log.itemName || '').trim();
+  if (log.foodId) { const f = await getFood(db, log.foodId); if (f && f.displayName) name = f.displayName; }
+  if (!name) name = String(log.foodType || '食物');
+  const at = String(log.eventDateTime || '');
+  const whenLabel = at.length >= 16 ? `${Number(at.slice(5, 7))}/${Number(at.slice(8, 10))} ${at.slice(11, 16)}` : at.slice(0, 10);
+  const eaten = Math.round(Number(log.amount) || 0);
+  const servedNote = Number(log.servedAmount) > 0
+    ? `（原 ${Math.round(Number(log.servedAmount))}g・剩 ${Math.round(Number(log.leftoverAmount) || 0)}g）` : '';
+  return { name, whenLabel, eatenText: `實吃 ${eaten}g${servedNote}` };
+}
+
+// 改份量時維持 served/leftover 一致（§5）：只在原本有記「原餵量」時處理，其餘紀錄行為不變。
+//  - 原餵量 >= 新實吃 → 保留原餵量、剩餘＝原餵量−新實吃。
+//  - 新實吃 > 原餵量 → 不造假原餵量，清掉剩食追蹤（只留實吃 amount）。
+export function reconcileServedOnSet(log, newAmount) {
+  if (!log || log.category !== 'food') return {};
+  if (log.servedAmount == null) return {};
+  const served = Number(log.servedAmount);
+  if (!(served > 0)) return {};
+  if (served >= newAmount) return { servedAmount: served, leftoverAmount: Math.round((served - newAmount) * 10) / 10 };
+  return { servedAmount: 0, leftoverAmount: 0 };
+}
+
+// 套用「改份量」到已鎖定的 log（水／食物共用；§5 served/leftover 一致、§10 重算當日）。呼叫端負責先驗證權限。
+export async function applyLogAmountEdit(db, log, newAmount, actorId) {
+  const fields = { amount: newAmount };
+  if (log.category === 'water') {
+    fields.waterMl = newAmount;
+  } else if (log.category === 'food') {
+    const food = log.foodId ? await getFood(db, log.foodId) : null;
+    const derived = deriveFoodFields(newAmount, log.foodType, food);
+    fields.kcal = derived.kcal;
+    fields.waterMl = derived.waterMl;
+    Object.assign(fields, reconcileServedOnSet(log, newAmount));
+  }
+  const updated = await updateLog(db, log.logId, fields, actorId);
+  const summary = await recomputeDay(db, updated.petId, String(updated.eventDateTime).slice(0, 10));
+  return { updated, summary };
+}
+
+// 套用「改品牌／品項」（§6/§9/§10）：用所選品項重設 foodId／顯示名／類型，並用該品項每克熱量重算 kcal、重算當日。
+// 只改這一筆 log，不建立／不修改 food_items。呼叫端負責先驗證 log 與 food 都屬本家庭且同 foodType。
+export async function applyFoodBrandChange(db, log, food, actorId) {
+  const derived = deriveFoodFields(Number(log.amount) || 0, food.foodType, food);
+  const updated = await updateLog(db, log.logId, {
+    foodId: food.foodId, itemName: food.displayName, foodType: food.foodType, kcal: derived.kcal, waterMl: derived.waterMl
+  }, actorId);
+  const summary = await recomputeDay(db, updated.petId, String(updated.eventDateTime).slice(0, 10));
+  return { updated, summary };
 }
 
 // ── 反查 food_items（無類別詞的品項候選用）＋ smid 合併／冪等（延後確認的品項寫入用）──
@@ -3228,11 +3323,14 @@ export function buildFoodTimelineResult(rows, { scope = 'recent', sinceDays = 30
   return lines.join('\n');
 }
 
-// 送出食物時間軸回覆＋（有資料時）附照護站連結；目前沒有專屬「食物足跡」頁，先深連到照護站。
+// 送出食物時間軸回覆：有資料 → Flex 逐筆＋每筆「修改」（§2）；無資料 → 文字。文字備援永遠附上（通知列/降級）。
 async function replyFoodTimeline(env, event, baseUrl, lineUserId, rows, opts) {
   const body = buildFoodTimelineResult(rows, opts);
-  const url = rows.length ? await siteLink(env, baseUrl, lineUserId) : '';
-  await replyOrPush(env, event, url ? `${body}\n\n查看更多紀錄：${url}` : body);
+  if (!rows.length) { await replyOrPush(env, event, body); return; }
+  const url = await siteLink(env, baseUrl, lineUserId, 'eaten');
+  const range = opts.scope === 'all' ? '全部' : (Number(opts.sinceDays) === 30 || !opts.sinceDays ? '最近 30 天' : `最近 ${opts.sinceDays} 天`);
+  const card = foodTimelineFlex({ rows, petName: opts.petName || '', label: opts.label || '食物', range, siteUrl: url });
+  await replyOrPushFlex(env, event, card, url ? `${body}\n\n查看更多紀錄：${url}` : body);
 }
 
 export function buildFoodHistoryResult(rows, { scope = 'recent', sinceDays = 30, foodType = '', petName = '' } = {}) {
