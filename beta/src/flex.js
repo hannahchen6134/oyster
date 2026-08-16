@@ -965,6 +965,32 @@ export function foodBrandPickFlex({ logId, foodType, currentName, foods, siteUrl
   return bubble('要改成哪一款？', { type: 'bubble', header: header('改品牌／品項'), body, footer });
 }
 
+// ---------- 「想看哪種紀錄？」回顧入口卡（模糊回顧詞觸發；手機單手可點）----------
+// 每顆都是 message action：點一下＝幫使用者打出既有查詢句，沿用現有 parser／handler（不必記語法）。
+export function reviewMenuFlex(siteUrl = '') {
+  const btn = (label, msg) => ({ type: 'button', height: 'sm', style: 'secondary', action: { type: 'message', label, text: msg } });
+  const body = {
+    type: 'box', layout: 'vertical', paddingAll: '18px', backgroundColor: BODY_BG, spacing: 'sm',
+    contents: [
+      text('想看哪種紀錄？', { size: 'md', weight: 'bold', color: C.ink }),
+      text('點一下就好，不用打整句', { size: 'xxs', color: C.muted, margin: 'xs' }),
+      { type: 'box', layout: 'vertical', margin: 'md', spacing: 'sm', contents: [
+        btn('🍚 吃過的食物', '最近吃什麼'),
+        btn('💧 喝水', '今天'),
+        btn('💊 用藥', '今天'),
+        btn('🐾 狀況', '今天')
+      ] }
+    ]
+  };
+  const footer = {
+    type: 'box', layout: 'vertical', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
+    contents: [siteUrl
+      ? { type: 'button', height: 'sm', style: 'primary', color: C.brand, action: { type: 'uri', label: '查看完整照護紀錄', uri: siteUrl } }
+      : { type: 'button', height: 'sm', style: 'primary', color: C.brand, action: { type: 'message', label: '查看完整照護紀錄', text: '照護站' } }]
+  };
+  return bubble('想看哪種紀錄？', { type: 'bubble', header: header('想看哪種紀錄？'), body, footer });
+}
+
 // ---------- 補充貓咪資料：深連結到設定→貓咪資料 ----------
 export function petDataFlex(url) {
   const body = {

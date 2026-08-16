@@ -81,7 +81,10 @@ const QUERY_WORDS = [
   { query: 'recent', words: ['回顧', '紀錄回顧', '記錄回顧', '最近紀錄', '最近記錄', '近期紀錄', '檢查紀錄'] },
   { query: 'visit', words: ['回診', '回诊', '看診', '看诊', '回診摘要', '給醫生', '給醫生看', '看醫生', '看診摘要'] },
   { query: 'website', words: ['網站', '照護站', '照护站', '登入', '开网站', '開網站', '我的照護站', '開照護站'] },
-  { query: 'recordMenu', words: ['記一筆', '紀錄', '記錄', '快速紀錄', '快速記錄', '新增', '記一下', '我要紀錄', '我要記錄'] },
+  { query: 'recordMenu', words: ['記一筆', '快速紀錄', '快速記錄', '新增', '記一下', '我要紀錄', '我要記錄'] },
+  // 模糊回顧詞：使用者只表達「想看紀錄」但沒指定類型 → 出「想看哪種紀錄？」入口卡（不直接猜食物）。
+  // 註：帶明確食物語意的（飲食紀錄／食物紀錄／最近的飲食／吃什麼…）改走食物歷史，見 parseLooseFoodReview。
+  { query: 'reviewMenu', words: ['紀錄', '記錄', '最近', '之前的紀錄', '之前的記錄', '查看紀錄', '查看記錄', '查紀錄', '查記錄', '看紀錄', '看記錄'] },
   { query: 'recordButtons', words: ['按鈕記錄', '按鈕紀錄', '按鈕模式', '用按鈕', '按鈕點選', '改用按鈕點選'] },
   { query: 'backfill', words: ['補登', '補記', '昨天', '前天'] },
   { query: 'onboarding', words: ['安心上手', '喵爸媽安心上手', '第一次使用', '怎麼開始', '新手'] },
@@ -400,6 +403,27 @@ export function parseFoodHistoryQuery(compact) {
   return { type: 'query', query: 'foodHistory', scope, sinceDays, foodType };
 }
 
+// 模糊「回頭看吃的」→ 食物入口（§二/§三）：沒有完整查詢文法、但語意偏回顧食物時補進食物歷史／時間軸。
+//  - 嚴格避開「新增紀錄」：整句含數字一律跳過（乾乾5／喝水30 交給後面的 record 解析）。
+//  - 帶明確食物字（飲食／吃飯／食物）或「吃什麼／吃過」但沒帶時間 → 食物歷史 aggregate（近 30 天）。
+//  - 純「時間詞＋類型別名（＋紀錄）」（最近乾乾／最近罐罐／乾糧紀錄）→ 該 foodType 的逐筆時間軸。
+export function parseLooseFoodReview(compact) {
+  const t = String(compact || '');
+  if (!t || /\d/.test(t)) return null;                 // 有數字 → 可能是新增紀錄，不在這裡攔
+  const time = parseTimeScope(t);
+  const foodWordReview = /^(最近的?|之前的?|以前的?|這陣子)?(飲食|吃飯|食物)(紀錄|記錄)?$/.test(t)
+    || /^(最近|之前|以前|這陣子)?(吃什麼|吃過什麼|吃過|吃的|吃了什麼)$/.test(t);
+  if (foodWordReview) {
+    return { type: 'query', query: 'foodHistory', scope: time?.scope || 'recent', sinceDays: time?.sinceDays ?? 30, foodType: '' };
+  }
+  // 只由「時間詞＋類型別名（＋的／紀錄）」組成才算——避免夾雜品名的句子被誤判
+  const tm = t.match(new RegExp(`^(?:最近|這陣子|近期|近來|之前|以前|過去|上個?月)?(?:的)?(${FOOD_ALIAS_RE})(?:的)?(?:紀錄|記錄)?$`));
+  if (tm && (time || /(紀錄|記錄)$/.test(t))) {
+    return { type: 'query', query: 'foodTimeline', scope: time?.scope || 'recent', sinceDays: time?.sinceDays ?? 30, foodType: FOOD_ALIAS_MAP.get(tm[1]) || '', nameQuery: '' };
+  }
+  return null;
+}
+
 export function parseMessage(rawText) {
   const text = normalizeText(rawText);
   if (!text) return { type: 'unknown' };
@@ -430,6 +454,9 @@ export function parseMessage(rawText) {
   // 食物歷史口語查詢（最近吃什麼／之前吃過哪些罐頭…）——aggregate「吃過什麼」，放在固定查詢詞之後
   const foodHist = parseFoodHistoryQuery(compact);
   if (foodHist) return foodHist;
+  // 模糊回顧食物（飲食紀錄／最近乾乾／吃過什麼…）——明確查詢文法沒中、但語意偏回顧食物時補上
+  const looseFood = parseLooseFoodReview(compact);
+  if (looseFood) return looseFood;
 
   // 「新增貓咪」為主，保留「新增毛孩」「新增貓貓」相容
   const addPetMatch = text.match(/^新增(?:貓咪|貓貓|毛孩)\s*(.+)$/);
@@ -1002,7 +1029,7 @@ export function analyzeLeading(rawText, petNames = []) {
       if (parsesToRecord(rest)) return { kind: 'named', petName: name, rest };
       // 剝出貓名後是「食物歷史／時間軸查詢」（唯讀，例：蚵仔最近吃什麼／蚵仔最近罐頭吃什麼）→ 也視為 named，安全歸給該貓
       const restCompact = String(rest).replace(/ /g, '');
-      if (parseFoodTimelineQuery(restCompact) || parseFoodHistoryQuery(restCompact)) return { kind: 'named', petName: name, rest };
+      if (parseFoodTimelineQuery(restCompact) || parseFoodHistoryQuery(restCompact) || parseLooseFoodReview(restCompact)) return { kind: 'named', petName: name, rest };
       // 剝出貓名、但後段像「食物名＋份量」卻無法可靠解析（如 希爾斯罐頭23g）→ partial：
       // 辨認到貓、但「不寫入、不降級成通用罐頭」；交第二階段用 food_item 精確比對／澄清。
       // 加「像食物/有數量」條件，避免把「蚵仔你好嗎」這種閒聊也當 partial。
