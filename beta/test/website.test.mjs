@@ -35,7 +35,11 @@ test('A4 匯出：離屏容器 #a4Export 放畫面外、模組已引入、且移
   assert.ok(/position:\s*fixed/.test(m[0]) && /left:\s*-\d{5,}px/.test(m[0]), '#a4Export 必須離屏（fixed + 大負 left）');
   // 已改為單一「存成照片給醫生」，移除「列印／下載 A4」按鈕
   assert.ok(!html.includes('reportPrintBtn'), '不得再有列印 A4 按鈕');
-  assert.ok(html.includes('傳完整報告到我的 LINE'), '主按鈕＝傳完整報告到我的 LINE');
+  // 主操作＝儲存完整報告（存成圖片，不需先傳 LINE）；傳到 LINE 降為次要分享；文案不再把 LINE 當唯一用途
+  assert.ok(html.includes('儲存完整報告'), '主按鈕＝儲存完整報告');
+  assert.ok(html.includes('id="reportSendLineBtn"') && html.includes('傳到 LINE'), '次要入口＝傳到 LINE');
+  assert.ok(!html.includes('傳完整報告到我的 LINE'), '主按鈕不再是「傳完整報告到我的 LINE」');
+  assert.ok(/可儲存成圖片，也可以直接傳到 LINE/.test(html), '說明文：可儲存成圖片，也可以直接傳到 LINE');
   // A4 版面模組已引入（允許帶 cache-busting 版本參數）
   assert.ok(/src="\/a4-report\.js(\?v=[^"]*)?"/.test(html), '需引入 a4-report.js 模組');
   // 單一統計範圍控制存在（7/14/30）
@@ -114,12 +118,28 @@ test('A4 存圖：每頁有「儲存第N張」鈕綁 data-idx，逐頁用 a4Shar
   assert.ok(/a4PageFilenames\(base, pngs\.length\)/.test(html), '用 a4PageFilenames 產生每頁檔名');
 });
 
-// 傳完整報告到 LINE（liff.sendMessages 主流程）：主按鈕、防連點、snapshot、上傳全成才送、fallback、preview
-test('傳完整報告到 LINE：主按鈕文案、防連點鎖、snapshot 資料渲染、送前再驗家庭', () => {
-  assert.ok(html.includes('傳完整報告到我的 LINE'), '主按鈕＝傳完整報告到我的 LINE');
-  const fn = html.slice(html.indexOf("$('reportSaveBtn').addEventListener"), html.indexOf("$('reportSaveBtn').addEventListener") + 5400);
+// 儲存完整報告（主要入口）：存成圖片，不經 LINE、不上傳 /shot，沿用 a4RenderPages + showReportImages
+test('儲存完整報告：主按鈕存圖不經 LINE、防連點、snapshot 資料渲染、多頁完整保留', () => {
+  const fn = html.slice(html.indexOf("$('reportSaveBtn').addEventListener"), html.indexOf("$('reportSaveBtn').addEventListener") + 2000);
+  // 防連點：與「傳到 LINE」互斥
+  assert.ok(/let reportSaving = false/.test(html) && /if \(reportSaving \|\| reportSending\) return/.test(fn), '需有防連點鎖（與傳 LINE 互斥）');
+  assert.ok(/reportSaving = true/.test(fn) && /reportSaving = false/.test(fn), '處理中鎖定、完成後解除');
+  // snapshot：同步 collectA4Data + 用 snap.data 渲染
+  assert.ok(/const snap = \{/.test(fn) && /data: collectA4Data\(\)/.test(fn), '需 snapshot petId/資料');
+  assert.ok(/a4RenderPages\(snap\.data\)/.test(fn), '用 snapshot 資料渲染');
+  // 存圖不經 LINE、不上傳 /shot；每頁 dataUrl 直接交給 showReportImages（多頁完整保留）
+  assert.ok(!/a4UploadShot/.test(fn) && !/a4SendReport/.test(fn), '存圖不上傳 /shot、不送 LINE');
+  assert.ok(/pngs\.map\(\(png, i\) => \(\{ dataUrl: png/.test(fn), '每頁 dataUrl 供分享／長按儲存');
+  assert.ok(/showReportImages\(items\)/.test(fn), '交給既有儲存 UI 顯示每一頁');
+  assert.ok(/trackEvent\('report_save'\)/.test(fn), '記錄 report_save 事件');
+});
+
+// 傳到 LINE（次要入口，liff.sendMessages 主流程）：防連點、snapshot、上傳全成才送、fallback、preview
+test('傳到 LINE：次要入口文案、防連點鎖、snapshot 資料渲染、送前再驗家庭', () => {
+  assert.ok(html.includes('傳到 LINE'), '次要入口＝傳到 LINE');
+  const fn = html.slice(html.indexOf("$('reportSendLineBtn').addEventListener"), html.indexOf("$('reportSendLineBtn').addEventListener") + 5400);
   // 防連點
-  assert.ok(/let reportSending = false/.test(html) && /if \(reportSending\) return/.test(fn), '需有防連點鎖');
+  assert.ok(/let reportSending = false/.test(html) && /if \(reportSending \|\| reportSaving\) return/.test(fn), '需有防連點鎖');
   assert.ok(/reportSending = true/.test(fn) && /reportSending = false/.test(fn), '處理中鎖定、完成後解除');
   // snapshot：同步 collectA4Data + 用 snap.data 渲染（不吃後續 state 切換）
   assert.ok(/const snap = \{/.test(fn) && /data: collectA4Data\(\)/.test(fn), '需 snapshot petId/資料');
@@ -130,8 +150,8 @@ test('傳完整報告到 LINE：主按鈕文案、防連點鎖、snapshot 資料
   assert.ok(/正在整理完整報告/.test(fn) && /完整報告已傳到聊天室/.test(fn), '處理中與成功文案');
 });
 
-test('傳完整報告：先全部上傳、再用 a4SendReport 一次送；deps 綁 liff.sendMessages＋fallback', () => {
-  const fn = html.slice(html.indexOf("$('reportSaveBtn').addEventListener"), html.indexOf("$('reportSaveBtn').addEventListener") + 5400);
+test('傳到 LINE：先全部上傳、再用 a4SendReport 一次送；deps 綁 liff.sendMessages＋fallback', () => {
+  const fn = html.slice(html.indexOf("$('reportSendLineBtn').addEventListener"), html.indexOf("$('reportSendLineBtn').addEventListener") + 5400);
   // 全部頁上傳完成才送（迴圈 push items 後才呼叫 a4SendReport）
   assert.ok(/for \(let i = 0; i < pngs\.length/.test(fn) && /a4UploadShot\(png\)/.test(fn), '逐頁上傳');
   assert.ok(/window\.a4SendReport\(items, deps\)/.test(fn), '用 a4SendReport 一次送全部');

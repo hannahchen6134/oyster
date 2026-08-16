@@ -547,9 +547,10 @@
     .digest-seg button.active { background: var(--brand); color: #fff; }
     /* 複製：安靜的文字鈕，不搶截圖畫面 */
     .digest-copy { border: none; background: transparent; color: var(--brand); font-size: 12.5px; font-weight: 600; letter-spacing: 0.04em; padding: 6px 2px; white-space: nowrap; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--line-strong); }
-    /* 存成圖片給醫生：置頂按鈕＋一句說明 */
-    .report-actions { margin-bottom: 14px; text-align: center; }
-    #reportSaveBtn { width: auto; display: inline-block; padding-left: 22px; padding-right: 22px; }
+    /* 存成圖片給醫生：主按鈕「儲存」＋次要「傳到 LINE」＋一句說明 */
+    .report-actions { margin-bottom: 14px; text-align: center; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+    #reportSaveBtn, #reportSendLineBtn { width: auto; display: inline-block; padding-left: 22px; padding-right: 22px; }
+    .report-actions .report-hint { flex: 1 0 100%; }
     .report-hint { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 8px 2px 0; text-align: center; }
     /* 截圖用標題（平常隱藏，產生圖片時才插入） */
     /* 產生好的報告圖：全螢幕顯示，長按即可存到相簿 */
@@ -1355,8 +1356,9 @@
       <!-- 回診 -->
       <section class="panel hidden" id="trendView">
         <div class="report-actions cap-hide">
-          <button class="btn btn-primary" id="reportSaveBtn" type="button">📤 傳完整報告到我的 LINE</button>
-          <p class="report-hint">按一次就把完整 A4 回診摘要（可能多頁）傳回你的 LINE 聊天室，長按或轉傳給醫生</p>
+          <button class="btn btn-primary" id="reportSaveBtn" type="button">💾 儲存完整報告</button>
+          <button class="btn btn-secondary" id="reportSendLineBtn" type="button">📤 傳到 LINE</button>
+          <p class="report-hint">可儲存成圖片，也可以直接傳到 LINE 分享給醫生。多頁報告會完整保留每一頁。</p>
         </div>
         <div class="report-range cap-hide">
           <span class="report-range-label">統計範圍</span>
@@ -4501,12 +4503,56 @@
       return { pngs: out, pages: built.pages };
     }
 
-    // 主流程：按一次「傳完整報告到我的 LINE」→ 產生所有 A4 頁 → 全部上傳 /shot → 一次 liff.sendMessages 傳回聊天室。
-    // 防連點、pet/owner snapshot、全部上傳成功才送、fallback（shareTargetPicker→頁面長按），皆在此。
-    let reportSending = false;
+    // 兩個入口共用同一套產圖流程（a4RenderPages），各自防連點，互斥避免同時觸發。
+    let reportSending = false;   // 「傳到 LINE」處理中
+    let reportSaving = false;    // 「儲存完整報告」處理中
+
+    // 主要入口：按「儲存完整報告」→ 產生所有 A4 頁 → 直接顯示每一頁供長按／分享儲存（不經 LINE、不上傳 /shot）。
+    // 儲存圖片不需要先傳 LINE；多頁報告每一頁都完整保留。沿用既有產圖（a4RenderPages）與儲存 UI（showReportImages）。
     $('reportSaveBtn').addEventListener('click', async () => {
-      if (reportSending) return;                    // 防連點：處理中忽略後續點擊（不重複產圖/上傳/傳送）
+      if (reportSaving || reportSending) return;    // 防連點：任一入口處理中就忽略後續點擊
       const btn = $('reportSaveBtn');
+      if (!window.htmlToImage || typeof window.buildA4Report !== 'function') { toast('報告功能還在載入，請稍等一下再按', true); return; }
+      if (!state.trendRows) { toast('資料還在載入，請稍等一下再按', true); return; }
+      const snap = {
+        petId: state.petId,
+        rangeDays: state.reportRange || 14,
+        today: todayStr(),
+        genId: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
+        data: collectA4Data()
+      };
+      const snapPet = (state.pets || []).find((p) => p.petId === snap.petId);
+      if (!snapPet) { toast('找不到目前的貓咪資料，請重新整理再試', true); return; }
+      const petName = snapPet.petName;
+      reportSaving = true;
+      trackEvent('report_save');
+      const orig = btn.textContent;
+      btn.disabled = true; btn.textContent = '整理中…';
+      const loading = showLoadingOverlay('正在整理完整報告⋯');
+      try {
+        const { pngs, pages } = await a4RenderPages(snap.data);   // 用 snapshot 資料渲染
+        if (!pngs.length) { loading.remove(); alert('這個瀏覽器產出的圖片是空白的，請改用一般瀏覽器（Safari／Chrome）開，或先用手機截圖。'); return; }
+        if (pngs.length < pages) { loading.remove(); console.error('[A4] 頁數不符 pages=' + pages + ' pngs=' + pngs.length); alert(`第 ${pngs.length + 1} 頁產生失敗，請重新產生報告。`); return; }
+        const base = `${a4SafeName(petName)}_回診摘要_近${snap.rangeDays}天_${snap.today}`;
+        const names = window.a4PageFilenames(base, pngs.length);
+        loading.remove();
+        // 直接把每一頁交給既有儲存 UI：dataUrl 供分享／長按儲存、src 供顯示、name 供檔名。不上傳、不經 LINE。
+        const items = pngs.map((png, i) => ({ dataUrl: png, src: png, name: names[i] }));
+        showReportImages(items);
+      } catch (error) {
+        loading.remove();
+        console.error('[A4] 儲存完整報告失敗：', error);
+        alert('報告產生失敗，請重新嘗試。');
+      } finally {
+        btn.disabled = false; btn.textContent = orig; reportSaving = false;
+      }
+    });
+
+    // 次要入口：按「傳到 LINE」→ 產生所有 A4 頁 → 全部上傳 /shot → 一次 liff.sendMessages 傳回聊天室。
+    // 防連點、pet/owner snapshot、全部上傳成功才送、fallback（shareTargetPicker→頁面長按），皆在此。
+    $('reportSendLineBtn').addEventListener('click', async () => {
+      if (reportSending || reportSaving) return;    // 防連點：任一入口處理中就忽略後續點擊
+      const btn = $('reportSendLineBtn');
       if (!window.htmlToImage || typeof window.buildA4Report !== 'function') { toast('報告功能還在載入，請稍等一下再按', true); return; }
       if (!state.trendRows) { toast('資料還在載入，請稍等一下再按', true); return; }
       // ── snapshot：同步固定本次的 petId／範圍／日期／資料，整個產圖・上傳・傳送都用它（產圖中切換毛孩也不混用）──
