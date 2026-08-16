@@ -6,7 +6,7 @@ import {
   getUser, updateUser, listPets, getPet, createPet,
   listFoods, getFood, resolveDefaultFood, setDefaultFood, clearDefaultFood, listDefaultFoods,
   insertLog, getLog, getLogsForDay, updateLog, softDeleteLog, resyncPetWeight,
-  recomputeDay, getSummaries, getSessionUser, getRecentLogsByPet,
+  recomputeDay, getSummaries, getSessionUser, getRecentLogsByPet, getFoodTimeline,
   resolveDataOwner, createCareInvite, listCareMembers, track, healFoodKcal,
   updatePetFields, getAllLogsForPet, saveDataExport,
   createTask, getTask, listTasksForPet, completeTask, uncompleteTask, skipTask, cancelTask
@@ -18,6 +18,8 @@ import { jsonResponse, newId, nowIso, isValidDate, isValidDateTime, taipeiNowDat
 
 // 支援「設為預設」的食物類型（各自獨立，不共用）：主食罐≠副食罐≠罐頭。
 const DEFAULT_FOOD_TYPES = ['乾糧', '主食罐', '副食罐', '罐頭', '零食'];
+// 「吃過的食物」時間軸可用的類型過濾（網站顯示正式名稱；口語別名只存在 LINE parser）。
+const FOOD_TIMELINE_TYPES = ['主食罐', '副食罐', '罐頭', '乾糧', '零食'];
 
 const RESOURCES = {
   pets: {
@@ -173,6 +175,20 @@ export async function handleApi(request, env, url) {
       if (!(await assertPetOwner(db, petId, dataOwnerId))) return forbidden();
       const logs = await getRecentLogsByPet(db, petId, limit);
       return jsonResponse({ ok: true, logs });
+    }
+
+    // 「吃過的食物」時間軸（純讀取）：實際吃過的 food logs 逐筆，最近在前；只補顯示名，不回推品牌。
+    // owner 由 server resolve、petId 必須屬本家庭；days=all/0＝全部歷史、否則近 N 天；foodType 可選過濾。
+    if (resource === 'food-timeline' && method === 'GET') {
+      const petId = url.searchParams.get('petId') || '';
+      if (!(await assertPetOwner(db, petId, dataOwnerId))) return forbidden();
+      const daysParam = String(url.searchParams.get('days') || '30');
+      const sinceDays = (daysParam === 'all' || daysParam === '0') ? 0 : Math.min(3650, Math.max(1, Number(daysParam) || 30));
+      const foodTypeParam = String(url.searchParams.get('foodType') || '');
+      const foodType = FOOD_TIMELINE_TYPES.includes(foodTypeParam) ? foodTypeParam : '';
+      const limit = Math.min(200, Math.max(1, Number(url.searchParams.get('limit')) || 50));
+      const rows = await getFoodTimeline(db, petId, { sinceDays, foodType, limit });
+      return jsonResponse({ ok: true, rows, days: sinceDays || 0, limit });
     }
 
     // 給醫生的注意事項：只放需要留意的狀況——吐/疫苗/除蟲/精神/自由備註，以及「有描述」的排便排尿。
