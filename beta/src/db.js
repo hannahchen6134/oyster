@@ -688,7 +688,7 @@ export async function getFoodTimeline(db, petId, { sinceDays = null, foodType = 
   }
   const { results } = await db
     .prepare(
-      `SELECT logs.eventDateTime AS at, logs.foodType AS foodType, logs.amount AS amount,
+      `SELECT logs.logId AS logId, logs.eventDateTime AS at, logs.foodType AS foodType, logs.amount AS amount,
               logs.servedAmount AS servedAmount, logs.leftoverAmount AS leftoverAmount,
               COALESCE(NULLIF(fi.displayName, ''), NULLIF(fi.productName, ''), NULLIF(fi.brand, ''), NULLIF(logs.itemName, ''), logs.foodType) AS name
          FROM logs LEFT JOIN food_items fi ON fi.foodId = logs.foodId AND logs.foodId != ''

@@ -862,6 +862,109 @@ export function deletedCard(url) {
   return bubble('已刪除剛剛的資料', { type: 'bubble', size: 'mega', header: header('已刪除'), body, footer });
 }
 
+// ---------- 吃過的食物：LINE 時間軸（逐筆＋每筆「修改」）＋修改選單＋改品牌選單 ----------
+// 每筆只放一顆輕量「修改」（§2/§15），點進去才展開選單；使用者看不到 logId／foodId（§11）。
+const EAT_TL_MAX = 8;
+function tlEditBtn(logId) {
+  return {
+    type: 'box', layout: 'vertical', backgroundColor: '#FFFFFF', cornerRadius: '8px',
+    borderColor: '#D9CBB6', borderWidth: '1px', justifyContent: 'center',
+    paddingTop: '6px', paddingBottom: '6px', paddingStart: '14px', paddingEnd: '14px',
+    action: { type: 'postback', label: '修改', data: `action=foodEdit&logId=${logId}`, displayText: '修改' },
+    contents: [text('修改', { color: C.brand, weight: 'bold', size: 'sm', align: 'center' })]
+  };
+}
+export function foodTimelineFlex({ rows, petName = '', label = '食物', range = '最近 30 天', siteUrl = '' }) {
+  const shown = rows.slice(0, EAT_TL_MAX);
+  const items = [];
+  shown.forEach((r, i) => {
+    if (i > 0) items.push({ type: 'separator', color: SEPARATOR });
+    const at = String(r.at || '');
+    const md = at.length >= 10 ? `${Number(at.slice(5, 7))}/${Number(at.slice(8, 10))}` : at.slice(0, 10);
+    const hm = at.slice(11, 16);
+    const amt = `${Math.round(Number(r.amount) || 0)}g`;
+    const servedNote = Number(r.servedAmount) > 0
+      ? `（原 ${Math.round(Number(r.servedAmount))}g・剩 ${Math.round(Number(r.leftoverAmount) || 0)}g）` : '';
+    items.push({
+      type: 'box', layout: 'horizontal', spacing: 'md', paddingTop: '10px', paddingBottom: '10px',
+      contents: [
+        { type: 'box', layout: 'vertical', flex: 1, spacing: 'xs', contents: [
+          text(`${md}${hm ? ' ' + hm : ''}`, { size: 'xxs', color: C.muted }),
+          text(`${r.name}　${amt}`, { size: 'sm', color: C.ink, weight: 'bold', wrap: true }),
+          ...(servedNote ? [text(`實吃 ${amt}${servedNote}`, { size: 'xxs', color: C.muted, wrap: true })] : [])
+        ] },
+        { type: 'box', layout: 'vertical', flex: 0, justifyContent: 'center', contents: [tlEditBtn(r.logId)] }
+      ]
+    });
+  });
+  const body = {
+    type: 'box', layout: 'vertical', paddingAll: '18px', backgroundColor: BODY_BG, spacing: 'none',
+    contents: [
+      text(`${petName ? petName + ' ' : ''}${range}的${label}紀錄`, { size: 'sm', weight: 'bold', color: C.ink }),
+      text('點任一筆的「修改」可改份量、品牌或刪除', { size: 'xxs', color: C.muted, margin: 'sm', wrap: true }),
+      { type: 'box', layout: 'vertical', margin: 'md', spacing: 'none', contents: items },
+      ...(rows.length > EAT_TL_MAX ? [text(`⋯還有 ${rows.length - EAT_TL_MAX} 筆，完整看照護站`, { size: 'xxs', color: C.muted, margin: 'md', wrap: true })] : [])
+    ]
+  };
+  const footer = siteUrl ? {
+    type: 'box', layout: 'vertical', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
+    contents: [{ type: 'button', height: 'sm', style: 'secondary', action: { type: 'uri', label: '在照護站看完整時間軸', uri: siteUrl } }]
+  } : undefined;
+  return bubble(`${petName ? petName + ' ' : ''}${range}的${label}紀錄`, { type: 'bubble', size: 'mega', header: header('吃過的食物'), body, ...(footer ? { footer } : {}) });
+}
+
+// 修改選單（§11：只放「你要改什麼」，不露 DB 欄位）。改份量／刪除沿用既有 postback；改品牌為新流程。
+export function foodEditMenuFlex({ logId, name, whenLabel, eatenText, siteUrl = '' }) {
+  const body = {
+    type: 'box', layout: 'vertical', paddingAll: '18px', backgroundColor: BODY_BG, spacing: 'xs',
+    contents: [
+      text('要修改什麼？', { size: 'md', weight: 'bold', color: C.ink }),
+      { type: 'box', layout: 'vertical', backgroundColor: C.tint, cornerRadius: '10px', paddingAll: '12px', margin: 'md', spacing: 'xs',
+        contents: [
+          text(name, { size: 'sm', weight: 'bold', color: C.brand, wrap: true }),
+          text(`${whenLabel}　${eatenText}`, { size: 'xs', color: C.inkSoft, wrap: true })
+        ] },
+      { type: 'box', layout: 'vertical', margin: 'lg', spacing: 'sm', contents: [
+        solidActionBtn('改份量', `action=editAmount&logId=${logId}`),
+        outlineActionBtn('改品牌／品項', `action=foodBrandAsk&logId=${logId}`, { fg: C.brand, border: '#D9CBB6' }),
+        outlineActionBtn('刪除這筆', `action=delAsk&logId=${logId}`, { fg: C.seal, border: '#E3B9AE' })
+      ] }
+    ]
+  };
+  const footer = siteUrl ? {
+    type: 'box', layout: 'vertical', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
+    contents: [{ type: 'button', height: 'sm', style: 'secondary', action: { type: 'uri', label: '到照護站編輯更多', uri: siteUrl } }]
+  } : undefined;
+  return bubble('要修改這筆的什麼？', { type: 'bubble', header: header('修改紀錄'), body, ...(footer ? { footer } : {}) });
+}
+
+// 改品牌／品項：只列目前家庭「同 foodType」的既有品項（active），不建立新品項（§6）。
+export function foodBrandPickFlex({ logId, foodType, currentName, foods, siteUrl = '' }) {
+  const options = foods.slice(0, 6).map((f) => outlineActionBtn(
+    String(f.displayName).slice(0, 30),
+    `action=foodBrandSet&logId=${logId}&foodId=${encodeURIComponent(f.foodId)}`,
+    { fg: C.brand, border: '#D9CBB6' }
+  ));
+  const body = {
+    type: 'box', layout: 'vertical', paddingAll: '18px', backgroundColor: BODY_BG, spacing: 'xs',
+    contents: [
+      text('要改成哪一款？', { size: 'md', weight: 'bold', color: C.ink }),
+      text(`目前：${currentName}（${foodType}）`, { size: 'xs', color: C.muted, margin: 'sm', wrap: true }),
+      ...(options.length
+        ? [{ type: 'box', layout: 'vertical', margin: 'lg', spacing: 'sm', contents: options }]
+        : [text(`還沒有建立${foodType}的品項。到照護站新增後就能選。`, { size: 'sm', color: C.inkSoft, margin: 'lg', wrap: true })])
+    ]
+  };
+  const footer = {
+    type: 'box', layout: 'vertical', paddingAll: '10px', backgroundColor: FOOTER_COLOR, spacing: 'sm',
+    contents: [
+      ...(siteUrl ? [{ type: 'button', height: 'sm', style: 'secondary', action: { type: 'uri', label: '到照護站新增食物', uri: siteUrl } }] : []),
+      { type: 'button', height: 'sm', style: 'secondary', action: { type: 'postback', label: '取消', data: `action=foodEdit&logId=${logId}`, displayText: '取消' } }
+    ]
+  };
+  return bubble('要改成哪一款？', { type: 'bubble', header: header('改品牌／品項'), body, footer });
+}
+
 // ---------- 補充貓咪資料：深連結到設定→貓咪資料 ----------
 export function petDataFlex(url) {
   const body = {
