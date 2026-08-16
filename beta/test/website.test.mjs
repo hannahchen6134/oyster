@@ -174,6 +174,34 @@ test('傳到 LINE：先全部上傳、再用 a4SendReport 一次送；deps 綁 l
   assert.ok(/permission\.query\('chat_message\.write'\)/.test(html), 'init 用 permission.query 取 chat_message.write 授權');
 });
 
+// 吃過的食物（照護時間軸）：回顧 tab 內的入口、逐筆時間軸、類型／範圍 filter、誠實顯示 generic、deep link
+test('吃過的食物：入口在回顧、逐筆時間軸、資料走 food-timeline API、generic 只顯示類型', () => {
+  // 入口與名稱（不叫品牌歷史／food history）
+  assert.ok(/id="eatenFold"/.test(html) && html.includes('吃過的食物'), '回顧內有「吃過的食物」fold');
+  assert.ok(html.includes('看看最近什麼時候吃了哪一款'), '副標語氣');
+  assert.ok(!/id="eatenFold"[\s\S]{0,400}品牌歷史/.test(html), '入口不叫「品牌歷史」（generic 可能沒品牌）');
+  // 類型 chips 顯示正式名稱（口語別名只在 LINE parser）
+  for (const t of ['全部', '主食罐', '副食罐', '罐頭', '乾糧', '零食']) assert.ok(html.includes(`>${t}</button>`), `類型 chip：${t}`);
+  // 時間範圍 chips（近 7／近 30／全部）
+  assert.ok(/data-days="7"/.test(html) && /data-days="30"[^>]*class="active"/.test(html) && /data-days="all"/.test(html), '範圍 chips，預設近 30 天');
+  // 資料來源：呼叫 food-timeline API（pet scoped，帶 days/limit）
+  const load = html.slice(html.indexOf('async function loadFoodTimeline'), html.indexOf('async function loadFoodTimeline') + 900);
+  assert.ok(/food-timeline\?petId=\$\{state\.petId\}&days=\$\{days\}&limit=\$\{limit\}/.test(load), '走 food-timeline API、pet scoped、帶 days/limit');
+  // 效能：limit（避免第一次載入大量歷史）＋查看更多
+  assert.ok(/eatenMoreBtn/.test(html) && /state\.eaten\.limit \+= 100/.test(html), '有「查看更多」拉高上限');
+  // generic 誠實顯示：名稱===類型 → 不加品牌 tag；不顯示 foodId
+  const render = html.slice(html.indexOf('function renderFoodTimeline'), html.indexOf('function renderFoodTimeline') + 1600);
+  assert.ok(/const isGeneric = name === String\(r\.foodType/.test(render), 'generic（名稱===類型）判斷');
+  assert.ok(!/r\.foodId/.test(render), '時間軸不顯示 foodId');
+  // 實吃 amount；有原餵/剩餘才附註（不得把剩餘量當實吃）
+  assert.ok(/原 \$\{fmt\(served\)\}g・剩 \$\{fmt\(leftover\)\}g/.test(render) && /Number\(served\) > 0/.test(render), '附原餵/剩餘，不把剩餘當實吃');
+  // 空狀態（不是空白頁）＋誠實品牌教學
+  assert.ok(/還沒有吃飯紀錄/.test(html) && /之後就能在這裡回顧/.test(html), '空狀態文案');
+  assert.ok(/只記「乾乾5」這類簡略紀錄，如果沒有預設食物，就只會顯示「乾糧」/.test(html), '誠實的品牌教學');
+  // deep link：沿用既有 go= 機制（go=eaten 開回顧並展開），不另建 URL 系統
+  assert.ok(/goTarget === 'eaten'/.test(html) && /switchTab\('trend'\)/.test(html), 'go=eaten deep link 進回顧');
+});
+
 // /shot 6 小時失效
 test('/shot 6h 失效：shotExpired 規則（5h59m 可讀、>6h 不可讀），GET 端已接上', async () => {
   const { shotExpired } = await import('../src/util.js');

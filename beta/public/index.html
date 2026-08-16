@@ -552,6 +552,25 @@
     #reportSaveBtn, #reportSendLineBtn { width: auto; display: inline-block; padding-left: 22px; padding-right: 22px; }
     .report-actions .report-hint { flex: 1 0 100%; }
     .report-hint { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 8px 2px 0; text-align: center; }
+    /* 吃過的食物：照護時間軸（手機優先，不做後台表格） */
+    .eaten-filters { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+    .eaten-chips { display: flex; gap: 6px; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 2px; scrollbar-width: none; }
+    .eaten-chips::-webkit-scrollbar { display: none; }
+    .eaten-chips button { flex: 0 0 auto; border: 1px solid var(--line-strong); background: var(--sheet); color: var(--ink-soft); font-size: 12.5px; font-weight: 600; padding: 6px 13px; border-radius: 999px; white-space: nowrap; cursor: pointer; }
+    .eaten-chips button.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+    .eaten-day { margin-top: 14px; }
+    .eaten-day:first-child { margin-top: 4px; }
+    .eaten-day-label { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: 0.03em; margin: 0 2px 6px; }
+    .eaten-item { display: flex; align-items: baseline; gap: 10px; padding: 9px 2px; border-top: 1px solid var(--line); }
+    .eaten-day .eaten-item:first-of-type { border-top: none; }
+    .eaten-time { flex: 0 0 auto; font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 42px; }
+    .eaten-main { flex: 1 1 auto; min-width: 0; }
+    .eaten-name { font-size: 14.5px; font-weight: 600; color: var(--ink); line-height: 1.4; }
+    .eaten-type-tag { display: inline-block; font-size: 11px; font-weight: 600; color: var(--brand); background: rgba(115, 73, 33, 0.09); border-radius: 6px; padding: 1px 7px; margin-left: 6px; vertical-align: 1px; }
+    .eaten-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .eaten-amt { flex: 0 0 auto; font-size: 14px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+    .eaten-empty { text-align: center; color: var(--muted); font-size: 13px; line-height: 1.7; padding: 20px 10px; }
+    .eaten-empty b { color: var(--ink-soft); font-weight: 600; }
     /* 截圖用標題（平常隱藏，產生圖片時才插入） */
     /* 產生好的報告圖：全螢幕顯示，長按即可存到相簿 */
     .imgbox { position: fixed; inset: 0; z-index: 90; background: rgba(20, 16, 12, 0.86); display: flex; flex-direction: column; }
@@ -1423,6 +1442,37 @@
             <p class="muted cap-hide" style="font-size:12px;margin:14px 2px 0">濕食＝罐頭與濕糧（含水量高，是重要補水來源）。水分分「自己喝的」與「食物內含的」；截圖即可給醫生看。</p>
           </div>
         </details>
+        <details class="block fold sec-eaten cap-hide" id="eatenFold">
+          <summary>
+            <span class="fold-head">
+              <span class="fold-title">吃過的食物</span>
+              <span class="fold-sub">看看最近什麼時候吃了哪一款</span>
+            </span>
+            <span class="fold-toggle">＋</span>
+          </summary>
+          <div class="fold-body">
+            <div class="eaten-filters">
+              <div class="eaten-chips" id="eatenTypeChips">
+                <button data-type="" class="active" type="button">全部</button>
+                <button data-type="主食罐" type="button">主食罐</button>
+                <button data-type="副食罐" type="button">副食罐</button>
+                <button data-type="罐頭" type="button">罐頭</button>
+                <button data-type="乾糧" type="button">乾糧</button>
+                <button data-type="零食" type="button">零食</button>
+              </div>
+              <div class="eaten-chips" id="eatenRangeChips">
+                <button data-days="7" type="button">近 7 天</button>
+                <button data-days="30" class="active" type="button">近 30 天</button>
+                <button data-days="all" type="button">全部</button>
+              </div>
+            </div>
+            <div id="eatenTimeline"></div>
+            <div style="text-align:center;margin-top:10px">
+              <button class="link-btn hidden" id="eatenMoreBtn" type="button">查看更多</button>
+            </div>
+            <p class="muted" style="font-size:12px;line-height:1.7;margin:14px 2px 0">有記品牌的紀錄，會顯示當時吃的品牌；只記「乾乾5」這類簡略紀錄，如果沒有預設食物，就只會顯示「乾糧」。想之後回頭看品牌，可以先把常吃食物存起來，或設成預設食物。</p>
+          </div>
+        </details>
         <details class="block fold daycards-fold" open>
           <summary>
             <span class="fold-head">
@@ -1509,7 +1559,8 @@
       dayLogs: [],
       recentLogs: [],
       labs: [],
-      labItem: ''
+      labItem: '',
+      eaten: { type: '', days: 30, limit: 50 }   // 「吃過的食物」時間軸：類型過濾／天數／目前載入上限
     };
 
     const $ = (id) => document.getElementById(id);
@@ -3194,6 +3245,7 @@
       loadComposition();
       await loadDigest();
       await loadTable();
+      await loadFoodTimeline();
     }
 
     // ── 飲食與水分組成（給醫生看）：用已載入的近 30 天資料，依所選窗口加總 ──
@@ -3244,6 +3296,77 @@
         </div>`;
       }
       el.innerHTML = html;
+    }
+
+    // ── 吃過的食物（照護時間軸）：實際吃過的 food logs 逐筆，最近在前。純讀取，資料來自 logs，不回推品牌 ──
+    // 顯示名一律用「當時 log 真正記下來的資料」（後端 getFoodTimeline 已解析），generic 紀錄只會顯示類型。
+    async function loadFoodTimeline() {
+      if (!state.petId) return;
+      const el = $('eatenTimeline');
+      const moreBtn = $('eatenMoreBtn');
+      if (!el) return;
+      const { type, days, limit } = state.eaten;
+      try {
+        const q = `food-timeline?petId=${state.petId}&days=${days}&limit=${limit}${type ? `&foodType=${encodeURIComponent(type)}` : ''}`;
+        const data = await api(q);
+        renderFoodTimeline(data.rows || []);
+        // 回傳筆數 = 目前上限 → 可能還有更多，給「查看更多」（再拉高上限重載）
+        if (moreBtn) moreBtn.classList.toggle('hidden', (data.rows || []).length < limit);
+      } catch (error) {
+        el.innerHTML = `<div class="eaten-empty">紀錄暫時載入失敗，請稍後再試。</div>`;
+        if (moreBtn) moreBtn.classList.add('hidden');
+      }
+    }
+
+    // 依「實際吃下 amount」顯示；有原餵/剩餘才附註（不得把剩餘量當實吃）。名稱===類型＝generic，只顯示類型不猜品牌。
+    function renderFoodTimeline(rows) {
+      const el = $('eatenTimeline');
+      if (!el) return;
+      if (!rows.length) {
+        const typed = state.eaten.type;
+        el.innerHTML = typed
+          ? `<div class="eaten-empty">這個範圍還沒有<b>${esc(typed)}</b>的紀錄。</div>`
+          : `<div class="eaten-empty">還沒有吃飯紀錄。<br>平常在 LINE 直接打「乾乾5」「主食3」，之後就能在這裡回顧。<br><span style="display:inline-block;margin-top:6px">想之後看品牌，也可以到「設定 → 常吃食物」設定品牌／預設食物。</span></div>`;
+        return;
+      }
+      // 依日期分組（同一天的品項聚在一起），日期新到舊、日內時間新到舊（rows 已由後端排序）
+      const groups = [];
+      let cur = null;
+      for (const r of rows) {
+        const day = String(r.at || '').slice(0, 10);
+        if (!cur || cur.day !== day) { cur = { day, items: [] }; groups.push(cur); }
+        cur.items.push(r);
+      }
+      const html = groups.map((g) => {
+        const items = g.items.map((r) => {
+          const name = String(r.name || r.foodType || '');
+          const isGeneric = name === String(r.foodType || '');   // 名稱===類型＝沒有品牌的 generic 紀錄
+          const tag = isGeneric ? '' : `<span class="eaten-type-tag">${esc(r.foodType || '')}</span>`;
+          const time = String(r.at || '').slice(11, 16);
+          const eaten = fmt(r.amount);
+          const served = r.servedAmount, leftover = r.leftoverAmount;
+          const sub = (served != null && leftover != null && Number(served) > 0)
+            ? `<div class="eaten-sub">原 ${fmt(served)}g・剩 ${fmt(leftover)}g</div>` : '';
+          return `<div class="eaten-item">
+            <span class="eaten-time">${esc(time)}</span>
+            <span class="eaten-main"><span class="eaten-name">${esc(name)}${tag}</span>${sub}</span>
+            <span class="eaten-amt">${esc(eaten)}g</span>
+          </div>`;
+        }).join('');
+        return `<div class="eaten-day"><div class="eaten-day-label">${esc(eatenDayLabel(g.day))}</div>${items}</div>`;
+      }).join('');
+      el.innerHTML = html;
+    }
+
+    // 日期標題：今天／昨天／M月D日（週X）
+    function eatenDayLabel(day) {
+      if (!day) return '';
+      const today = todayStr();
+      if (day === today) return '今天';
+      if (day === shiftDate(today, -1)) return '昨天';
+      const [, m, d] = day.split('-');
+      const dow = '日一二三四五六'[new Date(`${day}T00:00:00`).getDay()];
+      return `${Number(m)}月${Number(d)}日（${dow}）`;
     }
 
     // 每日數字表：獨立範圍（30/60/90 天），可左右滑動
@@ -4163,6 +4286,16 @@
         switchTab('trend');
         return;
       }
+      // 深連結 go=eaten：開「回顧」並直接展開＋捲到「吃過的食物」（沿用既有 go= 機制，不另建 URL 系統）
+      if (goTarget === 'eaten') {
+        switchTab('trend');
+        const fold = $('eatenFold');
+        if (fold) {
+          fold.open = true;
+          setTimeout(() => { try { fold.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (error) { /* ignore */ } }, 300);
+        }
+        return;
+      }
       await loadDay();
       // 網址帶 ?tour=1 或 #tour：強制重播第一次導覽（自己測試／示範用，不受「看過」與「已設定食物」限制）
       if (location.hash === '#tour' || new URLSearchParams(location.search).has('tour')) {
@@ -4212,6 +4345,30 @@
         document.querySelectorAll('#reportRangeChips [data-range]').forEach((el) =>
           el.classList.toggle('active', el === rrBtn));
         return loadTrend();
+      }
+
+      // 吃過的食物：類型過濾（只重載時間軸，其餘報告不動）
+      const eTypeBtn = event.target.closest('#eatenTypeChips [data-type]');
+      if (eTypeBtn) {
+        state.eaten.type = eTypeBtn.dataset.type || '';
+        state.eaten.limit = 50;   // 換條件時回到第一頁
+        document.querySelectorAll('#eatenTypeChips [data-type]').forEach((el) =>
+          el.classList.toggle('active', el === eTypeBtn));
+        return loadFoodTimeline();
+      }
+      // 吃過的食物：時間範圍（近 7／近 30／全部）
+      const eDaysBtn = event.target.closest('#eatenRangeChips [data-days]');
+      if (eDaysBtn) {
+        state.eaten.days = eDaysBtn.dataset.days === 'all' ? 'all' : (Number(eDaysBtn.dataset.days) || 30);
+        state.eaten.limit = 50;
+        document.querySelectorAll('#eatenRangeChips [data-days]').forEach((el) =>
+          el.classList.toggle('active', el === eDaysBtn));
+        return loadFoodTimeline();
+      }
+      // 吃過的食物：查看更多（拉高上限重載，避免第一次就載入大量歷史）
+      if (event.target.closest('#eatenMoreBtn')) {
+        state.eaten.limit += 100;
+        return loadFoodTimeline();
       }
 
       const calCell = event.target.closest('.cal-cell[data-date]');
