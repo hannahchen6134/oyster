@@ -552,23 +552,27 @@
     #reportSaveBtn, #reportSendLineBtn { width: auto; display: inline-block; padding-left: 22px; padding-right: 22px; }
     .report-actions .report-hint { flex: 1 0 100%; }
     .report-hint { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 8px 2px 0; text-align: center; }
-    /* 吃過的食物：照護時間軸（手機優先，不做後台表格） */
-    .eaten-filters { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+    /* 吃過的食物：食物足跡時間軸——品牌／品項名為主，時間・類型・實吃量為輔（手機優先，不做後台表格） */
+    .eaten-filters { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
     .eaten-chips { display: flex; gap: 6px; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 2px; scrollbar-width: none; }
     .eaten-chips::-webkit-scrollbar { display: none; }
-    .eaten-chips button { flex: 0 0 auto; border: 1px solid var(--line-strong); background: var(--sheet); color: var(--ink-soft); font-size: 12.5px; font-weight: 600; padding: 6px 13px; border-radius: 999px; white-space: nowrap; cursor: pointer; }
+    /* 輕量 filter：矮、字小、選中清楚但不巨大；保留橫向捲動 */
+    .eaten-chips button { flex: 0 0 auto; border: 1px solid var(--line); background: transparent; color: var(--muted); font-size: 12px; font-weight: 600; padding: 4px 11px; border-radius: 999px; white-space: nowrap; cursor: pointer; line-height: 1.5; }
     .eaten-chips button.active { background: var(--brand); border-color: var(--brand); color: #fff; }
-    .eaten-day { margin-top: 14px; }
-    .eaten-day:first-child { margin-top: 4px; }
-    .eaten-day-label { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: 0.03em; margin: 0 2px 6px; }
-    .eaten-item { display: flex; align-items: baseline; gap: 10px; padding: 9px 2px; border-top: 1px solid var(--line); }
-    .eaten-day .eaten-item:first-of-type { border-top: none; }
-    .eaten-time { flex: 0 0 auto; font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 42px; }
-    .eaten-main { flex: 1 1 auto; min-width: 0; }
-    .eaten-name { font-size: 14.5px; font-weight: 600; color: var(--ink); line-height: 1.4; }
-    .eaten-type-tag { display: inline-block; font-size: 11px; font-weight: 600; color: var(--brand); background: rgba(115, 73, 33, 0.09); border-radius: 6px; padding: 1px 7px; margin-left: 6px; vertical-align: 1px; }
-    .eaten-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
-    .eaten-amt { flex: 0 0 auto; font-size: 14px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+    .eaten-day { margin-top: 22px; }
+    .eaten-day:first-child { margin-top: 6px; }
+    .eaten-day-label { font-size: 11.5px; font-weight: 700; color: var(--muted); letter-spacing: 0.06em; margin: 0 0 8px 2px; }
+    /* 每個日期一條很淡的時間軸；節點用小圓點，不是水平表格線 */
+    .eaten-list { position: relative; padding-left: 16px; }
+    .eaten-list::before { content: ''; position: absolute; left: 4px; top: 9px; bottom: 9px; width: 2px; background: rgba(115, 73, 33, 0.12); border-radius: 2px; }
+    .eaten-item { position: relative; padding: 7px 0; }
+    .eaten-item::before { content: ''; position: absolute; left: -15px; top: 11px; width: 7px; height: 7px; border-radius: 50%; background: var(--brand); box-shadow: 0 0 0 3px var(--sheet); }
+    .eaten-name { font-size: 15px; font-weight: 700; color: var(--ink); line-height: 1.35; word-break: break-word; }   /* 主角：品牌／品項名 */
+    .eaten-meta { font-size: 12px; color: var(--muted); margin-top: 2px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 8px; }
+    .eaten-meta .t { font-variant-numeric: tabular-nums; }                 /* 時間：次要、較小、不搶名字 */
+    .eaten-meta .ty { opacity: 0.85; }                                     /* 類型：淡，不重複搶視覺 */
+    .eaten-meta .g { color: var(--ink-soft); font-weight: 600; }           /* 實吃量：輔助行，不做右側巨大數字 */
+    .eaten-sub { font-size: 11.5px; color: var(--muted); margin-top: 1px; }
     .eaten-empty { text-align: center; color: var(--muted); font-size: 13px; line-height: 1.7; padding: 20px 10px; }
     .eaten-empty b { color: var(--ink-soft); font-weight: 600; }
     /* 截圖用標題（平常隱藏，產生圖片時才插入） */
@@ -3326,7 +3330,7 @@
         const typed = state.eaten.type;
         el.innerHTML = typed
           ? `<div class="eaten-empty">這個範圍還沒有<b>${esc(typed)}</b>的紀錄。</div>`
-          : `<div class="eaten-empty">還沒有吃飯紀錄。<br>平常在 LINE 直接打「乾乾5」「主食3」，之後就能在這裡回顧。<br><span style="display:inline-block;margin-top:6px">想之後看品牌，也可以到「設定 → 常吃食物」設定品牌／預設食物。</span></div>`;
+          : `<div class="eaten-empty">還沒有吃飯紀錄。<br>平常在 LINE 直接打「乾乾5」「主食3」，之後就能在這裡回顧。<br><span style="display:inline-block;margin-top:6px">有記品牌時，也能看到當時吃的是哪一款。</span></div>`;
         return;
       }
       // 依日期分組（同一天的品項聚在一起），日期新到舊、日內時間新到舊（rows 已由後端排序）
@@ -3341,19 +3345,22 @@
         const items = g.items.map((r) => {
           const name = String(r.name || r.foodType || '');
           const isGeneric = name === String(r.foodType || '');   // 名稱===類型＝沒有品牌的 generic 紀錄
-          const tag = isGeneric ? '' : `<span class="eaten-type-tag">${esc(r.foodType || '')}</span>`;
           const time = String(r.at || '').slice(11, 16);
           const eaten = fmt(r.amount);
+          // 類型只在「有品牌」時放進輔助行（generic 的名稱本身就是類型，不重複顯示）
+          const typeMeta = isGeneric ? '' : `<span class="ty">${esc(r.foodType || '')}</span>`;
           const served = r.servedAmount, leftover = r.leftoverAmount;
           const sub = (served != null && leftover != null && Number(served) > 0)
             ? `<div class="eaten-sub">原 ${fmt(served)}g・剩 ${fmt(leftover)}g</div>` : '';
-          return `<div class="eaten-item">
-            <span class="eaten-time">${esc(time)}</span>
-            <span class="eaten-main"><span class="eaten-name">${esc(name)}${tag}</span>${sub}</span>
-            <span class="eaten-amt">${esc(eaten)}g</span>
+          // 第一層＝品牌／品項名（主角）；第二層＝時間・類型・實吃量（輔）；第三層＝剩食（若有）。
+          // data-log-id 供日後接單筆修改用（本輪不加功能、不綁 handler）。
+          return `<div class="eaten-item" data-log-id="${esc(r.logId || '')}">
+            <div class="eaten-name">${esc(name)}</div>
+            <div class="eaten-meta"><span class="t">${esc(time)}</span>${typeMeta}<span class="g">實吃 ${esc(eaten)}g</span></div>
+            ${sub}
           </div>`;
         }).join('');
-        return `<div class="eaten-day"><div class="eaten-day-label">${esc(eatenDayLabel(g.day))}</div>${items}</div>`;
+        return `<div class="eaten-day"><div class="eaten-day-label">${esc(eatenDayLabel(g.day))}</div><div class="eaten-list">${items}</div></div>`;
       }).join('');
       el.innerHTML = html;
     }

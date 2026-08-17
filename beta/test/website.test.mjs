@@ -202,6 +202,30 @@ test('吃過的食物：入口在回顧、逐筆時間軸、資料走 food-timel
   assert.ok(/goTarget === 'eaten'/.test(html) && /switchTab\('trend'\)/.test(html), 'go=eaten deep link 進回顧');
 });
 
+// 資訊層級重整：品牌／品項名為主，時間・類型・實吃量為輔（不是三欄資料表）
+test('吃過的食物 UI：品項名為主層、時間/類型/實吃為輔層、generic 不重複類型、時間軸節點', () => {
+  const render = html.slice(html.indexOf('function renderFoodTimeline'), html.indexOf('function renderFoodTimeline') + 2600);
+  // 第一層＝品項名（.eaten-name 為獨立主層，且排在 meta 之前）
+  const nameIdx = render.indexOf('class="eaten-name"');
+  const metaIdx = render.indexOf('class="eaten-meta"');
+  assert.ok(nameIdx > 0 && metaIdx > nameIdx, '品項名為第一層、在輔助行之前');
+  // 第二層＝時間・類型・實吃量（同一 meta 行）
+  assert.ok(render.includes('class="eaten-meta"') && render.includes('<span class="t">'), '輔助行含時間');
+  assert.ok(render.includes('實吃 ') && /<span class="g">實吃/.test(render), '實吃量在輔助行（不做右側巨大數字）');
+  // generic：類型不重複進 meta（名稱本身就是類型）
+  assert.ok(/isGeneric \? '' : /.test(render) && render.includes('class="ty"'), 'generic 不重複顯示類型');
+  // 不再是三欄表格：舊的 .eaten-amt 右欄與彩色 .eaten-type-tag 皆已移除
+  assert.ok(!/class="eaten-amt"/.test(html) && !/class="eaten-type-tag"/.test(html), '移除右側大數字欄與彩色類型 pill');
+  // 時間軸節奏：淡 rail + 小節點（非粗水平線）；每筆保留 data-log-id 供日後接單筆修改
+  assert.ok(/\.eaten-list::before/.test(html) && /\.eaten-item::before/.test(html), '時間軸 rail＋節點');
+  assert.ok(/data-log-id="\$\{esc\(r\.logId \|\| ''\)\}"/.test(render), '每筆帶 data-log-id（可延伸，不綁 handler）');
+  // 輕量 filter：chips 字級比內容標題小、padding 縮小、保留橫向捲動
+  assert.ok(/\.eaten-chips button \{[^}]*font-size: 12px[^}]*padding: 4px 11px/.test(html), 'filter chips 視覺縮小');
+  assert.ok(/\.eaten-chips \{[^}]*overflow-x: auto/.test(html), 'chips 保留橫向捲動');
+  // 實吃/剩食不回歸
+  assert.ok(/原 \$\{fmt\(served\)\}g・剩 \$\{fmt\(leftover\)\}g/.test(render), 'served/leftover 顯示不回歸');
+});
+
 // 家裡習慣的叫法：食物設定頁的別名區塊＋新增/儲存/刪除接到 /api/food-aliases
 test('家裡習慣的叫法：食物頁有別名區塊，走 food-aliases API，不露 foodId/alias 技術詞', () => {
   assert.ok(/function renderAliasBlock\(\)/.test(html), '有 renderAliasBlock');
