@@ -3983,7 +3983,7 @@
 
       let rows = [];
       if (state.settingsTab === 'pets') { rows = (await api('me')).pets; state.pets = rows; }
-      if (state.settingsTab === 'foods') { rows = (await api('foods')).rows; state.foods = rows; state.foodDefaults = (await api('default-food')).defaults || {}; }
+      if (state.settingsTab === 'foods') { rows = (await api('foods')).rows; state.foods = rows; state.foodDefaults = (await api('default-food')).defaults || {}; state.foodAliases = (await api('food-aliases')).rows || []; }
       if (state.settingsTab === 'meds') { rows = (await api(`meds?petId=${state.petId}`)).rows; state.meds = rows; }
       if (state.settingsTab === 'vets') { rows = (await api('vets')).rows; state.vets = rows; }
       if (state.settingsTab === 'visits') {
@@ -3995,7 +3995,9 @@
       const ctx = { vetsById: Object.fromEntries(state.vets.map((vet) => [vet.vetId, vet])) };
       const container = $('settingsList');
       if (!rows.length) {
-        container.innerHTML = `<div class="empty">還沒有資料，按上方「＋ 新增」就能建立，之後隨時可以修改。</div>`;
+        // 食物頁即使還沒有品項，也要顯示「家裡習慣的叫法」區塊（可先設叫法）
+        container.innerHTML = `<div class="empty">還沒有資料，按上方「＋ 新增」就能建立，之後隨時可以修改。</div>`
+          + (state.settingsTab === 'foods' ? renderAliasBlock() : '');
         return;
       }
       container.innerHTML = rows.map((row) => {
@@ -4020,7 +4022,38 @@
             <button class="btn btn-secondary btn-sm" data-edit="${esc(id)}" type="button">編輯</button>
             <button class="btn btn-danger btn-sm" data-del="${esc(id)}" type="button">刪除</button>
           </div>`;
+      }).join('') + (state.settingsTab === 'foods' ? renderAliasBlock() : '');
+    }
+
+    // 「家裡習慣的叫法」：家裡平常怎麼叫，就讓管家記住（存 app_kv；不建立品項、不改預設）。
+    function renderAliasBlock() {
+      const aliases = state.foodAliases || [];
+      const rows = aliases.map((a) => {
+        const target = a.valid ? esc(a.displayTarget) : `<span style="color:var(--seal)">${esc(a.displayTarget)}</span>`;
+        return `<div class="list-item">
+          <div class="info"><div class="title">${esc(a.alias)} → ${target}</div><div class="sub">${a.targetType === 'foodItem' ? '對應常吃食物' : '對應食物類型'}</div></div>
+          <button class="btn btn-danger btn-sm" data-alias-del="${esc(a.alias)}" type="button">刪除</button>
+        </div>`;
       }).join('');
+      const typeOpts = DEFAULT_FOOD_TYPES.map((t) => `<option value="type:${esc(t)}">${esc(t)}</option>`).join('');
+      const itemOpts = (state.foods || []).filter((f) => !f.isDeleted)
+        .map((f) => `<option value="item:${esc(f.foodId)}">${esc(f.displayName)}（${esc(f.foodType)}）</option>`).join('');
+      return `
+      <div class="block" id="aliasBlock" style="margin-top:18px">
+        <div class="section-head"><h2>家裡習慣的叫法</h2></div>
+        <p class="muted" style="font-size:12px;line-height:1.7;margin:0 0 12px">家裡平常怎麼叫，就讓管家記住。例：<b>肉 → 罐頭</b>、<b>小藍罐 → 巔峰羊</b>。之後在 LINE 直接打「肉5」就能記。第一次在 LINE 遇到沒設定的叫法，管家也會先問你。</p>
+        ${rows || '<div class="empty" style="margin-bottom:12px">還沒有自訂叫法。</div>'}
+        <div id="aliasForm" class="hidden" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+          <input id="aliasName" placeholder="你平常怎麼叫？例如 肉" style="flex:1 1 140px" maxlength="12">
+          <select id="aliasTarget" style="flex:1 1 160px">
+            <optgroup label="食物類型">${typeOpts}</optgroup>
+            ${itemOpts ? `<optgroup label="常吃食物">${itemOpts}</optgroup>` : ''}
+          </select>
+          <button class="btn btn-primary btn-sm" data-alias-save type="button">儲存</button>
+          <button class="btn btn-secondary btn-sm" data-alias-cancel type="button">取消</button>
+        </div>
+        <button class="btn btn-secondary btn-sm" id="aliasAddBtn" type="button" style="margin-top:10px">＋ 新增叫法</button>
+      </div>`;
     }
 
     function settingsFieldHtml(field, value) {
@@ -4499,6 +4532,45 @@
         try {
           await api('default-food', { method: 'POST', body: JSON.stringify({ foodType: clrDefBtn.dataset.foodDefaultClear, foodId: '' }) });
           toast('已取消預設');
+          await loadSettings();
+        } catch (error) { toast(error.message, true); }
+        return;
+      }
+
+      // 家裡習慣的叫法：新增／取消／儲存／刪除
+      if (event.target.closest('#aliasAddBtn')) {
+        const form = $('aliasForm'); const btn = $('aliasAddBtn');
+        if (form) form.classList.remove('hidden');
+        if (btn) btn.classList.add('hidden');
+        if ($('aliasName')) $('aliasName').focus();
+        return;
+      }
+      if (event.target.closest('[data-alias-cancel]')) {
+        $('aliasForm')?.classList.add('hidden');
+        $('aliasAddBtn')?.classList.remove('hidden');
+        return;
+      }
+      if (event.target.closest('[data-alias-save]')) {
+        const alias = ($('aliasName')?.value || '').trim();
+        const sel = $('aliasTarget')?.value || '';
+        if (!alias) { toast('請先輸入平常的叫法', true); return; }
+        const [kind, ...rest] = sel.split(':');
+        const val = rest.join(':');
+        const payload = kind === 'item' ? { alias, targetType: 'foodItem', value: val } : { alias, targetType: 'foodType', value: val };
+        try {
+          await api('food-aliases', { method: 'POST', body: JSON.stringify(payload) });
+          toast(`已記住：以後「${alias}」就當作這個`);
+          await loadSettings();
+        } catch (error) { toast(error.message, true); }
+        return;
+      }
+      const aliasDelBtn = event.target.closest('[data-alias-del]');
+      if (aliasDelBtn) {
+        const alias = aliasDelBtn.dataset.aliasDel;
+        if (!confirm(`刪除叫法「${alias}」嗎？（只移除這個叫法，不影響食物與紀錄）`)) return;
+        try {
+          await api(`food-aliases?alias=${encodeURIComponent(alias)}`, { method: 'DELETE' });
+          toast('已刪除這個叫法');
           await loadSettings();
         } catch (error) { toast(error.message, true); }
         return;

@@ -9,11 +9,12 @@ import {
   recomputeDay, getSummaries, getSessionUser, getRecentLogsByPet, getFoodTimeline,
   resolveDataOwner, createCareInvite, listCareMembers, track, healFoodKcal,
   updatePetFields, getAllLogsForPet, saveDataExport,
-  createTask, getTask, listTasksForPet, completeTask, uncompleteTask, skipTask, cancelTask
+  createTask, getTask, listTasksForPet, completeTask, uncompleteTask, skipTask, cancelTask,
+  listFoodAliases, setFoodAlias, deleteFoodAlias, ALIAS_FOODTYPES
 } from './db.js';
 import { displayMedStatus, displayMedSlot } from './brand.js';
 import { computeDailySummary, deriveFoodFields, computeTodayBoard } from './summary.js';
-import { matchFood } from './parser.js';
+import { matchFood, isAskableFoodName } from './parser.js';
 import { jsonResponse, newId, nowIso, isValidDate, isValidDateTime, taipeiNowDateTime, taipeiToday } from './util.js';
 
 // 支援「設為預設」的食物類型（各自獨立，不共用）：主食罐≠副食罐≠罐頭。
@@ -260,6 +261,38 @@ export async function handleApi(request, env, url) {
         if (String(food.foodType) !== foodType) return jsonResponse({ ok: false, message: '品項類型與預設類型不符' }, 400);
         await setDefaultFood(db, dataOwnerId, foodType, foodId);
         return jsonResponse({ ok: true, foodType, foodId });
+      }
+      return jsonResponse({ ok: false, message: 'Method not allowed' }, 405);
+    }
+
+    // 家裡習慣的叫法（口語別名）：owner scope，只存 app_kv（不改 food_items/schema）。
+    // targetType='foodType' → 值為支援類型；'foodItem' → 值為本家庭品項 foodId（server 端驗證，不接受跨家庭）。
+    if (resource === 'food-aliases') {
+      if (method === 'GET') {
+        return jsonResponse({ ok: true, rows: await listFoodAliases(db, dataOwnerId) });
+      }
+      if (method === 'POST') {
+        const body = await request.json().catch(() => ({}));
+        const alias = String(body.alias || '').trim();
+        const targetType = String(body.targetType || '');
+        const value = String(body.value || '');
+        if (!isAskableFoodName(alias)) return jsonResponse({ ok: false, message: '這個叫法不適合（避免用到「今天」「體重」「喝水」這類詞，或帶數字）' }, 400);
+        if (targetType === 'foodType') {
+          if (!ALIAS_FOODTYPES.includes(value)) return jsonResponse({ ok: false, message: '不支援的食物類型' }, 400);
+        } else if (targetType === 'foodItem') {
+          const food = await getFood(db, value); // 已排除 isDeleted
+          if (!food || String(food.ownerLineUserId) !== String(dataOwnerId)) return forbidden(); // 找不到／已刪／跨家庭
+        } else {
+          return jsonResponse({ ok: false, message: '請選擇這個叫法代表什麼' }, 400);
+        }
+        const saved = await setFoodAlias(db, dataOwnerId, alias, { targetType, value });
+        return jsonResponse({ ok: true, alias: saved });
+      }
+      if (method === 'DELETE') {
+        const alias = String(url.searchParams.get('alias') || '');
+        if (!alias) return jsonResponse({ ok: false, message: '缺少叫法' }, 400);
+        await deleteFoodAlias(db, dataOwnerId, alias);
+        return jsonResponse({ ok: true });
       }
       return jsonResponse({ ok: false, message: 'Method not allowed' }, 405);
     }

@@ -202,6 +202,18 @@ test('吃過的食物：入口在回顧、逐筆時間軸、資料走 food-timel
   assert.ok(/goTarget === 'eaten'/.test(html) && /switchTab\('trend'\)/.test(html), 'go=eaten deep link 進回顧');
 });
 
+// 家裡習慣的叫法：食物設定頁的別名區塊＋新增/儲存/刪除接到 /api/food-aliases
+test('家裡習慣的叫法：食物頁有別名區塊，走 food-aliases API，不露 foodId/alias 技術詞', () => {
+  assert.ok(/function renderAliasBlock\(\)/.test(html), '有 renderAliasBlock');
+  assert.ok(html.includes('家裡習慣的叫法'), '區塊標題（生活化用詞）');
+  assert.ok(/state\.foodAliases = \(await api\('food-aliases'\)\)\.rows/.test(html), '食物頁載入別名');
+  assert.ok(/api\('food-aliases', \{ method: 'POST'/.test(html), '新增走 POST food-aliases');
+  assert.ok(/api\(`food-aliases\?alias=\$\{encodeURIComponent\(alias\)\}`, \{ method: 'DELETE'/.test(html), '刪除走 DELETE');
+  // 目標選單用 type:/item: 前綴，前端不必看到 targetType/foodId 名詞
+  assert.ok(/value="type:\$\{esc\(t\)\}"/.test(html) && /value="item:\$\{esc\(f\.foodId\)\}"/.test(html), '類型/品項選項用前綴，UI 不露技術欄位');
+  assert.ok(!/alias.*mapping|kcalSource/.test(html), '不顯示 mapping/kcalSource 這類技術詞');
+});
+
 // /shot 6 小時失效
 test('/shot 6h 失效：shotExpired 規則（5h59m 可讀、>6h 不可讀），GET 端已接上', async () => {
   const { shotExpired } = await import('../src/util.js');
