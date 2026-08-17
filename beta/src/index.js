@@ -967,8 +967,34 @@ async function askWhichCat(env, event, pets) {
   const items = pets.slice(0, 12).map((p) => qrMsg(p.petName, p.petName));
   const names = pets.map((p) => p.petName).filter(Boolean).join('、');
   await replyOrPushQuick(env, event,
-    `你要記錄哪隻貓貓的資料呢?\n家裡有：${names}\n先選一隻（選好後這筆再打一次就好）🐈`,
+    `這筆要記給哪隻貓？\n家裡有：${names}\n直接回覆名字就好，這筆就會記給牠 🐈`,
     items);
+}
+
+// 「等待選貓」的暫存紀錄（pendrec）在 pendingAction，格式：pendrec:<json{ r:已解析的 record, t:建立時間ms }>。
+const PENDREC_TTL_MS = 15 * 60 * 1000;   // 15 分鐘逾時：夠久讓分心的人回來，又不會久到之後打貓名意外補寫舊紀錄
+// 使用者回貓名時，若正在等「這筆記給哪隻貓？」→ 用選定的貓「重走既有 handleRecord」完成上一筆（不另做簡化寫入）。
+// 回 true＝有 pendrec 且已處理（完成寫入，或因過期/壞值而作廢）；false＝沒有 pendrec，交回呼叫端做原本行為。
+// 一律先清掉 pending（避免掛著、避免重複寫入）；過期/壞值不補寫。
+async function tryCompletePendingRecord(env, event, { db, user, pet, lineUserId, ownerId, caregiverName, baseUrl }) {
+  const pending = String(user.pendingAction || '');
+  if (!pending.startsWith('pendrec:')) return false;
+  await updateUser(db, lineUserId, { pendingAction: '' });
+  let data = null;
+  try { data = JSON.parse(pending.slice('pendrec:'.length)); } catch (error) { data = null; }
+  // 過期/壞值：已清 pending、不補寫；回 false → 呼叫端就當一般「切換貓」處理（不會靜默、也不會誤寫舊紀錄）
+  if (!data || !data.r || (Date.now() - Number(data.t || 0)) > PENDREC_TTL_MS) return false;
+  const recRes = await handleRecord(env, event, pet, data.r, ownerId, { actorId: lineUserId, caregiverName, baseUrl });
+  const recSavedId = recRes?.savedLog?.logId || '';
+  const recAllIds = [recRes?.savedLog?.logId, recRes?.addedWaterLog?.logId].filter(Boolean);
+  await logTextInput(db, {
+    lineUserId, ownerId, petId: pet.petId, rawText: event.message?.text || '',
+    parseStatus: recSavedId ? 'record' : (recRes?.disambiguated ? 'awaiting_food_selection' : 'record'),
+    failReason: recRes?.disambiguated ? 'need_food_selection' : '',
+    sourceMessageId: String(event.message?.id || ''), resolvedPetId: pet.petId, linkedLogId: recSavedId,
+    parsedResult: JSON.stringify({ events: [{ category: data.r.category, amount: data.r.amount, unit: data.r.unit, itemName: data.r.itemName, addedWaterMl: data.r.addedWaterMl || 0 }], savedLogIds: recAllIds, unparsedSegments: [], awaitingAction: recRes?.disambiguated ? 'food_selection' : '' })
+  });
+  return true;
 }
 // progressive disclosure：紀錄很少＝還在學，才顯示「怎麼打字記錄」教學鈕；上手後自動收起
 async function isBeginner(db, petId) {
@@ -2006,7 +2032,7 @@ export async function recordMultiForPet(env, event, db, opts) {
   await replyOrPushFlex(env, event, multiRecordFlex(pet, lines, lastSummary, lastDate, multiSiteUrl, multiUndo), fallback);
 }
 
-async function handleTextMessage(event, env, baseUrl) {
+export async function handleTextMessage(event, env, baseUrl) {
   const db = env.DB;
   const lineUserId = event.source?.userId;
 
@@ -2142,6 +2168,13 @@ async function handleTextMessage(event, env, baseUrl) {
   }
   if (switchTarget) {
     if (pets.length > 1) {
+      // 若正在等「這筆記給哪隻貓？」（pendrec），使用者回貓名＝回答上一筆 → 優先完成那筆（重走 handleRecord），
+      // 完成後把牠設成 active pet；之後的紀錄就直接記給牠，不必再問。沒有 pendrec 才是單純切換。
+      const completed = await tryCompletePendingRecord(env, event, { db, user, pet: switchTarget, lineUserId, ownerId, caregiverName, baseUrl });
+      if (completed) {
+        if (user.defaultPetId !== switchTarget.petId) await updateUser(db, lineUserId, { defaultPetId: switchTarget.petId });
+        return;
+      }
       if (user.defaultPetId !== switchTarget.petId) {
         await updateUser(db, lineUserId, { defaultPetId: switchTarget.petId });
       }
@@ -2397,7 +2430,12 @@ async function handleTextMessage(event, env, baseUrl) {
     }
 
     case 'record': {
-      if (!explicitPet && needsCatPick(user, pets)) { await askWhichCat(env, event, pets); return; }
+      if (!explicitPet && needsCatPick(user, pets)) {
+        // 已成功解析、只缺「哪隻貓」→ 暫存這筆（pendrec），等使用者回貓名再用既有流程完成，不要丟掉輸入。
+        await updateUser(db, lineUserId, { pendingAction: `pendrec:${JSON.stringify({ r: intent.record, t: Date.now() })}` });
+        await askWhichCat(env, event, pets);
+        return;
+      }
       if (!pet) {
         pet = await createPet(db, ownerId, { petName: '貓貓' });
         await updateUser(db, lineUserId, { defaultPetId: pet.petId });
