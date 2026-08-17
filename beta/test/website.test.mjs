@@ -174,56 +174,43 @@ test('傳到 LINE：先全部上傳、再用 a4SendReport 一次送；deps 綁 l
   assert.ok(/permission\.query\('chat_message\.write'\)/.test(html), 'init 用 permission.query 取 chat_message.write 授權');
 });
 
-// 吃過的食物（照護時間軸）：回顧 tab 內的入口、逐筆時間軸、類型／範圍 filter、誠實顯示 generic、deep link
-test('吃過的食物：入口在回顧、逐筆時間軸、資料走 food-timeline API、generic 只顯示類型', () => {
-  // 入口與名稱（不叫品牌歷史／food history）
+// 吃過的食物（兩層）：第一層品項摘要（吃過哪些），點開才看第二層逐餐明細
+test('吃過的食物：入口在回顧、第一層品項摘要走 food-history API、chips 不回歸', () => {
   assert.ok(/id="eatenFold"/.test(html) && html.includes('吃過的食物'), '回顧內有「吃過的食物」fold');
-  assert.ok(html.includes('看看最近什麼時候吃了哪一款'), '副標語氣');
+  assert.ok(html.includes('看看這陣子吃過哪些品項'), '副標＝品項摘要語氣');
   assert.ok(!/id="eatenFold"[\s\S]{0,400}品牌歷史/.test(html), '入口不叫「品牌歷史」（generic 可能沒品牌）');
-  // 類型 chips 顯示正式名稱（口語別名只在 LINE parser）
   for (const t of ['全部', '主食罐', '副食罐', '罐頭', '乾糧', '零食']) assert.ok(html.includes(`>${t}</button>`), `類型 chip：${t}`);
-  // 時間範圍 chips（近 7／近 30／全部）
   assert.ok(/data-days="7"/.test(html) && /data-days="30"[^>]*class="active"/.test(html) && /data-days="all"/.test(html), '範圍 chips，預設近 30 天');
-  // 資料來源：呼叫 food-timeline API（pet scoped，帶 days/limit）
-  const load = html.slice(html.indexOf('async function loadFoodTimeline'), html.indexOf('async function loadFoodTimeline') + 900);
-  assert.ok(/food-timeline\?petId=\$\{state\.petId\}&days=\$\{days\}&limit=\$\{limit\}/.test(load), '走 food-timeline API、pet scoped、帶 days/limit');
-  // 效能：limit（避免第一次載入大量歷史）＋查看更多
-  assert.ok(/eatenMoreBtn/.test(html) && /state\.eaten\.limit \+= 100/.test(html), '有「查看更多」拉高上限');
-  // generic 誠實顯示：名稱===類型 → 不加品牌 tag；不顯示 foodId
-  const render = html.slice(html.indexOf('function renderFoodTimeline'), html.indexOf('function renderFoodTimeline') + 1600);
-  assert.ok(/const isGeneric = name === String\(r\.foodType/.test(render), 'generic（名稱===類型）判斷');
-  assert.ok(!/r\.foodId/.test(render), '時間軸不顯示 foodId');
-  // 實吃 amount；有原餵/剩餘才附註（不得把剩餘量當實吃）
-  assert.ok(/原 \$\{fmt\(served\)\}g・剩 \$\{fmt\(leftover\)\}g/.test(render) && /Number\(served\) > 0/.test(render), '附原餵/剩餘，不把剩餘當實吃');
-  // 空狀態（不是空白頁）＋誠實品牌教學
+  // 第一層資料來源：food-history 聚合 API（pet scoped、帶 days、可帶 foodType）
+  const load = html.slice(html.indexOf('async function loadFoodSummary'), html.indexOf('async function loadFoodSummary') + 700);
+  assert.ok(/food-history\?petId=\$\{state\.petId\}&days=\$\{days\}/.test(load), '第一層走 food-history API、pet scoped');
+  // 空狀態（不是空白頁）＋底部一次性品牌提示
   assert.ok(/還沒有吃飯紀錄/.test(html) && /之後就能在這裡回顧/.test(html), '空狀態文案');
-  assert.ok(/只記「乾乾5」這類簡略紀錄，如果沒有預設食物，就只會顯示「乾糧」/.test(html), '誠實的品牌教學');
-  // deep link：沿用既有 go= 機制（go=eaten 開回顧並展開），不另建 URL 系統
+  assert.ok(/只記「乾乾5」這類簡略紀錄，如果沒有預設食物，就只會顯示「乾糧」/.test(html), '底部一次性誠實提示');
+  // deep link 不回歸
   assert.ok(/goTarget === 'eaten'/.test(html) && /switchTab\('trend'\)/.test(html), 'go=eaten deep link 進回顧');
 });
 
-// 資訊層級重整：品牌／品項名為主，時間・類型・實吃量為輔（不是三欄資料表）
-test('吃過的食物 UI：品項名為主層、時間/類型/實吃為輔層、generic 不重複類型、時間軸節點', () => {
-  const render = html.slice(html.indexOf('function renderFoodTimeline'), html.indexOf('function renderFoodTimeline') + 2600);
-  // 第一層＝品項名（.eaten-name 為獨立主層，且排在 meta 之前）
-  const nameIdx = render.indexOf('class="eaten-name"');
-  const metaIdx = render.indexOf('class="eaten-meta"');
-  assert.ok(nameIdx > 0 && metaIdx > nameIdx, '品項名為第一層、在輔助行之前');
-  // 第二層＝時間・類型・實吃量（同一 meta 行）
-  assert.ok(render.includes('class="eaten-meta"') && render.includes('<span class="t">'), '輔助行含時間');
-  assert.ok(render.includes('實吃 ') && /<span class="g">實吃/.test(render), '實吃量在輔助行（不做右側巨大數字）');
-  // generic：類型不重複進 meta（名稱本身就是類型）
-  assert.ok(/isGeneric \? '' : /.test(render) && render.includes('class="ty"'), 'generic 不重複顯示類型');
-  // 不再是三欄表格：舊的 .eaten-amt 右欄與彩色 .eaten-type-tag 皆已移除
-  assert.ok(!/class="eaten-amt"/.test(html) && !/class="eaten-type-tag"/.test(html), '移除右側大數字欄與彩色類型 pill');
-  // 時間軸節奏：淡 rail + 小節點（非粗水平線）；每筆保留 data-log-id 供日後接單筆修改
-  assert.ok(/\.eaten-list::before/.test(html) && /\.eaten-item::before/.test(html), '時間軸 rail＋節點');
-  assert.ok(/data-log-id="\$\{esc\(r\.logId \|\| ''\)\}"/.test(render), '每筆帶 data-log-id（可延伸，不綁 handler）');
-  // 輕量 filter：chips 字級比內容標題小、padding 縮小、保留橫向捲動
-  assert.ok(/\.eaten-chips button \{[^}]*font-size: 12px[^}]*padding: 4px 11px/.test(html), 'filter chips 視覺縮小');
-  assert.ok(/\.eaten-chips \{[^}]*overflow-x: auto/.test(html), 'chips 保留橫向捲動');
-  // 實吃/剩食不回歸
-  assert.ok(/原 \$\{fmt\(served\)\}g・剩 \$\{fmt\(leftover\)\}g/.test(render), 'served/leftover 顯示不回歸');
+// 兩層資訊架構：第一層只有品項名/類型/最近日期/次數（不逐餐）；第二層點開才逐餐
+test('吃過的食物 UI：第一層品項摘要（名/類型/最近/次數，不逐餐）＋第二層點開逐餐明細', () => {
+  const sum = html.slice(html.indexOf('function renderFoodSummary'), html.indexOf('function renderFoodSummary') + 1400);
+  // 第一層每項：品項名為主、meta＝類型・最近日期・次數
+  assert.ok(sum.includes('class="eaten-sum-name"') && sum.includes('class="eaten-sum-meta"'), '第一層品項名＋摘要 meta');
+  assert.ok(/最近 \$\{esc\(eatenMD\(r\.lastAt\)\)\}/.test(sum) && /\$\{Number\(r\.times\) \|\| 0\} 次/.test(sum), 'meta 顯示最近日期＋次數');
+  // 第一層不逐餐：摘要不出現時間 HH:MM 或 servedAmount/leftoverAmount
+  assert.ok(!/servedAmount/.test(sum) && !/leftoverAmount/.test(sum) && !/實吃/.test(sum), '第一層不含每餐時間/實吃/剩食');
+  // generic：名稱===類型 → 標「未記品牌」，不猜品牌
+  assert.ok(/const isGeneric = name === String\(r\.foodType/.test(sum) && sum.includes('未記品牌'), 'generic 誠實標示、不猜品牌');
+  // 展開才載入第二層；第二層才有逐餐（時間＋實吃＋原/剩）
+  assert.ok(/async function toggleEatenDetail/.test(html) && /panel\.dataset\.loaded/.test(html), '點開才載入第二層（避免一開始拉全部）');
+  const detail = html.slice(html.indexOf('function renderEatenDetail'), html.indexOf('function renderEatenDetail') + 900);
+  assert.ok(/實吃 \$\{esc\(eaten\)\}g/.test(detail), '第二層才顯示每餐實吃量');
+  assert.ok(/原 \$\{fmt\(served\)\}g・剩 \$\{fmt\(leftover\)\}g/.test(detail) && /Number\(served\) > 0/.test(detail), 'served/leftover 只在第二層、不把剩餘當實吃');
+  // 第二層資料來源：branded 用 foodId、generic 用 generic=1&foodType
+  const ld = html.slice(html.indexOf('async function loadEatenDetail'), html.indexOf('async function loadEatenDetail') + 800);
+  assert.ok(/&foodId=\$\{encodeURIComponent\(foodId\)\}/.test(ld) && /&generic=1&foodType=/.test(ld), '第二層 branded=foodId / generic=generic旗標');
+  // 舊逐餐流水帳結構已移除（不再是第一層時間軸 rail/node）
+  assert.ok(!/function renderFoodTimeline\b/.test(html) && !/class="eaten-item"/.test(html), '移除舊第一層逐餐時間軸');
 });
 
 // 家裡習慣的叫法：食物設定頁的別名區塊＋新增/儲存/刪除接到 /api/food-aliases

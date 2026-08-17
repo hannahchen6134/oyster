@@ -552,27 +552,31 @@
     #reportSaveBtn, #reportSendLineBtn { width: auto; display: inline-block; padding-left: 22px; padding-right: 22px; }
     .report-actions .report-hint { flex: 1 0 100%; }
     .report-hint { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 8px 2px 0; text-align: center; }
-    /* 吃過的食物：食物足跡時間軸——品牌／品項名為主，時間・類型・實吃量為輔（手機優先，不做後台表格） */
+    /* 吃過的食物：兩層——第一層品項摘要（吃過哪些），點開才看第二層逐餐明細（手機優先，不做流水帳） */
     .eaten-filters { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
     .eaten-chips { display: flex; gap: 6px; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 2px; scrollbar-width: none; }
     .eaten-chips::-webkit-scrollbar { display: none; }
     /* 輕量 filter：矮、字小、選中清楚但不巨大；保留橫向捲動 */
     .eaten-chips button { flex: 0 0 auto; border: 1px solid var(--line); background: transparent; color: var(--muted); font-size: 12px; font-weight: 600; padding: 4px 11px; border-radius: 999px; white-space: nowrap; cursor: pointer; line-height: 1.5; }
     .eaten-chips button.active { background: var(--brand); border-color: var(--brand); color: #fff; }
-    .eaten-day { margin-top: 22px; }
-    .eaten-day:first-child { margin-top: 6px; }
-    .eaten-day-label { font-size: 11.5px; font-weight: 700; color: var(--muted); letter-spacing: 0.06em; margin: 0 0 8px 2px; }
-    /* 每個日期一條很淡的時間軸；節點用小圓點，不是水平表格線 */
-    .eaten-list { position: relative; padding-left: 16px; }
-    .eaten-list::before { content: ''; position: absolute; left: 4px; top: 9px; bottom: 9px; width: 2px; background: rgba(115, 73, 33, 0.12); border-radius: 2px; }
-    .eaten-item { position: relative; padding: 7px 0; }
-    .eaten-item::before { content: ''; position: absolute; left: -15px; top: 11px; width: 7px; height: 7px; border-radius: 50%; background: var(--brand); box-shadow: 0 0 0 3px var(--sheet); }
-    .eaten-name { font-size: 15px; font-weight: 700; color: var(--ink); line-height: 1.35; word-break: break-word; }   /* 主角：品牌／品項名 */
-    .eaten-meta { font-size: 12px; color: var(--muted); margin-top: 2px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 8px; }
-    .eaten-meta .t { font-variant-numeric: tabular-nums; }                 /* 時間：次要、較小、不搶名字 */
-    .eaten-meta .ty { opacity: 0.85; }                                     /* 類型：淡，不重複搶視覺 */
-    .eaten-meta .g { color: var(--ink-soft); font-weight: 600; }           /* 實吃量：輔助行，不做右側巨大數字 */
-    .eaten-sub { font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+    /* 第一層：品項摘要清單（小列，不做大卡片、不加陰影） */
+    .eaten-sum-item { border-top: 1px solid var(--line); }
+    .eaten-sum-item:first-child { border-top: none; }
+    .eaten-sum-head { width: 100%; display: flex; align-items: baseline; gap: 10px; background: none; border: none; padding: 11px 2px; text-align: left; cursor: pointer; }
+    .eaten-sum-body { flex: 1 1 auto; min-width: 0; }
+    .eaten-sum-name { font-size: 15px; font-weight: 700; color: var(--ink); line-height: 1.35; word-break: break-word; }   /* 主角：品牌／品項名 */
+    .eaten-sum-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }                                            /* 類型・最近日期・次數 */
+    .eaten-sum-meta .gen { color: var(--muted); opacity: 0.75; }                                                          /* 未記品牌：非常淡 */
+    .eaten-sum-caret { flex: 0 0 auto; color: var(--muted); font-size: 12px; transition: transform 0.15s; align-self: center; }
+    .eaten-sum-head[aria-expanded="true"] .eaten-sum-caret { transform: rotate(180deg); }
+    /* 第二層：逐餐明細（縮排、更淡，收在展開區內） */
+    .eaten-detail { padding: 2px 2px 12px 14px; }
+    .eaten-detail-row { padding: 6px 0; border-top: 1px dashed var(--line); }
+    .eaten-detail-row:first-child { border-top: none; }
+    .eaten-detail-when { font-size: 12.5px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+    .eaten-detail-when .g { font-weight: 600; }
+    .eaten-detail-sub { font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+    .eaten-detail-more { margin-top: 8px; }
     .eaten-empty { text-align: center; color: var(--muted); font-size: 13px; line-height: 1.7; padding: 20px 10px; }
     .eaten-empty b { color: var(--ink-soft); font-weight: 600; }
     /* 截圖用標題（平常隱藏，產生圖片時才插入） */
@@ -1450,7 +1454,7 @@
           <summary>
             <span class="fold-head">
               <span class="fold-title">吃過的食物</span>
-              <span class="fold-sub">看看最近什麼時候吃了哪一款</span>
+              <span class="fold-sub">看看這陣子吃過哪些品項</span>
             </span>
             <span class="fold-toggle">＋</span>
           </summary>
@@ -1471,9 +1475,6 @@
               </div>
             </div>
             <div id="eatenTimeline"></div>
-            <div style="text-align:center;margin-top:10px">
-              <button class="link-btn hidden" id="eatenMoreBtn" type="button">查看更多</button>
-            </div>
             <p class="muted" style="font-size:12px;line-height:1.7;margin:14px 2px 0">有記品牌的紀錄，會顯示當時吃的品牌；只記「乾乾5」這類簡略紀錄，如果沒有預設食物，就只會顯示「乾糧」。想之後回頭看品牌，可以先把常吃食物存起來，或設成預設食物。</p>
           </div>
         </details>
@@ -1564,7 +1565,7 @@
       recentLogs: [],
       labs: [],
       labItem: '',
-      eaten: { type: '', days: 30, limit: 50 }   // 「吃過的食物」時間軸：類型過濾／天數／目前載入上限
+      eaten: { type: '', days: 30 }   // 「吃過的食物」：第一層品項摘要的類型過濾／天數（第二層逐餐上限存在各展開面板上）
     };
 
     const $ = (id) => document.getElementById(id);
@@ -3249,7 +3250,7 @@
       loadComposition();
       await loadDigest();
       await loadTable();
-      await loadFoodTimeline();
+      await loadFoodSummary();
     }
 
     // ── 飲食與水分組成（給醫生看）：用已載入的近 30 天資料，依所選窗口加總 ──
@@ -3302,78 +3303,94 @@
       el.innerHTML = html;
     }
 
-    // ── 吃過的食物（照護時間軸）：實際吃過的 food logs 逐筆，最近在前。純讀取，資料來自 logs，不回推品牌 ──
-    // 顯示名一律用「當時 log 真正記下來的資料」（後端 getFoodTimeline 已解析），generic 紀錄只會顯示類型。
-    async function loadFoodTimeline() {
+    // ── 吃過的食物（兩層）：第一層＝品項摘要（吃過哪些、最近一次、幾次），點某項才展開第二層逐餐明細。 ──
+    // 純讀取。第一層重用 getFoodHistory（聚合，依 lastAt 由近到遠）；第二層 getFoodTimeline（逐筆）。誠實：generic 不回推品牌。
+    const eatenMD = (at) => { const s = String(at || ''); return s.length >= 10 ? `${Number(s.slice(5, 7))}/${Number(s.slice(8, 10))}` : s.slice(0, 10); };
+    const eatenRangeWord = () => (state.eaten.days === 'all' ? '' : `近 ${state.eaten.days} 天 `);
+
+    async function loadFoodSummary() {
       if (!state.petId) return;
       const el = $('eatenTimeline');
-      const moreBtn = $('eatenMoreBtn');
       if (!el) return;
-      const { type, days, limit } = state.eaten;
+      const { type, days } = state.eaten;
       try {
-        const q = `food-timeline?petId=${state.petId}&days=${days}&limit=${limit}${type ? `&foodType=${encodeURIComponent(type)}` : ''}`;
+        const q = `food-history?petId=${state.petId}&days=${days}${type ? `&foodType=${encodeURIComponent(type)}` : ''}`;
         const data = await api(q);
-        renderFoodTimeline(data.rows || []);
-        // 回傳筆數 = 目前上限 → 可能還有更多，給「查看更多」（再拉高上限重載）
-        if (moreBtn) moreBtn.classList.toggle('hidden', (data.rows || []).length < limit);
+        renderFoodSummary(data.rows || []);
       } catch (error) {
         el.innerHTML = `<div class="eaten-empty">紀錄暫時載入失敗，請稍後再試。</div>`;
-        if (moreBtn) moreBtn.classList.add('hidden');
       }
     }
 
-    // 依「實際吃下 amount」顯示；有原餵/剩餘才附註（不得把剩餘量當實吃）。名稱===類型＝generic，只顯示類型不猜品牌。
-    function renderFoodTimeline(rows) {
+    // 第一層：每個品項一列（品項名為主，類型・最近日期・次數為輔）。點整列展開逐餐明細；不逐餐攤開。
+    function renderFoodSummary(rows) {
       const el = $('eatenTimeline');
       if (!el) return;
       if (!rows.length) {
         const typed = state.eaten.type;
         el.innerHTML = typed
           ? `<div class="eaten-empty">這個範圍還沒有<b>${esc(typed)}</b>的紀錄。</div>`
-          : `<div class="eaten-empty">還沒有吃飯紀錄。<br>平常在 LINE 直接打「乾乾5」「主食3」，之後就能在這裡回顧。<br><span style="display:inline-block;margin-top:6px">有記品牌時，也能看到當時吃的是哪一款。</span></div>`;
+          : `<div class="eaten-empty">還沒有吃飯紀錄。<br>平常在 LINE 直接打「乾乾5」「主食3」，之後就能在這裡回顧。<br><span style="display:inline-block;margin-top:6px">有記品牌時，也能看到最近吃過哪一款。</span></div>`;
         return;
       }
-      // 依日期分組（同一天的品項聚在一起），日期新到舊、日內時間新到舊（rows 已由後端排序）
-      const groups = [];
-      let cur = null;
-      for (const r of rows) {
-        const day = String(r.at || '').slice(0, 10);
-        if (!cur || cur.day !== day) { cur = { day, items: [] }; groups.push(cur); }
-        cur.items.push(r);
-      }
-      const html = groups.map((g) => {
-        const items = g.items.map((r) => {
-          const name = String(r.name || r.foodType || '');
-          const isGeneric = name === String(r.foodType || '');   // 名稱===類型＝沒有品牌的 generic 紀錄
-          const time = String(r.at || '').slice(11, 16);
-          const eaten = fmt(r.amount);
-          // 類型只在「有品牌」時放進輔助行（generic 的名稱本身就是類型，不重複顯示）
-          const typeMeta = isGeneric ? '' : `<span class="ty">${esc(r.foodType || '')}</span>`;
-          const served = r.servedAmount, leftover = r.leftoverAmount;
-          const sub = (served != null && leftover != null && Number(served) > 0)
-            ? `<div class="eaten-sub">原 ${fmt(served)}g・剩 ${fmt(leftover)}g</div>` : '';
-          // 第一層＝品牌／品項名（主角）；第二層＝時間・類型・實吃量（輔）；第三層＝剩食（若有）。
-          // data-log-id 供日後接單筆修改用（本輪不加功能、不綁 handler）。
-          return `<div class="eaten-item" data-log-id="${esc(r.logId || '')}">
-            <div class="eaten-name">${esc(name)}</div>
-            <div class="eaten-meta"><span class="t">${esc(time)}</span>${typeMeta}<span class="g">實吃 ${esc(eaten)}g</span></div>
-            ${sub}
-          </div>`;
-        }).join('');
-        return `<div class="eaten-day"><div class="eaten-day-label">${esc(eatenDayLabel(g.day))}</div><div class="eaten-list">${items}</div></div>`;
+      const rangeWord = eatenRangeWord();
+      el.innerHTML = rows.map((r, i) => {
+        const name = String(r.name || r.foodType || '');
+        const isGeneric = name === String(r.foodType || '');   // 名稱===類型＝沒有品牌的 generic
+        const typePart = isGeneric ? '<span class="gen">未記品牌</span>' : esc(r.foodType || '');
+        const meta = `${typePart} · 最近 ${esc(eatenMD(r.lastAt))} · ${esc(rangeWord)}${Number(r.times) || 0} 次`;
+        return `<div class="eaten-sum-item">
+          <button class="eaten-sum-head" type="button" aria-expanded="false" data-eaten-idx="${i}" data-food-id="${esc(r.foodId || '')}" data-food-type="${esc(r.foodType || '')}" data-generic="${isGeneric ? '1' : '0'}">
+            <span class="eaten-sum-body"><span class="eaten-sum-name">${esc(name)}</span><span class="eaten-sum-meta">${meta}</span></span>
+            <span class="eaten-sum-caret">▾</span>
+          </button>
+          <div class="eaten-detail" id="eatenDetail${i}" hidden></div>
+        </div>`;
       }).join('');
-      el.innerHTML = html;
     }
 
-    // 日期標題：今天／昨天／M月D日（週X）
-    function eatenDayLabel(day) {
-      if (!day) return '';
-      const today = todayStr();
-      if (day === today) return '今天';
-      if (day === shiftDate(today, -1)) return '昨天';
-      const [, m, d] = day.split('-');
-      const dow = '日一二三四五六'[new Date(`${day}T00:00:00`).getDay()];
-      return `${Number(m)}月${Number(d)}日（${dow}）`;
+    // 展開／收合某品項 → 第二層逐餐明細（首次展開才載入，避免一開始就拉全部）
+    async function toggleEatenDetail(head) {
+      const i = head.dataset.eatenIdx;
+      const panel = $(`eatenDetail${i}`);
+      if (!panel) return;
+      if (head.getAttribute('aria-expanded') === 'true') { head.setAttribute('aria-expanded', 'false'); panel.hidden = true; return; }
+      head.setAttribute('aria-expanded', 'true'); panel.hidden = false;
+      if (!panel.dataset.loaded) { panel.innerHTML = '<div class="eaten-detail-sub">載入中⋯</div>'; await loadEatenDetail(head, panel, 6); }
+    }
+
+    // 第二層：某品項（foodId）或某 generic 類型（generic=1＋foodType）的逐筆紀錄。日期時間・實吃量（＋原餵/剩）。
+    async function loadEatenDetail(head, panel, limit) {
+      const foodId = head.dataset.foodId || '';
+      const generic = head.dataset.generic === '1';
+      const foodType = head.dataset.foodType || '';
+      let q = `food-timeline?petId=${state.petId}&days=${state.eaten.days}&limit=${limit}`;
+      if (foodId) q += `&foodId=${encodeURIComponent(foodId)}`;
+      else if (generic) q += `&generic=1&foodType=${encodeURIComponent(foodType)}`;
+      else q += `&foodType=${encodeURIComponent(foodType)}`;
+      try {
+        const data = await api(q);
+        renderEatenDetail(panel, data.rows || [], limit, head);
+        panel.dataset.loaded = '1'; panel.dataset.limit = String(limit);
+      } catch (error) {
+        panel.innerHTML = '<div class="eaten-detail-sub">明細載入失敗，請稍後再試。</div>';
+      }
+    }
+
+    function renderEatenDetail(panel, rows, limit, head) {
+      if (!rows.length) { panel.innerHTML = '<div class="eaten-detail-sub">這個範圍沒有逐餐紀錄。</div>'; return; }
+      const list = rows.map((r) => {
+        const at = String(r.at || ''); const md = eatenMD(at); const hm = at.slice(11, 16);
+        const eaten = fmt(r.amount);
+        const served = r.servedAmount, leftover = r.leftoverAmount;
+        const sub = (served != null && leftover != null && Number(served) > 0)
+          ? `<div class="eaten-detail-sub">原 ${fmt(served)}g・剩 ${fmt(leftover)}g</div>` : '';
+        return `<div class="eaten-detail-row"><div class="eaten-detail-when">${esc(md)}${hm ? ' ' + esc(hm) : ''}　<span class="g">實吃 ${esc(eaten)}g</span></div>${sub}</div>`;
+      }).join('');
+      // 回傳筆數 = 上限 → 可能還有更多，給「查看更多」（拉高該品項上限重載）
+      const more = rows.length >= limit
+        ? `<div class="eaten-detail-more"><button class="link-btn" type="button" data-eaten-more="${esc(head.dataset.eatenIdx)}">查看更多</button></div>` : '';
+      panel.innerHTML = list + more;
     }
 
     // 每日數字表：獨立範圍（30/60/90 天），可左右滑動
@@ -4387,28 +4404,33 @@
         return loadTrend();
       }
 
-      // 吃過的食物：類型過濾（只重載時間軸，其餘報告不動）
+      // 吃過的食物：類型過濾（只重載第一層品項摘要，其餘報告不動）
       const eTypeBtn = event.target.closest('#eatenTypeChips [data-type]');
       if (eTypeBtn) {
         state.eaten.type = eTypeBtn.dataset.type || '';
-        state.eaten.limit = 50;   // 換條件時回到第一頁
         document.querySelectorAll('#eatenTypeChips [data-type]').forEach((el) =>
           el.classList.toggle('active', el === eTypeBtn));
-        return loadFoodTimeline();
+        return loadFoodSummary();
       }
       // 吃過的食物：時間範圍（近 7／近 30／全部）
       const eDaysBtn = event.target.closest('#eatenRangeChips [data-days]');
       if (eDaysBtn) {
         state.eaten.days = eDaysBtn.dataset.days === 'all' ? 'all' : (Number(eDaysBtn.dataset.days) || 30);
-        state.eaten.limit = 50;
         document.querySelectorAll('#eatenRangeChips [data-days]').forEach((el) =>
           el.classList.toggle('active', el === eDaysBtn));
-        return loadFoodTimeline();
+        return loadFoodSummary();
       }
-      // 吃過的食物：查看更多（拉高上限重載，避免第一次就載入大量歷史）
-      if (event.target.closest('#eatenMoreBtn')) {
-        state.eaten.limit += 100;
-        return loadFoodTimeline();
+      // 吃過的食物：點某品項 → 展開／收合第二層逐餐明細
+      const eSumHead = event.target.closest('.eaten-sum-head');
+      if (eSumHead) { return toggleEatenDetail(eSumHead); }
+      // 第二層「查看更多」：拉高該品項上限、重載它的明細（不影響其他品項）
+      const eMoreBtn = event.target.closest('[data-eaten-more]');
+      if (eMoreBtn) {
+        const idx = eMoreBtn.dataset.eatenMore;
+        const head = document.querySelector(`.eaten-sum-head[data-eaten-idx="${idx}"]`);
+        const panel = $(`eatenDetail${idx}`);
+        if (head && panel) { const next = (Number(panel.dataset.limit) || 6) + 20; return loadEatenDetail(head, panel, next); }
+        return;
       }
 
       const calCell = event.target.closest('.cal-cell[data-date]');

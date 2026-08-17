@@ -6,7 +6,7 @@ import {
   getUser, updateUser, listPets, getPet, createPet,
   listFoods, getFood, resolveDefaultFood, setDefaultFood, clearDefaultFood, listDefaultFoods,
   insertLog, getLog, getLogsForDay, updateLog, softDeleteLog, resyncPetWeight,
-  recomputeDay, getSummaries, getSessionUser, getRecentLogsByPet, getFoodTimeline,
+  recomputeDay, getSummaries, getSessionUser, getRecentLogsByPet, getFoodTimeline, getFoodHistory,
   resolveDataOwner, createCareInvite, listCareMembers, track, healFoodKcal,
   updatePetFields, getAllLogsForPet, saveDataExport,
   createTask, getTask, listTasksForPet, completeTask, uncompleteTask, skipTask, cancelTask,
@@ -180,6 +180,19 @@ export async function handleApi(request, env, url) {
 
     // 「吃過的食物」時間軸（純讀取）：實際吃過的 food logs 逐筆，最近在前；只補顯示名，不回推品牌。
     // owner 由 server resolve、petId 必須屬本家庭；days=all/0＝全部歷史、否則近 N 天；foodType 可選過濾。
+    // 品項摘要（第一層）：實際吃過哪些品項，依 lastAt 由近到遠。重用 getFoodHistory（聚合、不重造）。
+    if (resource === 'food-history' && method === 'GET') {
+      const petId = url.searchParams.get('petId') || '';
+      if (!(await assertPetOwner(db, petId, dataOwnerId))) return forbidden();
+      const daysParam = String(url.searchParams.get('days') || '30');
+      const sinceDays = (daysParam === 'all' || daysParam === '0') ? 0 : Math.min(3650, Math.max(1, Number(daysParam) || 30));
+      const foodTypeParam = String(url.searchParams.get('foodType') || '');
+      const foodType = FOOD_TIMELINE_TYPES.includes(foodTypeParam) ? foodTypeParam : '';
+      const rows = await getFoodHistory(db, petId, { sinceDays: sinceDays || null, foodType });
+      return jsonResponse({ ok: true, rows, days: sinceDays || 0 });
+    }
+
+    // 逐餐明細（第二層）：某品項（foodId）或某 generic 類型（generic=1＋foodType）的逐筆紀錄。
     if (resource === 'food-timeline' && method === 'GET') {
       const petId = url.searchParams.get('petId') || '';
       if (!(await assertPetOwner(db, petId, dataOwnerId))) return forbidden();
@@ -187,8 +200,10 @@ export async function handleApi(request, env, url) {
       const sinceDays = (daysParam === 'all' || daysParam === '0') ? 0 : Math.min(3650, Math.max(1, Number(daysParam) || 30));
       const foodTypeParam = String(url.searchParams.get('foodType') || '');
       const foodType = FOOD_TIMELINE_TYPES.includes(foodTypeParam) ? foodTypeParam : '';
+      const foodId = String(url.searchParams.get('foodId') || '');
+      const genericOnly = url.searchParams.get('generic') === '1';
       const limit = Math.min(200, Math.max(1, Number(url.searchParams.get('limit')) || 50));
-      const rows = await getFoodTimeline(db, petId, { sinceDays, foodType, limit });
+      const rows = await getFoodTimeline(db, petId, { sinceDays, foodType, foodId, genericOnly, limit });
       return jsonResponse({ ok: true, rows, days: sinceDays || 0, limit });
     }
 

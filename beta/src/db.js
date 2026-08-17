@@ -749,12 +749,15 @@ export async function getFoodHistory(db, petId, { sinceDays = null, foodType = '
 // 食物「時間軸」（§B「何時吃什麼」，逐筆，非聚合）：一律查 logs（實際吃過的），LEFT JOIN food_items 只補顯示名。
 // 可依 foodType／foodId／品牌品項名（nameQuery，比對 food_items 顯示名或 log 自打名）過濾；sinceDays 給值＝近 N 天。
 // 顯示名優先序（§7）：food_items.displayName > productName > brand > log.itemName > foodType。回最近在前。
-export async function getFoodTimeline(db, petId, { sinceDays = null, foodType = '', foodId = '', nameQuery = '', limit = 20 } = {}) {
+export async function getFoodTimeline(db, petId, { sinceDays = null, foodType = '', foodId = '', nameQuery = '', genericOnly = false, limit = 20 } = {}) {
   const where = ["logs.petId = ?", "logs.category = 'food'", 'logs.isDeleted = 0'];
   const params = [petId];
   if (Number(sinceDays) > 0) { where.push('logs.eventDateTime >= ?'); params.push(`${addDays(taipeiToday(), -Number(sinceDays))} 00:00`); }
   if (foodType) { where.push('logs.foodType = ?'); params.push(foodType); }
+  // genericOnly：只回沒有綁品牌（foodId 空）的紀錄，供「品項摘要」裡的 generic 類型（乾糧…）逐餐明細用。
+  // 預設 false → 既有呼叫端（含 LINE 時間軸）行為完全不變。與 foodId 互斥（有 foodId 就是查某品牌）。
   if (foodId) { where.push('logs.foodId = ?'); params.push(foodId); }
+  else if (genericOnly) { where.push("logs.foodId = ''"); }
   else if (nameQuery) {
     const like = `%${nameQuery}%`;
     where.push('(fi.displayName LIKE ? OR fi.brand LIKE ? OR fi.productName LIKE ? OR logs.itemName LIKE ?)');
