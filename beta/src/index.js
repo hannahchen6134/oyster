@@ -3,7 +3,7 @@
 // /api/*    → 照護站 REST API
 // 其餘路徑 → 照護站網站（public/ 靜態資源）
 
-import { parseMessage, matchFood, guessFood, normalizeText, analyzeLeading, stripFoodTypeWords } from './parser.js';
+import { parseMessage, matchFood, guessFood, normalizeText, analyzeLeading, stripFoodTypeWords, isAskableFoodName } from './parser.js';
 import { deriveFoodFields, isWetFoodType, isEstimableType, buildHandoff } from './summary.js';
 import { handleApi } from './api.js';
 import { verifyLineSignature, replyOrPush, replyOrPushQuick, replyOrPushFlex, replyMessages, pushText, pushMessages, getProfile, getAccessToken, checkAccessToken } from './line.js';
@@ -15,6 +15,7 @@ import {
   ensureUser, updateUser, getUser, listPets, createPet, resolveDefaultPet, getPet, updatePetFields, createFoodItem, createMedItem,
   listFoods, getFood, insertLog, getLog, getLastLogByUser, softDeleteLog, updateLog,
   getFoodHistory, getFoodTimeline, resolveDefaultFood,
+  resolveFoodAlias, setFoodAlias, ALIAS_FOODTYPES,
   getLatestWeightLog, resyncPetWeight,
   recomputeDay, getRecentSummaries,
   upcomingVisits, listVetsByOwner, createSession,
@@ -1590,6 +1591,43 @@ async function handlePostback(event, env, baseUrl) {
     return;
   }
 
+  // ── 家裡習慣的叫法：第一次遇到未知口語（肉5）→ 選類型 → 問要不要記住（§六/§二十四）──
+  if (action === 'aliasType') {
+    const name = data.get('n') || '';
+    const t = data.get('t') || '';
+    const g = Number(data.get('g')) || 0;
+    const aw = Number(data.get('aw')) || 0;
+    if (!name || !ALIAS_FOODTYPES.includes(t)) { await replyOrPush(env, event, '好，先不記 👌'); return; }
+    const enc = `n=${encodeURIComponent(name)}&t=${encodeURIComponent(t)}&g=${g}&aw=${aw}`;
+    await replyOrPushQuick(env, event, `之後「${name}」都代表「${t}」嗎？`, [
+      qrPost('記住這個叫法', `action=aliasSave&${enc}`, '記住這個叫法'),
+      qrPost('這次而已', `action=aliasOnce&${enc}`, '這次而已')
+    ]);
+    return;
+  }
+  if (action === 'aliasSave' || action === 'aliasOnce') {
+    const name = data.get('n') || '';
+    const t = data.get('t') || '';
+    const g = Number(data.get('g')) || 0;
+    const aw = Number(data.get('aw')) || 0;
+    if (!name || !ALIAS_FOODTYPES.includes(t) || !(g > 0)) { await replyOrPush(env, event, '好，先不記 👌'); return; }
+    const user = await getUser(db, lineUserId);
+    const pets = await listPets(db, ownerId);
+    const pet = await resolveDefaultPet(db, user, pets);
+    if (!pet) { await replyOrPush(env, event, '還沒有建立貓咪。'); return; }
+    const caregiverName = ownerId !== lineUserId ? String(user.displayName || '') : '';
+    // 「記住」才寫入家庭別名（只存 app_kv，保留詞不寫）；兩者都照常記這一次（走 defaultFood/generic，§五A）。
+    if (action === 'aliasSave' && isAskableFoodName(name)) {
+      await setFoodAlias(db, ownerId, name, { targetType: 'foodType', value: t });
+    }
+    await handleRecord(env, event, pet, { category: 'food', foodType: t, itemName: '', amount: g, unit: 'g', addedWaterMl: aw, medStatus: '', medSlot: '', note: '' }, ownerId, { fromButton: true, actorId: lineUserId, caregiverName, baseUrl });
+    if (action === 'aliasSave') {
+      await replyOrPush(env, event, `👌 已記住：以後「${name}」就當作「${t}」。想改或移除可到照護站的「家裡習慣的叫法」。`);
+    }
+    return;
+  }
+  if (action === 'aliasCancel') { await replyOrPush(env, event, '好，這筆先不記 👌'); return; }
+
   // P0-2：「改 品名 N」多餐符合時，使用者從確認卡選定要改哪一餐 → 改成 N。
   // mode=subtract 時（超口語「別名減N／別名-N」的確認）改為從實吃量扣掉 N，其餘一律預設改成 N。
   if (action === 'fixPick') {
@@ -2456,7 +2494,37 @@ async function handleTextMessage(event, env, baseUrl) {
         await replyOrPushQuick(env, event, `「${intent.itemName}」有幾個可能的品項，請選一個（${intent.amount} g）：`, btns);
         return;
       }
-      // 3) 完全沒命中 → 不猜是哪種食物、不寫入，保留為未解析並引導補上類型
+      // 3) 家庭「習慣的叫法」（§二/§五/§九）：沒有明確 food_item 命中才查，且每次 server 端重新驗證（§八）。
+      const alias = await resolveFoodAlias(db, ownerId, intent.itemName);
+      if (alias) {
+        const rec = alias.kind === 'foodItem'
+          ? { category: 'food', foodType: alias.food.foodType, itemName: alias.food.displayName, amount: intent.amount, unit: 'g', addedWaterMl: intent.addedWaterMl || 0, medStatus: '', medSlot: '', note: '', dayOffset: intent.dayOffset || 0, time: intent.time || '' }
+          : { category: 'food', foodType: alias.foodType, itemName: '', amount: intent.amount, unit: 'g', addedWaterMl: intent.addedWaterMl || 0, medStatus: '', medSlot: '', note: '', dayOffset: intent.dayOffset || 0, time: intent.time || '' };
+        const res = await handleRecord(env, event, pet, rec, ownerId, { actorId: lineUserId, caregiverName, baseUrl });
+        const allIds = [res?.savedLog?.logId, res?.addedWaterLog?.logId].filter(Boolean);
+        await logTextInput(db, {
+          lineUserId, ownerId, petId: pet.petId, rawText: event.message?.text || '',
+          parseStatus: 'record', failReason: '', sourceMessageId: smid, resolvedPetId: pet.petId, linkedLogId: res?.savedLog?.logId || '',
+          parsedResult: JSON.stringify({ events: [{ category: 'food', foodType: rec.foodType, itemName: rec.itemName, amount: intent.amount, alias: intent.itemName }], savedLogIds: allIds, unparsedSegments: [], awaitingAction: '' })
+        });
+        return;
+      }
+      // 4) 第一次遇到的口語叫法（文字＋數字、非保留詞）→ 不亂猜，先安全詢問「這是指什麼？」（§六/§二十二）
+      if (isAskableFoodName(intent.itemName)) {
+        const n = encodeURIComponent(intent.itemName);
+        const g = Number(intent.amount) || 0;
+        const aw = Number(intent.addedWaterMl) || 0;
+        const btns = ALIAS_FOODTYPES.map((t) => qrPost(t, `action=aliasType&n=${n}&g=${g}&aw=${aw}&t=${encodeURIComponent(t)}`, t));
+        btns.push(qrPost('先不記', `action=aliasCancel&n=${n}`, '先不記'));
+        await logTextInput(db, {
+          lineUserId, ownerId, petId: pet.petId, rawText: event.message?.text || '',
+          parseStatus: 'awaiting_food_alias', failReason: 'alias_unknown', sourceMessageId: smid, resolvedPetId: pet.petId, linkedLogId: '',
+          parsedResult: JSON.stringify({ events: [{ itemName: intent.itemName, amount: intent.amount }], savedLogIds: [], unparsedSegments: [], awaitingAction: 'food_alias' })
+        });
+        await replyOrPushQuick(env, event, `「${intent.itemName}」是指哪一種？（這次 ${g}g）\n選好之後可以讓管家記住，下次直接用。`, btns);
+        return;
+      }
+      // 5) 完全沒命中且不像叫法 → 不猜是哪種食物、不寫入，保留為未解析並引導補上類型
       await logTextInput(db, {
         lineUserId, ownerId, petId: pet.petId, rawText: event.message?.text || '',
         parseStatus: 'unknown', failReason: 'item_lookup_none', sourceMessageId: smid, resolvedPetId: pet.petId, linkedLogId: '',

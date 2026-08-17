@@ -339,6 +339,80 @@ export async function listDefaultFoods(db, ownerId, foodTypes = []) {
   return out;
 }
 
+// 依前綴列出 app_kv（唯讀）。ownerId／foodType 都不含 %／_，直接 LIKE 前綴即可。
+export async function appKvListByPrefix(db, prefix) {
+  try {
+    const { results } = await db.prepare('SELECT k, v FROM app_kv WHERE k LIKE ? ORDER BY k').bind(`${String(prefix)}%`).all();
+    return results || [];
+  } catch (error) {
+    return [];
+  }
+}
+
+// ---------- 家庭「口語別名」＝家裡習慣的叫法（存 app_kv，不改 schema、不複製品牌資料）----------
+// key：foodAlias:<ownerId>:<正規化別名> → value JSON：{ targetType:'foodType'|'foodItem', value, label }
+//   targetType='foodType' → value＝foodType（肉→罐頭）；'foodItem' → value＝foodId（小藍罐→某品項，只存指標）。
+//   label＝使用者原本輸入的叫法（顯示用）。解析一律 server 端重新驗證，不信任舊值（§八）。
+export const ALIAS_FOODTYPES = ['乾糧', '主食罐', '副食罐', '罐頭', '零食'];
+export function normalizeAliasKey(alias) {
+  return String(alias || '').trim().replace(/\s+/g, '').toLowerCase();
+}
+const foodAliasKey = (ownerId, alias) => `foodAlias:${ownerId}:${normalizeAliasKey(alias)}`;
+
+export async function setFoodAlias(db, ownerId, alias, target) {
+  const payload = { targetType: target.targetType, value: String(target.value || ''), label: String(alias || '').trim() };
+  await appKvSet(db, foodAliasKey(ownerId, alias), JSON.stringify(payload));
+  return payload;
+}
+export async function deleteFoodAlias(db, ownerId, alias) {
+  await appKvDelete(db, foodAliasKey(ownerId, alias));
+}
+export async function getFoodAlias(db, ownerId, alias) {
+  const raw = await appKvGet(db, foodAliasKey(ownerId, alias));
+  if (!raw) return null;
+  try { const o = JSON.parse(raw); if (o && o.targetType) return o; } catch (error) { /* 壞值視為無 */ }
+  return null;
+}
+// 解析並重新驗證家庭別名（§八）：foodItem 必須存在、未刪、屬本家庭；foodType 必須是支援類型。失效一律回 null（走安全 fallback）。
+export async function resolveFoodAlias(db, ownerId, alias) {
+  const a = await getFoodAlias(db, ownerId, alias);
+  if (!a) return null;
+  if (a.targetType === 'foodItem') {
+    const f = await getFood(db, a.value);
+    if (!f || f.isDeleted || String(f.ownerLineUserId) !== String(ownerId)) return null;
+    return { kind: 'foodItem', food: f, label: a.label };
+  }
+  if (a.targetType === 'foodType') {
+    if (!ALIAS_FOODTYPES.includes(a.value)) return null;
+    return { kind: 'foodType', foodType: a.value, label: a.label };
+  }
+  return null;
+}
+// 列出家庭所有別名（照護站顯示用）：附解析後的目標名稱與是否有效（失效品項標示、不隱藏，供使用者清掉）。
+export async function listFoodAliases(db, ownerId) {
+  const rows = await appKvListByPrefix(db, `foodAlias:${ownerId}:`);
+  const out = [];
+  for (const r of rows) {
+    let o;
+    try { o = JSON.parse(r.v); } catch (error) { continue; }
+    if (!o || !o.targetType) continue;
+    const item = { alias: o.label || '', targetType: o.targetType, value: o.value || '' };
+    if (o.targetType === 'foodItem') {
+      const f = await getFood(db, o.value);
+      item.valid = !!(f && !f.isDeleted && String(f.ownerLineUserId) === String(ownerId));
+      item.displayTarget = item.valid ? f.displayName : '（品項已刪除）';
+      item.foodType = item.valid ? f.foodType : '';
+    } else {
+      item.valid = ALIAS_FOODTYPES.includes(o.value);
+      item.displayTarget = o.value;
+      item.foodType = o.value;
+    }
+    out.push(item);
+  }
+  out.sort((a, b) => String(a.alias).localeCompare(String(b.alias)));
+  return out;
+}
+
 // 訊息冪等：第一次看到某 message.id → 原子性寫入並回 true（該處理）；
 // 重送或打到其他 Worker 實例再看到同一則 → INSERT OR IGNORE 不會寫入、回 false（跳過，不重複回覆）。
 export async function claimMessageOnce(db, messageId) {
