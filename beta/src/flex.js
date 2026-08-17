@@ -1156,10 +1156,15 @@ export function recordTutorialFlex() {
   cmd('備註 今天梳毛');
 
   sec('回頭查');
+  cmd('紀錄', '想不起說法就打這個');
   cmd('今天吃多少');
-  cmd('今天喝多少');
   cmd('最近吃什麼');
+  cmd('最近乾糧');
   cmd('之前吃過哪些罐頭');
+
+  sec('家裡自己的說法');
+  cmd('肉5', '先讓管家記住肉＝罐頭');
+  rows.push(text('第一次打沒設定過的叫法（例如「肉」），管家會先問你那是什麼；記住後下次直接用。也可到照護站「家裡習慣的叫法」設定。', { size: 'xxs', color: C.muted, wrap: true, margin: 'sm' }));
 
   sec('補登・指定時間');
   cmd('昨天 21:30 喝水30');
