@@ -2,7 +2,7 @@
 // 規則：所有刪除都是 isDeleted 軟刪除；logs 有任何變動就重算該日 daily_summary。
 
 import { computeDailySummary, deriveFoodFields } from './summary.js';
-import { newId, newToken, nowIso, addDays, taipeiNowDateTime, taipeiToday } from './util.js';
+import { newId, newToken, nowIso, addDays, taipeiNowDateTime, taipeiToday, randomDigits, randomFromAlphabet } from './util.js';
 
 // ---------- users ----------
 
@@ -1069,10 +1069,20 @@ export async function listCareCircle(db, ownerLineUserId) {
 
 // 邀請碼：6 碼（去掉易混淆字元），存在 app_kv，7 天有效、可重複使用（方便一次找幾個人）
 function newInviteCode() {
-  const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-  let code = '';
-  for (let i = 0; i < 6; i += 1) code += alphabet[Math.floor(Math.random() * alphabet.length)];
-  return code;
+  // 6 碼、無易混字元、加密級亂數（取代可預測的 Math.random）；配合兌換端每位使用者限流，暴力猜碼不可行。
+  return randomFromAlphabet(6, 'ABCDEFGHJKMNPQRSTUVWXYZ23456789');
+}
+
+// 簡易限流（防暴力猜碼）：以「時間窗桶」在 app_kv 累計次數，超過上限回 true。
+// key 建議帶行為者（IP／LINE 使用者）以免全域互相影響；每次呼叫都會 +1（含成功，正常人一次就過）。
+export async function rateLimited(db, scope, max = 10, windowSec = 600) {
+  const bucket = Math.floor(Date.now() / (windowSec * 1000));
+  const k = `rl:${scope}:${bucket}`;
+  let n = 0;
+  try { n = Number(await appKvGet(db, k)) || 0; } catch (error) { n = 0; }
+  n += 1;
+  try { await appKvSet(db, k, String(n)); } catch (error) { /* 限流失敗不擋主流程 */ }
+  return n > max;
 }
 
 export async function createCareInvite(db, ownerLineUserId) {
@@ -1110,7 +1120,7 @@ export async function redeemCareInvite(db, code, memberLineUserId) {
 // ---------- 電腦登入碼（在 LINE 取碼 → 電腦網站輸入即可登入）----------
 // 6 位數字、10 分鐘有效、用一次即失效。存在 app_kv。
 export async function createLoginCode(db, lineUserId) {
-  const code = String(Math.floor(100000 + Math.random() * 900000));
+  const code = randomDigits(6);   // 加密級亂數（取代可預測的 Math.random）
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
   await appKvSet(db, `logincode:${code}`, JSON.stringify({ lineUserId, expiresAt }));
   return code;

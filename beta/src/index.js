@@ -21,7 +21,7 @@ import {
   upcomingVisits, listVetsByOwner, createSession,
   appKvGet, appKvSet, claimMessageOnce, purgeOldSeenMessages, saveReportShot, getReportShot, purgeOldShots, getDataExport, purgeOldExports, getSessionUser, track, healFoodKcal,
   resolveDataOwner, createCareInvite, redeemCareInvite, listCareMembers, listCareCircle,
-  createLoginCode, redeemLoginCode
+  createLoginCode, redeemLoginCode, rateLimited
 } from './db.js';
 import {
   recordReply, lightRecordReply, todayReply, handoffReply, weekReply, monthReply, visitReply,
@@ -29,10 +29,35 @@ import {
   recordTutorial, medTutorial, onboardingText, recordPrompt, backfillGuide
 } from './replies.js';
 import { getRecentLogsByPet, ensureTaskSchema, getLogsForDay, logTextInput } from './db.js';
-import { jsonResponse, taipeiToday, taipeiNowDateTime, addDays, formatWeightKg, weightEquals, shotExpired } from './util.js';
+import { jsonResponse, taipeiToday, taipeiNowDateTime, addDays, formatWeightKg, weightEquals, shotExpired, constantTimeEqual, newToken } from './util.js';
 
 // 官方 LINE 加好友連結（basicId @232mjffx）——給共同照護邀請用
 const LINE_ADD_URL = 'https://line.me/R/ti/p/@232mjffx';
+
+// 管理員驗證：優先 cookie session（/admin/login 換發，金鑰不再掛網址），否則沿用 ?key=（constant-time 比對）。
+// 回 { ok, viaCookie }。ADMIN_KEY 少於 8 碼一律拒絕（等於沒設好就不開後台）。
+async function adminAuth(env, request, url) {
+  const key = String(env.ADMIN_KEY || '');
+  if (key.length < 8) return { ok: false, viaCookie: false };
+  const cookie = request.headers.get('cookie') || '';
+  const m = cookie.match(/(?:^|;\s*)adm=([A-Za-z0-9]+)/);
+  if (m) {
+    try {
+      const raw = await appKvGet(env.DB, `adminsess:${m[1]}`);
+      if (raw) { const s = JSON.parse(raw); if (s && String(s.expiresAt) > new Date().toISOString()) return { ok: true, viaCookie: true }; }
+    } catch (error) { /* 壞值視為未登入 */ }
+  }
+  const qk = url.searchParams.get('key');
+  if (qk != null && constantTimeEqual(qk, key)) return { ok: true, viaCookie: false };
+  return { ok: false, viaCookie: false };
+}
+// 由 ?key= 進來且尚無 cookie → 發一張 8 小時 cookie，之後導覽不必再帶 key（HttpOnly/Secure/SameSite）。
+async function issueAdminCookieIfNeeded(env, auth) {
+  if (!auth.ok || auth.viaCookie) return null;
+  const token = newToken();
+  try { await appKvSet(env.DB, `adminsess:${token}`, JSON.stringify({ expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString() })); } catch (error) { return null; }
+  return `adm=${token}; HttpOnly; Secure; SameSite=Strict; Path=/admin; Max-Age=28800`;
+}
 
 // LINE 重送去重（單一 isolate 內有效，Beta 足夠）
 const seenMessageIds = new Map();
@@ -65,6 +90,11 @@ export default {
     // 電腦登入：未登入即可呼叫，用 LINE 取得的 6 位碼換一個 session（放在 handleApi 的權杖檢查之前）
     if (url.pathname === '/api/login-code' && request.method === 'POST') {
       try {
+        // 防暴力猜碼：同一 IP 每 10 分鐘最多 10 次嘗試（正常人一次就過）
+        const ip = request.headers.get('cf-connecting-ip') || 'unknown';
+        if (await rateLimited(env.DB, `login:${ip}`, 10, 600)) {
+          return jsonResponse({ ok: false, message: '嘗試太多次，請稍後再試。' }, 429);
+        }
         const body = await request.json();
         const lineUserId = await redeemLoginCode(env.DB, body?.code);
         if (!lineUserId) return jsonResponse({ ok: false, message: '登入碼無效或已過期，請回 LINE 打「電腦登入」重新取得。' }, 400);
@@ -154,9 +184,19 @@ export default {
     if (url.pathname === '/healthz') {
       return jsonResponse({ ok: true, service: 'cat-care-beta', now: new Date().toISOString() });
     }
-    // 權杖健康檢查（不外洩權杖本身），用 ADMIN_KEY 保護（不可用測試者也有的邀請碼）
+    // 管理員登入：用 ?key= 換一張 cookie session 後導回後台（金鑰只在這一次的網址出現，之後靠 cookie）
+    if (url.pathname === '/admin/login') {
+      const key = String(env.ADMIN_KEY || '');
+      const qk = url.searchParams.get('key');
+      if (key.length < 8 || qk == null || !constantTimeEqual(qk, key)) {
+        return new Response('403 Forbidden', { status: 403, headers: { 'content-type': 'text/plain; charset=utf-8' } });
+      }
+      const cookie = await issueAdminCookieIfNeeded(env, { ok: true, viaCookie: false });
+      return new Response(null, { status: 302, headers: { location: '/admin/testers', ...(cookie ? { 'set-cookie': cookie } : {}) } });
+    }
+    // 權杖健康檢查（不外洩權杖本身），用 ADMIN_KEY／cookie session 保護（不可用測試者也有的邀請碼）
     if (url.pathname === '/admin/line-token') {
-      if (String(env.ADMIN_KEY || '').length < 8 || url.searchParams.get('key') !== env.ADMIN_KEY) {
+      if (!(await adminAuth(env, request, url)).ok) {
         return jsonResponse({ ok: false }, 403);
       }
       try {
@@ -167,7 +207,7 @@ export default {
     }
     // 行為追蹤儀表板（唯讀彙總；用固定金鑰保護）——結束「靠感覺」，用數據看留存/活化
     if (url.pathname === '/admin/metrics') {
-      if (String(env.ADMIN_KEY || '').length < 8 || url.searchParams.get('key') !== env.ADMIN_KEY) return jsonResponse({ ok: false }, 403);
+      if (!(await adminAuth(env, request, url)).ok) return jsonResponse({ ok: false }, 403);
       try {
         const db = env.DB;
         const today = taipeiToday();
@@ -203,17 +243,19 @@ export default {
     }
     // 測試者管理小網頁：手機開網址、點按鈕就能開通/關閉某位測試者（只碰存取權旗標，讀不到任何健康紀錄）
     if (url.pathname === '/admin/testers') {
-      const key = String(env.ADMIN_KEY || '');
-      if (key.length < 8 || url.searchParams.get('key') !== key) {
+      const auth = await adminAuth(env, request, url);
+      if (!auth.ok) {
         return new Response('403 Forbidden', { status: 403, headers: { 'content-type': 'text/plain; charset=utf-8' } });
       }
+      // 由 ?key= 進來時順手發一張 cookie，之後所有導覽／切換連結都不必再帶金鑰
+      const setCookie = await issueAdminCookieIfNeeded(env, auth);
       const db = env.DB;
-      // 切換某人存取權 → 改完導回名單（用 302，避免重新整理又觸發一次）
+      // 切換某人存取權 → 改完導回名單（用 302，避免重新整理又觸發一次）；連結不帶金鑰，靠 cookie
       const toggleUser = url.searchParams.get('user');
       if (toggleUser) {
         const access = url.searchParams.get('access') === '1' ? 1 : 0;
         try { await updateUser(db, toggleUser, { betaAccess: access }); } catch (error) { /* 找不到就當沒事 */ }
-        return new Response(null, { status: 302, headers: { location: `/admin/testers?key=${encodeURIComponent(key)}` } });
+        return new Response(null, { status: 302, headers: { location: '/admin/testers', ...(setCookie ? { 'set-cookie': setCookie } : {}) } });
       }
       try {
         const today = taipeiToday();
@@ -257,7 +299,7 @@ export default {
         const cardHtml = (r) => {
           const on = Number(r.betaAccess) === 1;
           const label = esc(r.displayName) || mask(r.lineUserId);
-          const href = `/admin/testers?key=${encodeURIComponent(key)}&user=${encodeURIComponent(r.lineUserId)}&access=${on ? 0 : 1}`;
+          const href = `/admin/testers?user=${encodeURIComponent(r.lineUserId)}&access=${on ? 0 : 1}`;
           const confirmMsg = `確定要${on ? '關閉' : '開通'}「${label}」嗎？`;
           return `<div class="row${on ? '' : ' off'}">
             <div class="info">
@@ -357,9 +399,9 @@ export default {
   ${usageSections}
   <div class="sec-title">測試者名單</div>
   ${cards || '<div class="empty">還沒有任何使用者</div>'}
-  <div class="foot">網址含金鑰，請勿外流。停用後對方在 LINE 會被擋在門檻外、看不到任何內容，但資料保留；重新「開通」即可恢復。</div>
+  <div class="foot">此頁僅供管理員，請勿外流。停用後對方在 LINE 會被擋在門檻外、看不到任何內容，但資料保留；重新「開通」即可恢復。</div>
 </body></html>`;
-        return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
+        return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8', ...(setCookie ? { 'set-cookie': setCookie } : {}) } });
       } catch (error) {
         return new Response('error: ' + error.message, { status: 500, headers: { 'content-type': 'text/plain; charset=utf-8' } });
       }
@@ -2059,7 +2101,9 @@ export async function handleTextMessage(event, env, baseUrl) {
   }
   if (codeMatch) {
     const explicit = pastedInvite || text.startsWith('加入'); // 明確要加入，無效時給提示
-    const result = await redeemCareInvite(db, codeMatch[1], lineUserId);
+    // 防暴力猜邀請碼：同一使用者 10 分鐘內最多 12 次兌換嘗試；超過就當作無效（明確加入才回提示，其餘讓訊息照常處理）
+    const throttled = await rateLimited(db, `invite:${lineUserId}`, 12, 600);
+    const result = throttled ? { ok: false, reason: 'throttled' } : await redeemCareInvite(db, codeMatch[1], lineUserId);
     if (result.ok) {
       await track(db, lineUserId, 'invite_redeemed');
       if (!isBetaAllowed(user)) await updateUser(db, lineUserId, { betaAccess: 1 });
@@ -2073,9 +2117,10 @@ export async function handleTextMessage(event, env, baseUrl) {
       return;
     }
     if (explicit) {
-      const why = result.reason === 'expired' ? '這組邀請碼已過期（7 天有效），請對方再給你一組新的。'
+      const why = result.reason === 'throttled' ? '嘗試太多次了，請稍後再試。'
+        : result.reason === 'expired' ? '這組邀請碼已過期（7 天有效），請對方再給你一組新的。'
         : result.reason === 'self' ? '這是你自己的邀請碼，不用加入喔。'
-        : '找不到這組邀請碼，請確認有沒有打錯（6 碼英數）。';
+        : '找不到這組邀請碼，請確認有沒有打錯。';
       await replyOrPush(env, event, why);
       return;
     }

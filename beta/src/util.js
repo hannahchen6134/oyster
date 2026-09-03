@@ -81,6 +81,23 @@ export function newToken() {
   return (crypto.randomUUID() + crypto.randomUUID()).replace(/-/g, '');
 }
 
+// 加密級亂數（取代 Math.random，登入碼/邀請碼用）：crypto.getRandomValues 在 Workers 與 Node 都有。
+export function randomDigits(n) {
+  const a = new Uint32Array(Math.max(1, n)); crypto.getRandomValues(a);
+  let s = ''; for (let i = 0; i < n; i += 1) s += String(a[i] % 10); return s;
+}
+export function randomFromAlphabet(n, alphabet) {
+  const a = new Uint32Array(Math.max(1, n)); crypto.getRandomValues(a);
+  let s = ''; for (let i = 0; i < n; i += 1) s += alphabet[a[i] % alphabet.length]; return s;
+}
+// 定時比對（避免用 !== 比金鑰時的計時側信道）；長度不同直接回 false（固定長度金鑰可接受）。
+export function constantTimeEqual(a, b) {
+  const x = String(a == null ? '' : a); const y = String(b == null ? '' : b);
+  if (x.length !== y.length) return false;
+  let r = 0; for (let i = 0; i < x.length; i += 1) r |= x.charCodeAt(i) ^ y.charCodeAt(i);
+  return r === 0;
+}
+
 export function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
