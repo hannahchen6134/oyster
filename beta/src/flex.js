@@ -1312,7 +1312,7 @@ export function recordMenuFlex(introText = '想記哪一種？點一下就開始
 }
 
 // ---------- 近 7 天迷你圖卡（長條＝水分） ----------
-export function weekFlex(petName, rows) {
+export function weekFlex(petName, rows, trendUrl = '') {
   // 兩條長條並列（每日）：水分（湖水綠）＋熱量（藕紫），與後台網站同一套色票與語意。
   // 各自對自己 7 天內的高峰做比例，讓「哪天多／哪天少」一眼可讀（不是把兩種單位混在同一軸）。
   const maxWater = Math.max(1, ...rows.map((row) => Number(row.totalWaterMl) || 0));
@@ -1376,8 +1376,12 @@ export function weekFlex(petName, rows) {
   const footer = {
     type: 'box', layout: 'vertical', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
     contents: [
-      { type: 'button', height: 'sm', style: 'primary', color: C.brand,
-        action: { type: 'message', label: '開啟管家後台看完整趨勢', text: '照護站' } }
+      // 有 trend 連結就一鍵直接開後台「體重・水分・熱量折線圖」那頁；沒有才退回文字指令
+      trendUrl
+        ? { type: 'button', height: 'sm', style: 'primary', color: C.brand,
+            action: { type: 'uri', label: '看體重・水分・熱量折線圖', uri: trendUrl } }
+        : { type: 'button', height: 'sm', style: 'primary', color: C.brand,
+            action: { type: 'message', label: '開啟管家後台看完整趨勢', text: '照護站' } }
     ]
   };
   return bubble(

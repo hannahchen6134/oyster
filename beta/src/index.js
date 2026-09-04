@@ -3648,7 +3648,9 @@ async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId, ow
 
   if (query === 'week') {
     const rows = await getRecentSummaries(db, pet.petId, today, 7);
-    await replyOrPushFlex(env, event, weekFlex(pet.petName, rows), weekReply(pet.petName, rows));
+    // 折線圖（體重・水分・熱量）在後台趨勢頁；卡片底鈕一鍵直接開那頁
+    const trendUrl = await siteLink(env, baseUrl, lineUserId, 'trend');
+    await replyOrPushFlex(env, event, weekFlex(pet.petName, rows, trendUrl), weekReply(pet.petName, rows));
     return;
   }
 
