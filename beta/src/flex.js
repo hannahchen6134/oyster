@@ -1313,37 +1313,58 @@ export function recordMenuFlex(introText = '想記哪一種？點一下就開始
 
 // ---------- 近 7 天迷你圖卡（長條＝水分） ----------
 export function weekFlex(petName, rows) {
+  // 兩條長條並列（每日）：水分（湖水綠）＋熱量（藕紫），與後台網站同一套色票與語意。
+  // 各自對自己 7 天內的高峰做比例，讓「哪天多／哪天少」一眼可讀（不是把兩種單位混在同一軸）。
   const maxWater = Math.max(1, ...rows.map((row) => Number(row.totalWaterMl) || 0));
+  const maxKcal = Math.max(1, ...rows.map((row) => Number(row.kcal) || 0));
   const recorded = rows.filter((row) => row.entryCount > 0);
   const avg = (selector) => (recorded.length
     ? recorded.reduce((total, row) => total + (Number(selector(row)) || 0), 0) / recorded.length
     : 0);
 
+  // 單一長條（軌道＋填色），pct=0 時留空軌道
+  const bar = (pct, color) => ({
+    type: 'box', layout: 'vertical', backgroundColor: '#EFEBE0', cornerRadius: '3px', height: '7px',
+    contents: pct > 0
+      ? [{ type: 'box', layout: 'vertical', backgroundColor: color, cornerRadius: '3px', height: '7px', width: `${pct}%`, contents: [{ type: 'filler' }] }]
+      : [{ type: 'filler' }]
+  });
+
   const dayRows = rows.map((row) => {
     const day = `${Number(row.date.slice(5, 7))}/${Number(row.date.slice(8, 10))}`;
     const warn = row.vomitCount > 0 || row.medIssueCount > 0;
+    const has = row.entryCount > 0;
     const water = Number(row.totalWaterMl) || 0;
-    const pct = Math.max(row.entryCount ? 4 : 0, Math.round((water / maxWater) * 100));
+    const kcal = Number(row.kcal) || 0;
+    const pw = has ? Math.max(3, Math.round((water / maxWater) * 100)) : 0;
+    const pk = has ? Math.max(3, Math.round((kcal / maxKcal) * 100)) : 0;
     return {
-      type: 'box', layout: 'horizontal', margin: 'md',
+      type: 'box', layout: 'horizontal', margin: 'md', spacing: 'sm',
       contents: [
-        text(`${day}${warn ? '⚠' : ''}`, { size: 'xs', color: warn ? C.seal : C.muted, flex: 2, gravity: 'center' }),
-        {
-          type: 'box', layout: 'vertical', flex: 6, backgroundColor: '#EFEBE0',
-          cornerRadius: '3px', height: '8px', margin: 'sm',
-          contents: pct > 0
-            ? [{ type: 'box', layout: 'vertical', backgroundColor: C.olive, cornerRadius: '3px', height: '8px', width: `${pct}%`, contents: [{ type: 'filler' }] }]
-            : [{ type: 'filler' }]
-        },
-        text(row.entryCount ? fmt(water) : '—', { size: 'xs', color: C.inkSoft, flex: 2, align: 'end', gravity: 'center' })
+        text(`${day}${warn ? ' ⚠' : ''}`, { size: 'xxs', color: warn ? C.seal : C.muted, flex: 3, gravity: 'center' }),
+        { type: 'box', layout: 'vertical', flex: 8, spacing: 'xs', contents: [bar(pw, STAT_ACCENT.water), bar(pk, STAT_ACCENT.kcal)] },
+        { type: 'box', layout: 'vertical', flex: 5, contents: [
+          text(has ? fmt(water) : '—', { size: 'xxs', color: STAT_ACCENT.water, align: 'end', gravity: 'center' }),
+          text(has ? fmt(kcal) : '—', { size: 'xxs', color: STAT_ACCENT.kcal, align: 'end', gravity: 'center' })
+        ] }
       ]
     };
   });
 
+  // 圖例：色塊＋名稱（水分／熱量），置中
+  const legendDot = (color) => ({ type: 'box', layout: 'vertical', width: '11px', height: '11px', cornerRadius: '2px', backgroundColor: color, contents: [{ type: 'filler' }] });
+  const legend = {
+    type: 'box', layout: 'horizontal', spacing: 'sm', justifyContent: 'center', alignItems: 'center',
+    contents: [
+      legendDot(STAT_ACCENT.water), text('水分 ml', { size: 'xxs', color: C.muted, flex: 0, gravity: 'center' }),
+      { ...legendDot(STAT_ACCENT.kcal), margin: 'md' }, text('熱量 kcal', { size: 'xxs', color: C.muted, flex: 0, gravity: 'center' })
+    ]
+  };
+
   const body = {
     type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
     contents: [
-      text('長條＝總水分（ml）', { size: 'xs', color: C.muted, align: 'center' }),
+      legend,
       ...dayRows,
       { type: 'separator', margin: 'xl', color: SEPARATOR },
       statCellRow([
@@ -1360,7 +1381,7 @@ export function weekFlex(petName, rows) {
     ]
   };
   return bubble(
-    `近 7 天（${petName}）日均水分 ${fmt(avg((row) => row.totalWaterMl))} ml`,
+    `近 7 天（${petName}）日均水分 ${fmt(avg((row) => row.totalWaterMl))} ml、日均熱量 ${fmt(avg((row) => row.kcal))} kcal`,
     { type: 'bubble', size: 'mega', header: header(`近 7 天・${petName}`), body, footer }
   );
 }
