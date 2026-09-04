@@ -4716,7 +4716,7 @@
       }));
       const genAt = new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Taipei' }).slice(0, 16);
       return {
-        petName, reportName: '回診摘要', source: '喵喵照護站',
+        petName, reportName: '回診摘要', source: '喵喵管家',
         dateRangeLabel: `${from.replace(/-/g, '/')}－${to.replace(/-/g, '/')}（近 ${rDays} 天）`,
         generatedAt: genAt, rangeDays: rDays,
         weight: { latest: lastNonNull(wVals), unit: 'kg', points: pts(wVals), deltaPct: a4DeltaPct(wVals, true), count: wCount },

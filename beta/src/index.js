@@ -3384,7 +3384,10 @@ export async function handleRecord(env, event, pet, record, lineUserId, opts = {
 // 選單設計版本：改了選單圖片或區塊配置就把這個數字 +1，
 // 現有使用者的快取版本不符就會強制重建，改版才推得到所有人。
 // v6：更新選單圖（更深色版，使用者指定）。按鈕送出詞與標籤維持一致。
-const RICHMENU_VERSION = 7;
+// v8：LINE 體驗改版——記一筆／近七天記錄／出報告 ・ 管家後台／說明・怎麼記／照護月曆。
+//     今日記錄→近七天記錄（既有 week 卡）、給醫生看→出報告（就醫／照護）、
+//     照護站→管家後台、拿掉與趨勢／後台重複的「記錄回顧」，右下改為「照護月曆」（在對話看）。
+const RICHMENU_VERSION = 8;
 
 async function ensurePersonalRichMenu(env, baseUrl, lineUserId) {
   const db = env.DB;
@@ -3402,21 +3405,20 @@ async function ensurePersonalRichMenu(env, baseUrl, lineUserId) {
   const token = await createSession(db, lineUserId);
   // 有 LIFF 用永不過期的 LIFF 連結（點開自動登入）；沒有才烤 token 連結
   const site = liffLink(env) || `${baseUrl}/#token=${token}`;
-  const trendSite = liffLink(env, 'trend') || `${baseUrl}/#token=${token}&go=trend`;
   const W = 2500, H = 1686, colW = Math.round(W / 3), rowH = H / 2;
   const cell = (c, r, action) => ({ bounds: { x: c * colW, y: r * rowH, width: c === 2 ? W - 2 * colW : colW, height: rowH }, action });
   const send = (text) => ({ type: 'message', text });
   const menu = {
     size: { width: W, height: H }, selected: true, name: `owner-${lineUserId.slice(-8)}`, chatBarText: '選單',
-    // v4 重排：上排＝每天要做的（留對話），下排＝查看與前往
-    // 送出的字＝選單標籤（自動回覆一致）：記一筆／今日記錄／給醫生看／怎麼記
+    // v8：上排＝每天要做的（留對話），下排＝查看與前往
+    // 送出的字＝選單標籤（自動回覆一致）：記一筆／近七天記錄／出報告 ・ 說明・怎麼記／照護月曆
     areas: [
       cell(0, 0, send('記一筆')),                  // 記一筆 → 快速記錄選單
-      cell(1, 0, send('今日記錄')),                // 今日記錄 → 今天總結
-      cell(2, 0, send('給醫生看')),                // 給醫生看 → 回診重點
-      cell(0, 1, { type: 'uri', uri: site }),      // 喵喵照護站（網站）
-      cell(1, 1, send('怎麼記')),                  // 說明／怎麼記 → 可點範例卡
-      cell(2, 1, { type: 'uri', uri: trendSite })  // 記錄回顧（網站，近 30 天）
+      cell(1, 0, send('近七天記錄')),              // 近七天記錄 → 近 7 天卡（week）
+      cell(2, 0, send('出報告')),                  // 出報告 → 就醫／照護 二選一
+      cell(0, 1, { type: 'uri', uri: site }),      // 管家後台（網站）
+      cell(1, 1, send('怎麼記')),                  // 說明・怎麼記 → 可點範例卡
+      cell(2, 1, send('照護月曆'))                 // 照護月曆 → 在對話看月曆
     ]
   };
   const lineApi = async (url, options) => {
@@ -3612,6 +3614,15 @@ async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId, ow
 
   if (!pet) {
     await replyOrPush(env, event, '還沒有建立貓咪，先輸入「新增貓咪 名字」吧！');
+    return;
+  }
+
+  // 出報告：先問用途（就醫／照護），再走既有的整理輸出——就醫＝給醫生看（週趨勢＋可複製整理），
+  // 照護＝交接卡（接手怎麼顧）。不新造資料欄位，只把既有能力用一個清楚入口收斂。
+  if (query === 'report') {
+    await replyOrPushQuick(env, event,
+      '這份報告要拿來做什麼？\n・就醫使用：整理最近的照護與異常，給醫生快速看\n・照護使用：交接給家人／保姆，接手怎麼顧',
+      [qrMsg('🏥 就醫使用', '就醫報告'), qrMsg('🤝 照護使用', '照護報告')]);
     return;
   }
 

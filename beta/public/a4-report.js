@@ -71,7 +71,7 @@ function fullHeader(d) {
       <div class="a4-head-meta">
         <div><b>報告期間：</b>${esc(d.dateRangeLabel || '—')}</div>
         <div><b>產生日期：</b>${esc(d.generatedAt || '')}</div>
-        <div><b>資料來源：</b>${esc(d.source || '喵喵照護站')}</div>
+        <div><b>資料來源：</b>${esc(d.source || '喵喵管家')}</div>
       </div>
     </header>`;
 }
@@ -82,7 +82,7 @@ function pageFooter(d, pageNo, totalPages) {
   return `
     <footer class="a4-foot">
       <p class="a4-disc">※ 本報告整理自飼主日常紀錄，可能存在遺漏或誤差，僅供回診溝通與照護參考，不作為診斷依據，實際狀況請由獸醫師判斷。</p>
-      <div class="a4-foot-row"><span>${esc(d.source || '喵喵照護站')}</span><span>${esc(d.generatedAt || '')}</span><span>${pageNo}／${totalPages}</span></div>
+      <div class="a4-foot-row"><span>${esc(d.source || '喵喵管家')}</span><span>${esc(d.generatedAt || '')}</span><span>${pageNo}／${totalPages}</span></div>
     </footer>`;
 }
 

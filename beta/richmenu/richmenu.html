@@ -2,98 +2,113 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<!-- LINE 圖文選單設計稿：以 1250×843 檢視、deviceScaleFactor 2 輸出 2500×1686
-     v4 重排：對準「每天最常做的事」。
-     上排＝每天要做的（記一筆／看今天／給醫生看，全部留在對話裡）。
-     下排＝查看與前往（淺米帶：照護站／月曆／飲食回顧）。
-     「記一筆」是每天最高頻動作，用品牌淡底 highlight。
-     會離開對話開網站的兩格（照護站、飲食回顧）右上角加「網站 ↗」角標。 -->
+<!-- LINE 圖文選單設計稿（喵喵管家 v8・深色版）
+     以 1250×843 檢視、deviceScaleFactor 2 輸出 2500×1686。
+     上排＝每天要做的（留在對話）：記一筆／前七天記錄／出報告
+     下排＝查看與前往：開啟管家後台（品牌貓 logo）／說明・怎麼記／記錄回顧
+     深色暖棕底、奶油色字與線icon，維持現行選單的親切安心感。 -->
 <style>
   :root {
-    --bg: #f7f4ee;
-    --surface: #fffefb;
-    --band: #f3eee3;
-    --ink: #2b2a26;
-    --muted: #8b867a;
-    --line: #e3ddd0;
-    --brand: #734921;
-    --brand-deep: #5a3617;
-    --tint: #efe6d5;
+    --bg: #4a3117;          /* 暖深棕 */
+    --bg2: #432c14;         /* 下排略深 */
+    --line: rgba(240,228,204,0.22);
+    --ink: #f2e7cf;         /* 奶油白 */
+    --muted: #cbb590;
+    --accent: #cf8f52;      /* 陶土橘（圖表） */
+    --tint: rgba(240,228,204,0.06);
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     width: 1250px; height: 843px; overflow: hidden;
-    font-family: "Noto Sans TC", "PingFang TC", sans-serif;
+    font-family: "Noto Serif TC", "PingFang TC", serif;
     background: var(--bg); color: var(--ink);
   }
   .menu {
     display: grid; width: 100%; height: 100%;
     grid-template-columns: repeat(3, 1fr);
     grid-template-rows: 1fr 1fr;
+    gap: 0;
   }
   .cell {
     position: relative;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 14px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line);
-    background: var(--surface);
+    gap: 26px;
   }
-  .cell:nth-child(3n) { border-right: none; }
-  .cell:nth-child(n+4) { border-bottom: none; }
-  /* 下排「查看與前往」區帶：淺米底，和上排的白底分開 */
-  .cell.zone-view { background: var(--band); }
-  /* 上排與下排之間的分隔：較深一階的規線，強化「兩區」 */
-  .cell:nth-child(4), .cell:nth-child(5), .cell:nth-child(6) { border-top: 2px solid #d9d0be; }
-  /* 記一筆：每天最常做的動作，品牌淡底 highlight（不用整塊深咖啡，較不搶眼、較耐看） */
-  .cell.primary { background: var(--tint); }
-  svg { width: 62px; height: 62px; stroke: var(--brand); stroke-width: 1.6; fill: none; stroke-linecap: round; stroke-linejoin: round; }
-  .label { font-family: "Noto Serif TC", serif; font-size: 34px; font-weight: 600; letter-spacing: 0.06em; }
-  .cmd { font-size: 19px; color: var(--muted); letter-spacing: 0.08em; }
-  .cell.primary .label { color: var(--brand-deep); }
-  /* 開網站角標：右上角「網站 ↗」，代表會離開對話 */
-  .ext {
-    position: absolute; top: 20px; right: 22px;
-    display: flex; align-items: center; gap: 6px;
-    font-size: 16px; color: var(--brand); letter-spacing: 0.06em;
-    background: rgba(115, 73, 33, 0.10); border-radius: 999px; padding: 5px 12px;
+  /* 每格內縮一個圓角卡框（線框，不填滿），維持現行選單的卡片感 */
+  .cell::before {
+    content: ""; position: absolute; inset: 18px;
+    border: 1.4px solid var(--line); border-radius: 26px;
   }
-  .ext svg { width: 20px; height: 20px; stroke: var(--brand); stroke-width: 2.2; }
+  .cell.zone-view { background: var(--bg2); }
+  .cell.primary::before { background: var(--tint); }
+  .ico { width: 92px; height: 92px; position: relative; z-index: 1; }
+  .ico svg { width: 100%; height: 100%; stroke: var(--ink); stroke-width: 1.5; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  .label {
+    position: relative; z-index: 1;
+    font-size: 38px; font-weight: 600; letter-spacing: 0.05em;
+  }
+  .cell.primary .label { color: #ffffff; }
 </style>
 </head>
 <body>
   <div class="menu">
     <!-- 上排：每天要做的（留在對話） -->
     <div class="cell primary">
-      <svg viewBox="0 0 24 24"><path d="M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19l-4 1z"/><path d="M14.5 6.5l3 3"/></svg>
+      <div class="ico"><svg viewBox="0 0 24 24"><path d="M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19l-4 1z"/><path d="M14.5 6.5l3 3"/></svg></div>
       <div class="label">記一筆</div>
-      <div class="cmd">水・飯・藥，打字或點</div>
     </div>
     <div class="cell">
-      <svg viewBox="0 0 24 24"><rect x="3.5" y="4" width="17" height="17" rx="3"/><path d="M8 12.5l2.8 2.8L16.5 9"/></svg>
-      <div class="label">看今天</div>
-      <div class="cmd">今天吃喝了多少</div>
+      <!-- 前七天：七根遞增小長條（七天趨勢），與右下「記錄回顧(30天)」的實心長條區隔 -->
+      <div class="ico"><svg viewBox="0 0 24 24">
+        <path d="M3 20h18"/>
+        <path d="M5 20v-3"/><path d="M8 20v-5"/><path d="M11 20v-7"/><path d="M14 20v-4"/><path d="M17 20v-8"/><path d="M20 20v-6"/>
+      </svg></div>
+      <div class="label">近七天記錄</div>
     </div>
     <div class="cell">
-      <svg viewBox="0 0 24 24"><path d="M7 3.5v5a5 5 0 0 0 10 0v-5"/><path d="M12 13.5v2.5a4 4 0 0 0 4 4h1"/><circle cx="19" cy="20" r="1.6"/></svg>
-      <div class="label">給醫生看</div>
-      <div class="cmd">回診重點整理</div>
+      <!-- 出報告：一頁帶折角＋內文線，代表整理好的報告 -->
+      <div class="ico"><svg viewBox="0 0 24 24">
+        <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/>
+        <path d="M14 3v5h5"/><path d="M9 13h6"/><path d="M9 16.5h6"/>
+      </svg></div>
+      <div class="label">出報告</div>
     </div>
-    <!-- 下排：查看與前往（淺米帶） -->
+    <!-- 下排：查看與前往 -->
     <div class="cell zone-view">
-      <div class="ext"><span>網站</span><svg viewBox="0 0 24 24"><path d="M7 17 L17 7"/><path d="M8.5 7 H17 V15.5"/></svg></div>
-      <svg viewBox="0 0 24 24"><circle cx="12" cy="13.5" r="7"/><path d="M7.2 8.6 L5.6 3.8 L10.2 6.4"/><path d="M16.8 8.6 L18.4 3.8 L13.8 6.4"/><path d="M9.5 13.2 q1.2 1.2 2.5 0"/><path d="M12 13.2 q1.2 1.2 2.5 0"/></svg>
-      <div class="label">喵喵照護站</div>
-      <div class="cmd">開啟網站</div>
+      <!-- 管家後台：親切的貓臉（尖耳＋瞇眼＋鬍鬚），安心不冰冷 -->
+      <div class="ico"><svg viewBox="0 0 24 24">
+        <circle cx="12" cy="12.6" r="7.4"/>
+        <path d="M6.7 7.7 L5.2 3.9 L9.2 5.9"/>
+        <path d="M17.3 7.7 L18.8 3.9 L14.8 5.9"/>
+        <path d="M8.6 12 q1 0.9 2 0"/>
+        <path d="M13.4 12 q1 0.9 2 0"/>
+        <path d="M11.3 14.3 q0.7 0.6 1.4 0"/>
+        <path d="M5.8 13 L8.4 13.5"/>
+        <path d="M18.2 13 L15.6 13.5"/>
+      </svg></div>
+      <div class="label">管家後台</div>
     </div>
     <div class="cell zone-view">
-      <svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 2.8v4M16 2.8v4"/></svg>
+      <!-- 說明・怎麼記：兩顆對話泡＋問號 -->
+      <div class="ico"><svg viewBox="0 0 24 24">
+        <path d="M4 6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2H8l-4 3z"/>
+        <path d="M13.5 15.5a2 2 0 0 1 2-2H18a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-2l-2.5 2v-2z"/>
+        <path d="M9 7.6a1.4 1.4 0 1 1 1.8 1.35c-.5.2-.8.5-.8 1.05"/>
+      </svg></div>
+      <div class="label">說明・怎麼記</div>
+    </div>
+    <div class="cell zone-view">
+      <!-- 照護月曆：在對話直接看月曆、點日期看那天細節（不必開網站，與趨勢／後台不重複） -->
+      <div class="ico"><svg viewBox="0 0 24 24">
+        <rect x="3.5" y="5" width="17" height="15.5" rx="2.6"/>
+        <path d="M3.5 9.6h17"/><path d="M8 3v4"/><path d="M16 3v4"/>
+        <circle cx="8" cy="13.6" r="1.05" style="fill:var(--ink);stroke:none"/>
+        <circle cx="12" cy="13.6" r="1.05" style="fill:var(--accent);stroke:none"/>
+        <circle cx="16" cy="13.6" r="1.05" style="fill:var(--ink);stroke:none"/>
+        <circle cx="8" cy="17" r="1.05" style="fill:var(--ink);stroke:none"/>
+        <circle cx="12" cy="17" r="1.05" style="fill:var(--ink);stroke:none"/>
+      </svg></div>
       <div class="label">照護月曆</div>
-      <div class="cmd">在對話看月曆</div>
-    </div>
-    <div class="cell zone-view">
-      <div class="ext"><span>網站</span><svg viewBox="0 0 24 24"><path d="M7 17 L17 7"/><path d="M8.5 7 H17 V15.5"/></svg></div>
-      <svg viewBox="0 0 24 24"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 19v-6"/><path d="M12.5 19V9"/><path d="M17 19v-8"/><path d="M8 8.5 12.5 6 17 7.5"/></svg>
-      <div class="label">飲食回顧</div>
-      <div class="cmd">近 30 天吃喝比例</div>
     </div>
   </div>
 </body>
