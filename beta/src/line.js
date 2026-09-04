@@ -196,6 +196,21 @@ export async function replyOrPush(env, event, text) {
   if (targetId) await pushText(env, targetId, text);
 }
 
+// 「管家處理中…」載入動畫（免費、不算一則訊息、只在 1:1 聊天有效）：
+// 在進 parser 前先亮一顆動態點點，回覆（已記錄卡）一到就自動消失，做出「處理中→已記錄」的體感。
+// 失敗一律吞掉：這只是視覺提示，不能影響任何實際回覆。
+export async function showLoadingAnimation(env, chatId, loadingSeconds = 5) {
+  const to = String(chatId || '').trim();
+  if (!to) return;
+  try {
+    // 秒數需為 5 的倍數、上限 60；夾在合理範圍
+    const secs = Math.max(5, Math.min(60, Math.round(loadingSeconds / 5) * 5));
+    await callLineApi(env, '/chat/loading/start', { chatId: to, loadingSeconds: secs });
+  } catch (error) {
+    console.warn('loading animation failed (non-blocking):', error.message);
+  }
+}
+
 export async function getProfile(env, userId) {
   try {
     const token = await getAccessToken(env);

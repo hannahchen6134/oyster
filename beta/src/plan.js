@@ -43,7 +43,7 @@ export function normalizeCode(text) {
 
 export function gateText() {
   return [
-    '感謝你對喵喵照護安心管家的興趣 🐱',
+    '感謝你對喵喵管家的興趣 🐱',
     '',
     '目前是封閉測試，需要邀請碼才能開始。',
     '請直接在這裡輸入你收到的邀請碼 👇',

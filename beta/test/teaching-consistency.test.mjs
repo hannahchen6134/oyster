@@ -24,9 +24,9 @@ test('B LINE help 不以「主食-3」作主要示範（示範清楚的 乾乾�
   assert.ok(h.includes('乾乾減5'), 'help 應示範清楚的 乾乾減5');
 });
 
-test('C LINE 教學告知：可在照護站設「預設」，之後簡短紀錄', () => {
+test('C LINE 教學告知：可在管家後台設「預設」，之後簡短紀錄', () => {
   const t = recordTutorial();
-  assert.ok(/預設/.test(t) && /照護站/.test(t), '第二層教學應提到照護站可設預設');
+  assert.ok(/預設/.test(t) && /管家後台/.test(t), '第二層教學應提到管家後台可設預設');
   assert.ok(t.includes('乾乾3') || t.includes('主食5'), '應示範設預設後的簡短紀錄');
   // 時間軸（何時吃哪款）例句放第二層
   assert.ok(t.includes('最近乾糧吃什麼') || t.includes('希爾斯什麼時候吃'), '第二層應含時間軸例句');

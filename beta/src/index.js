@@ -6,7 +6,7 @@
 import { parseMessage, matchFood, guessFood, normalizeText, analyzeLeading, stripFoodTypeWords, isAskableFoodName } from './parser.js';
 import { deriveFoodFields, isWetFoodType, isEstimableType, buildHandoff } from './summary.js';
 import { handleApi } from './api.js';
-import { verifyLineSignature, replyOrPush, replyOrPushQuick, replyOrPushFlex, replyMessages, pushText, pushMessages, getProfile, getAccessToken, checkAccessToken } from './line.js';
+import { verifyLineSignature, replyOrPush, replyOrPushQuick, replyOrPushFlex, replyMessages, pushText, pushMessages, getProfile, getAccessToken, checkAccessToken, showLoadingAnimation } from './line.js';
 import { hasAnyReminder, parseReminderSettings, buildReminderLines, reminderMessage, visitReminderMessage } from './reminders.js';
 import { shortDate } from './replies.js';
 import { recordFlex, recordFlexCompact, foodDisambigFlex, multiRecordFlex, undoConfirmFlex, todayFlex, handoffFlex, websiteFlex, menuFlex, recordMenuFlex, recordTutorialFlex, quickRecordCarousel, weekFlex, monthFlex, recentFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, onboardingCarousel, menuCell, exampleCard, petDataFlex, deletedCard, confirmDeleteFlex, careNotifyFlex, careInviteFlex, weightModifyConfirmFlex, weightNoRecordFlex, weightAddedFlex, weightModifiedFlex, foodTimelineFlex, foodEditMenuFlex, foodBrandPickFlex, reviewMenuFlex } from './flex.js';
@@ -571,6 +571,8 @@ async function processWebhookEvents(events, env, baseUrl) {
       } else if (event.type === 'message' && event.message?.type === 'text') {
         // 同實例再加一層記憶體快速擋（同一批次內重複）
         if (isDuplicateMessage(event.message.id)) continue;
+        // 「管家處理中…」動態點點（免費、不算訊息、僅 1:1 有效）：先亮再處理，回覆一到就消失
+        if (event.source?.type === 'user') await showLoadingAnimation(env, event.source.userId);
         await handleTextMessage(event, env, baseUrl);
       } else if (event.type === 'postback') {
         await handlePostback(event, env, baseUrl);
@@ -647,7 +649,7 @@ function doneCard(petName) {
     rows: [
       [menuCell('快速紀錄', '點按鈕記，不用打字', '紀錄', true)],
       [menuCell('怎麼記？看範例', '想打字更快看這', '怎麼記'), menuCell('今日記錄', '今天記了什麼', '今天')],
-      [menuCell('補充貓咪資料', '晶片・疾病・疫苗', '補資料'), menuCell('開啟照護站', '回診・回顧・設定', '照護站')]
+      [menuCell('補充貓咪資料', '晶片・疾病・疫苗', '補資料'), menuCell('開啟管家後台', '回診・回顧・設定', '照護站')]
     ],
     hint: '晶片、疾病、疫苗、醫院醫生等詳細資料，點「補充貓咪資料」直接到設定頁填',
     alt: '都準備好了！'
@@ -663,7 +665,7 @@ export function petAddedCard(petName) {
       [menuCell('用按鈕記也可以', '不想打字就點這', '紀錄', true)],
       [menuCell('讓紀錄更準', '想更準可補常吃食物與熱量（選填）', '補資料')]
     ],
-    hint: '沒設定也能一直用；體重、生日、常吃食物、目標都可以之後在照護站補。',
+    hint: '沒設定也能一直用；體重、生日、常吃食物、目標都可以之後在管家後台補。',
     alt: `${petName}加入完成，直接打「乾乾5」就能記`
   });
 }
@@ -711,7 +713,7 @@ function foodDoneCard(name, foodType, info) {
   const estimable = isEstimableType(foodType);
   const subtitle = info.needsKcal
     ? (estimable
-        ? `${foodType}・含水 ${waterPct}%\n還沒填每克熱量，記錄時會先用「${foodType}」類型預設估算（畫面標 ≈）。到照護站「設定→常吃的食物」填精確每克熱量，就會變精確值、並自動補算過去的估算。`
+        ? `${foodType}・含水 ${waterPct}%\n還沒填每克熱量，記錄時會先用「${foodType}」類型預設估算（畫面標 ≈）。到管家後台「設定→常吃的食物」填精確每克熱量，就會變精確值、並自動補算過去的估算。`
         : `${foodType}・含水 ${waterPct}%\n這類（零食/其他）每家熱量差很多，沒辦法估。填一次每克熱量（包裝上通常有），以後這個就會自動算。`)
     : `${foodType}・每克 ${info.kcalPerGram} kcal・含水 ${waterPct}%${healedLine}`;
   return onboardCard({
@@ -736,7 +738,7 @@ async function handlePending(env, event, { db, user, pet, pets, lineUserId, owne
       await replyOrPushFlex(env, event, onboardCard({
         title: '好，先自己逛逛',
         subtitle: '想開始時輸入「安心上手」，我都在',
-        rows: [[menuCell('安心上手', '上手小教學', '安心上手'), menuCell('開啟照護站', '看看長什麼樣子', '照護站')]]
+        rows: [[menuCell('安心上手', '上手小教學', '安心上手'), menuCell('開啟管家後台', '看看長什麼樣子', '照護站')]]
       }), '好，想開始時輸入「安心上手」');
     } else {
       await replyOrPushFlex(env, event, doneCard(pet?.petName || '貓貓'), '好，隨時打「水 60」開始記錄');
@@ -755,7 +757,7 @@ async function handlePending(env, event, { db, user, pet, pets, lineUserId, owne
     }
     // P0-1：只要名字就完成，立刻可記錄；體重／食物不再阻塞，之後可到照護站補
     await clear();
-    await replyOrPushFlex(env, event, petAddedCard(newPet.petName), `${newPet.petName}加入完成，現在就可以開始記錄！之後想補體重、生日或常吃食物，打「補資料」或開照護站即可。`);
+    await replyOrPushFlex(env, event, petAddedCard(newPet.petName), `${newPet.petName}加入完成，現在就可以開始記錄！之後想補體重、生日或常吃食物，打「補資料」或開管家後台即可。`);
     return true;
   }
 
@@ -796,7 +798,7 @@ async function handlePending(env, event, { db, user, pet, pets, lineUserId, owne
     await clear();
     await replyOrPushFlex(env, event, onboardCard({
       title: age ? `已記下${pet.petName}約 ${age[1]} 歲` : `已記下${pet.petName}的生日`,
-      subtitle: age ? `生日先記為 ${value}，照護站可調整` : value,
+      subtitle: age ? `生日先記為 ${value}，管家後台可調整` : value,
       rows: [[menuCell('記體重', '例如 4.2', '記體重'), menuCell('完成', '開始使用', '完成設定')]]
     }), age ? `已記下約 ${age[1]} 歲` : `已記下生日 ${value}`);
     return true;
@@ -1516,7 +1518,7 @@ async function handlePostback(event, env, baseUrl) {
     // 不論結果都回一張安心卡（避免使用者卡住沒反應）
     const url = await siteLink(env, baseUrl, lineUserId);
     await replyOrPushFlex(env, event, deletedCard(url),
-      '已刪除剛剛的資料囉。若要再調整，請開啟照護站。');
+      '已刪除剛剛的資料囉。若要再調整，請開啟管家後台。');
   }
 
   // ↩️ 撤銷這次紀錄：以「這張結果卡建立的全部 log」為單位（含連動加水），二段式確認後才軟刪。
@@ -1636,7 +1638,7 @@ async function handlePostback(event, env, baseUrl) {
     const { name } = await foodLogDisplay(db, log);
     const url = await siteLink(env, baseUrl, lineUserId, 'settings');
     await replyOrPushFlex(env, event, foodBrandPickFlex({ logId: log.logId, foodType: log.foodType, currentName: name, foods, siteUrl: url }),
-      foods.length ? `要把「${name}」改成哪一款？` : `還沒有建立${log.foodType}的品項，可到照護站新增。`);
+      foods.length ? `要把「${name}」改成哪一款？` : `還沒有建立${log.foodType}的品項，可到管家後台新增。`);
     return;
   }
   // 套用改品牌：重新驗證 log 與所選品項都屬本家庭且同類型 → 更新 foodId/itemName/kcal，重算當日（§9/§10）。
@@ -1690,7 +1692,7 @@ async function handlePostback(event, env, baseUrl) {
     }
     await handleRecord(env, event, pet, { category: 'food', foodType: t, itemName: '', amount: g, unit: 'g', addedWaterMl: aw, medStatus: '', medSlot: '', note: '' }, ownerId, { fromButton: true, actorId: lineUserId, caregiverName, baseUrl });
     if (action === 'aliasSave') {
-      await replyOrPush(env, event, `👌 已記住：以後「${name}」就當作「${t}」。想改或移除可到照護站的「家裡習慣的叫法」。`);
+      await replyOrPush(env, event, `👌 已記住：以後「${name}」就當作「${t}」。想改或移除可到管家後台的「家裡習慣的叫法」。`);
     }
     return;
   }
@@ -2110,8 +2112,8 @@ export async function handleTextMessage(event, env, baseUrl) {
       const joinedPets = await listPets(db, result.ownerLineUserId);
       const joinedNames = joinedPets.map((p) => p.petName).filter(Boolean).join('、');
       const joinMsg = joinedPets.length >= 2
-        ? `✓ 加入成功！你的登記顯示有 ${joinedPets.length} 隻貓貓：${joinedNames}，請打名字先選要記哪隻貓貓的資料哦～\n選好後打「水 20」「罐頭 30」就會記給牠，也能打「照護站」看完整資料 🐈`
-        : '✓ 加入成功！接下來你在這裡打「水 20」「罐頭 30」就會記進對方的貓咪，也能打「照護站」開網站看完整資料 🐈';
+        ? `✓ 加入成功！你的登記顯示有 ${joinedPets.length} 隻貓貓：${joinedNames}，請打名字先選要記哪隻貓貓的資料哦～\n選好後打「水 20」「罐頭 30」就會記給牠，也能打「管家後台」看完整資料 🐈`
+        : '✓ 加入成功！接下來你在這裡打「水 20」「罐頭 30」就會記進對方的貓咪，也能打「管家後台」開網站看完整資料 🐈';
       await replyOrPush(env, event, joinMsg);
       try { await ensurePersonalRichMenu(env, baseUrl, lineUserId); } catch (error) { console.error('personal richmenu failed:', error.message); }
       return;
@@ -2153,7 +2155,7 @@ export async function handleTextMessage(event, env, baseUrl) {
   if (['電腦登入', '電腦', '網頁登入', '網站登入', '登入碼', '用電腦', '電腦版'].includes(text)) {
     const code = await createLoginCode(db, lineUserId);
     await replyOrPush(env, event,
-      `💻 用電腦登入照護站：\n\n1. 電腦打開這個網址：\n${baseUrl}\n\n2. 在登入畫面輸入這組登入碼：\n${code}\n\n（10 分鐘內有效，用一次就好；登入後電腦會記住你，下次直接開網址就進得去）`);
+      `💻 用電腦登入管家後台：\n\n1. 電腦打開這個網址：\n${baseUrl}\n\n2. 在登入畫面輸入這組登入碼：\n${code}\n\n（10 分鐘內有效，用一次就好；登入後電腦會記住你，下次直接開網址就進得去）`);
     return;
   }
 
@@ -2318,7 +2320,7 @@ export async function handleTextMessage(event, env, baseUrl) {
       if (!pets.length) await updateUser(db, lineUserId, { defaultPetId: newPet.petId });
       // P0-1：只要名字就完成（第 2、3 隻貓同樣不阻塞）；體重／食物改為選填、之後補
       await updateUser(db, lineUserId, { pendingAction: '' });
-      await replyOrPushFlex(env, event, petAddedCard(newPet.petName), `${intent.name}加入完成，現在就可以開始記錄！之後想補體重、生日或常吃食物，打「補資料」或開照護站即可。`);
+      await replyOrPushFlex(env, event, petAddedCard(newPet.petName), `${intent.name}加入完成，現在就可以開始記錄！之後想補體重、生日或常吃食物，打「補資料」或開管家後台即可。`);
       return;
     }
 
@@ -2364,7 +2366,7 @@ export async function handleTextMessage(event, env, baseUrl) {
       }
       await replyOrPushFlex(env, event, onboardCard({
         title: '補充基本資料',
-        subtitle: '選填，之後在照護站也都能改',
+        subtitle: '選填，之後在管家後台也都能改',
         rows: [[menuCell('記體重', '例如 4.2', '記體重'), menuCell('記年齡', '大約幾歲', '記年齡')]],
         alt: '補充基本資料'
       }), '輸入「記體重」或「記生日」');
@@ -2613,7 +2615,7 @@ export async function handleTextMessage(event, env, baseUrl) {
         parseStatus: 'unknown', failReason: 'item_lookup_none', sourceMessageId: smid, resolvedPetId: pet.petId, linkedLogId: '',
         parsedResult: JSON.stringify({ events: [{ itemName: intent.itemName, amount: intent.amount }], savedLogIds: [], unparsedSegments: [`${intent.itemName} ${intent.amount}`], awaitingAction: '' })
       });
-      await replyOrPush(env, event, `我看到「${intent.itemName} ${intent.amount}」，但還不確定這是哪一種食物 🙏\n可以打「罐頭 ${intent.itemName} ${intent.amount}」告訴我類型，或到照護站先建立這個品項。`);
+      await replyOrPush(env, event, `我看到「${intent.itemName} ${intent.amount}」，但還不確定這是哪一種食物 🙏\n可以打「罐頭 ${intent.itemName} ${intent.amount}」告訴我類型，或到管家後台先建立這個品項。`);
       return;
     }
 
@@ -2687,7 +2689,7 @@ export async function handleTextMessage(event, env, baseUrl) {
           return;
         }
         await updateUser(db, lineUserId, { pendingAction: 'amount|罐頭' });
-        await replyOrPush(env, event, '吃了幾克？直接打數字，例如 30\n（先當罐頭記，之後可在照護站改）\n\n💡 熟了更快：直接打「罐頭 品名 30」。');
+        await replyOrPush(env, event, '吃了幾克？直接打數字，例如 30\n（先當罐頭記，之後可在管家後台改）\n\n💡 熟了更快：直接打「罐頭 品名 30」。');
         return;
       }
       // 用藥：給快捷鈕，免打字
@@ -2911,7 +2913,7 @@ export async function handleFixMatch(env, event, pet, intent, actorId) {
   let matches = foods.filter((l) => l.itemName && (l.itemName.includes(q) || q.includes(l.itemName)));
   if (!matches.length) matches = foods.filter((l) => l.foodType && (l.foodType.includes(q) || q.includes(l.foodType)));
   if (!matches.length) {
-    await replyOrPush(env, event, `找不到可以調整的食物紀錄（「${q}」）。\n・想改最近一餐：直接打「改 ${intent.amount}」\n・或到照護站點那筆改`);
+    await replyOrPush(env, event, `找不到可以調整的食物紀錄（「${q}」）。\n・想改最近一餐：直接打「改 ${intent.amount}」\n・或到管家後台點那筆改`);
     return;
   }
   const setIntent = { mode: 'set', amount: intent.amount };
@@ -2945,7 +2947,7 @@ export async function handleFoodAdjust(env, event, pet, intent, actorId) {
   const matches = recent.filter((l) => l.category === 'food' && !l.isDeleted && l.foodType === foodType);
 
   if (!matches.length) {
-    await replyOrPush(env, event, `找不到可以調整的${foodType}紀錄。\n・想改最近一餐：直接打「${verb} ${amount}」\n・或到照護站點那筆改`);
+    await replyOrPush(env, event, `找不到可以調整的${foodType}紀錄。\n・想改最近一餐：直接打「${verb} ${amount}」\n・或到管家後台點那筆改`);
     return;
   }
 
@@ -3470,7 +3472,7 @@ export function buildFoodTimelineResult(rows, { scope = 'recent', sinceDays = 30
       : '';
     lines.push(`${md}${hm ? ' ' + hm : ''}　${r.name}　${amt}${served}`);
   }
-  if (rows.length > MAX) lines.push('…還有更多，完整看照護站');
+  if (rows.length > MAX) lines.push('…還有更多，完整看管家後台');
   return lines.join('\n');
 }
 
@@ -3509,7 +3511,7 @@ export function buildFoodHistoryResult(rows, { scope = 'recent', sinceDays = 30,
     }
     if (items.length > MAX_PER_GROUP) truncated += items.length - MAX_PER_GROUP;
   }
-  if (truncated > 0) lines.push('', `…還有 ${truncated} 項，完整清單看照護站`);
+  if (truncated > 0) lines.push('', `…還有 ${truncated} 項，完整清單看管家後台`);
   return lines.join('\n');
 }
 
@@ -3593,7 +3595,7 @@ async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId, ow
     await track(db, lineUserId, 'menu_review');
     const url = await siteLink(env, baseUrl, lineUserId);
     await replyOrPushFlex(env, event, reviewMenuFlex(url),
-      '想看哪種紀錄？\n· 吃過的食物 → 打「最近吃什麼」\n· 今日喝水／用藥／狀況 → 打「今天」\n· 完整紀錄 → 開照護站');
+      '想看哪種紀錄？\n· 吃過的食物 → 打「最近吃什麼」\n· 今日喝水／用藥／狀況 → 打「今天」\n· 完整紀錄 → 開管家後台');
     return;
   }
 

@@ -212,7 +212,7 @@ export function recordFlex({ pet, categoryKey, mainText, subText, summary, date,
     paddingAll: '12px', margin: 'md', spacing: 'xs',
     contents: [
       text('熱量未設定（零食沒有系統粗估值）', { size: 'sm', weight: 'bold', color: C.brand, wrap: true }),
-      text('零食每家熱量差很多，不亂估、也不計入總熱量。這筆先記份量了；到照護站補品牌與實際熱量，之後就會自動算。', { size: 'xxs', color: C.inkSoft, wrap: true })
+      text('零食每家熱量差很多，不亂估、也不計入總熱量。這筆先記份量了；到管家後台補品牌與實際熱量，之後就會自動算。', { size: 'xxs', color: C.inkSoft, wrap: true })
     ]
   }] : [];
   // 熱量用「類型預設」估算時：溫和標示（不是錯，是待補），並提醒可設定精確值
@@ -221,7 +221,7 @@ export function recordFlex({ pet, categoryKey, mainText, subText, summary, date,
     paddingAll: '12px', margin: 'md', spacing: 'xs',
     contents: [
       text(`≈ 目前用系統粗估值（${foodType || '食物'}每克約 ${estKcalPerG} kcal）`, { size: 'sm', weight: 'bold', color: C.brand, wrap: true }),
-      text('想記品牌、讓熱量更準？到照護站設定「常吃食物」，設定後，之後的紀錄會自動套用。', { size: 'xxs', color: C.inkSoft, wrap: true })
+      text('想記品牌、讓熱量更準？到管家後台設定「常吃食物」，設定後，之後的紀錄會自動套用。', { size: 'xxs', color: C.inkSoft, wrap: true })
     ]
   }] : [];
   const body = {
@@ -277,8 +277,8 @@ export function recordFlex({ pet, categoryKey, mainText, subText, summary, date,
       { type: 'button', height: 'sm', style: (warnNoKcal || estimated) ? 'link' : 'primary', color: C.brand,
         // 直接開網站（已烤入登入連結）；沒有 siteUrl 時退回舊的訊息觸發
         action: siteUrl
-          ? { type: 'uri', label: '開啟照護站', uri: siteUrl }
-          : { type: 'message', label: '開啟照護站', text: '照護站' } }
+          ? { type: 'uri', label: '開啟管家後台', uri: siteUrl }
+          : { type: 'message', label: '開啟管家後台', text: '照護站' } }
     ]
   };
   const headerTitle = title || `已記錄・${pet?.petName || '貓貓'}`;
@@ -364,13 +364,13 @@ export function foodDisambigFlex({ pet, foodType, typedName, grams, addedWaterMl
       // 明確品牌輸入、已有預設、或打了品名對不到的情境都不顯示（bareType=false）。不強迫設定：上面「先記」隨時能直接完成。
       ...(bareType ? [
         { type: 'separator', margin: 'md', color: SEPARATOR },
-        text(`常吃固定同一款？到照護站設成「預設食物」，下次只打「${(FOODTYPE_ALIAS_EG[foodType] || foodType)}${Number(grams) || 0}」就不用再選。`, { size: 'xxs', color: C.brand, wrap: true, margin: 'none' }),
+        text(`常吃固定同一款？到管家後台設成「預設食物」，下次只打「${(FOODTYPE_ALIAS_EG[foodType] || foodType)}${Number(grams) || 0}」就不用再選。`, { size: 'xxs', color: C.brand, wrap: true, margin: 'none' }),
         text(isEstimableType(foodType)
-          ? '若這款尚未設定實際熱量，會先用系統粗估值（已設定的品項就用實際熱量）；想讓品牌與熱量更準，可到照護站補設定，沒設定也能先記。'
-          : '若這款尚未設定實際熱量，零食會標示「未計入」（已設定的就用實際熱量）；想更準可到照護站補品牌與實際熱量，沒設定也能先記。',
+          ? '若這款尚未設定實際熱量，會先用系統粗估值（已設定的品項就用實際熱量）；想讓品牌與熱量更準，可到管家後台補設定，沒設定也能先記。'
+          : '若這款尚未設定實際熱量，零食會標示「未計入」（已設定的就用實際熱量）；想更準可到管家後台補品牌與實際熱量，沒設定也能先記。',
           { size: 'xxs', color: C.muted, wrap: true, margin: 'none' }),
         { type: 'button', height: 'sm', style: 'link', color: C.brand,
-          action: { type: 'message', label: '到照護站設定品牌／熱量', text: '照護站' } }
+          action: { type: 'message', label: '到管家後台設定品牌／熱量', text: '照護站' } }
       ] : []),
       { type: 'separator', margin: 'md', color: SEPARATOR },
       { type: 'button', height: 'sm', style: 'link', color: C.muted,
@@ -406,8 +406,8 @@ export function multiRecordFlex(pet, lines, summary, date, siteUrl = '', undoDat
         action: { type: 'postback', label: `🗑 刪除這次 ${lines.length} 筆`, data: `action=undoOp&${undoData}`, displayText: `刪除這次 ${lines.length} 筆` } }] : []),
       { type: 'button', height: 'sm', style: 'primary', color: C.brand,
         action: siteUrl
-          ? { type: 'uri', label: '開啟照護站', uri: siteUrl }
-          : { type: 'message', label: '開啟照護站', text: '照護站' } }
+          ? { type: 'uri', label: '開啟管家後台', uri: siteUrl }
+          : { type: 'message', label: '開啟管家後台', text: '照護站' } }
     ]
   };
   return bubble(`已記錄 ${lines.length} 筆`, { type: 'bubble', size: 'mega', header: header(`已記錄・${pet?.petName || '貓貓'}`), body, footer });
@@ -526,7 +526,7 @@ export function weightAddedFlex({ pet, amount, logId, summary, date, siteUrl = '
       { type: 'button', height: 'sm', style: 'link', color: C.brand,
         action: { type: 'postback', label: '🗑 刪除這筆', data: `action=delAsk&logId=${logId}`, displayText: '刪除這筆' } },
       { type: 'button', height: 'sm', style: 'primary', color: C.brand,
-        action: siteUrl ? { type: 'uri', label: '開啟照護站', uri: siteUrl } : { type: 'message', label: '開啟照護站', text: '照護站' } }
+        action: siteUrl ? { type: 'uri', label: '開啟管家後台', uri: siteUrl } : { type: 'message', label: '開啟管家後台', text: '照護站' } }
     ]
   };
   return bubble(`已記錄・${petName} 體重 ${formatWeightKg(amount)} kg`, { type: 'bubble', size: 'mega', header: header(`已記錄・${petName}`), body, footer });
@@ -551,7 +551,7 @@ export function weightModifiedFlex({ pet, oldKg, newKg, recordDate, logId, siteU
       { type: 'button', height: 'sm', style: 'link', color: C.brand,
         action: { type: 'postback', label: '✏️ 再修改', data: `action=wEditAsk&logId=${logId}`, displayText: '再修改' } },
       { type: 'button', height: 'sm', style: 'primary', color: C.brand,
-        action: siteUrl ? { type: 'uri', label: '開啟照護站', uri: siteUrl } : { type: 'message', label: '開啟照護站', text: '照護站' } }
+        action: siteUrl ? { type: 'uri', label: '開啟管家後台', uri: siteUrl } : { type: 'message', label: '開啟管家後台', text: '照護站' } }
     ]
   };
   return bubble(`已修改${petName}最近一次體重 ${formatWeightKg(oldKg)}→${formatWeightKg(newKg)} kg`, { type: 'bubble', size: 'mega', header: header(`體重已修改・${petName}`), body, footer });
@@ -593,8 +593,8 @@ export function todayFlex({ pet, date, summary, dateLabel, siteUrl = '' }) {
     contents: [
       { type: 'button', height: 'sm', style: 'primary', color: C.brand,
         action: siteUrl
-          ? { type: 'uri', label: '開啟照護站', uri: siteUrl }
-          : { type: 'message', label: '開啟照護站', text: '照護站' } }
+          ? { type: 'uri', label: '開啟管家後台', uri: siteUrl }
+          : { type: 'message', label: '開啟管家後台', text: '照護站' } }
     ]
   };
   return bubble(
@@ -657,17 +657,17 @@ export function websiteFlex(url) {
       text('點下方按鈕直接登入', { size: 'md', weight: 'bold', color: '#3F2B18', align: 'center' }),
       text('月曆・給醫生看・血檢趨勢\n每一筆紀錄都能修改補登', { size: 'xs', color: C.muted, wrap: true, align: 'center', margin: 'md' }),
       { type: 'separator', margin: 'xl', color: SEPARATOR },
-      text('連結會隨使用自動延長效期；就算過期，輸入「照護站」拿新連結，資料都不會消失。請勿轉傳給別人。', { size: 'xxs', color: C.muted, wrap: true, margin: 'lg' })
+      text('連結會隨使用自動延長效期；就算過期，輸入「管家後台」拿新連結，資料都不會消失。請勿轉傳給別人。', { size: 'xxs', color: C.muted, wrap: true, margin: 'lg' })
     ]
   };
   const footer = {
     type: 'box', layout: 'vertical', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
     contents: [
       { type: 'button', style: 'primary', color: C.brand,
-        action: { type: 'uri', label: '開啟照護站', uri: url } }
+        action: { type: 'uri', label: '開啟管家後台', uri: url } }
     ]
   };
-  return bubble('照護站登入連結', { type: 'bubble', size: 'mega', header: header('照護站'), body, footer });
+  return bubble('管家後台登入連結', { type: 'bubble', size: 'mega', header: header('管家後台'), body, footer });
 }
 
 // ---------- 引導流程卡（喵爸媽安心上手：一張卡一件事、大按鈕） ----------
@@ -748,7 +748,7 @@ export function onboardingCarousel(petName = '') {
       line(t2, '乾乾5', '吃飯（不用寫「克」）'),
       line(t2, '喝水30', '喝水'),
       line(t2, '嘔吐 白沫', '狀況＋描述'),
-      hintBox(t2, '送出後會跳一張卡，顯示今天累計多少\n熱量沒設公式會先「估算」（標 ≈），到照護站設定每克熱量就變精確')
+      hintBox(t2, '送出後會跳一張卡，顯示今天累計多少\n熱量沒設公式會先「估算」（標 ≈），到管家後台設定每克熱量就變精確')
     ] }
   };
   const t3 = T.s3;
@@ -808,7 +808,7 @@ export function careNotifyFlex(who, petName, desc, logId, siteUrl, summary = nul
       text(`📝 ${who} 記錄了 ${petName}`, { size: 'xs', color: C.muted }),
       text(desc, { size: 'md', weight: 'bold', color: C.ink, wrap: true, margin: 'md' }),
       ...totals,
-      text('記錯了嗎？可以直接刪除，或開照護站調整', { size: 'xxs', color: C.muted, margin: 'lg' })
+      text('記錯了嗎？可以直接刪除，或開管家後台調整', { size: 'xxs', color: C.muted, margin: 'lg' })
     ]
   };
   const footer = {
@@ -817,7 +817,7 @@ export function careNotifyFlex(who, petName, desc, logId, siteUrl, summary = nul
       { type: 'button', height: 'sm', style: 'secondary',
         action: { type: 'postback', label: '🗑 刪除這筆', data: `action=delAsk&logId=${logId}`, displayText: '刪除這筆' } },
       ...(siteUrl ? [{ type: 'button', height: 'sm', style: 'primary', color: C.brand,
-        action: { type: 'uri', label: '開照護站修改', uri: siteUrl } }] : [])
+        action: { type: 'uri', label: '開管家後台修改', uri: siteUrl } }] : [])
     ]
   };
   return bubble(`📝 ${who} 記錄了 ${petName}：${desc}`, { type: 'bubble', size: 'kilo', body, footer });
@@ -849,14 +849,14 @@ export function deletedCard(url) {
     type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG,
     contents: [
       text('已刪除剛剛的資料囉', { size: 'md', weight: 'bold', color: '#3F2B18', align: 'center' }),
-      text('若要刪除或調整其他紀錄，\n可以開啟照護站處理', { size: 'xs', color: C.muted, wrap: true, align: 'center', margin: 'md' })
+      text('若要刪除或調整其他紀錄，\n可以開啟管家後台處理', { size: 'xs', color: C.muted, wrap: true, align: 'center', margin: 'md' })
     ]
   };
   const footer = {
     type: 'box', layout: 'vertical', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
     contents: [
       { type: 'button', style: 'primary', color: C.brand,
-        action: { type: 'uri', label: '開啟照護站', uri: url } }
+        action: { type: 'uri', label: '開啟管家後台', uri: url } }
     ]
   };
   return bubble('已刪除剛剛的資料', { type: 'bubble', size: 'mega', header: header('已刪除'), body, footer });
@@ -903,12 +903,12 @@ export function foodTimelineFlex({ rows, petName = '', label = '食物', range =
       text(`${petName ? petName + ' ' : ''}${range}的${label}紀錄`, { size: 'sm', weight: 'bold', color: C.ink }),
       text('點任一筆的「修改」可改份量、品牌或刪除', { size: 'xxs', color: C.muted, margin: 'sm', wrap: true }),
       { type: 'box', layout: 'vertical', margin: 'md', spacing: 'none', contents: items },
-      ...(rows.length > EAT_TL_MAX ? [text(`⋯還有 ${rows.length - EAT_TL_MAX} 筆，完整看照護站`, { size: 'xxs', color: C.muted, margin: 'md', wrap: true })] : [])
+      ...(rows.length > EAT_TL_MAX ? [text(`⋯還有 ${rows.length - EAT_TL_MAX} 筆，完整看管家後台`, { size: 'xxs', color: C.muted, margin: 'md', wrap: true })] : [])
     ]
   };
   const footer = siteUrl ? {
     type: 'box', layout: 'vertical', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
-    contents: [{ type: 'button', height: 'sm', style: 'secondary', action: { type: 'uri', label: '在照護站看完整時間軸', uri: siteUrl } }]
+    contents: [{ type: 'button', height: 'sm', style: 'secondary', action: { type: 'uri', label: '在管家後台看完整時間軸', uri: siteUrl } }]
   } : undefined;
   return bubble(`${petName ? petName + ' ' : ''}${range}的${label}紀錄`, { type: 'bubble', size: 'mega', header: header('吃過的食物'), body, ...(footer ? { footer } : {}) });
 }
@@ -933,7 +933,7 @@ export function foodEditMenuFlex({ logId, name, whenLabel, eatenText, siteUrl = 
   };
   const footer = siteUrl ? {
     type: 'box', layout: 'vertical', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
-    contents: [{ type: 'button', height: 'sm', style: 'secondary', action: { type: 'uri', label: '到照護站編輯更多', uri: siteUrl } }]
+    contents: [{ type: 'button', height: 'sm', style: 'secondary', action: { type: 'uri', label: '到管家後台編輯更多', uri: siteUrl } }]
   } : undefined;
   return bubble('要修改這筆的什麼？', { type: 'bubble', header: header('修改紀錄'), body, ...(footer ? { footer } : {}) });
 }
@@ -952,13 +952,13 @@ export function foodBrandPickFlex({ logId, foodType, currentName, foods, siteUrl
       text(`目前：${currentName}（${foodType}）`, { size: 'xs', color: C.muted, margin: 'sm', wrap: true }),
       ...(options.length
         ? [{ type: 'box', layout: 'vertical', margin: 'lg', spacing: 'sm', contents: options }]
-        : [text(`還沒有建立${foodType}的品項。到照護站新增後就能選。`, { size: 'sm', color: C.inkSoft, margin: 'lg', wrap: true })])
+        : [text(`還沒有建立${foodType}的品項。到管家後台新增後就能選。`, { size: 'sm', color: C.inkSoft, margin: 'lg', wrap: true })])
     ]
   };
   const footer = {
     type: 'box', layout: 'vertical', paddingAll: '10px', backgroundColor: FOOTER_COLOR, spacing: 'sm',
     contents: [
-      ...(siteUrl ? [{ type: 'button', height: 'sm', style: 'secondary', action: { type: 'uri', label: '到照護站新增食物', uri: siteUrl } }] : []),
+      ...(siteUrl ? [{ type: 'button', height: 'sm', style: 'secondary', action: { type: 'uri', label: '到管家後台新增食物', uri: siteUrl } }] : []),
       { type: 'button', height: 'sm', style: 'secondary', action: { type: 'postback', label: '取消', data: `action=foodEdit&logId=${logId}`, displayText: '取消' } }
     ]
   };
@@ -986,7 +986,7 @@ export function reviewMenuFlex(siteUrl = '') {
     type: 'box', layout: 'vertical', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
     contents: [siteUrl
       ? { type: 'button', height: 'sm', style: 'primary', color: C.brand, action: { type: 'uri', label: '查看完整照護紀錄', uri: siteUrl } }
-      : { type: 'button', height: 'sm', style: 'primary', color: C.brand, action: { type: 'message', label: '查看完整照護紀錄', text: '照護站' } }]
+      : { type: 'button', height: 'sm', style: 'primary', color: C.brand, action: { type: 'message', label: '查看完整照護紀錄', text: '管家後台' } }]
   };
   return bubble('想看哪種紀錄？', { type: 'bubble', header: header('想看哪種紀錄？'), body, footer });
 }
@@ -1164,7 +1164,7 @@ export function recordTutorialFlex() {
 
   sec('家裡自己的說法');
   cmd('肉5', '先讓管家記住肉＝罐頭');
-  rows.push(text('第一次打沒設定過的叫法（例如「肉」），管家會先問你那是什麼；記住後下次直接用。也可到照護站「家裡習慣的叫法」設定。', { size: 'xxs', color: C.muted, wrap: true, margin: 'sm' }));
+  rows.push(text('第一次打沒設定過的叫法（例如「肉」），管家會先問你那是什麼；記住後下次直接用。也可到管家後台「家裡習慣的叫法」設定。', { size: 'xxs', color: C.muted, wrap: true, margin: 'sm' }));
 
   sec('補登・指定時間');
   cmd('昨天 21:30 喝水30');
@@ -1181,7 +1181,7 @@ export function recordTutorialFlex() {
   const footer = {
     type: 'box', layout: 'vertical', paddingAll: '14px', paddingStart: '20px', paddingEnd: '20px', backgroundColor: FOOTER_COLOR,
     contents: [
-      text('想更準？到照護站存「常吃食物」、設「預設食物」，之後只打「乾乾3」「主食5」就自動套用。沒設定也可以先記；沒有品牌實際熱量時，系統會先用粗估值並標示。',
+      text('想更準？到管家後台存「常吃食物」、設「預設食物」，之後只打「乾乾3」「主食5」就自動套用。沒設定也可以先記；沒有品牌實際熱量時，系統會先用粗估值並標示。',
         { size: 'xxs', color: C.brand, wrap: true })
     ]
   };
@@ -1246,7 +1246,7 @@ export function quickRecordCarousel(opts = {}) {
       line(t2, '罐罐剩10', '沒吃完剩多少'),
       line(t2, '昨天 21:30 喝水30', '補登・指定時間'),
       line(t2, opts.petName || '貓貓名字', '換一隻貓記（打名字）', opts.petName || ''),
-      text('常吃固定一款？到照護站設成「預設食物」，之後只打「乾乾3」就自動套用；沒設定也能先記，沒有品牌實際熱量時系統會標示粗估。', { size: 'xxs', color: C.muted, wrap: true, margin: 'md' })
+      text('常吃固定一款？到管家後台設成「預設食物」，之後只打「乾乾3」就自動套用；沒設定也能先記，沒有品牌實際熱量時系統會標示粗估。', { size: 'xxs', color: C.muted, wrap: true, margin: 'md' })
     ] },
     footer: { type: 'box', layout: 'horizontal', paddingAll: '10px', backgroundColor: FOOTER_COLOR, contents: [
       { type: 'button', height: 'sm', style: 'primary', color: t2.grad.endColor,
@@ -1259,19 +1259,19 @@ export function quickRecordCarousel(opts = {}) {
     action: { type: 'message', label: label.slice(0, 20), text: sendText }
   });
   const bubble3 = {
-    type: 'bubble', size: 'mega', header: catHeader(t3.grad, '3', '進階功能', '照護站・多人照護'),
+    type: 'bubble', size: 'mega', header: catHeader(t3.grad, '3', '進階功能', '管家後台・多人照護'),
     body: { type: 'box', layout: 'vertical', paddingAll: '16px', backgroundColor: t3.body, contents: [
       text('開網站看整理、找人一起照護', { size: 'xxs', color: C.muted, wrap: true }),
       // 有 LIFF 連結就直接開（免登入、少跳一則回覆）；沒有才退回文字指令
       opts.siteUrl
         ? { type: 'button', height: 'sm', style: 'primary', color: t3.grad.endColor, margin: 'md',
-            action: { type: 'uri', label: '🐾 開啟照護站（免登入）', uri: opts.siteUrl } }
-        : featBtn('🐾 開啟照護站', '照護站'),
+            action: { type: 'uri', label: '🐾 開啟管家後台（免登入）', uri: opts.siteUrl } }
+        : featBtn('🐾 開啟管家後台', '照護站'),
       featBtn('🤝 邀請一起照護（多人）', '邀請'),
       featBtn('💻 用電腦登入', '電腦登入')
     ] }
   };
-  return bubble('怎麼記：① 直接說（主食3・喝水30・嘔吐 白沫・最近吃什麼）② 進階（品牌・剩多少・補登・換貓）③ 照護站・多人照護',
+  return bubble('怎麼記：① 直接說（主食3・喝水30・嘔吐 白沫・最近吃什麼）② 進階（品牌・剩多少・補登・換貓）③ 管家後台・多人照護',
     { type: 'carousel', contents: [bubble1, bubble2, bubble3] });
 }
 
@@ -1284,7 +1284,7 @@ export function menuFlex() {
       row([menuCell(BRAND.onboarding, '第一次使用看這裡', '安心上手')]),
       row([menuCell('怎麼記？看範例', '點一句就記', '怎麼記'), menuCell('如何記餵藥', '藥的記法', '如何記餵藥')]),
       row([menuCell('今日記錄', '今天記了什麼', '今天'), menuCell('給醫生看', '近 7 天整理', '給醫生看')]),
-      row([menuCell('開啟照護站', '回診・血檢・設定', '照護站', true)])
+      row([menuCell('開啟管家後台', '回診・血檢・設定', '照護站', true)])
     ]
   };
   return bubble('使用說明選單', { type: 'bubble', size: 'mega', header: header('想做什麼？'), body });
@@ -1356,7 +1356,7 @@ export function weekFlex(petName, rows) {
     type: 'box', layout: 'vertical', paddingAll: '10px', backgroundColor: FOOTER_COLOR,
     contents: [
       { type: 'button', height: 'sm', style: 'primary', color: C.brand,
-        action: { type: 'message', label: '開啟照護站看完整趨勢', text: '照護站' } }
+        action: { type: 'message', label: '開啟管家後台看完整趨勢', text: '照護站' } }
     ]
   };
   return bubble(
@@ -1477,7 +1477,7 @@ export function monthFlex(petName, month, rows, today, calendarUrl = '') {
   if (calendarUrl) {
     footerRows.push({
       type: 'button', height: 'sm', style: 'primary', color: C.brand,
-      action: { type: 'uri', label: '看完整月曆（去照護站）', uri: calendarUrl }
+      action: { type: 'uri', label: '看完整月曆（去管家後台）', uri: calendarUrl }
     });
   }
   const footer = { type: 'box', layout: 'vertical', paddingAll: '8px', spacing: 'sm', backgroundColor: FOOTER_COLOR, contents: footerRows };
@@ -1538,7 +1538,7 @@ export function recentFlex(petName, items) {
     contents: [
       text('重要數字請核對後再參考', { size: 'xxs', color: C.muted, align: 'center' }),
       { type: 'button', height: 'sm', style: 'primary', color: C.brand,
-        action: { type: 'message', label: '開啟照護站看全部', text: '照護站' } }
+        action: { type: 'message', label: '開啟管家後台看全部', text: '照護站' } }
     ]
   };
   return bubble(
@@ -1578,7 +1578,7 @@ export function reminderFlex(pet, lines, title) {
       { type: 'button', height: 'sm', style: 'link', color: C.brand,
         action: { type: 'message', label: '看今日記錄', text: '看今日記錄' } },
       { type: 'button', height: 'sm', style: 'primary', color: C.brand,
-        action: { type: 'message', label: '開啟照護站', text: '照護站' } }
+        action: { type: 'message', label: '開啟管家後台', text: '照護站' } }
     ]
   };
   return bubble(
@@ -1601,7 +1601,7 @@ export function visitReminderFlex(pet, visits, vetsById, dateLabel) {
   }
   contents.push(
     { type: 'separator', margin: 'lg', color: SEPARATOR },
-    text('回診前可先看「給醫生看」，或到照護站的「回診」頁一鍵複製給醫生',
+    text('回診前可先看「給醫生看」，或到管家後台的「回診」頁一鍵複製給醫生',
       { size: 'xs', color: C.muted, wrap: true, margin: 'lg' })
   );
   const body = { type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: BODY_BG, contents };
@@ -1611,7 +1611,7 @@ export function visitReminderFlex(pet, visits, vetsById, dateLabel) {
       { type: 'button', height: 'sm', style: 'link', color: C.brand,
         action: { type: 'message', label: '給醫生看', text: '給醫生看' } },
       { type: 'button', height: 'sm', style: 'primary', color: C.brand,
-        action: { type: 'message', label: '開啟照護站', text: '照護站' } }
+        action: { type: 'message', label: '開啟管家後台', text: '照護站' } }
     ]
   };
   return bubble(

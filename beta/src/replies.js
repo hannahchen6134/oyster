@@ -182,7 +182,7 @@ export function weekReply(petName, rows) {
     if (row.medIssueCount > 0) parts.push(`藥留意${row.medIssueCount}`);
     lines.push(`${day} ${parts.join('・')}`);
   }
-  lines.push('', '※ 詳細請開照護站（輸入「網站」）');
+  lines.push('', '※ 詳細請開管家後台（輸入「網站」）');
   return lines.join('\n');
 }
 
@@ -207,13 +207,13 @@ export function monthReply(petName, monthLabel, rows) {
   if (vomitDays.length) lines.push(`嘔吐日：${vomitDays.map(Number).join('、')} 號`);
   if (medIssueDays.length) lines.push(`用藥留意日：${medIssueDays.map(Number).join('、')} 號`);
   if (!vomitDays.length && !medIssueDays.length) lines.push('這個月的紀錄都很平穩');
-  lines.push('', '※ 月曆圖請開照護站');
+  lines.push('', '※ 月曆圖請開管家後台');
   return lines.join('\n');
 }
 
 export function visitReply(petName, visits, vetsById) {
   if (!visits.length) {
-    return `${petName} 沒有排定的回診。\n可在照護站「設定 → 回診資料」新增。`;
+    return `${petName} 沒有排定的回診。\n可在管家後台「設定 → 回診資料」新增。`;
   }
   const lines = [`🏥 回診資訊（${petName}）`];
   for (const visit of visits) {
@@ -231,13 +231,13 @@ export function visitReply(petName, visits, vetsById) {
 
 export function websiteReply(url) {
   return [
-    '你的專屬照護站連結：',
+    '你的專屬管家後台連結：',
     url,
     '',
     '這是你的專屬連結，',
     '請不要轉傳給不相關的人。',
     '',
-    '若連結過期，輸入「照護站」',
+    '若連結過期，輸入「管家後台」',
     '就能取得新連結，',
     '既有資料不會消失。'
   ].join('\n');
@@ -252,7 +252,7 @@ export function helpText() {
     '主食3、乾乾10、巔峰羊35',
     '（不用寫「克」；有品牌直接打名字）',
     '家裡有自己的叫法？第一次打「肉5」管家會先問，',
-    '記住後下次直接用（也可到照護站設定）。',
+    '記住後下次直接用（也可到管家後台設定）。',
     '',
     '【沒吃完 / 要修正】',
     '乾乾減5、罐罐剩10、改成20',
@@ -271,7 +271,7 @@ export function helpText() {
     '多貓：開頭加名字（蚵仔 主食3）',
     '新貓咪：新增貓咪 蚵仔',
     '看月曆／回診：月曆・回診',
-    '開網站：照護站',
+    '開網站：管家後台',
     '',
     '不知道怎麼說？照平常講話試試看。',
     '※ 僅協助記錄整理，健康問題請諮詢獸醫師'
@@ -301,7 +301,7 @@ export function welcomeText() {
     '想回頭看：',
     '「今天」看今日、「最近吃什麼」看紀錄，',
     '想不起完整說法，直接打「紀錄」也會跳入口。',
-    '「照護站」開網站，「安心上手」看小教學。',
+    '「管家後台」開網站，「安心上手」看小教學。',
     '',
     '小提醒：這是照護紀錄輔助工具，',
     '不提供醫療診斷；數字請自行核對，',
@@ -392,7 +392,7 @@ export function recordTutorial() {
     '想看牠什麼時候吃哪款，也可以直接問：',
     '最近乾糧吃什麼、希爾斯什麼時候吃',
     '',
-    '💡 先到照護站「設定 → 常吃的食物」',
+    '💡 先到管家後台「設定 → 常吃的食物」',
     '建好品牌與熱量公式，之後打品牌',
     '就會自動算熱量與水分。',
     '把常吃的一款設成「預設」，',
@@ -479,6 +479,6 @@ export function backfillGuide() {
     '改 54（改上一筆數量）',
     '剩 20（沒吃完扣掉）',
     '刪除（刪上一筆）',
-    '或開照護站直接編輯。'
+    '或開管家後台直接編輯。'
   ].join('\n');
 }
