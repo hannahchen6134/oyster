@@ -18,8 +18,8 @@ function mkRows() {
 
 test('每天有水分＋熱量兩條長條（兩種主色都出現），且有圖例', () => {
   const s = JSON.stringify(weekFlex('蚵仔', mkRows()));
-  assert.ok(s.includes('#2B7A66'), '水分色（湖水綠）應出現');
-  assert.ok(s.includes('#5A4A84'), '熱量色（藕紫）應出現');
+  assert.ok(s.includes('#7C9070'), '水分色（柔沙綠・大地色）應出現');
+  assert.ok(s.includes('#C08E5E'), '熱量色（暖陶土・大地色）應出現');
   assert.ok(s.includes('水分 ml') && s.includes('熱量 kcal'), '應有水分／熱量圖例');
 });
 

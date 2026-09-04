@@ -1313,8 +1313,10 @@ export function recordMenuFlex(introText = '想記哪一種？點一下就開始
 
 // ---------- 近 7 天迷你圖卡（長條＝水分） ----------
 export function weekFlex(petName, rows, trendUrl = '') {
-  // 兩條長條並列（每日）：水分（湖水綠）＋熱量（藕紫），與後台網站同一套色票與語意。
+  // 兩條長條並列（每日）：水分＋熱量。用溫和大地色（柔沙綠／暖陶土），與暖棕品牌一致、親切不冰冷。
   // 各自對自己 7 天內的高峰做比例，讓「哪天多／哪天少」一眼可讀（不是把兩種單位混在同一軸）。
+  const cWater = '#7C9070'; // 柔沙綠（大地色・水分）
+  const cKcal = '#C08E5E';  // 暖陶土（大地色・熱量）
   const maxWater = Math.max(1, ...rows.map((row) => Number(row.totalWaterMl) || 0));
   const maxKcal = Math.max(1, ...rows.map((row) => Number(row.kcal) || 0));
   const recorded = rows.filter((row) => row.entryCount > 0);
@@ -1342,10 +1344,10 @@ export function weekFlex(petName, rows, trendUrl = '') {
       type: 'box', layout: 'horizontal', margin: 'md', spacing: 'sm',
       contents: [
         text(`${day}${warn ? ' ⚠' : ''}`, { size: 'xxs', color: warn ? C.seal : C.muted, flex: 3, gravity: 'center' }),
-        { type: 'box', layout: 'vertical', flex: 8, spacing: 'xs', contents: [bar(pw, STAT_ACCENT.water), bar(pk, STAT_ACCENT.kcal)] },
+        { type: 'box', layout: 'vertical', flex: 8, spacing: 'xs', contents: [bar(pw, cWater), bar(pk, cKcal)] },
         { type: 'box', layout: 'vertical', flex: 5, contents: [
-          text(has ? fmt(water) : '—', { size: 'xxs', color: STAT_ACCENT.water, align: 'end', gravity: 'center' }),
-          text(has ? fmt(kcal) : '—', { size: 'xxs', color: STAT_ACCENT.kcal, align: 'end', gravity: 'center' })
+          text(has ? fmt(water) : '—', { size: 'xxs', color: cWater, align: 'end', gravity: 'center' }),
+          text(has ? fmt(kcal) : '—', { size: 'xxs', color: cKcal, align: 'end', gravity: 'center' })
         ] }
       ]
     };
@@ -1356,8 +1358,8 @@ export function weekFlex(petName, rows, trendUrl = '') {
   const legend = {
     type: 'box', layout: 'horizontal', spacing: 'sm', justifyContent: 'center', alignItems: 'center',
     contents: [
-      legendDot(STAT_ACCENT.water), text('水分 ml', { size: 'xxs', color: C.muted, flex: 0, gravity: 'center' }),
-      { ...legendDot(STAT_ACCENT.kcal), margin: 'md' }, text('熱量 kcal', { size: 'xxs', color: C.muted, flex: 0, gravity: 'center' })
+      legendDot(cWater), text('水分 ml', { size: 'xxs', color: C.muted, flex: 0, gravity: 'center' }),
+      { ...legendDot(cKcal), margin: 'md' }, text('熱量 kcal', { size: 'xxs', color: C.muted, flex: 0, gravity: 'center' })
     ]
   };
 
@@ -1368,8 +1370,8 @@ export function weekFlex(petName, rows, trendUrl = '') {
       ...dayRows,
       { type: 'separator', margin: 'xl', color: SEPARATOR },
       statCellRow([
-        statCell('日均水分', fmt(avg((row) => row.totalWaterMl)), 'ml', STAT_ACCENT.water),
-        statCell('日均熱量', `${fmt(avg((row) => row.kcal))}${rows.some((r) => r.kcalIncomplete) ? '+' : ''}`, kcalUnit(rows.some((r) => r.kcalEstimated), rows.some((r) => r.kcalIncomplete)), STAT_ACCENT.kcal)
+        statCell('日均水分', fmt(avg((row) => row.totalWaterMl)), 'ml', cWater),
+        statCell('日均熱量', `${fmt(avg((row) => row.kcal))}${rows.some((r) => r.kcalIncomplete) ? '+' : ''}`, kcalUnit(rows.some((r) => r.kcalEstimated), rows.some((r) => r.kcalIncomplete)), cKcal)
       ])
     ]
   };
