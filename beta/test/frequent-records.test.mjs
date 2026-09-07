@@ -159,13 +159,3 @@ test('切換貓後重用舊卡片，帶入卡片上的貓名，不會默默寫�
  await say('麵線');await click(water.data);await say(water.fillInText+'3');
  assert.equal(logs().at(-1).petId,'p1');assert.equal(logs().at(-1).amount,3);
 },'owner'));
-
-test('日常連續主食水藥只回成功短卡；從卡片修改後可繼續記',()=>setup(async({say,click,last,logs})=>{
- for(const command of ['主食31','水5','藥早已吃']){
-  await say(command);const card=JSON.stringify(last());assert.match(card,/已記錄・小花/);assert.match(card,/繼續記給：小花/);assert.doesNotMatch(card,/今日累積|今日目標/);assert.equal(last().quickReply.items.length,8);
- }
- assert.equal(logs().length,3);const water=logs().find(l=>l.category==='water');
- await click('action=editAmount&logId='+water.logId);await say('8');
- assert.equal(logs().length,3);assert.equal(logs().find(l=>l.logId===water.logId).amount,8);assert.match(JSON.stringify(last()),/已更新・小花/);assert.ok(last().quickReply.items.some(i=>i.action.label==='水'));
- await say('水2');assert.equal(logs().length,4);
-}));

@@ -24,8 +24,8 @@ export function withFrequentRecords(message,petId='',{persistent=true,petName=''
     // text so reusing that card cannot silently write to the new default cat.
     const cardItems=frequentRecordItems(petId,petName);
     const rows=recordGridRows(cardItems);
-    const grid={type:'box',layout:'vertical',spacing:'sm',margin:'md',contents:[
-      {type:'text',text:petName?`繼續記給：${petName}`:'點類別，接著填數字或情況',size:'sm',color:'#5C4A38',wrap:true},...rows
+    const grid={type:'box',layout:'vertical',spacing:'sm',margin:'lg',contents:[
+      {type:'text',text:petName?`再幫${petName}記一筆`:'點類別，接著填數字或情況',size:'xs',color:'#5C4A38',wrap:true},...rows
     ]};
     result.contents={...message.contents,body:{...message.contents.body,contents:[...message.contents.body.contents,grid]}};
   }

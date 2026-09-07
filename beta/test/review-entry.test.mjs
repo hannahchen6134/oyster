@@ -70,10 +70,10 @@ test('§四 邊界：純類型別名（無數字、無回顧語境）不被誤�
 });
 
 // ── §五 入口卡：手機單手、單一 tap、四類＋完整入口 ──
-test('§五 reviewMenuFlex：三個入口（今天／近七天／吃過的食物）＋完整紀錄，皆一鍵', () => {
+test('§五 reviewMenuFlex：四個類別鈕（吃過的食物／喝水／用藥／狀況）＋完整紀錄，皆一鍵', () => {
   const json = JSON.stringify(reviewMenuFlex('https://site'));
   assert.ok(json.includes('想看哪種紀錄？'), '標題');
-  assert.ok(json.includes('吃過的食物') && json.includes('今天') && json.includes('近七天'), '三個不同用途入口');
+  assert.ok(json.includes('吃過的食物') && json.includes('喝水') && json.includes('用藥') && json.includes('狀況'), '四類別鈕');
   assert.ok(json.includes('"text":"最近吃什麼"'), '吃過的食物 → 打「最近吃什麼」（沿用既有查詢）');
   assert.ok(json.includes('"uri":"https://site"'), '完整紀錄 → 照護站連結');
   // 點了會真的通到既有 handler：模擬按鈕送出的文字
