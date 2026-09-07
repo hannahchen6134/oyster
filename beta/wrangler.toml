@@ -1,6 +1,10 @@
 name = "cat-care-beta"
 main = "src/index.js"
 compatibility_date = "2026-07-01"
+compatibility_flags = ["nodejs_compat"]
+
+[browser]
+binding = "REPORT_BROWSER"
 
 # 照護站網站（beta/public）由 Worker Static Assets 直接服務。
 # /webhook 與 /api/* 一律先進 Worker 程式。

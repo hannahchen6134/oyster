@@ -1,4 +1,5 @@
 import { publicReport, purgeReports } from './report-sharing.js';
+import { startLineReport, handleLineReportPostback, handleLineReportText } from './line-reports.js';
 // 貓貓照護管家 Beta — Cloudflare Worker 入口
 // /webhook  → LINE Messaging API webhook（驗簽後直接處理、直接 reply，不需早回 ack）
 // /api/*    → 照護站 REST API
@@ -1123,6 +1124,8 @@ async function handlePostback(event, env, baseUrl) {
   // 共同照護者操作時解析到飼主本人（飼主本人時 ownerId === lineUserId，行為不變）
   const ownerId = lineUserId ? await resolveDataOwner(db, lineUserId) : lineUserId;
 
+  if (String(action).startsWith('report')) return handleLineReportPostback(env, { ...event, __reportBaseUrl: baseUrl }, ownerId, data);
+
   // 一鍵把今日交班推播給所有共照夥伴（LINE 不能轉傳 Flex，改由機器人主動推）
   if (action === 'handoffShare') {
     const user = await getUser(db, lineUserId);
@@ -2185,6 +2188,7 @@ export async function handleTextMessage(event, env, baseUrl) {
   // 多貓咪：
   //  - 只打貓咪名（如「蚵仔」）→ 切換「目前登記的貓」，之後每筆都記給牠（與網站同步）
   //  - 名字前綴（如「冠關 水 20」）→ 只有這一則記給那隻，不改預設
+  if (await handleLineReportText(env, event, ownerId, text)) return;
   let pet = await resolveDefaultPet(db, user, pets);
   // 「把炭吉體重改成6公斤」：把/幫 開頭時，剝掉動詞助詞讓貓名回句首，交既有貓名前綴流程（僅在剝完真的接已知貓名時）。
   if (/^(?:請幫|請|把|幫)/.test(text)) {
@@ -3562,10 +3566,7 @@ async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId, ow
   }
 
   if (query === 'report') {
-    const doctorUrl = await siteLink(env, baseUrl, lineUserId, 'doctor');
-    const careUrl = await siteLink(env, baseUrl, lineUserId, 'care');
-    await replyOrPushFlex(env, event, reportChoiceFlex(doctorUrl, careUrl),
-      '這次要給誰？\n🏥 給醫生看：' + doctorUrl + '\n🐾 給照護者：' + careUrl);
+    await startLineReport(env, event, ownerId);
     return;
   }
 

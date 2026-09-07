@@ -108,16 +108,28 @@ export async function handleReportApi(request,env,url,actor,owner) {
 export async function publicReport(request,env,url) {
   const headers={'content-type':'text/html; charset=utf-8','cache-control':'private, no-store, max-age=0','referrer-policy':'no-referrer','x-robots-tag':'noindex, nofollow, noarchive','x-content-type-options':'nosniff','content-security-policy':"default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"};
   if(!['GET','HEAD'].includes(request.method))return new Response('Method not allowed',{status:405,headers});
-  const token=url.pathname.slice(3);const raw=/^[a-f0-9]{32}$/.test(token)?await appKvGet(env.DB,prefix+token):null;
+  const match=url.pathname.match(/^\/r\/([a-f0-9]{32})(?:\/image\/(\d{1,2}))?$/);
+  const token=match?.[1]||'';const raw=token?await appKvGet(env.DB,prefix+token):null;
   const row=raw?JSON.parse(raw):null;
   const pet=row?await getPet(env.DB,row.petId):null;
   const valid=row&&!row.revoked&&row.expiresAt>new Date().toISOString()&&pet?.ownerLineUserId===row.owner;
+  if(match?.[2]!==undefined){
+    if(!valid)return new Response('gone',{status:410,headers:{'cache-control':'no-store'}});
+    const image=await appKvGet(env.DB,`lineReportImage:${token}:${Number(match[2])}`);
+    if(!image)return new Response('not found',{status:404});
+    const data=JSON.parse(image);
+    if(data.expiresAt<=new Date().toISOString())return new Response('gone',{status:410});
+    const png=Uint8Array.from(atob(data.png),c=>c.charCodeAt(0));
+    return new Response(request.method==='HEAD'?null:png,{headers:{'content-type':'image/png','cache-control':'private, no-store','x-robots-tag':'noindex, nofollow','x-content-type-options':'nosniff'}});
+  }
   const content=valid?reportPreview(row.snapshot)+`<footer>這是產生當下的報告，之後的修改不會自動更新。<br>有效至 ${escapeReport(new Date(row.expiresAt).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}))}（台北時間）</footer>`:'<h1>這份報告已無法開啟</h1><p>連結可能已到期或被爸媽停用，請向爸媽索取新版。</p>';
   const html=`<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>喵喵管家｜分享報告</title><style>*{box-sizing:border-box}body{margin:0;padding:36px;background:#f2ece1;color:#403526;font:16px/1.8 system-ui,sans-serif}main{max-width:720px;margin:auto;overflow-wrap:anywhere}h1{font-size:28px}h2{font-size:20px}p{white-space:pre-wrap}.purpose-section{background:#fffdf8;border:1px solid #e1d3bc;border-radius:14px;padding:20px;margin:16px 0}.purpose-heading{border-bottom:2px solid #845a31}.purpose-notice,footer{font-size:13px;color:#776a59}summary{cursor:pointer;padding:12px 0}footer{margin:28px 0}</style><main>${content}</main></html>`;
   return new Response(request.method==='HEAD'?null:html,{status:valid?200:410,headers});
 }
 
 export async function purgeReports(db) {
+  await db.prepare(`DELETE FROM app_kv WHERE (k LIKE 'lineReportImage:%' OR k LIKE 'lineReportImages:%') AND json_extract(v,'$.expiresAt') < ?`).bind(new Date().toISOString()).run();
+  await db.prepare(`DELETE FROM app_kv WHERE (k LIKE 'lineReportFlow:%' OR k LIKE 'lineReportLock:%' OR k LIKE 'lineReportDelivered:%') AND updatedAt < ?`).bind(new Date(Date.now()-86400000).toISOString()).run();
   await db.prepare(`DELETE FROM app_kv WHERE k LIKE 'reportShare:%' AND json_extract(v,'$.expiresAt') < ?`).bind(new Date().toISOString()).run();
   await db.prepare(`DELETE FROM app_kv WHERE k LIKE 'reportLimit:%' AND updatedAt < ?`).bind(new Date(Date.now()-2*86400000).toISOString()).run();
 }
