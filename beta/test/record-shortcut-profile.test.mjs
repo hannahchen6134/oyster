@@ -60,14 +60,15 @@ test('只統計近30天本人有效紀錄；共照者、外家、刪除、未來
   }finally{DB.sdb.close();}
 });
 
-test('個人化卡片保留指定貓、同寬四欄與摘要補填選項，不改情境選擇或原物件',()=>{
+test('個人化卡片保留指定貓、同寬三欄與摘要補填選項，不改情境選擇或原物件',()=>{
   const entries=rankRecordShortcuts([...repeated('water',20),...repeated('supplement',10)]);
   const original=withFrequentRecords({type:'flex',altText:'test',contents:{type:'bubble',body:{type:'box',layout:'vertical',contents:[]}}},'p1',{petName:'蚵仔'});
   original.quickReply.items.push({type:'action',action:{type:'postback',label:'補充照護說明',data:'action=reportEdit'}});
   const before=JSON.stringify(original),message=personalizeFrequentMessage(original,entries);
   assert.equal(message.quickReply.items[0].action.label,'水');assert.equal(message.quickReply.items.at(-1).action.label,'補充照護說明');
   const rows=message.contents.body.contents.at(-1).contents.slice(1);
-  assert.ok(rows.every(row=>row.contents.length===4));
+  assert.ok(rows.every(row=>row.contents.length===3));
+  for(const cell of rows.flatMap(r=>r.contents).filter(c=>c.action)){assert.equal(cell.height,undefined);assert.equal(cell.minHeight,undefined);assert.equal(cell.paddingTop,'14px');assert.equal(cell.contents[0].wrap,true);}
   const actions=rows.flatMap(row=>row.contents.map(cell=>cell.action).filter(Boolean));
   assert.equal(actions[0].fillInText,'蚵仔 水');assert.match(actions[0].data,/petId=p1/);
   assert.equal(actions[1].fillInText,'蚵仔 保健');assert.equal(actions[1].displayText,undefined);

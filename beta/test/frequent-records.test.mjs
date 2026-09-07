@@ -111,7 +111,7 @@ test('從照護摘要補填切換到藥物快捷，不會把用藥文字存成�
 test('快捷列收起後仍可重用卡片內主食與水按鈕，點擊不增加問答或誤記',()=>setup(async({say,click,last,sent,logs})=>{
  await say('記一筆');
  const grid=last().contents.body.contents.at(-1);
- const actions=grid.contents.slice(1).flatMap(row=>row.contents.map(cell=>cell.action));
+ const actions=grid.contents.slice(1).flatMap(row=>row.contents.map(cell=>cell.action)).filter(Boolean);
  assert.deepEqual(actions.map(a=>a.label),last().quickReply.items.map(item=>item.action.label));
  assert.equal(actions[0].fillInText,'小花 主食');
  const food=actions.find(a=>a.label==='主食'),water=actions.find(a=>a.label==='水');
@@ -119,7 +119,7 @@ test('快捷列收起後仍可重用卡片內主食與水按鈕，點擊不增�
  await say(food.fillInText+'12');assert.equal(logs().at(-1).amount,12);
  count=sent.length;await click(water.data);assert.equal(sent.length,count);assert.equal(logs().length,1);
  await say(water.fillInText+'2');assert.equal(logs().at(-1).amount,2);assert.equal(logs().at(-1).category,'water');
- assert.equal(last().contents.body.contents.at(-1).contents.slice(1).flatMap(r=>r.contents).length,8);
+ assert.equal(last().contents.body.contents.at(-1).contents.slice(1).flatMap(r=>r.contents).filter(c=>c.action).length,8);
 }));
 
 test('查看今日、近七天、月曆、後台後最後回覆都有常用快捷，不需要重新開記一筆',()=>setup(async({say,last,logs})=>{
@@ -154,7 +154,7 @@ test('個人常用排序在記一筆及完成卡一致；更多可取回被收�
 
 test('切換貓後重用舊卡片，帶入卡片上的貓名，不會默默寫到另一隻',()=>setup(async({say,click,last,logs})=>{
  await say('蚵仔');await say('水2');
- const actions=last().contents.body.contents.at(-1).contents.slice(1).flatMap(r=>r.contents.map(c=>c.action));
+ const actions=last().contents.body.contents.at(-1).contents.slice(1).flatMap(r=>r.contents.map(c=>c.action)).filter(Boolean);
  const water=actions.find(a=>a.label==='水');assert.equal(water.fillInText,'蚵仔 水');
  await say('麵線');await click(water.data);await say(water.fillInText+'3');
  assert.equal(logs().at(-1).petId,'p1');assert.equal(logs().at(-1).amount,3);

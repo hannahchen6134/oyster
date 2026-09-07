@@ -25,20 +25,23 @@ export function withFrequentRecords(message,petId='',{persistent=true,petName=''
     const cardItems=frequentRecordItems(petId,petName);
     const rows=recordGridRows(cardItems);
     const grid={type:'box',layout:'vertical',spacing:'sm',margin:'lg',contents:[
-      {type:'text',text:petName?`再幫${petName}記一筆`:'點類別，接著填數字或情況',size:'xs',color:'#5C4A38',wrap:true},...rows
+      {type:'box',layout:'vertical',spacing:'xs',contents:[
+        {type:'text',text:petName?`再幫${petName}記一筆`:'再記一筆',size:'sm',weight:'bold',color:'#5C4A38',wrap:true},
+        {type:'text',text:'點類別，再填數量或情況',size:'xs',color:'#5C4A38',wrap:true}
+      ]},...rows
     ]};
     result.contents={...message.contents,body:{...message.contents.body,contents:[...message.contents.body.contents,grid]}};
   }
   return result;
 }
 function recordGridRows(items) {
-  return Array.from({length:Math.ceil(items.length/4)},(_,index)=>{
-    const contents=items.slice(index*4,index*4+4).map(({action})=>({
-      type:'box',layout:'vertical',flex:1,paddingAll:'6px',height:'44px',cornerRadius:'8px',
+  return Array.from({length:Math.ceil(items.length/3)},(_,index)=>{
+    const contents=items.slice(index*3,index*3+3).map(({action})=>({
+      type:'box',layout:'vertical',flex:1,paddingTop:'14px',paddingBottom:'14px',paddingStart:'8px',paddingEnd:'8px',cornerRadius:'8px',
       backgroundColor:'#F4EDE0',borderColor:'#EDE4D6',borderWidth:'1px',justifyContent:'center',action,
-      contents:[{type:'text',text:action.label,size:'sm',color:'#734921',align:'center',wrap:true}]
+      contents:[{type:'text',text:action.label,size:'sm',weight:'bold',color:'#734921',align:'center',wrap:true}]
     }));
-    while(contents.length<4)contents.push({type:'box',layout:'vertical',flex:1,contents:[]});
+    while(contents.length<3)contents.push({type:'box',layout:'vertical',flex:1,contents:[]});
     return {type:'box',layout:'horizontal',spacing:'sm',contents};
   });
 }
@@ -61,7 +64,7 @@ export function personalizeFrequentMessage(message,entries) {
   const body=message.contents?.body;
   if(body?.contents){
     const contents=body.contents.map(grid=>{
-      const cells=grid.contents?.slice(1).flatMap(row=>row.contents||[]);
+      const cells=grid.contents?.slice(1).flatMap(row=>row.contents||[]).filter(cell=>cell.action);
       if(!cells||cells.length!==8||!cells.every(cell=>common(cell.action)||more(cell.action)))return grid;
       const fill=cells.find(cell=>cell.action.fillInText)?.action;
       const petName=fill?.fillInText.slice(0,-fill.label.length).trim()||'';
