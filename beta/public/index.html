@@ -39,7 +39,7 @@
       --glow-brand: 0 0 0 3px rgba(115, 73, 33, 0.13), 0 5px 16px rgba(115, 73, 33, 0.22);
     }
     * { box-sizing: border-box; }
-    html { -webkit-text-size-adjust: 100%; -moz-text-size-adjust: 100%; text-size-adjust: 100%; background: var(--paper); }
+    html { -webkit-text-size-adjust: 100%; -moz-text-size-adjust: 100%; text-size-adjust: 100%; background: var(--paper); scrollbar-gutter: stable; }
     body {
       -webkit-text-size-adjust: 100%; text-size-adjust: 100%;
       margin: 0;
@@ -78,15 +78,34 @@
       background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.045'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
     }
     .panel { margin-top: 30px; }
+    .link-btn.back-link { padding: 0; min-height: 36px; border: 0; border-radius: var(--radius-sm); background: transparent; box-shadow: none; }
+    .link-btn.back-link:hover { box-shadow: none; }
+    .pet-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 12px; }
+    .pet-options .pet-option { display: flex; align-items: center; justify-content: center; width: 100%; min-width: 0; min-height: 54px; padding: 12px; margin: 0; border: 1px solid rgba(115,73,33,.24); border-radius: var(--radius-sm); background: var(--sheet); color: var(--brand); box-shadow: 0 1px 3px rgba(58,42,24,.06); font-size: 16px; font-weight: 500; line-height: 1.6; text-align: center; }
+    .pet-option span { min-width: 0; overflow-wrap: anywhere; }
+    .pet-options .pet-option:hover, .pet-options .pet-option:active { border-color: var(--brand); background: var(--brand-tint); }
+    .accordion { margin-top: 24px; border-block: 1px solid var(--line); }
+    .accordion > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; padding: 12px 0; list-style: none; cursor: pointer; color: var(--ink-soft); font-size: 15px; font-weight: 500; line-height: 1.7; }
+    .accordion > summary::-webkit-details-marker { display: none; }
+    .accordion > summary::marker { content: ''; }
+    .accordion > summary:hover { color: var(--brand); }
+    .accordion > summary:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; border-radius: 4px; }
+    .accordion-chevron { flex: 0 0 18px; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; transition: transform .18s ease; }
+    .accordion[open] > summary .accordion-chevron { transform: rotate(180deg); }
+    .accordion > div > p { margin: 0 0 16px; }
+    @media(prefers-reduced-motion:reduce) { .accordion-chevron { transition: none; } }
+    #reportPetChoice:not(:empty) { margin-top: 22px; }
+    #reportPetChoice h2 { font-size: 18px; font-weight: 500; line-height: 1.6; margin-bottom: 16px; }
+    #reportPetChoice h2::after { content: none; }
     .date-line {
       margin-top: 8px; font-family: var(--serif); font-size: 14px;
       color: var(--muted); letter-spacing: 0.14em;
     }
     /* 頁尾題記 */
     .colophon {
-      display: flex; align-items: center; gap: 18px; margin-top: 46px;
+      display: flex; align-items: center; gap: 18px; margin-top: 32px;
       font-family: var(--serif); font-size: 12.5px; color: var(--muted); letter-spacing: 0.3em;
-      white-space: nowrap;
+      white-space: normal; text-align: center; line-height: 1.8;
     }
     .colophon::before, .colophon::after { content: ''; flex: 1; height: 1px; background: var(--line); }
 
@@ -151,12 +170,12 @@
       position: relative;
       border: none; background: none; color: var(--muted); cursor: pointer; font: inherit;
       font-weight: 500; font-size: 15.5px; letter-spacing: 0.04em;
-      padding: 10px 6px 14px; margin-bottom: -1px;
+      padding: 10px 0 14px; margin-bottom: -1px;
       transition: color 0.15s;
     }
     /* 底線用滑入動畫，切換更順 */
     .tab::after {
-      content: ''; position: absolute; left: 4px; right: 4px; bottom: 0; height: 2.5px;
+      content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 2.5px;
       border-radius: 2px; background: var(--brand);
       transform: scaleX(0); transform-origin: center; transition: transform 0.22s ease;
     }
@@ -1054,7 +1073,7 @@
     .login-notice b { font-weight: 600; color: var(--seal); }
     /* 只在 LINE 內顯示的「回 LINE 對話」：關掉 LIFF 視窗 */
     .back-to-line {
-      display: block; margin: 30px auto 0; padding: 10px 24px;
+      display: block; margin: 36px auto 0; padding: 10px 24px; max-width: 100%; min-height: 44px;
       background: var(--brand); border: 1px solid var(--brand); border-radius: 999px;
       color: #fff; font-size: 13.5px; font-weight: 600; cursor: pointer;
       box-shadow: var(--shadow-soft);
@@ -1228,7 +1247,7 @@
       .cal-cell { min-height: 56px; padding: 6px 5px; border-radius: 11px; }
       .cal-daynum { font-size: 14.5px; width: 23px; height: 23px; }
       .cal-num { font-size: 11px; }
-      .colophon { margin-top: 44px; }
+
     }
     .liff-pending > .eyebrow, .liff-pending > h1 { display:none; }
     .purpose-section { border:1px solid var(--line, #e5d8bf); border-radius:14px; padding:16px; margin:14px 0; background:#fffdf8; break-inside:avoid; }
@@ -1249,8 +1268,8 @@
     #a4Export .purpose-mobile { width:390px; padding:24px; min-height:0; }
     #a4Export .purpose-a4 { width:794px; min-height:1123px; }
     .purpose-page footer { margin-top:20px; font-size:12px; color:#75644f; }
-    #reportView details summary { cursor:pointer; min-height:36px; font-size:16px; }
-  .report-mode .shell{width:min(920px,calc(100% - 72px));padding-top:36px}.report-mode #reportView{padding:18px;min-width:0}.report-mode #reportEditor,.report-mode #purposePreview{width:100%;min-width:0}.report-mode #reportView .btn{width:auto;flex:0 1 auto;max-width:100%;white-space:normal}.report-mode #reportView textarea{min-height:120px;resize:vertical}.report-mode #reportView textarea[data-report-field="rawNotes"]{min-height:190px}.purpose-hint{font-size:13px;line-height:1.7;color:#776a59}#reportConfirmLabel{display:flex!important;gap:8px;align-items:flex-start}#reportConfirmed{width:20px;min-width:20px;height:20px;margin-top:4px}#reportShareList{overflow-wrap:anywhere}#reportShareList>div{border-bottom:1px solid #dacdb8;padding:14px 0}#qrDialog{width:min(460px,calc(100% - 72px));max-height:calc(100dvh - 72px);overflow:auto;border:1px solid #d9c7ad;border-radius:16px;padding:18px;background:#fffdf8;color:#463620}#qrDialog::backdrop{background:#30241988}#qrImage{width:100%;height:auto}#qrDialog .report-controls{display:flex;gap:10px;flex-wrap:wrap}#qrDialog button,#qrDialog a{font:inherit;max-width:100%;overflow-wrap:anywhere}#qrDialog .btn{width:auto}#qrLink{display:block;overflow-wrap:anywhere;font-size:13px;margin:12px 0}.report-mode .purpose-heading h1{overflow-wrap:anywhere}@media(max-width:600px){#reportView .report-controls label{max-width:100%}#reportView select{width:100%;min-width:0}.report-mode .head{flex-wrap:wrap}.report-mode .purpose-section{padding:12px}.report-mode .report-controls{gap:8px}}
+    #reportView details:not(.accordion) summary { cursor:pointer; min-height:36px; font-size:16px; }
+  #reportView .btn{width:auto;flex:0 1 auto;max-width:100%;white-space:normal}#reportView textarea{min-height:120px;resize:vertical}#reportView textarea[data-report-field="rawNotes"]{min-height:190px}.purpose-hint{font-size:13px;line-height:1.7;color:#776a59}#reportConfirmLabel{display:flex!important;gap:8px;align-items:flex-start}#reportConfirmed{width:20px;min-width:20px;height:20px;margin-top:4px}#reportShareList{overflow-wrap:anywhere}#reportShareList>div{border-bottom:1px solid #dacdb8;padding:14px 0}#qrDialog{width:min(460px,calc(100% - 72px));max-height:calc(100dvh - 72px);overflow:auto;border:1px solid #d9c7ad;border-radius:16px;padding:18px;background:#fffdf8;color:#463620}#qrDialog::backdrop{background:#30241988}#qrImage{width:100%;height:auto}#qrDialog .report-controls{display:flex;gap:10px;flex-wrap:wrap}#qrDialog button,#qrDialog a{font:inherit;max-width:100%;overflow-wrap:anywhere}#qrDialog .btn{width:auto}#qrLink{display:block;overflow-wrap:anywhere;font-size:13px;margin:12px 0}.purpose-heading h1{overflow-wrap:anywhere}@media(max-width:600px){#reportView .report-controls label{max-width:100%}#reportView select{width:100%;min-width:0}}
 </style>
 </head>
 <body>
@@ -1516,7 +1535,7 @@
       </section>
 
       <section class="panel hidden" id="reportView">
-        <button class="link-btn" id="reportBackBtn" type="button">‹ 返回</button>
+        <button class="link-btn back-link" id="reportBackBtn" type="button">‹ 返回</button>
         <div id="reportPetChoice"></div>
         <div id="reportWork" class="hidden">
           <div class="report-controls"><button class="btn btn-secondary" data-purpose="doctor" type="button">給醫生看</button><button class="btn btn-secondary" data-purpose="care" type="button">給照護者</button></div>
@@ -1530,7 +1549,7 @@
             <button class="btn btn-secondary" id="purposeSend" type="button">傳到 LINE</button><button class="btn btn-secondary" id="purposeQr" type="button">產生 QR Code</button><label>連結有效期 <select id="shareDays"><option value="1">1 天</option><option value="7" selected>7 天</option><option value="30">30 天</option></select></label><p class="purpose-hint">取得連結或 QR Code 的人都能查看這份報告；到期或停用後失效。</p>
           </div>
         </div>
-        <details id="reportShareManage"><summary>已分享的報告</summary><div id="reportShareList"></div></details>
+        <details id="reportShareManage" class="accordion"><summary aria-expanded="false" aria-controls="reportShareList"><span>已分享的報告</span><svg class="accordion-chevron" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 7 5 5 5-5"/></svg></summary><div id="reportShareList"><p class="muted">目前還沒有已分享的報告</p></div></details>
       </section>
 
       <!-- 設定 -->
@@ -1538,7 +1557,7 @@
         <div id="settingsMenu"></div>
         <div id="settingsSection" class="hidden">
         <div class="set-back">
-          <button class="link-btn" id="settingsBackBtn" type="button">‹ 回設定</button>
+          <button class="link-btn back-link" id="settingsBackBtn" type="button">‹ 回設定</button>
           <h2 class="set-title" id="settingsTitle"></h2>
         </div>
         <div class="toolbar" style="margin-bottom:12px">
@@ -1720,7 +1739,6 @@
     function switchTab(tab) {
       state.activeTab = tab;
       $('reportView').classList.add('hidden');
-      document.body.classList.remove('report-mode');
       state.reportOpen = false;
       document.querySelectorAll('.tabs .tab').forEach((el) => el.classList.toggle('active', el.dataset.tab === tab));
       $('todayView').classList.toggle('hidden', tab !== 'today');
@@ -4288,7 +4306,6 @@
         if (!wasOpen) history.replaceState({ ...history.state, reportTab: returnTab }, '', location.href);
         history.pushState({ reportPurpose: purpose, reportPet: chosen ? state.petId : '' }, '', location.href);
       }
-      document.body.classList.add('report-mode');
       $('reportConfirmed').checked = false;
       state.reportShareRequest = null;
       state.reportOpen = true;
@@ -4302,9 +4319,12 @@
       $('purposeActions').classList.add('hidden');
       $('purposePreview').innerHTML = '';
       $('reportPetChoice').innerHTML = '';
+      $('reportShareManage').open = false;
+      $('reportShareList').textContent = '目前還沒有已分享的報告';
       if (purpose === 'choice') {
         $('reportWork').classList.add('hidden');
         $('reportPetChoice').innerHTML = '<h2>這次要給誰？</h2><button class="btn btn-primary" data-choose-purpose="doctor" type="button">🏥 給醫生看</button><p>整理近期狀況、異常、用藥與重要變化</p><button class="btn btn-secondary" data-choose-purpose="care" type="button">🐾 給照護者</button><p>家人、朋友或貓保姆照顧時使用</p>';
+        if (state.pets.length) loadReportShares();
         return;
       }
       if (!state.pets.length) {
@@ -4314,7 +4334,8 @@
       }
       if (state.pets.length > 1 && !chosen) {
         $('reportWork').classList.add('hidden');
-        $('reportPetChoice').innerHTML = '<h2>要整理哪隻貓？</h2>' + state.pets.map((p) => `<button class="btn btn-secondary" data-report-pet="${esc(p.petId)}" type="button">${esc(p.petName)}</button>`).join('');
+        $('reportPetChoice').innerHTML = '<h2>要整理哪隻貓？</h2><div class="pet-options">' + state.pets.map((p) => `<button class="btn btn-secondary pet-option" data-report-pet="${esc(p.petId)}" type="button"><span>${esc(p.petName)}</span></button>`).join('') + '</div>';
+        loadReportShares();
         return;
       }
       const pet = currentPet();
@@ -4484,11 +4505,14 @@
       }catch(error){if(revision===purposeRevision&&petId===state.petId)status.textContent=error.message;}
       finally{careBusy=false;btn.disabled=false;}
     });
+    $('reportShareManage').addEventListener('toggle', () => {
+      $('reportShareManage').querySelector('summary').setAttribute('aria-expanded', String($('reportShareManage').open));
+    });
     async function loadReportShares() {
       const petId=state.petId,revision=purposeRevision;
       $('reportShareList').textContent='正在讀取⋯';
       try{const result=await api('report-shares?petId='+encodeURIComponent(petId));if(revision!==purposeRevision||petId!==state.petId)return;
-        $('reportShareList').innerHTML=result.rows.length?result.rows.map(r=>`<div><strong>${esc(r.petName)} · ${r.purpose==='care'?'照護交接單':'就醫摘要'}</strong><p>${esc(new Date(r.createdAt).toLocaleString('zh-TW'))}</p><p>${r.revoked?'已停用':'有效至 '+esc(new Date(r.expiresAt).toLocaleString('zh-TW'))}</p>${r.revoked?'':`<button type="button" class="btn btn-secondary" data-show-qr="${esc(r.id)}" data-qr-label="${esc(r.petName+' · '+(r.purpose==='care'?'照護交接單':'就醫摘要'))}" data-qr-expiry="${esc(r.expiresAt)}">查看 QR Code</button> <button type="button" class="link-btn" data-revoke-report="${esc(r.id)}">停用</button>`}</div>`).join(''):'還沒有有效的分享報告。';
+        $('reportShareList').innerHTML=result.rows.length?result.rows.map(r=>`<div><strong>${esc(r.petName)} · ${r.purpose==='care'?'照護交接單':'就醫摘要'}</strong><p>${esc(new Date(r.createdAt).toLocaleString('zh-TW'))}</p><p>${r.revoked?'已停用':'有效至 '+esc(new Date(r.expiresAt).toLocaleString('zh-TW'))}</p>${r.revoked?'':`<button type="button" class="btn btn-secondary" data-show-qr="${esc(r.id)}" data-qr-label="${esc(r.petName+' · '+(r.purpose==='care'?'照護交接單':'就醫摘要'))}" data-qr-expiry="${esc(r.expiresAt)}">查看 QR Code</button> <button type="button" class="link-btn" data-revoke-report="${esc(r.id)}">停用</button>`}</div>`).join(''):'<p class="muted">目前還沒有已分享的報告</p>';
       }catch(error){if(revision===purposeRevision)$('reportShareList').textContent=error.message;}
     }
     let qrBusy=false,qrData=null;
