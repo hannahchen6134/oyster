@@ -19,32 +19,44 @@ async function setup(run,actor='single'){
  const last=()=>sent.at(-1).messages.at(-1);
  try{await run({DB,env,sent,say,click,logs,last});}finally{globalThis.fetch=old;}
 }
-test('自然語言主食31、水5與多筆照常，完成回讀包含貓與數字並再附六快捷',()=>setup(async({say,logs,last})=>{
- await say('主食31');assert.equal(logs()[0].foodType,'主食罐');assert.equal(logs()[0].amount,31);assert.match(JSON.stringify(last()),/小花/);assert.match(JSON.stringify(last()),/31/);assert.equal(last().quickReply.items.length,6);
+test('自然語言主食31、水5與多筆照常，完成回讀包含貓與數字並再附八快捷',()=>setup(async({say,logs,last})=>{
+ await say('主食31');assert.equal(logs()[0].foodType,'主食罐');assert.equal(logs()[0].amount,31);assert.match(JSON.stringify(last()),/小花/);assert.match(JSON.stringify(last()),/31/);assert.equal(last().quickReply.items.length,8);
  await say('水5');assert.equal(logs().at(-1).amount,5);assert.equal(logs().at(-1).category,'water');
- await say('主食31 水5');assert.equal(logs().length,4);assert.equal(last().quickReply.items.length,6);
+ await say('主食31 水5');assert.equal(logs().length,4);assert.equal(last().quickReply.items.length,8);
 }));
-test('記一筆→六類型→主食→31；單貓無選貓、不猜份量、不必進LIFF',()=>setup(async({say,click,logs,last})=>{
- await say('記一筆');const items=last().quickReply.items;assert.deepEqual(items.map(i=>i.action.label),['主食','乾乾','水','藥','尿尿','便便']);assert.equal(items.length,6);assert.doesNotMatch(JSON.stringify(last()),/"type":"uri"/);assert.match(JSON.stringify(last()),/action=recmore/);
- await click(items[0].action.data);assert.equal(logs().length,0);assert.match(last().text,/主食，要記多少/);assert.doesNotMatch(last().text,/選.*貓/);
- await say('31');assert.equal(logs().length,1);assert.equal(logs()[0].amount,31);assert.equal(logs()[0].petId,'s1');assert.equal(last().quickReply.items.length,6);
- await click(last().quickReply.items[2].action.data);await say('5');assert.equal(logs().at(-1).amount,5);
+test('主食快捷帶入原生輸入框；點擊不送訊息不等待數字，補31送出才記錄',()=>setup(async({say,click,logs,last,sent,DB})=>{
+ await say('記一筆');const items=last().quickReply.items;assert.deepEqual(items.map(i=>i.action.label),['主食','乾乾','乾糧','零食','水','藥','尿尿','便便']);assert.equal(items.length,8);assert.doesNotMatch(JSON.stringify(last()),/"type":"uri"/);assert.match(JSON.stringify(last()),/action=recmore/);
+ const count=sent.length;assert.equal(items[0].action.fillInText,'主食');assert.equal(items[0].action.inputOption,'openKeyboard');assert.equal(items[0].action.displayText,undefined);
+ await click(items[0].action.data);assert.equal(logs().length,0);assert.equal(sent.length,count);assert.equal(DB.prepare("SELECT pendingAction FROM users WHERE lineUserId='single'").first().pendingAction,'');
+ await say(items[0].action.fillInText+'31');assert.equal(logs().length,1);assert.equal(logs()[0].amount,31);assert.equal(logs()[0].petId,'s1');assert.equal(last().quickReply.items.length,8);
+ const water=last().quickReply.items.find(i=>i.action.label==='水').action;assert.equal(water.fillInText,'水');await click(water.data);await say(water.fillInText+'5');assert.equal(logs().at(-1).amount,5);
+}));
+test('所有常用關鍵字填入輸入框，乾乾乾糧同類、零食與藥補完才寫入',()=>setup(async({say,click,logs,sent,DB})=>{
+ for(const [label,suffix,expected] of [['主食','31','主食罐'],['乾乾','3.1','乾糧'],['乾糧','4','乾糧'],['零食','2','零食'],['水','5','water'],['藥',' 晚 已吃','med']]){
+  const action=frequentRecordItems().find(i=>i.action.label===label).action;
+  assert.equal(action.fillInText,label);assert.equal(action.inputOption,'openKeyboard');assert.equal(action.displayText,undefined);
+  DB.prepare("UPDATE users SET pendingAction='amount|水|s1|1' WHERE lineUserId='single'").run();
+  const before=logs().length,count=sent.length;await click(action.data);assert.equal(logs().length,before);assert.equal(sent.length,count);
+  assert.equal(DB.prepare("SELECT pendingAction FROM users WHERE lineUserId='single'").first().pendingAction,'');
+  await say(action.fillInText+suffix);assert.equal(logs().length,before+1);assert.equal(logs().at(-1).foodType||logs().at(-1).category,expected);
+ }
+ assert.equal(frequentRecordItems('p1','蚵仔')[0].action.fillInText,'蚵仔 主食');
 }));
 test('多貓未選對象：先填數字仍不寫入，沿用既有選貓後只記指定貓',()=>setup(async({say,click,logs,last,DB})=>{
  await say('記一筆');assert.doesNotMatch(last().quickReply.items[0].action.data,/petId/);
- await click(last().quickReply.items[0].action.data);await say('31');assert.equal(logs().length,0);assert.match(last().text,/這筆要記給哪隻貓/);
+ await click(last().quickReply.items[0].action.data);await say('主食31');assert.equal(logs().length,0);assert.match(last().text,/這筆要記給哪隻貓/);
  await say('麵線');assert.equal(logs().length,1);assert.equal(logs()[0].petId,'p2');assert.equal(logs()[0].amount,31);assert.match(JSON.stringify(last()),/麵線/);
- await click(last().quickReply.items[2].action.data);await say('5');assert.equal(logs().at(-1).petId,'p2');
+ await click(last().quickReply.items.find(i=>i.action.label==='水').action.data);await say('水5');assert.equal(logs().at(-1).petId,'p2');
 },'owner'));
 test('多貓已選對象：免重選；外家petId拒絕，切換貓會取消舊數量輸入',()=>setup(async({say,click,logs,last,DB})=>{
- await say('蚵仔');await say('記一筆');await click(last().quickReply.items[0].action.data);await say('31');assert.equal(logs()[0].petId,'p1');
+ await say('蚵仔');await say('記一筆');await click(last().quickReply.items[0].action.data);await say('主食31');assert.equal(logs()[0].petId,'p1');
  await click('action=frequent&kind=water&petId=x1');assert.match(last().text,/找不到這隻貓/);assert.equal(logs().length,1);
  await click('action=frequent&kind=water&petId=p1');await say('麵線');assert.equal(DB.prepare("SELECT pendingAction FROM users WHERE lineUserId='owner'").first().pendingAction,'');await say('5');assert.equal(logs().length,1);
 },'owner'));
 test('藥、尿尿、便便先問情況；只在使用者選定後沿用parser寫入',()=>setup(async({say,click,logs,last})=>{
  for(const [kind,label,category] of [['med','未餵','med'],['urine','只記有尿尿','urine'],['stool','只記有便便','stool']]){
   const count=logs().length;await click(`action=frequent&kind=${kind}&petId=s1`);assert.equal(logs().length,count);
-  const choice=last().quickReply.items.find(i=>i.action.label===label);await say(choice.action.text);assert.equal(logs().at(-1).category,category);assert.equal(last().quickReply.items.length,6);
+  const choice=last().quickReply.items.find(i=>i.action.label===label);await say(choice.action.text);assert.equal(logs().at(-1).category,category);assert.equal(last().quickReply.items.length,8);
  }
  assert.equal(logs()[0].medStatus,'漏餵'); // existing parser's normalized storage value for 未餵
 }));
@@ -54,9 +66,9 @@ test('取消、逾時及自然語言插入不誤記；小數不四捨五入',()=
  await click('action=frequent&kind=wet');await say('水5');assert.equal(logs().length,1);assert.equal(logs()[0].category,'water');
  await click('action=frequent&kind=dry');await say('3.1');assert.equal(logs().at(-1).amount,3.1);
 }));
-test('Flex無法顯示時文字備援也保留六快捷',async()=>{
+test('Flex無法顯示時文字備援也保留八快捷',async()=>{
  const old=fetch,sent=[];let failed=false;globalThis.fetch=async(url,options)=>{const body=JSON.parse(options.body);sent.push(body);if(!failed){failed=true;return new Response('no flex',{status:400});}return new Response('{}');};
- try{await replyOrPushFlex({LINE_CHANNEL_ACCESS_TOKEN:'test'},{source:{userId:'single'},replyToken:'test'},{type:'flex',altText:'確認',contents:{},quickReply:{items:frequentRecordItems('s1')}},'已記錄 小花 水5');assert.equal(sent[1].messages[0].type,'text');assert.equal(sent[1].messages[0].quickReply.items.length,6);}finally{globalThis.fetch=old;}
+ try{await replyOrPushFlex({LINE_CHANNEL_ACCESS_TOKEN:'test'},{source:{userId:'single'},replyToken:'test'},{type:'flex',altText:'確認',contents:{},quickReply:{items:frequentRecordItems('s1')}},'已記錄 小花 水5');assert.equal(sent[1].messages[0].type,'text');assert.equal(sent[1].messages[0].quickReply.items.length,8);}finally{globalThis.fetch=old;}
 });
 test('近七天、照護月曆、LIFF與共照API仍可使用；後台入口保留',()=>setup(async({DB,env,say,last})=>{
  await say('近七天記錄');assert.equal(last().type,'flex');assert.match(JSON.stringify(last()),/小花/);

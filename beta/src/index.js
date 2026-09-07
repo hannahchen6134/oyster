@@ -1110,10 +1110,14 @@ async function handlePostback(event, env, baseUrl) {
     if(requested&&!pet){await replyOrPush(env,event,'找不到這隻貓，請重新點「記一筆」。');return;}
     if(!pets.length){await replyOrPush(env,event,'先輸入「新增貓咪 名字」，就能開始記錄。');return;}
     const kind=data.get('kind'),base={wet:'主食',dry:'乾乾',water:'水'}[kind];
-    if(!['wet','dry','water','med','urine','stool'].includes(kind))return;
+    if(!['wet','dry','snack','water','med','urine','stool'].includes(kind))return;
     // Leave a pending report form when starting a new daily-record action.
     const reportRaw=await appKvGet(db,`lineReportFlow:${lineUserId}`);
     if(reportRaw){const flow=JSON.parse(reportRaw);if(['feeding','confirm'].includes(flow.stage)){flow.stage='cancelled';await appKvSet(db,`lineReportFlow:${lineUserId}`,JSON.stringify(flow));}}
+    if(data.get('input')==='fill'){
+      // LINE opens its own keyboard with fillInText. No chat message or numeric waiting state.
+      await updateUser(db,lineUserId,{pendingAction:''});return;
+    }
     if(base){
       await updateUser(db,lineUserId,{pendingAction:`amount|${base}|${pet?.petId||''}|${Date.now()}`});
       await replyOrPushQuick(env,event,`${pet?pet.petName+'｜':''}${base}，要記多少${kind==='water'?' ml':'克'}？\n直接輸入數字，例如 ${kind==='water'?'5':'31'}。${pet?'':'\n填完再選要記給哪隻貓。'}`,[qrMsg('取消','取消')]);return;
@@ -2274,8 +2278,8 @@ export async function handleTextMessage(event, env, baseUrl) {
       parseStatus: 'partial', failReason: 'unknown_food_expression', sourceMessageId: String(event.message?.id || ''),
       resolvedPetId: rpid, linkedLogId: '', parsedResult: JSON.stringify({ events: [], savedLogIds: [], unparsedSegments: [leadPartial.rest], awaitingAction: '', recognizedPetName: leadPartial.petName, rest: leadPartial.rest })
     });
-    // 只帶已辨認的 petId，點類型後再問數量，不猜原本尚未解析的份量。
-    const shortcuts = frequentRecordItems(rpid);
+    // 預填已辨認的貓名與關鍵字，不猜原本尚未解析的份量。
+    const shortcuts = frequentRecordItems(rpid,leadPartial.petName);
     await replyOrPushQuick(env, event,
       `我知道你要記錄「${leadPartial.petName}」，但還看不懂「${leadPartial.rest}」🙏\n`
       + `⚠️ 這筆尚未記錄。\n`
@@ -3583,7 +3587,7 @@ async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId, ow
   if (query === 'recordMenu') {
     await track(db, lineUserId, 'menu_record');
     const petId=needsCatPick(user,await listPets(db,ownerId))?'':pet?.petId||'';
-    const card=onboardCard({title:'記一筆',subtitle:`${petId?pet.petName+'｜':''}點下方常用快捷，再填這次的數量或情況。\n也可以直接打「主食31 水5」。`,rows:[[menuCell('更多紀錄','嘔吐、精神、備註等','更多紀錄',false,'','action=recmore')]],alt:'記一筆：主食、乾乾、水、藥、尿尿、便便'});
+    const card=onboardCard({title:'記一筆',subtitle:`${petId?pet.petName+'｜':''}點主食、乾乾、乾糧、零食、水或藥，文字會帶入輸入框，補上份量或用藥情況再送出。\n例如「主食31 水5」或「藥 晚 已吃」。`,rows:[[menuCell('更多紀錄','嘔吐、精神、備註等','更多紀錄',false,'','action=recmore')]],alt:'記一筆：主食、乾乾、乾糧、零食、水、藥、尿尿、便便'});
     await replyOrPushFlex(env,event,withFrequentRecords(card,petId),'點下方常用快捷；也可直接輸入「主食31 水5」。');
     return;
   }
