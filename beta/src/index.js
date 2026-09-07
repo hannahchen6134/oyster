@@ -9,7 +9,7 @@ import { handleApi } from './api.js';
 import { verifyLineSignature, replyOrPush, replyOrPushQuick, replyOrPushFlex, replyMessages, pushText, pushMessages, getProfile, getAccessToken, checkAccessToken, showLoadingAnimation } from './line.js';
 import { hasAnyReminder, parseReminderSettings, buildReminderLines, reminderMessage, visitReminderMessage } from './reminders.js';
 import { shortDate } from './replies.js';
-import { recordFlex, recordFlexCompact, foodDisambigFlex, multiRecordFlex, undoConfirmFlex, todayFlex, handoffFlex, websiteFlex, menuFlex, recordMenuFlex, recordTutorialFlex, quickRecordCarousel, weekFlex, monthFlex, recentFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, onboardingCarousel, menuCell, exampleCard, petDataFlex, deletedCard, confirmDeleteFlex, careNotifyFlex, careInviteFlex, weightModifyConfirmFlex, weightNoRecordFlex, weightAddedFlex, weightModifiedFlex, foodTimelineFlex, foodEditMenuFlex, foodBrandPickFlex, reviewMenuFlex } from './flex.js';
+import { reportChoiceFlex, recordFlex, recordFlexCompact, foodDisambigFlex, multiRecordFlex, undoConfirmFlex, todayFlex, handoffFlex, websiteFlex, menuFlex, recordMenuFlex, recordTutorialFlex, quickRecordCarousel, weekFlex, monthFlex, recentFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, onboardingCarousel, menuCell, exampleCard, petDataFlex, deletedCard, confirmDeleteFlex, careNotifyFlex, careInviteFlex, weightModifyConfirmFlex, weightNoRecordFlex, weightAddedFlex, weightModifiedFlex, foodTimelineFlex, foodEditMenuFlex, foodBrandPickFlex, reviewMenuFlex } from './flex.js';
 import { isBetaAllowed, normalizeCode, gateText } from './plan.js';
 import {
   ensureUser, updateUser, getUser, listPets, createPet, resolveDefaultPet, getPet, updatePetFields, createFoodItem, createMedItem,
@@ -3387,7 +3387,8 @@ export async function handleRecord(env, event, pet, record, lineUserId, opts = {
 // v8：LINE 體驗改版——記一筆／近七天記錄／出報告 ・ 管家後台／說明・怎麼記／照護月曆。
 //     今日記錄→近七天記錄（既有 week 卡）、給醫生看→出報告（就醫／照護）、
 //     照護站→管家後台、拿掉與趨勢／後台重複的「記錄回顧」，右下改為「照護月曆」（在對話看）。
-const RICHMENU_VERSION = 8;
+// v9：重新綁定既有六格與 LIFF 直開；圖片與標籤不變。
+const RICHMENU_VERSION = 9;
 
 async function ensurePersonalRichMenu(env, baseUrl, lineUserId) {
   const db = env.DB;
@@ -3557,6 +3558,14 @@ async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId, ow
     return;
   }
 
+  if (query === 'report') {
+    const doctorUrl = await siteLink(env, baseUrl, lineUserId, 'doctor');
+    const careUrl = await siteLink(env, baseUrl, lineUserId, 'care');
+    await replyOrPushFlex(env, event, reportChoiceFlex(doctorUrl, careUrl),
+      '這次要給誰？\n🏥 給醫生看：' + doctorUrl + '\n🐾 給照護者：' + careUrl);
+    return;
+  }
+
   if (query === 'website') {
     const url = await siteLink(env, baseUrl, lineUserId);
     await replyOrPushFlex(env, event, websiteFlex(url), websiteReply(url));
@@ -3614,15 +3623,6 @@ async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId, ow
 
   if (!pet) {
     await replyOrPush(env, event, '還沒有建立貓咪，先輸入「新增貓咪 名字」吧！');
-    return;
-  }
-
-  // 出報告：先問用途（就醫／照護），再走既有的整理輸出——就醫＝給醫生看（週趨勢＋可複製整理），
-  // 照護＝交接卡（接手怎麼顧）。不新造資料欄位，只把既有能力用一個清楚入口收斂。
-  if (query === 'report') {
-    await replyOrPushQuick(env, event,
-      '這份報告要拿來做什麼？\n・就醫使用：整理最近的照護與異常，給醫生快速看\n・照護使用：交接給家人／保姆，接手怎麼顧',
-      [qrMsg('🏥 就醫使用', '就醫報告'), qrMsg('🤝 照護使用', '照護報告')]);
     return;
   }
 

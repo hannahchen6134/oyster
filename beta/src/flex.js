@@ -7,6 +7,20 @@ import { BRAND, displayMedStatus } from './brand.js';
 import { isWetFoodType, isEstimableType } from './summary.js';
 import { formatWeightKg } from './util.js';
 
+export function reportChoiceFlex(doctorUrl, careUrl) {
+  return { type: 'flex', altText: '這次要給誰？給醫生看／給照護者', contents: {
+    type: 'bubble', body: { type: 'box', layout: 'vertical', paddingAll: '20px', spacing: 'lg', backgroundColor: '#FFFDF8', contents: [
+      { type: 'text', text: '這次要給誰？', weight: 'bold', size: 'xl', color: '#5A3617', wrap: true },
+      ...[[ '🏥 給醫生看', '整理近期狀況、異常、用藥與重要變化', doctorUrl ], [ '🐾 給照護者', '家人、朋友或貓保姆照顧時使用', careUrl ]].map(([label, description, uri]) => ({
+        type: 'box', layout: 'vertical', spacing: 'sm', contents: [
+          { type: 'button', style: 'primary', color: '#734921', action: { type: 'uri', label, uri } },
+          { type: 'text', text: description, size: 'sm', color: '#5C4A38', wrap: true }
+        ]
+      }))
+    ] }
+  } };
+}
+
 // 卡身：暖米白（和照護站網站同一個紙面世界，不用冷白）；標題：暖棕漸層
 const BODY_BG = '#FFFDF8';
 const HEADER_BG = { type: 'linearGradient', angle: '135deg', startColor: '#8A5A2C', endColor: '#6A4119' };

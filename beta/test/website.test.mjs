@@ -111,7 +111,7 @@ test('A4 存圖：每頁有「儲存第N張」鈕綁 data-idx，逐頁用 a4Shar
   assert.ok(/一次分享全部/.test(fn), '多頁主鈕「一次分享全部」');
   assert.ok(/請依序按下方的/.test(fn), '不支援多檔分享時要明確要求逐頁分享／儲存（不假裝成功）');
   // 不得把兩頁合成一張長圖：仍是每個 .a4-page 各自渲染成 2480×3508
-  assert.ok(/TARGET_W = 2480, TARGET_H = 3508/.test(html), '每頁固定 2480×3508');
+  assert.ok(/TARGET_W = mobile \? 1170 : 2480, TARGET_H = 3508/.test(html), 'A4 保留 2480×3508；手機版獨立 1170px 寬');
   assert.ok(/for \(const node of nodes\)/.test(html), '逐頁節點各自產圖，不合成長圖');
   // 頁數與實際張數不符時不假裝已產生 N 張（規格六）
   assert.ok(/pngs\.length < pages/.test(html), '頁數不符時報錯，不假裝已產生');
@@ -120,7 +120,7 @@ test('A4 存圖：每頁有「儲存第N張」鈕綁 data-idx，逐頁用 a4Shar
 
 // 儲存完整報告（主要入口）：存成圖片，不經 LINE、不上傳 /shot，沿用 a4RenderPages + showReportImages
 test('儲存完整報告：主按鈕存圖不經 LINE、防連點、snapshot 資料渲染、多頁完整保留', () => {
-  const fn = html.slice(html.indexOf("$('reportSaveBtn').addEventListener"), html.indexOf("$('reportSaveBtn').addEventListener") + 2000);
+  const fn = html.slice(html.indexOf("$('reportSaveBtn').addEventListener"), html.indexOf("$('reportSendLineBtn').addEventListener"));
   // 防連點：與「傳到 LINE」互斥
   assert.ok(/let reportSaving = false/.test(html) && /if \(reportSaving \|\| reportSending\) return/.test(fn), '需有防連點鎖（與傳 LINE 互斥）');
   assert.ok(/reportSaving = true/.test(fn) && /reportSaving = false/.test(fn), '處理中鎖定、完成後解除');

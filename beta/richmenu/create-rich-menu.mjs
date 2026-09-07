@@ -15,6 +15,10 @@ if (!token) {
 }
 const imagePath = process.argv[2] || 'richmenu/richmenu.png';
 const MENU_NAME = 'cat-care-beta-main';
+// 與 Worker 使用同一個 LIFF 設定；備援選單也直接開登入，不經訊息卡。
+const config = await readFile(new URL('../wrangler.toml', import.meta.url), 'utf8');
+const liffId = process.env.LIFF_ID || config.match(/^LIFF_ID\s*=\s*"([^"]+)"/m)?.[1];
+const siteUrl = liffId ? `https://liff.line.me/${liffId}` : 'https://cat-care-beta.hannahchen6134.workers.dev/';
 
 const W = 2500;
 const H = 1686;
@@ -40,7 +44,7 @@ const menu = {
     cell(1, 0, send('近七天記錄')),              // 近七天記錄（week 卡）
     cell(2, 0, send('出報告')),                  // 出報告（就醫／照護）
     // 管家後台：直接開網站（回訪者已登入一點就進；新朋友會看到登入引導頁）
-    cell(0, 1, { type: 'uri', uri: 'https://cat-care-beta.hannahchen6134.workers.dev/' }),
+    cell(0, 1, { type: 'uri', uri: siteUrl }),
     cell(1, 1, send('怎麼記')),                  // 說明・怎麼記
     // 照護月曆：直接在對話裡回月曆卡（不用開網站，點日期看那天細節）
     cell(2, 1, send('照護月曆'))

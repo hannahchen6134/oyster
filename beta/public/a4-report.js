@@ -3,6 +3,7 @@
 // 供「存成照片給醫生」離屏渲染成 2480×3508 PNG（每頁一張）。圖表用 inline SVG（向量、清晰）。
 // 版面：第1頁 頁首＋體重/水分/熱量趨勢；第2頁起 水分來源＋飲食組成＋回診重點；之後 每日照護明細。
 
+import { escapeReport, reportSectionHtml } from './report-purpose.js';
 const DAILY_PER_PAGE = 26;   // 每頁明細列數（A4 下 ≥8.5pt 仍清楚）
 const DIGEST_PER_PAGE = 16;  // 每頁回診重點列數
 
@@ -196,6 +197,7 @@ function estCompositionH(d) { const c = d.composition || {}; if (!c.hasData) ret
 
 // 依內容高度把區塊「一頁塞滿才換頁」，杜絕每頁只放一區塊而下方大片空白。回傳 { html, pages }。
 export function buildA4Report(data) {
+  if (Array.isArray(data?.sections)) return buildPurposePages(data);
   const d = data || {};
   const digest = (Array.isArray(d.digest) ? d.digest : []).slice()
     .sort((a, b) => `${b.date} ${b.time || ''}`.localeCompare(`${a.date} ${a.time || ''}`)); // 新→舊
@@ -234,6 +236,42 @@ export function buildA4Report(data) {
   const pages = (pageBlocks.length ? pageBlocks : [['']]).map((arr, i) =>
     `<div class="a4-page"><div class="a4-body">${i === 0 ? fullHeader(d) : miniHeader(d)}${arr.join('')}</div>${pageFooter(d, i + 1, total)}</div>`).join('');
   return { html: `<div class="a4-doc">${pages}</div>`, pages: total };
+}
+
+// 手機圖片與 A4 使用同一份已確認資料。長文字分段，不縮字、不裁掉後半段。
+export function buildPurposePages(data) {
+  const mobile = data.outputFormat !== 'a4';
+  const columns = mobile ? 18 : 36;
+  const cap = mobile ? 620 : 720;
+  const parts = [];
+  const intro = [data.notice, data.empty ? `最近 ${data.rangeDays} 天沒有足夠紀錄。` : ''].filter(Boolean);
+  const sections = [...(data.empty ? [{ title: '紀錄範圍', items: [intro.at(-1)] }] : []), ...data.sections];
+  for (const section of sections) {
+    for (const text of section.items) {
+      let fragment = '', lines = 1, col = 0, part = 0;
+      const flush = () => {
+        if (!fragment) return;
+        parts.push({ h: 72 + lines * 28, html: reportSectionHtml({title: section.title + (part++ ? '（續）' : ''), items: [fragment]}) });
+        fragment = ''; lines = 1; col = 0;
+      };
+      for (const char of Array.from(text)) {
+        if (char === '\n' || col >= columns) { lines++; col = 0; }
+        if (lines > 10) flush();
+        fragment += char;
+        if (char !== '\n') col++;
+      }
+      flush();
+    }
+  }
+  const pages = []; let current = [], height = 0;
+  for (const part of parts) {
+    if (current.length && height + part.h > cap) { pages.push(current); current = []; height = 0; }
+    current.push(part.html); height += part.h;
+  }
+  if (current.length) pages.push(current);
+  if (!pages.length) pages.push([]);
+  const html = pages.map((body, i) => `<div class="a4-page purpose-page ${mobile ? 'purpose-mobile' : 'purpose-a4'}"><header class="purpose-heading"><p>${escapeReport(data.petName)}</p><h1>${escapeReport(data.reportName)}</h1><p>${escapeReport(data.dateRangeLabel)}</p></header>${body.join('')}<footer>${escapeReport(data.notice)}<br>喵喵管家 · ${escapeReport(data.generatedAt)} · ${i+1} / ${pages.length}</footer></div>`).join('');
+  return { html, pages: pages.length };
 }
 
 // 多頁報告的檔名：單頁＝base.png；多頁＝base_1.png、base_2.png…（每頁獨立、可辨識頁碼）

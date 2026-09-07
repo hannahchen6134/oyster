@@ -1230,6 +1230,26 @@
       .cal-num { font-size: 11px; }
       .colophon { margin-top: 44px; }
     }
+    .liff-pending > .eyebrow, .liff-pending > h1 { display:none; }
+    .purpose-section { border:1px solid var(--line, #e5d8bf); border-radius:14px; padding:16px; margin:14px 0; background:#fffdf8; break-inside:avoid; }
+    .purpose-section h2 { font-size:18px; margin:0 0 10px; color:#5a3617; }
+    .purpose-section p { font-size:16px; line-height:1.7; white-space:pre-wrap; overflow-wrap:anywhere; margin:8px 0; }
+    .purpose-heading p { font-size:14px; color:#75644f; margin:5px 0; overflow-wrap:anywhere; }
+    .purpose-heading h1 { font-size:26px; margin:4px 0 12px; }
+    .purpose-notice, .purpose-empty { font-size:15px; line-height:1.7; padding:12px; background:#f4ede0; border-radius:10px; }
+    #reportView label { display:block; font-size:16px; margin:14px 0; }
+    #reportView textarea { display:block; width:100%; box-sizing:border-box; min-height:88px; font:inherit; line-height:1.7; margin-top:7px; }
+    #reportView .report-controls { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:16px 0; }
+    #reportView .report-controls button { min-height:44px; }
+    #reportView [data-purpose-days] { border:1px solid #d9cbb9; border-radius:10px; background:#fffdf8; color:#5a3617; padding:9px 13px; font:inherit; cursor:pointer; }
+    #reportView [aria-pressed="true"] { background:#734921; color:#fffdf8; border-color:#734921; }
+    #reportView select { font-size:16px; max-width:100%; }
+    .purpose-page { box-sizing:border-box; background:#fffdf8; color:#332417; }
+    #a4Export .purpose-page { padding:32px; height:auto; overflow:visible; }
+    #a4Export .purpose-mobile { width:390px; padding:24px; min-height:0; }
+    #a4Export .purpose-a4 { width:794px; min-height:1123px; }
+    .purpose-page footer { margin-top:20px; font-size:12px; color:#75644f; }
+    #reportView details summary { cursor:pointer; min-height:36px; font-size:16px; }
   </style>
 </head>
 <body>
@@ -1261,9 +1281,10 @@
             <span class="liff-paw p4"><svg viewBox="0 0 48 48"><g fill="currentColor"><circle cx="19" cy="27" r="12.5"/><circle cx="25.5" cy="10.5" r="4.6"/><circle cx="34.5" cy="14" r="4.9"/><circle cx="39" cy="22.5" r="4.9"/><circle cx="36.5" cy="31.5" r="4.6"/></g></svg></span>
             <span class="liff-paw p5"><svg viewBox="0 0 48 48"><g fill="currentColor"><circle cx="19" cy="27" r="12.5"/><circle cx="25.5" cy="10.5" r="4.6"/><circle cx="34.5" cy="14" r="4.9"/><circle cx="39" cy="22.5" r="4.9"/><circle cx="36.5" cy="31.5" r="4.6"/></g></svg></span>
           </div>
-          <div class="liff-wait-text">正在為你開啟管家後台</div>
+          <div class="liff-wait-text" role="status">正在開啟⋯</div>
           <div class="liff-wait-sub">第一次進入需要幾秒，請稍候</div>
         </div>
+        <div id="loginFailure" class="hidden" role="alert"><p>暫時無法開啟，請檢查網路或稍後再試。</p><button id="loginRetryBtn" class="btn btn-secondary" type="button">再試一次</button></div>
         <details class="disclaimer-fold">
           <summary>免責聲明<span class="df-caret">⌄</span></summary>
           <ul>
@@ -1382,7 +1403,8 @@
 
       <!-- 回診 -->
       <section class="panel hidden" id="trendView">
-        <div class="report-actions cap-hide">
+        <button id="openReportBtn" class="btn btn-primary" type="button">出報告</button>
+        <div class="report-actions cap-hide hidden">
           <button class="btn btn-primary" id="reportSaveBtn" type="button">💾 儲存完整報告</button>
           <button class="btn btn-secondary" id="reportSendLineBtn" type="button">📤 傳到 LINE</button>
           <p class="report-hint">可儲存成圖片，也可以直接傳到 LINE 分享給醫生。多頁報告會完整保留每一頁。</p>
@@ -1492,6 +1514,23 @@
         </details>
       </section>
 
+      <section class="panel hidden" id="reportView">
+        <button class="link-btn" id="reportBackBtn" type="button">‹ 返回</button>
+        <div id="reportPetChoice"></div>
+        <div id="reportWork" class="hidden">
+          <div class="report-controls"><button class="btn btn-secondary" data-purpose="doctor" type="button">給醫生看</button><button class="btn btn-secondary" data-purpose="care" type="button">給照護者</button></div>
+          <div id="reportEditor"></div>
+          <div id="purposeRange" class="report-controls"><span>近期範圍</span><button data-purpose-days="7" type="button">7 天</button><button data-purpose-days="14" type="button">14 天</button><button data-purpose-days="30" type="button">30 天</button></div>
+          <div id="reportStatus" role="status"></div>
+          <article id="purposePreview"></article>
+          <div id="purposeActions" class="report-controls hidden">
+            <label>分享版面 <select id="purposeFormat"><option value="mobile">手機閱讀</option><option value="a4">A4 列印</option></select></label>
+            <button class="btn btn-primary" id="purposeSave" type="button">分享／儲存圖片</button>
+            <button class="btn btn-secondary" id="purposeSend" type="button">傳到 LINE</button>
+          </div>
+        </div>
+      </section>
+
       <!-- 設定 -->
       <section class="panel hidden" id="settingsView">
         <div id="settingsMenu"></div>
@@ -1541,7 +1580,7 @@
 
   <!-- 存成圖片給醫生：同源本地檔，執行時不連外 -->
   <script src="/html-to-image.js"></script>
-  <script type="module" src="/a4-report.js?v=20260806c"></script>
+  <script type="module" src="/a4-report.js?v=20260907"></script>
   <script>
     'use strict';
     const TOKEN_KEY = 'cat-care-beta-token';
@@ -1568,6 +1607,7 @@
       eaten: { type: '', days: 30 }   // 「吃過的食物」：第一層品項摘要的類型過濾／天數（第二層逐餐上限存在各展開面板上）
     };
 
+    const reportModule = import('/report-purpose.js?v=20260907');
     const $ = (id) => document.getElementById(id);
 
     // ---------- 食物類型：網站端單一真相來源 ----------
@@ -1640,6 +1680,7 @@
       try {
         response = await fetch('/api/' + path, {
           ...options,
+          signal: options.signal || ((options.method || 'GET') === 'GET' ? AbortSignal.timeout(12000) : undefined),
           headers: {
             'Content-Type': 'application/json',
             Authorization: 'Bearer ' + state.token,
@@ -1652,6 +1693,7 @@
       let data = {};
       try { data = await response.json(); } catch (error) { /* ignore */ }
       if (response.status === 401) {
+        state.purposeData = null; state.reportBundle = null;
         localStorage.removeItem(TOKEN_KEY);
         showLogin(true);
         throw new Error(data.message || '連結已過期，請回 LINE 輸入「管家後台」取得新連結');
@@ -1672,6 +1714,9 @@
     }
 
     function switchTab(tab) {
+      state.activeTab = tab;
+      $('reportView').classList.add('hidden');
+      state.reportOpen = false;
       document.querySelectorAll('.tabs .tab').forEach((el) => el.classList.toggle('active', el.dataset.tab === tab));
       $('todayView').classList.toggle('hidden', tab !== 'today');
       $('calendarView').classList.toggle('hidden', tab !== 'calendar');
@@ -4212,6 +4257,154 @@
       if (btn) btn.addEventListener('click', () => { localStorage.setItem('disclaimerAck', '1'); bar.remove(); });
     }
 
+    function showStartupFailure() {
+      clearTimeout(state.startupTimer);
+      setLiffPending(false);
+      $('loginFailure').classList.remove('hidden');
+    }
+    $('loginRetryBtn').addEventListener('click', () => {
+      try { sessionStorage.removeItem('liffTries_h'); } catch {}
+      location.reload();
+    });
+
+    // 沿用已登入者可讀的既有 API，不建立公開帳號／報告網址或資料庫欄位。
+    let purposeRevision = 0;
+    function purposeDraftKey() {
+      return `reportDraft:${state.user?.lineUserId || ''}:${state.petId}:${state.reportPurpose}`;
+    }
+    function readPurposeDraft(defaults) {
+      try { return { ...defaults, ...JSON.parse(sessionStorage.getItem(purposeDraftKey()) || '{}') }; }
+      catch { return defaults; }
+    }
+    async function openPurpose(purpose = 'doctor', chosen = false, recordHistory = true) {
+      const wasOpen = state.reportOpen;
+      const returnTab = state.activeTab || 'today';
+      if (recordHistory) {
+        if (!wasOpen) history.replaceState({ ...history.state, reportTab: returnTab }, '', location.href);
+        history.pushState({ reportPurpose: purpose, reportPet: chosen ? state.petId : '' }, '', location.href);
+      }
+      state.reportOpen = true;
+      state.reportPurpose = purpose;
+      document.querySelectorAll('.tabs .tab').forEach((b) => b.classList.remove('active'));
+      state.purposeData = null; state.reportBundle = null;
+      const revision = ++purposeRevision;
+      ['todayView','calendarView','trendView','settingsView'].forEach((id) => $(id).classList.add('hidden'));
+      $('reportView').classList.remove('hidden');
+      $('pageMode').textContent = '出報告';
+      $('purposeActions').classList.add('hidden');
+      $('purposePreview').innerHTML = '';
+      $('reportPetChoice').innerHTML = '';
+      if (purpose === 'choice') {
+        $('reportWork').classList.add('hidden');
+        $('reportPetChoice').innerHTML = '<h2>這次要給誰？</h2><button class="btn btn-primary" data-choose-purpose="doctor" type="button">🏥 給醫生看</button><p>整理近期狀況、異常、用藥與重要變化</p><button class="btn btn-secondary" data-choose-purpose="care" type="button">🐾 給照護者</button><p>家人、朋友或貓保姆照顧時使用</p>';
+        return;
+      }
+      if (!state.pets.length) {
+        $('reportWork').classList.add('hidden');
+        $('reportPetChoice').innerHTML = '<p>先新增貓咪，就能整理照護資訊。</p><button class="btn btn-primary" data-tab="settings" type="button">前往設定</button>';
+        return;
+      }
+      if (state.pets.length > 1 && !chosen) {
+        $('reportWork').classList.add('hidden');
+        $('reportPetChoice').innerHTML = '<h2>要整理哪隻貓？</h2>' + state.pets.map((p) => `<button class="btn btn-secondary" data-report-pet="${esc(p.petId)}" type="button">${esc(p.petName)}</button>`).join('');
+        return;
+      }
+      const pet = currentPet();
+      if (!pet) return;
+      const petId = pet.petId;
+      const days = state.reportRange || 14;
+      const to = todayStr(), from = shiftDate(to, -(days - 1));
+      $('reportWork').classList.remove('hidden');
+      $('reportEditor').innerHTML = '';
+      $('reportStatus').textContent = '正在整理⋯';
+      $('purposeRange').classList.toggle('hidden', purpose === 'care');
+      document.querySelectorAll('[data-purpose-days]').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.purposeDays) === days)));
+      document.querySelectorAll('[data-purpose]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.purpose === purpose)));
+      try {
+        const [mod, summary, highlights, weights, meds, vets] = await Promise.all([
+          reportModule,
+          api(`summary?petId=${encodeURIComponent(petId)}&from=${from}&to=${to}`),
+          api(`highlights?petId=${encodeURIComponent(petId)}&days=${days}`),
+          api(`weights?petId=${encodeURIComponent(petId)}`),
+          api(`meds?petId=${encodeURIComponent(petId)}`), api('vets')
+        ]);
+        if (revision !== purposeRevision || !state.reportOpen || state.petId !== petId) return;
+        state.reportBundle = { pet, rows: summary.rows || [], highlights: highlights.logs || [], weights: weights.rows || [], from, to, days };
+        const defaults = purpose === 'care' ? mod.careDefaults(pet, meds.rows, vets.rows) : { concern: localStorage.getItem(`vetAsk:${petId}`) || '' };
+        state.reportDraft = readPurposeDraft(defaults);
+        const fields = purpose === 'care' ? [
+          ['feeding','餵食與飲水怎麼安排？','食物、份量、時間或特殊飲食，請由你確認'],
+          ['medicine','用藥方式','已帶入這隻貓的用藥設定，請確認是否仍適用'],
+          ['notes','有什麼要特別注意？','貓砂、最近狀況、個性習慣或禁忌'],
+          ['emergency','緊急時怎麼聯絡？','主人聯絡方式、醫院或你希望的處理方式']
+        ] : [['concern','這次最想讓醫生知道什麼？','選填，例如這週食量減少，想請醫生確認']];
+        const editorFields = fields.map(([key,label,hint]) => `<label>${label}<textarea data-report-field="${key}" maxlength="2000" placeholder="${hint}">${esc(state.reportDraft[key] || '')}</textarea></label>`).join('');
+        $('reportEditor').innerHTML = purpose === 'care'
+          ? '<details id="careEditFold"><summary>這次有需要修改或補充嗎？</summary><p>已帶入現有設定；這次調整只用於這份照護說明。</p>' + editorFields + '</details>'
+          : editorFields;
+        $('reportStatus').textContent = '';
+        await renderPurposePreview();
+      } catch (error) {
+        if (revision !== purposeRevision || !state.reportOpen) return;
+        state.purposeData = null;
+        $('reportStatus').innerHTML = '<p>暫時無法整理，請檢查網路或稍後再試。已填的文字會保留。</p><button class="btn btn-secondary" id="purposeRetry" type="button">再試一次</button>';
+      }
+    }
+    async function renderPurposePreview() {
+      if (!state.reportBundle || !state.reportOpen) return;
+      const mod = await reportModule;
+      if (!state.reportBundle || !state.reportOpen) return;
+      state.purposeData = mod.purposeReport({ ...state.reportBundle, purpose: state.reportPurpose, draft: state.reportDraft });
+      $('purposePreview').innerHTML = mod.reportPreview(state.purposeData) + (state.purposeData.empty && state.reportRange !== 30 ? '<button data-purpose-days="30" class="btn btn-secondary" type="button">改看 30 天</button>' : '');
+      if (state.reportPurpose === 'care' && !String(state.reportDraft.feeding || '').trim()) {
+        const notice = $('purposePreview').querySelector('.purpose-notice');
+        notice.insertAdjacentHTML('beforeend', '<br><button id="completeFeeding" class="link-btn" type="button">補充餵食與飲水方式</button>');
+      }
+      $('purposeActions').classList.remove('hidden');
+    }
+    $('reportEditor').addEventListener('input', (event) => {
+      const key = event.target.dataset.reportField;
+      if (!key || !state.reportBundle) return;
+      state.reportDraft[key] = event.target.value;
+      try { sessionStorage.setItem(purposeDraftKey(), JSON.stringify(state.reportDraft)); } catch {}
+      renderPurposePreview();
+    });
+    document.addEventListener('click', async (event) => {
+      const choice = event.target.closest('[data-choose-purpose]');
+      if (choice) return openPurpose(choice.dataset.choosePurpose);
+      if (event.target.closest('#completeFeeding')) {
+        $('careEditFold').open = true;
+        $('reportEditor').querySelector('[data-report-field="feeding"]').focus();
+        return;
+      }
+      const petButton = event.target.closest('[data-report-pet]');
+      if (petButton && state.pets.some((p) => p.petId === petButton.dataset.reportPet)) {
+        state.petId = petButton.dataset.reportPet;
+        $('petSelect').value = state.petId;
+        $('petTitle').textContent = currentPet().petName;
+        history.replaceState({ ...history.state, reportPet: state.petId }, '', location.href);
+        return openPurpose(state.reportPurpose, true, false);
+      }
+      const purpose = event.target.closest('[data-purpose]');
+      if (purpose) return openPurpose(purpose.dataset.purpose, true);
+      const days = event.target.closest('[data-purpose-days]');
+      if (days) { state.reportRange = Number(days.dataset.purposeDays); return openPurpose(state.reportPurpose, true, false); }
+      if (event.target.closest('#purposeRetry')) return openPurpose(state.reportPurpose, true, false);
+    });
+    $('openReportBtn').addEventListener('click', () => openPurpose('choice'));
+    $('purposeSave').addEventListener('click', () => $('reportSaveBtn').click());
+    $('purposeSend').addEventListener('click', () => $('reportSendLineBtn').click());
+    $('reportBackBtn').addEventListener('click', () => history.back());
+    window.addEventListener('popstate', (event) => {
+      if (state.reportImageBox) {
+        state.reportImageBox.remove(); state.reportImageBox = null;
+        return;
+      }
+      if (event.state?.reportPurpose) openPurpose(event.state.reportPurpose, !!event.state.reportPet, false);
+      else if (state.reportOpen) { ++purposeRevision; switchTab(event.state?.reportTab || 'today'); }
+    });
+
+
     function loadScript(src) {
       return new Promise((resolve, reject) => {
         const s = document.createElement('script');
@@ -4225,13 +4418,13 @@
       // 防迴圈保險：LIFF 初始化正常會重載一次頁面；若異常連續重導，最多 3 次就放棄改走手動登入
       try {
         const tries = Number(sessionStorage.getItem('liffTries_h') || '0');
-        if (tries >= 3) return;
+        if (tries >= 3) throw new Error('init-retry-limit');
         sessionStorage.setItem('liffTries_h', String(tries + 1));
       } catch (error) { /* sessionStorage 不可用就照舊 */ }
       try {
-        const cfg = await fetch('/api/liff-config').then((r) => r.json()).catch(() => ({}));
+        const cfg = await fetch('/api/liff-config', { signal: AbortSignal.timeout(6000) }).then((r) => { if (!r.ok) throw new Error('config'); return r.json(); });
         if (!cfg || !cfg.liffId) return;
-        await loadScript('https://static.line-scdn.net/liff/edge/2/sdk.js');
+        await Promise.race([loadScript('https://static.line-scdn.net/liff/edge/2/sdk.js'), new Promise((_, reject) => setTimeout(() => reject(new Error('sdk-timeout')), 6000))]);
         // init 逾時保險：卡超過 6 秒就放棄，讓頁面停在手動登入
         await Promise.race([
           liff.init({ liffId: cfg.liffId }),
@@ -4252,13 +4445,13 @@
           const accessToken = liff.getAccessToken && liff.getAccessToken();
           if (accessToken) {
             const res = await fetch('/api/liff-login', {
-              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              method: 'POST', signal: AbortSignal.timeout(6000), headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ accessToken })
             }).then((r) => r.json()).catch(() => null);
             if (res && res.ok && res.token) state.liff.autoToken = res.token;
           }
         }
-      } catch (error) { /* LIFF 失敗不擋手動登入 */ }
+      } catch (error) { state.liff.error = true; /* 保留手動登入 */ }
     }
 
     // LIFF 自動登入進行中：登入卡只顯示「正在用 LINE 身分登入」，不閃手動登入表單
@@ -4270,27 +4463,31 @@
     async function bootstrap() {
       // 一進來先顯示登入頁，避免載入期間整頁空白；成功後再切主畫面
       showLogin(false);
+      const startupTimer = setTimeout(() => showStartupFailure(), 18000);
+      state.startupTimer = startupTimer;
       // LIFF 開啟時網址帶有 liff.state / context_token 等參數，liff.init 要靠它們完成初始化；
       // 這種情況絕對不能動網址（之前在這裡洗掉參數，造成 init 無限重導），
       // 並先顯示「LINE 登入中」過場，不閃手動登入表單
       const hasLiffParams = /liff\.state|liffClientId|context_token=|access_token=/.test(location.search + location.hash);
       // 只要有任何自動登入的機會（LIFF、網址帶 token、或本機存過 token），就先顯示登入動畫，
       // 不閃手動登入表單；純粹新訪客(沒有以上任一)才直接看到手動登入
-      const willAutoLogin = hasLiffParams || /[#&]token=/.test(location.hash) || !!localStorage.getItem(TOKEN_KEY);
+      const willAutoLogin = hasLiffParams || /Line\//i.test(navigator.userAgent) || /[#&]token=/.test(location.hash) || !!localStorage.getItem(TOKEN_KEY);
       if (willAutoLogin) setLiffPending(true);
       const liffReady = initLiff();
       // 從網址 hash 取 token（LINE 登入連結）與深連結目標 go=
       // 注意：一定要錨定 [#&]token=，否則會誤吃 LIFF 的 context_token / access_token
       const hashMatch = location.hash.match(/[#&]token=([a-zA-Z0-9]+)/);
-      const goEarly = location.hash.match(/[#&]go=([a-z]+)/);
+      const goEarly = (location.search + location.hash).match(/[?#&]go=([a-z]+)/);
       if (hashMatch && !hasLiffParams) {
         localStorage.setItem(TOKEN_KEY, hashMatch[1]);
         history.replaceState(null, '', location.pathname);
       }
       // 在 LINE 內時，LIFF 換發的新登入優先於可能過期的舊 token；最多等 5 秒
+      let liffWaitTimer;
       try {
-        await Promise.race([liffReady, new Promise((resolve) => setTimeout(resolve, 5000))]);
-      } catch (error) { /* ignore */ }
+        await Promise.race([liffReady, new Promise((resolve) => { liffWaitTimer = setTimeout(() => { state.liff.error = true; resolve(); }, 17000); })]);
+      } catch (error) { state.liff.error = true; }
+      finally { clearTimeout(liffWaitTimer); }
       // 深連結 go=：LIFF 連結會轉成 ?go=…（init 完成後才回寫網址），一般登入連結則是 #go=…
       const goLate = (location.search + location.hash).match(/[?#&]go=([a-z]+)/);
       const goTarget = (goLate || goEarly) ? (goLate || goEarly)[1] : '';
@@ -4300,17 +4497,18 @@
       } else {
         state.token = localStorage.getItem(TOKEN_KEY) || '';
       }
-      if (!state.token) { setLiffPending(false); return; } // 自動登入沒成 → 顯示手動登入表單
+      if (!state.token) { clearTimeout(startupTimer); setLiffPending(false); if (willAutoLogin || state.liff.error) showStartupFailure(); return; } // 自動登入沒成 → 顯示手動登入表單
 
       try {
         await refreshPets();
         state.foods = (await api('foods')).rows;
         if (state.petId) state.meds = (await api(`meds?petId=${state.petId}`)).rows;
       } catch (error) {
-        setLiffPending(false);
+        clearTimeout(startupTimer); showStartupFailure();
         return; // 401 時 api() 已切到登入畫面
       }
 
+      clearTimeout(startupTimer);
       $('loginView').classList.add('hidden');
       $('appView').classList.remove('hidden');
       trackEvent('website_open', true);
@@ -4325,6 +4523,10 @@
       const dow = '日一二三四五六'[new Date(`${tpe}T00:00:00`).getDay()];
       $('dateLine').textContent = `${Number(tpe.slice(5, 7))}月${Number(tpe.slice(8, 10))}日（${dow}）`;
       // 深連結：go=pet → 直接開「設定 → 貓咪資料」；go=settings → 設定選單
+      if (goTarget === 'doctor' || goTarget === 'care') {
+        await openPurpose(goTarget);
+        return;
+      }
       if (goTarget === 'pet') {
         state.settingsTab = 'pets';
         switchTab('settings');
@@ -4636,6 +4838,7 @@
       $('petTitle').textContent = currentPet()?.petName || '貓貓';
       state.meds = (await api(`meds?petId=${state.petId}`)).rows;
       await api('me', { method: 'PUT', body: JSON.stringify({ defaultPetId: state.petId }) }).catch(() => {});
+      if (state.reportOpen) { await openPurpose(state.reportPurpose, true, false); return; }
       const activeTab = document.querySelector('.tabs .tab.active')?.dataset.tab || 'today';
       switchTab(activeTab);
     });
@@ -4683,6 +4886,7 @@
     }
     // 蒐集「已算好的」report data，交給 buildA4Report 排版。全部用單一 state.reportRange 窗口，不重算、不改數值定義。
     function collectA4Data() {
+      if (state.reportOpen && state.purposeData) return JSON.parse(JSON.stringify({ ...state.purposeData, outputFormat: $('purposeFormat').value }));
       const pet = (state.pets || []).find((p) => p.petId === state.petId);
       const petName = pet ? pet.petName : (($('petTitle').textContent || '貓咪').trim());
       const to = todayStr();
@@ -4737,7 +4941,8 @@
       host.innerHTML = built.html;
       if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch (e) { /* ignore */ } }
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-      const TARGET_W = 2480, TARGET_H = 3508;
+      const mobile = snapshotData?.outputFormat === 'mobile';
+      const TARGET_W = mobile ? 1170 : 2480, TARGET_H = 3508;
       const nodes = Array.from(host.querySelectorAll('.a4-page'));
       if (!nodes.length) { console.error('[A4] 匯出容器沒有 .a4-page 節點'); throw new Error('a4_no_pages'); }
       const out = [];
@@ -4745,12 +4950,13 @@
       for (const node of nodes) {
         const w = node.offsetWidth || 794;
         if (!(w > 0)) { console.error('[A4] 匯出節點寬度為 0，版面未渲染'); throw new Error('a4_zero_width'); }
+        if (!mobile && node.scrollHeight > 1125) throw new Error('報告內容超出頁面，請改用手機閱讀版面');
         const ratio = TARGET_W / w;                       // 讓來源寬度剛好放大到 2480
         const dataUrl = await window.htmlToImage.toPng(node, { pixelRatio: ratio, backgroundColor: '#FFFDF8', skipFonts: true });
         maxSrcLen = Math.max(maxSrcLen, (dataUrl || '').length);
         const img = new Image(); img.src = dataUrl; await (img.decode ? img.decode() : new Promise((r) => { img.onload = r; }));
-        const canvas = document.createElement('canvas'); canvas.width = TARGET_W; canvas.height = TARGET_H;
-        const ctx = canvas.getContext('2d'); ctx.fillStyle = '#FFFDF8'; ctx.fillRect(0, 0, TARGET_W, TARGET_H);
+        const canvas = document.createElement('canvas'); canvas.width = TARGET_W; canvas.height = mobile ? Math.ceil(img.height * TARGET_W / img.width) : TARGET_H;
+        const ctx = canvas.getContext('2d'); ctx.fillStyle = '#FFFDF8'; ctx.fillRect(0, 0, TARGET_W, canvas.height);
         const dh = Math.round(img.width ? img.height * (TARGET_W / img.width) : TARGET_H);
         ctx.drawImage(img, 0, 0, TARGET_W, dh);           // 等比填滿寬度、頂端對齊；不足處留白底、超出裁掉
         out.push(canvas.toDataURL('image/png'));
@@ -4771,7 +4977,7 @@
       if (reportSaving || reportSending) return;    // 防連點：任一入口處理中就忽略後續點擊
       const btn = $('reportSaveBtn');
       if (!window.htmlToImage || typeof window.buildA4Report !== 'function') { toast('報告功能還在載入，請稍等一下再按', true); return; }
-      if (!state.trendRows) { toast('資料還在載入，請稍等一下再按', true); return; }
+      if (state.reportOpen ? !state.purposeData : !state.trendRows) { toast('資料還在載入，請稍等一下再按', true); return; }
       const snap = {
         petId: state.petId,
         rangeDays: state.reportRange || 14,
@@ -4791,7 +4997,7 @@
         const { pngs, pages } = await a4RenderPages(snap.data);   // 用 snapshot 資料渲染
         if (!pngs.length) { loading.remove(); alert('這個瀏覽器產出的圖片是空白的，請改用一般瀏覽器（Safari／Chrome）開，或先用手機截圖。'); return; }
         if (pngs.length < pages) { loading.remove(); console.error('[A4] 頁數不符 pages=' + pages + ' pngs=' + pngs.length); alert(`第 ${pngs.length + 1} 頁產生失敗，請重新產生報告。`); return; }
-        const base = `${a4SafeName(petName)}_回診摘要_近${snap.rangeDays}天_${snap.today}`;
+        const base = `${a4SafeName(petName)}_${snap.data.reportName || "回診摘要"}_${snap.today}`;
         const names = window.a4PageFilenames(base, pngs.length);
         loading.remove();
         // 直接把每一頁交給既有儲存 UI：dataUrl 供分享／長按儲存、src 供顯示、name 供檔名。不上傳、不經 LINE。
@@ -4812,7 +5018,7 @@
       if (reportSending || reportSaving) return;    // 防連點：任一入口處理中就忽略後續點擊
       const btn = $('reportSendLineBtn');
       if (!window.htmlToImage || typeof window.buildA4Report !== 'function') { toast('報告功能還在載入，請稍等一下再按', true); return; }
-      if (!state.trendRows) { toast('資料還在載入，請稍等一下再按', true); return; }
+      if (state.reportOpen ? !state.purposeData : !state.trendRows) { toast('資料還在載入，請稍等一下再按', true); return; }
       // ── snapshot：同步固定本次的 petId／範圍／日期／資料，整個產圖・上傳・傳送都用它（產圖中切換毛孩也不混用）──
       const snap = {
         petId: state.petId,
@@ -4833,7 +5039,7 @@
         const { pngs, pages } = await a4RenderPages(snap.data);   // 用 snapshot 資料渲染，不吃後續 state 變動
         if (!pngs.length) { loading.remove(); alert('這個瀏覽器產出的圖片是空白的，請改用一般瀏覽器（Safari／Chrome）開，或先用手機截圖。'); return; }
         if (pngs.length < pages) { loading.remove(); console.error('[A4] 頁數不符 pages=' + pages + ' pngs=' + pngs.length); alert(`第 ${pngs.length + 1} 頁產生失敗，請重新產生報告。`); return; }
-        const base = `${a4SafeName(petName)}_回診摘要_近${snap.rangeDays}天_${snap.today}`;
+        const base = `${a4SafeName(petName)}_${snap.data.reportName || "回診摘要"}_${snap.today}`;
         const names = window.a4PageFilenames(base, pngs.length);
         // 先把「所有頁」都上傳完成，全部處理完才送 LINE：不邊傳邊送、不缺頁、保序。
         // 逐頁驗證檔案規格：original<=10MB、preview<=1MB（超過就縮，縮不下去→oversize→轉 manual）。
@@ -4927,14 +5133,14 @@
         fetchBlob: async (dataUrl) => (await fetch(dataUrl)).blob(),
         makeFile: (blob, name) => new File([blob], name, { type: 'image/png' }),
         canShare: (files) => !!(navigator.canShare && navigator.canShare({ files })),
-        share: (files) => navigator.share({ files, title: '回診摘要' })
+        share: (files) => navigator.share({ files, title: '貓咪照護資訊' })
       };
       const box = document.createElement('div');
       box.className = 'imgbox';
       const pageBlocks = items.map((it, i) => `
         <div style="margin:0 auto 20px;max-width:100%">
           ${multi ? `<div style="text-align:center;font-size:13px;font-weight:600;color:#8a7c68;margin:6px 0 6px">第 ${i + 1} 頁／共 ${items.length} 頁</div>` : ''}
-          <img alt="回診摘要 第${i + 1}頁" src="${it.src}" style="width:100%;height:auto;display:block;border:1px solid rgba(0,0,0,.08)">
+          <img alt="貓咪照護資訊 第${i + 1}頁" src="${it.src}" style="width:100%;height:auto;display:block;border:1px solid rgba(0,0,0,.08)">
           <button class="btn btn-secondary btn-sm imgbox-savepage" data-idx="${i}" type="button" style="width:100%;margin-top:8px">${multi ? `分享／儲存第 ${i + 1} 張` : '分享／儲存這張'}</button>
         </div>`).join('');
       // navigator.share 會開系統分享面板（不一定直接寫相簿），文案用「分享／儲存」較不誤導
@@ -4944,12 +5150,14 @@
       box.innerHTML = `
         <div class="imgbox-bar">
           <div class="imgbox-hint">${hint}</div>
-          <button class="imgbox-btn imgbox-shareall" type="button">${multi ? '一次分享全部' : '分享給醫生'}</button>
+          <button class="imgbox-btn imgbox-shareall" type="button">${multi ? '一次分享全部' : '分享這張'}</button>
           <button class="imgbox-btn imgbox-close" type="button">關閉</button>
         </div>
         <div class="imgbox-scroll">${pageBlocks}</div>`;
       document.body.appendChild(box);
-      box.querySelector('.imgbox-close').onclick = () => box.remove();
+      state.reportImageBox = box;
+      history.pushState({ ...history.state, reportImages: true }, '', location.href);
+      box.querySelector('.imgbox-close').onclick = () => history.back();
       // 每頁「儲存第N張」：用自己的 pageIndex 分享/儲存該頁；不支援分享就提示長按這一頁
       box.querySelectorAll('.imgbox-savepage').forEach((b) => {
         b.onclick = async () => {

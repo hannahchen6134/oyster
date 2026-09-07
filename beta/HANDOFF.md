@@ -176,8 +176,9 @@ LINE 使用者打字
    免費方案 10ms 上限**，需 **Workers Paid（US$5/月）**。目前的免費備案是：LINE 顯示雙長條卡，
    想看折線圖點底鈕開後台趨勢頁。若之後升級付費要做，元件是 `@resvg/resvg-wasm` + 一個
    **子集化 CJK 字型**（別整包 wqy-zenhei，太大）。這是刻意未做，不是 bug。
-2. **出報告目前是「可用版入口」**：就醫→`visit`、照護→`handoff`，**尚未做**近7/近14 範圍選擇與
-   §8/§9 的「就醫 vs 照護報告內容差異化」（Phase 3）。
+2. **出報告用途已拆分（本機修改，部署狀態另查）**：`report` 回覆「這次要給誰？」Flex，兩個 URI 直接前往 LIFF `go=doctor`／`go=care`。
+   就醫摘要保留 7／14／30 天、預設 14 天；照護說明由既有用藥／貓咪／醫院設定加主人確認文字組成，不從歷史紀錄推導指示。
+   `public/report-purpose.js` 整理用途內容，`public/a4-report.js` 共用手機圖片／A4 分頁與原分享管線。細節見 `docs/report-flow-20260907.md`。
 3. **文案／字串測試很嚴**：改 Flex 卡片或指令關鍵詞時，`teaching-consistency`、`food-brand-hint`、
    `pet-selection`、`richmenu-routing`、`brand-naming`、`week-chart` 等會斷言字串／顏色，改文案要
    同步改測試（但別為了綠燈刪掉有意義的測試）。
@@ -203,6 +204,12 @@ LINE 使用者打字
 4. 任何改動：**先寫／改測試 → `npm test` 綠 → `npm run deploy`**；別跳過測試閘門、別碰 production。
 
 有背景脈絡在 `docs/`（付費方案、使用說明、資料備份與復原、LINE OA 介紹）與 `PRODUCT_ANALYSIS.md`。
+
+### 2026-09-07 介面流程與報告修改補充
+- 本輪六格圖片與標籤不變，個人選單版本為 v9；原本已是 LIFF URI 的後台入口保持直開，備援選單改讀同一個 LIFF 設定。
+- 新增報告用途測試後，本機完整測試 578 項通過；先前的 570 是交接時基準。
+- 報告補充文字只存於本機 sessionStorage（使用者／貓咪／用途分開），不修改照護設定、不新增 DB schema。
+- 程式修改與驗證不代表已部署；部署仍從 main，須另外取得本次發布授權。
 
 ---
 
