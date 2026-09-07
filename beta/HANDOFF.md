@@ -1,5 +1,7 @@
 # 喵喵管家 — 交接報告（給接手的工程師／Codex）
 
+> LINE 紀錄效能第一批：回覆優先、背景維護去重、完整進度差額與匿名 timing。實作、量測判讀及尚未處理的加總競態見 [docs/record-performance.md](docs/record-performance.md)。
+
 > 2026-09-07 最新：以 main 為唯一發布來源；新增照護範本、AI 原句分類及醫生／照護 QR 分享。完整行為與權限以 [docs/report-sharing.md](docs/report-sharing.md) 為準。下方早期『無 LLM／main 落後／QR 未實作』敘述為歷史資訊。
 
 > 這份是「接手前先讀我」。目標：讓你在**不打破現有功能**、**不誤動正式環境**的前提下，

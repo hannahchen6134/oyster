@@ -128,8 +128,9 @@ function statCellRow(cells) {
   return { type: 'box', layout: 'horizontal', spacing: 'md', margin: 'md', contents: cells };
 }
 
-function progressBar(label, value, goal) {
+function progressBar(label, value, goal, unit = '') {
   const pct = Math.max(0, Math.min(100, Math.round((Number(value) / Number(goal)) * 100)));
+  const remaining = Math.max(0, Math.round((Number(goal) - Number(value)) * 10) / 10);
   const done = pct >= 100;
   return {
     type: 'box', layout: 'vertical', margin: 'md', spacing: 'xs',
@@ -149,7 +150,8 @@ function progressBar(label, value, goal) {
           cornerRadius: '4px', height: '8px', width: `${Math.max(pct, 4)}%`,
           contents: [{ type: 'filler' }]
         }]
-      }
+      },
+      text(remaining > 0 ? `還差 ${fmt(remaining)} ${unit}`.trim() : '已達目標', { size: 'xs', color: C.inkSoft, wrap: true })
     ]
   };
 }
@@ -174,8 +176,8 @@ function goalContents(pet, summary, date, showEncourage = true) {
     { type: 'separator', margin: 'lg', color: SEPARATOR },
     text('今日目標', { size: 'xs', color: C.muted, margin: 'lg', weight: 'bold' })
   ];
-  if (goalWater > 0) contents.push(progressBar(`水分 ${fmt(summary.totalWaterMl)} / ${fmt(goalWater)} ml`, summary.totalWaterMl, goalWater));
-  if (goalKcal > 0) contents.push(progressBar(`熱量 ${fmt(summary.kcal)} / ${fmt(goalKcal)} kcal${summary.kcalIncomplete ? '（尚有未計熱量）' : (summary.kcalEstimated ? '（粗估）' : '')}`, summary.kcal, goalKcal));
+  if (goalWater > 0) contents.push(progressBar(`水分 ${fmt(summary.totalWaterMl)} / ${fmt(goalWater)} ml`, summary.totalWaterMl, goalWater, 'ml'));
+  if (goalKcal > 0) contents.push(progressBar(`熱量 ${fmt(summary.kcal)} / ${fmt(goalKcal)} kcal${summary.kcalIncomplete ? '（尚有未計熱量）' : (summary.kcalEstimated ? '（粗估）' : '')}`, summary.kcal, goalKcal, 'kcal'));
   if (slots.length) {
     const doneSlots = new Set((summary.meds || []).filter((m) => m.status === '已吃').map((m) => m.slot));
     const parts = slots.map((slot) => `${slot} ${doneSlots.has(slot) ? '✓' : '未記'}`).join('　');

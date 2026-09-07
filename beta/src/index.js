@@ -1,15 +1,16 @@
 import { publicReport, purgeReports } from './report-sharing.js';
 import { startLineReport, handleLineReportPostback, handleLineReportText } from './line-reports.js';
 import { frequentRecordItems, withFrequentRecords } from './frequent-records.js';
+import { LINE_EVENT, withLineEvent, afterEventReply, markEvent, measureEvent } from './line-event.js';
 // 貓貓照護管家 Beta — Cloudflare Worker 入口
-// /webhook  → LINE Messaging API webhook（驗簽後直接處理、直接 reply，不需早回 ack）
+// /webhook  → LINE Messaging API webhook（驗簽後先回 ack，waitUntil 內記錄並 reply）
 // /api/*    → 照護站 REST API
 // 其餘路徑 → 照護站網站（public/ 靜態資源）
 
 import { parseMessage, matchFood, guessFood, normalizeText, analyzeLeading, stripFoodTypeWords, isAskableFoodName } from './parser.js';
 import { deriveFoodFields, isWetFoodType, isEstimableType, buildHandoff } from './summary.js';
 import { handleApi } from './api.js';
-import { verifyLineSignature, replyOrPush, replyOrPushQuick, replyOrPushFlex, replyMessages, pushText, pushMessages, getProfile, getAccessToken, checkAccessToken, showLoadingAnimation } from './line.js';
+import { verifyLineSignature, replyOrPush, replyOrPushQuick, replyOrPushFlex, replyMessages, pushText, pushMessages, getProfile, getAccessToken, checkAccessToken, showLoadingAnimation, startRecordLoading } from './line.js';
 import { hasAnyReminder, parseReminderSettings, buildReminderLines, reminderMessage, visitReminderMessage } from './reminders.js';
 import { shortDate } from './replies.js';
 import { reportChoiceFlex, recordFlex, recordFlexCompact, foodDisambigFlex, multiRecordFlex, undoConfirmFlex, todayFlex, handoffFlex, websiteFlex, menuFlex, recordMenuFlex, recordTutorialFlex, quickRecordCarousel, weekFlex, monthFlex, recentFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, onboardingCarousel, menuCell, exampleCard, petDataFlex, deletedCard, confirmDeleteFlex, careNotifyFlex, careInviteFlex, weightModifyConfirmFlex, weightNoRecordFlex, weightAddedFlex, weightModifiedFlex, foodTimelineFlex, foodEditMenuFlex, foodBrandPickFlex, reviewMenuFlex } from './flex.js';
@@ -79,14 +80,15 @@ function isDuplicateMessage(messageId) {
 
 export default {
   async fetch(request, env, ctx) {
+    const receivedAt = performance.now();
     const url = new URL(request.url);
     if (url.pathname.startsWith('/r/')) return publicReport(request,env,url);
+    if (url.pathname === '/webhook' && request.method === 'POST') {
+      return handleWebhook(request, env, url, ctx, { receivedAt, colo: request.cf?.colo });
+    }
     // 確保 tasks 表與 logs.sourceTaskId 已存在（冪等、每 isolate 一次），再進任何會寫 logs 的路徑
     await ensureTaskSchema(env.DB);
 
-    if (url.pathname === '/webhook' && request.method === 'POST') {
-      return handleWebhook(request, env, url, ctx);
-    }
     // LIFF 設定：前端讀這個決定要不要啟用「挑好友送出邀請」（未設定 LIFF_ID 時回空字串→自動退回複製邀請）
     if (url.pathname === '/api/liff-config') {
       return jsonResponse({ ok: true, liffId: String(env.LIFF_ID || '') });
@@ -537,7 +539,7 @@ async function runDailyReminders(env) {
   }
 }
 
-async function handleWebhook(request, env, url, ctx) {
+async function handleWebhook(request, env, url, ctx, timing = {}) {
   const rawBody = await request.text();
   const signature = request.headers.get('x-line-signature') || '';
 
@@ -558,38 +560,43 @@ async function handleWebhook(request, env, url, ctx) {
   // 立刻回 200 給 LINE，實際處理與回覆在背景進行（replyToken 仍在有效窗內）。
   // 這樣即使記錄/回覆稍慢，LINE 也不會判定逾時而「重送」，避免重複紀錄與
   // replyToken 被搶用造成「有時有回、有時沒回」。ctx.waitUntil 讓背景工作跑完才回收。
-  const work = processWebhookEvents(events, env, baseUrl);
+  const work = processWebhookEvents(events, env, baseUrl, timing);
   if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(work);
   else await work;
 
   return jsonResponse({ ok: true });
 }
 
-async function processWebhookEvents(events, env, baseUrl) {
+async function processWebhookEvents(events, originalEnv, baseUrl, timing) {
   for (const event of events) {
-    try {
-      // 事件級去重：LINE 重送（含按鈕 postback）帶同一個 webhookEventId，原子認領確保每個事件只處理一次，
-      // 避免重送把「按按鈕」重播成好幾次、或回覆兩次。
-      if (event.webhookEventId && !(await claimMessageOnce(env.DB, `evt:${event.webhookEventId}`))) continue;
-      if (event.type === 'follow') {
-        await handleFollow(event, env);
-      } else if (event.type === 'message' && event.message?.type === 'text') {
-        // 同實例再加一層記憶體快速擋（同一批次內重複）
-        if (isDuplicateMessage(event.message.id)) continue;
-        // 「管家處理中…」動態點點（免費、不算訊息、僅 1:1 有效）：先亮再處理，回覆一到就消失
-        if (event.source?.type === 'user') await showLoadingAnimation(env, event.source.userId);
-        await handleTextMessage(event, env, baseUrl);
-      } else if (event.type === 'postback') {
-        await handlePostback(event, env, baseUrl);
-      }
-    } catch (error) {
-      console.error('event handling failed:', error);
+    await withLineEvent(originalEnv, event, async env => {
       try {
-        await replyOrPush(env, event, '系統忙碌中，\n這筆沒有記錄成功，\n請再傳一次 🙏');
-      } catch (replyError) {
-        console.error('error reply failed:', replyError);
+        // Signature was verified before reaching any schema/data mutation.
+        await measureEvent(env, 'schema', () => ensureTaskSchema(env.DB));
+        markEvent(env, 'schema_done');
+        // 事件級去重：LINE 重送（含按鈕 postback）帶同一個 webhookEventId，原子認領確保每個事件只處理一次，
+        // 避免重送把「按按鈕」重播成好幾次、或回覆兩次。
+        if (event.webhookEventId && !(await claimMessageOnce(env.DB, `evt:${event.webhookEventId}`))) return;
+        if (event.type === 'follow') {
+          await handleFollow(event, env);
+        } else if (event.type === 'message' && event.message?.type === 'text') {
+          // 同實例再加一層記憶體快速擋（同一批次內重複）
+          if (isDuplicateMessage(event.message.id)) return;
+          if (event.source?.type === 'user') startRecordLoading(env, event.source.userId);
+          await handleTextMessage(event, env, baseUrl);
+        } else if (event.type === 'postback') {
+          await handlePostback(event, env, baseUrl);
+        }
+      } catch (error) {
+        env[LINE_EVENT].status = 'failed';
+        console.error('event handling failed:', error);
+        try {
+          await replyOrPush(env, event, '系統忙碌中，\n這筆沒有記錄成功，\n請再傳一次 🙏');
+        } catch (replyError) {
+          console.error('error reply failed:', replyError);
+        }
       }
-    }
+    }, timing);
   }
 }
 
@@ -2096,6 +2103,10 @@ export async function recordMultiForPet(env, event, db, opts) {
 }
 
 export async function handleTextMessage(event, env, baseUrl) {
+  return withLineEvent(env, event, scoped => handleTextMessageInner(event, scoped, baseUrl));
+}
+
+async function handleTextMessageInner(event, env, baseUrl) {
   const db = env.DB;
   const lineUserId = event.source?.userId;
 
@@ -2105,6 +2116,7 @@ export async function handleTextMessage(event, env, baseUrl) {
   }
 
   const { user, created } = await ensureUser(db, lineUserId);
+  markEvent(env, 'user_resolved');
   if (created) {
     const profile = await getProfile(env, lineUserId);
     if (profile?.displayName) await updateUser(db, lineUserId, { displayName: profile.displayName });
@@ -2150,9 +2162,11 @@ export async function handleTextMessage(event, env, baseUrl) {
 
   // 這位使用者實際操作誰的資料：飼主本人＝自己；共同照護者＝那位飼主（本人時完全等於原行為）
   const ownerId = await resolveDataOwner(db, lineUserId);
+  markEvent(env, 'owner_resolved');
   const isCaregiver = ownerId !== lineUserId;
   const caregiverName = isCaregiver ? String(user.displayName || '') : '';
   const pets = await listPets(db, ownerId);
+  markEvent(env, 'pets_loaded');
 
   // 封閉測試門檻：未解鎖者只能輸入邀請碼，看不到任何產品內容
   if (!isBetaAllowed(user)) {
@@ -2166,9 +2180,8 @@ export async function handleTextMessage(event, env, baseUrl) {
     return;
   }
 
-  // 任何一則訊息都順手確認專屬選單是最新版（版本相符時只是一次快取讀取、很便宜；
-  // 版本不符才會重建＝改版後使用者一互動就換到新選單，不必特地做某個動作）
-  try { await ensurePersonalRichMenu(env, baseUrl, lineUserId); } catch (error) { console.error('richmenu ensure failed:', error.message); }
+  // 每個事件只維護一次；等紀錄者收到回覆後才讀快取／重建選單。
+  await maintainPersonalMenu(env, baseUrl, lineUserId);
 
   // 電腦登入：在電腦網站輸入這組碼即可登入（免把手機連結複製過去）
   if (['電腦登入', '電腦', '網頁登入', '網站登入', '登入碼', '用電腦', '電腦版'].includes(text)) {
@@ -2201,7 +2214,7 @@ export async function handleTextMessage(event, env, baseUrl) {
   // 多貓咪：
   //  - 只打貓咪名（如「蚵仔」）→ 切換「目前登記的貓」，之後每筆都記給牠（與網站同步）
   //  - 名字前綴（如「冠關 水 20」）→ 只有這一則記給那隻，不改預設
-  if (await handleLineReportText(env, event, ownerId, text)) return;
+  if (await measureEvent(env, 'summary_flow', () => handleLineReportText(env, event, ownerId, text))) return;
   let pet = await resolveDefaultPet(db, user, pets);
   // 「把炭吉體重改成6公斤」：把/幫 開頭時，剝掉動詞助詞讓貓名回句首，交既有貓名前綴流程（僅在剝完真的接已知貓名時）。
   if (/^(?:請幫|請|把|幫)/.test(text)) {
@@ -2325,6 +2338,8 @@ export async function handleTextMessage(event, env, baseUrl) {
   }
 
   const intent = parseMessage(text);
+  if (env[LINE_EVENT]) env[LINE_EVENT].intent = intent.type;
+  markEvent(env, 'parser_done');
 
   switch (intent.type) {
     case 'addPet': {
@@ -3308,26 +3323,36 @@ export async function handleRecord(env, event, pet, record, lineUserId, opts = {
     });
   }
   const eventDate = eventDateTime.slice(0, 10);
-  const summary = await recomputeDay(db, pet.petId, eventDate);
+  const eventWork = env[LINE_EVENT];
+  if (eventWork) {
+    eventWork.recordCount += addedWaterLog ? 2 : 1;
+    eventWork.categories.add(record.category);
+    eventWork.caregiver = Boolean(opts.actorId && opts.actorId !== lineUserId);
+  }
+  markEvent(env, 'insert_done');
+  const summary = await measureEvent(env, 'daily_summary', () => recomputeDay(db, pet.petId, eventDate));
+  markEvent(env, 'summary_done');
   // 體重：insert 後依「最新未刪除體重」回算目前體重（新增一定是最新→等於這筆；補舊日期則仍取真正最新）
   if (record.category === 'weight') {
     try { await resyncPetWeight(db, pet.petId); } catch (error) { console.warn('resync weightKg failed:', error.message); }
   }
-  await track(db, lineUserId, 'record', { c: record.category, src: 'line' });
+  await afterEventReply(env, `analytics:${savedLog.logId}`, () => track(db, lineUserId, 'record', { c: record.category, src: 'line' }));
 
   // 共同照護·即時通知：只要「共同照護者」記錄，飼主本人就即時收到每一筆；
-  // 共同照護者自己不會被即時通知（他們只收每日總結）。背景 try/catch，不影響記錄與回覆。
+  // 先回覆記錄者，再送爸媽通知；由 webhook waitUntil 擁有這份工作。
   // 通知卡附「刪除這筆／開照護站修改」：飼主看到記錯當場就能處理（刪除會先跳確認）
   const notifyActorId = opts.actorId || lineUserId; // lineUserId 為飼主本人（資料擁有者）
   if (notifyActorId && notifyActorId !== lineUserId) {
-    try {
-      const who = opts.caregiverName || '共同照護者';
-      const notifySiteUrl = await siteLink(env, opts.baseUrl, lineUserId);
-      await pushMessages(env, lineUserId, [careNotifyFlex(who, pet.petName, description, savedLog.logId, notifySiteUrl, summary)]);
-    } catch (error) {
-      console.error('care notify failed:', error.message);
-      try { await pushText(env, lineUserId, `📝 ${opts.caregiverName || '共同照護者'} 記錄了 ${pet.petName}：${description}`); } catch (e2) { /* ignore */ }
-    }
+    await afterEventReply(env, `notify:${savedLog.logId}`, async () => {
+      try {
+        const who = opts.caregiverName || '共同照護者';
+        const notifySiteUrl = await siteLink(env, opts.baseUrl, lineUserId);
+        await pushMessages(env, lineUserId, [careNotifyFlex(who, pet.petName, description, savedLog.logId, notifySiteUrl, summary)]);
+      } catch (error) {
+        console.error('care notify failed:', error.message);
+        await pushText(env, lineUserId, `📝 ${opts.caregiverName || '共同照護者'} 記錄了 ${pet.petName}：${description}`);
+      }
+    });
   }
 
   const categoryKey = record.category === 'food'
@@ -3358,9 +3383,10 @@ export async function handleRecord(env, event, pet, record, lineUserId, opts = {
   if (record.category === 'weight') {
     const wSite = await siteLink(env, opts.baseUrl, lineUserId);
     const wCard = weightAddedFlex({ pet, amount: record.amount, logId: savedLog?.logId || '', summary, date: eventDate, siteUrl: wSite });
+    markEvent(env, 'flex_done');
     await replyOrPushFlex(env, event, withFrequentRecords(wCard,pet.petId), `已記錄・${pet?.petName || '貓貓'}\n體重 ${formatWeightKg(record.amount)} kg`);
     if (opts.baseUrl) {
-      try { await ensurePersonalRichMenu(env, opts.baseUrl, lineUserId); } catch (error) { console.error('personal richmenu refresh failed:', error.message); }
+      await maintainPersonalMenu(env, opts.baseUrl, opts.actorId || lineUserId);
     }
     return { mainText, summary, eventDate, savedLog, addedWaterLog };
   }
@@ -3387,10 +3413,10 @@ export async function handleRecord(env, event, pet, record, lineUserId, opts = {
     warnNoKcal: record.category === 'food' && noKcal, foodType: record.foodType || '',
     estimated: record.category === 'food' && estimated, estKcalPerG
   });
+  markEvent(env, 'flex_done');
   await replyOrPushFlex(env, event, withFrequentRecords(card,pet.petId), fallbackText);
-  // 記錄是每天最高頻的互動：順手把專屬圖文選單保持在最新版（版本相符時只是一次快取讀取，不重建）
   if (opts.baseUrl) {
-    try { await ensurePersonalRichMenu(env, opts.baseUrl, lineUserId); } catch (error) { console.error('personal richmenu refresh failed:', error.message); }
+    await maintainPersonalMenu(env, opts.baseUrl, opts.actorId || lineUserId);
   }
   return { mainText, summary, eventDate, savedLog, addedWaterLog };
 }
@@ -3406,6 +3432,10 @@ export async function handleRecord(env, event, pet, record, lineUserId, opts = {
 //     照護站→管家後台、拿掉與趨勢／後台重複的「記錄回顧」，右下改為「照護月曆」（在對話看）。
 // v9：重新綁定既有六格與 LIFF 直開；圖片與標籤不變。
 const RICHMENU_VERSION = 10;
+
+async function maintainPersonalMenu(env, baseUrl, lineUserId) {
+  return afterEventReply(env, `menu:${lineUserId}`, () => ensurePersonalRichMenu(env, baseUrl, lineUserId));
+}
 
 async function ensurePersonalRichMenu(env, baseUrl, lineUserId) {
   const db = env.DB;

@@ -2,6 +2,7 @@
 // Beta 設計原則：後端夠快，一律優先用免費的 reply，push 僅作為備援。
 
 import { appKvGet, appKvSet } from './db.js';
+import { LINE_EVENT } from './line-event.js';
 
 const LINE_API_BASE = 'https://api.line.me/v2/bot';
 const LINE_OAUTH_URL = 'https://api.line.me/v2/oauth/accessToken';
@@ -39,7 +40,14 @@ function selfRenewEnabled(env) {
   return Boolean(env.LINE_CHANNEL_ID && env.LINE_CHANNEL_SECRET && env.DB);
 }
 
-export async function getAccessToken(env) {
+export function getAccessToken(env) {
+  const scope = env[LINE_EVENT];
+  // Loading and the reply may overlap; share token lookup/renewal within this event.
+  if (scope) return scope.tokenPromise ||= resolveAccessToken(env);
+  return resolveAccessToken(env);
+}
+
+async function resolveAccessToken(env) {
   if (!selfRenewEnabled(env)) return env.LINE_CHANNEL_ACCESS_TOKEN || '';
   try {
     const now = Date.now();
@@ -106,21 +114,38 @@ function truncate(text) {
   return value.length > MAX_TEXT_LENGTH ? `${value.slice(0, MAX_TEXT_LENGTH)}…` : value;
 }
 
-async function callLineApi(env, path, body) {
+async function callLineApi(env, path, body, options = {}) {
+  const scope = env[LINE_EVENT];
+  const delivery = path === '/message/reply' || (path === '/message/push' && body.to === scope?.actor);
+  if (delivery && scope) { scope.deliveryStarted = true; scope.stopLoading?.(); }
   const token = await getAccessToken(env);
-  const response = await fetch(`${LINE_API_BASE}${path}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`
-    },
-    body: JSON.stringify(body)
-  });
-
-  if (!response.ok) {
-    throw new Error(`LINE API ${path} failed ${response.status}: ${await response.text()}`);
-  }
-  return response;
+  // In particular, a slow token lookup must not launch loading after the reply.
+  options.signal?.throwIfAborted();
+  if (delivery) scope?.beforeDelivery();
+  const start = performance.now();
+  const metric = { kind: path === '/chat/loading/start' ? 'loading' : delivery ? 'reply' : 'notify', ms: 0, status: null };
+  if (scope) scope.line.push(metric);
+  try {
+    const response = await fetch(`${LINE_API_BASE}${path}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify(body),
+      ...(options.signal ? { signal: options.signal } : {})
+    });
+    metric.status = response.status;
+    if (!response.ok) {
+      throw new Error(`LINE API ${path} failed ${response.status}: ${await response.text()}`);
+    }
+    if (delivery && scope) {
+      scope.mark('line_accepted');
+      scope.acceptedReplyMs ??= scope.marks.line_accepted;
+      scope.phase = 'after_reply';
+    }
+    return response;
+  } finally { metric.ms = Math.round((performance.now() - start) * 10) / 10; }
 }
 
 export async function replyText(env, replyToken, text) {
@@ -199,16 +224,32 @@ export async function replyOrPush(env, event, text) {
 // 「管家處理中…」載入動畫（免費、不算一則訊息、只在 1:1 聊天有效）：
 // 在進 parser 前先亮一顆動態點點，回覆（已記錄卡）一到就自動消失，做出「處理中→已記錄」的體感。
 // 失敗一律吞掉：這只是視覺提示，不能影響任何實際回覆。
-export async function showLoadingAnimation(env, chatId, loadingSeconds = 5) {
+export async function showLoadingAnimation(env, chatId, loadingSeconds = 5, options = {}) {
   const to = String(chatId || '').trim();
   if (!to) return;
   try {
     // 秒數需為 5 的倍數、上限 60；夾在合理範圍
     const secs = Math.max(5, Math.min(60, Math.round(loadingSeconds / 5) * 5));
-    await callLineApi(env, '/chat/loading/start', { chatId: to, loadingSeconds: secs });
+    await callLineApi(env, '/chat/loading/start', { chatId: to, loadingSeconds: secs }, options);
   } catch (error) {
+    if (options.signal?.aborted) return;
     console.warn('loading animation failed (non-blocking):', error.message);
   }
+}
+
+// Start alongside the record. A response or the short deadline cancels pending
+// loading, including a token lookup that has not reached fetch yet.
+export function startRecordLoading(env, chatId) {
+  const scope = env[LINE_EVENT];
+  if (!scope || scope.deliveryStarted || scope.loadingDone) return;
+  const controller = new AbortController();
+  let resolveAbort;
+  const aborted = new Promise(resolve => { resolveAbort = resolve; });
+  scope.stopLoading = () => { controller.abort(); resolveAbort(); };
+  const timer = setTimeout(scope.stopLoading, 700);
+  scope.loadingDone = Promise.race([
+    showLoadingAnimation(env, chatId, 5, { signal: controller.signal }), aborted
+  ]).finally(() => clearTimeout(timer));
 }
 
 export async function getProfile(env, userId) {
