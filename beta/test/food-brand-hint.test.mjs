@@ -2,7 +2,7 @@
 //  - 沒有預設 → 直接記 generic 類型（用系統粗估值），不因家庭有多個品牌就強迫選、也不自動套唯一品項。
 //  - 有預設 → 自動帶入預設品牌與實際熱量。
 //  - 品牌選擇卡只在「打了品名／品牌卻對不到既有品項」時出現。
-//  - 完成卡：generic 粗估 → 標示系統粗估值＋照護站引導；零食無熱量 → 熱量未設定；有品牌實際 kcal → 不顯示粗估 CTA。
+//  - 完成卡：generic 粗估 → 標示系統粗估值＋看紀錄引導；零食無熱量 → 熱量未設定；有品牌實際 kcal → 不顯示粗估 CTA。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -61,7 +61,7 @@ test('A 多品牌、無預設：乾乾5 → 不出品牌卡、直接記 generic 
   assert.equal(foodCount(db), 1, '直接完成一筆');
   const j = cap.all();
   assert.ok(j.includes('系統粗估值'), '完成卡標示系統粗估值');
-  assert.ok(j.includes('照護站'), '完成卡引導照護站');
+  assert.ok(j.includes('看紀錄'), '完成卡提供看紀錄入口');
   assert.ok(!j.includes('找不到已建立的品項'), '不得回「找不到已建立品項」');
 });
 
@@ -116,7 +116,7 @@ test('E 其他類型一致（多品牌無預設都記 generic 粗估）：主食
   }
 });
 
-test('F 零食無品牌熱量：零食1（多品項無預設）→ generic、熱量未設定、完成卡引導照護站', async () => {
+test('F 零食無品牌熱量：零食1（多品項無預設）→ generic、熱量未設定、完成卡提供看紀錄入口', async () => {
   const { db, pet } = await seed();
   await createFoodItem(db, 'u1', { displayName: 'CIAO', foodType: '零食', kcalPerGram: 0 });
   await createFoodItem(db, 'u1', { displayName: '凍乾', foodType: '零食', kcalPerGram: 0 });
@@ -127,7 +127,7 @@ test('F 零食無品牌熱量：零食1（多品項無預設）→ generic、熱
   assert.equal(res.savedLog.kcal, 0);
   const j = cap.all();
   assert.ok(j.includes('熱量未設定'), '零食顯示熱量未設定');
-  assert.ok(j.includes('照護站'));
+  assert.ok(j.includes('看紀錄'));
 });
 
 test('G 品牌歧義：打了品名卻對不到既有品項 → 才出品牌選擇卡（乾糧 新牌 5）', async () => {
@@ -139,14 +139,14 @@ test('G 品牌歧義：打了品名卻對不到既有品項 → 才出品牌選�
   assert.equal(foodCount(db), 0, '確認前不寫入');
 });
 
-test('H 0 品項：乾乾5 → generic 3.7 粗估、完成卡系統粗估值＋照護站', async () => {
+test('H 0 品項：乾乾5 → generic 3.7 粗估、完成卡系統粗估值＋看紀錄', async () => {
   const { db, pet } = await seed();
   const cap = capture();
   const res = await rec(db, pet, '乾乾5');
   assert.equal(res.savedLog.foodId, '');
   assert.equal(res.savedLog.kcal, 18.5);
   const j = cap.all();
-  assert.ok(j.includes('系統粗估值') && j.includes('照護站'));
+  assert.ok(j.includes('系統粗估值') && j.includes('看紀錄'));
 });
 
 test('§10 實機 regression：家庭有希爾斯乾糧＋皇家乾糧、無預設乾糧，「乾乾 5」直接記 generic，不回「找不到已建立品項」', async () => {

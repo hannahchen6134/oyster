@@ -139,7 +139,7 @@ export async function handleLineReportText(env,event,owner,text) {
     await replyOrPush(env,event,'已取消這次補充。');return true;
   }
   // Menu commands stay commands; do not accidentally save a navigation command as care instructions.
-  if(/^記法[:：]/.test(text) || ['記一筆','近七天記錄','管家後台','照護站','怎麼記','更多紀錄範例','完整記法','照護月曆','今天'].includes(text)){flow.stage='cancelled';await saveFlow(env.DB,event.source.userId,flow);return false;}
+  if(/^記法[:：]/.test(text) || ['使用說明','說明','安心上手','第一次使用','看紀錄','記一筆','近七天記錄','管家後台','照護站','怎麼記','更多紀錄範例','完整記法','照護月曆','今天'].includes(text)){flow.stage='cancelled';await saveFlow(env.DB,event.source.userId,flow);return false;}
   if(!await allowed(env,event,owner))return true;
   const pet=await getPet(env.DB,flow.petId);
   if(!pet||pet.isDeleted||pet.ownerLineUserId!==owner){await replyOrPush(env,event,'貓咪資料已變更，請重新點「出摘要」。');return true;}

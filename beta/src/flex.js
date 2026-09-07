@@ -220,7 +220,7 @@ function outlineActionBtn(label, data, { fg = C.inkSoft, border = '#D9CBB6' } = 
 }
 
 // ---------- 記錄確認卡 ----------
-export function recordFlex({ pet, categoryKey, mainText, subText, summary, date, logId, hints = [], title = '', tip = '', siteUrl = '', warnNoKcal = false, foodType = '', estimated = false, estKcalPerG = 0, addedWaterMl = 0, undoData = '', undoCount = 1 }) {
+export function recordFlex({ pet, categoryKey, mainText, subText, summary, date, logId, hints = [], title = '', tip = '', siteUrl = '', warnNoKcal = false, foodType = '', estimated = false, estKcalPerG = 0, addedWaterMl = 0, undoData = '', undoCount = 1, compact = false }) {
   const style = CATEGORY_STYLE[categoryKey] || CATEGORY_STYLE.note;
   // 零食/其他這種「沒辦法估」的類型：不假裝估算，也不用紅色錯誤——溫和請使用者填一次（包裝上有）
   const warnBox = warnNoKcal ? [{
@@ -297,6 +297,23 @@ export function recordFlex({ pet, categoryKey, mainText, subText, summary, date,
           : { type: 'message', label: '開啟管家後台', text: '照護站' } }
     ]
   };
+  if (compact) {
+    body.paddingAll='16px';
+    body.contents=[
+      text(`✓ ${title ? '已更新' : '已記錄'}・${pet?.petName || '貓貓'}`,{size:'16px',color:C.brand,weight:'bold',wrap:true}),
+      text(mainText,{size:'18px',weight:'bold',color:C.ink,margin:'8px',wrap:true}),
+      ...(addedWaterMl>0?[text(`＋ 另外加水 ${addedWaterMl} ml`,{size:'16px',color:C.ink,wrap:true})]:[]),
+      ...(subText?[text(subText,{size:'14px',color:C.inkSoft,wrap:true,margin:'4px'})]:[]),
+      ...(warnNoKcal?[text('熱量未設定，這筆已記份量，未計入總熱量。',{size:'14px',color:C.inkSoft,wrap:true,margin:'8px'})]:[]),
+      ...(estimated?[text(`熱量為系統粗估值（每克約 ${estKcalPerG} kcal）。`,{size:'14px',color:C.inkSoft,wrap:true,margin:'8px'})]:[]),
+      ...hints.filter(Boolean).map(h=>text(h,{size:'14px',color:C.inkSoft,wrap:true,margin:'8px'}))
+    ];
+    const edits=footer.contents.filter(b=>b.action.type==='postback');
+    const settings=footer.contents.filter(b=>b.action.type==='message'&&b.action.text.startsWith('設定')); 
+    footer.contents=[{type:'box',layout:'horizontal',contents:edits},...settings,
+      {type:'button',height:'sm',style:'link',color:C.brand,action:{type:'message',label:'看紀錄',text:'看紀錄'}}];
+    return bubble(`已記錄・${pet?.petName || '貓貓'}・${mainText}`,{type:'bubble',size:'mega',body,footer});
+  }
   const headerTitle = title || `已記錄・${pet?.petName || '貓貓'}`;
   return bubble(`${title ? '已更新' : '已記錄'} ${mainText}`, { type: 'bubble', size: 'mega', header: header(headerTitle), body, footer });
 }
@@ -989,12 +1006,11 @@ export function reviewMenuFlex(siteUrl = '') {
     type: 'box', layout: 'vertical', paddingAll: '18px', backgroundColor: BODY_BG, spacing: 'sm',
     contents: [
       text('想看哪種紀錄？', { size: 'md', weight: 'bold', color: C.ink }),
-      text('點一下就好，不用打整句', { size: 'xxs', color: C.muted, margin: 'xs' }),
+      text('選今天、近七天，或查吃過的食物', { size: 'sm', color: C.muted, margin: 'xs' }),
       { type: 'box', layout: 'vertical', margin: 'md', spacing: 'sm', contents: [
-        btn('🍚 吃過的食物', '最近吃什麼'),
-        btn('💧 喝水', '今天'),
-        btn('💊 用藥', '今天'),
-        btn('🐾 狀況', '今天')
+        btn('今天', '今天'),
+        btn('近七天', '近七天記錄'),
+        btn('🍚 吃過的食物', '最近吃什麼')
       ] }
     ]
   };
@@ -1265,17 +1281,17 @@ export function quickRecordCarousel(opts = {}) {
         {type:'button',style:'primary',color:C.brand,action:{type:'message',label:'記一筆・常用快捷',text:'記一筆'}}
       ]},
       {type:'separator',margin:'24px',color:SEPARATOR},
-      actionRow('📋 近七天記錄','看每天的飲食、喝水紀錄。',{type:'message',label:'近七天記錄',text:'近七天記錄'}),
+      actionRow('📋 看紀錄','今天、近七天，或查吃過的食物。',{type:'message',label:'看紀錄',text:'看紀錄'}),
       {type:'separator',color:SEPARATOR},
       actionRow('📄 出摘要','選貓 → 給醫生看／給照護者。\n收到圖片與 QR Code；缺照護資料會先問你。',{type:'postback',label:'出摘要',data:'action=reportStart'}),
       {type:'separator',color:SEPARATOR},
       actionRow('⚙️ 管家後台','完整紀錄、月曆與詳細設定，需要時再進來。',opts.siteUrl?{type:'uri',label:'管家後台',uri:opts.siteUrl}:{type:'message',label:'管家後台',text:'管家後台'})
-    ]},footer:{type:'box',layout:'vertical',paddingAll:'12px',backgroundColor:FOOTER_COLOR,contents:[{type:'button',style:'link',color:C.brand,action:{type:'message',label:'更多紀錄範例',text:'更多紀錄範例'}}]}
+    ]},footer:{type:'box',layout:'vertical',paddingAll:'12px',backgroundColor:FOOTER_COLOR,contents:[{type:'button',style:'link',color:C.brand,action:{type:'message',label:'記錄範例',text:'更多紀錄範例'}}]}
   });
 }
 
 export function howToUseText() {
-  return '🐱 喵喵管家怎麼用？\n平常直接在 LINE 告訴我就好，不用特別學格式。\n✏️ 直接記：主食31、水5、乾乾10、嘔吐 白沫\n⚡ 輸入「記一筆」→ 點主食 → 補數量送出。\n📋 輸入「近七天記錄」看每天飲食、喝水。\n📄 輸入「出摘要」→ 選貓 → 給醫生看／給照護者，收到圖片與 QR Code；缺照護資料會先問你。\n⚙️ 完整紀錄、月曆與設定：輸入「管家後台」。\n更多例句：輸入「更多紀錄範例」。';
+  return '🐱 喵喵管家怎麼用？\n平常直接在 LINE 告訴我就好，不用特別學格式。\n✏️ 直接記：主食31、水5、乾乾10、嘔吐 白沫\n⚡ 輸入「記一筆」→ 點主食 → 補數量送出。\n📋 輸入「看紀錄」，選今天、近七天或吃過的食物。\n📄 輸入「出摘要」→ 選貓 → 給醫生看／給照護者，收到圖片與 QR Code；缺照護資料會先問你。\n⚙️ 完整紀錄、月曆與設定：輸入「管家後台」。\n更多例句：輸入「更多紀錄範例」。';
 }
 
 export const HELP_EXAMPLES = [

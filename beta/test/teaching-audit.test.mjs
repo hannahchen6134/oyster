@@ -13,7 +13,7 @@ test('怎麼記第一層：五個開始方式，詳細設定不塞進第一層',
   const message = quickRecordCarousel({siteUrl:'https://liff.line.me/test'});
   const j = J(message);
   assert.equal(message.contents.type,'bubble');
-  for (const ex of ['主食31','乾乾10','水5','嘔吐 白沫','常用快捷','近七天記錄','出摘要','管家後台','更多紀錄範例']) assert.ok(j.includes(ex),ex);
+  for (const ex of ['主食31','乾乾10','水5','嘔吐 白沫','常用快捷','看紀錄','出摘要','管家後台','更多紀錄範例']) assert.ok(j.includes(ex),ex);
   for (const obsolete of ['免登入','進階功能','就醫使用','照護使用','預設食物']) assert.ok(!j.includes(obsolete),obsolete);
 });
 

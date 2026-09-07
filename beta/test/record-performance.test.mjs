@@ -58,7 +58,7 @@ async function fixture(run, hooks = {}) {
   finally { globalThis.fetch=oldFetch; console.log=oldLog; console.warn=oldWarn; console.error=oldError; DB.sdb.close(); }
 }
 
-test('喝水完成回覆前降為6讀3寫，保留總計、目標、差額與快捷；每次只查一次選單', () => fixture(async ({send,calls,timings,sql,DB}) => {
+test('喝水完成回覆前降為6讀3寫，成功短卡保留對象與快捷，統計移至看紀錄；每次只查一次選單', () => fixture(async ({send,calls,timings,sql,DB}) => {
   await (await send('喝水20ml')).done;
   const metric=timings.at(-1), entries=Object.entries(metric.queries);
   const count=op=>entries.filter(([k])=>k.startsWith(`before_reply:${op}:`)).reduce((n,[,v])=>n+v.count,0);
@@ -68,8 +68,10 @@ test('喝水完成回覆前降為6讀3寫，保留總計、目標、差額與快
   assert.equal(sql.filter(s=>s.query.startsWith('INSERT INTO events')).length,1);
   assert.equal(metric.queries['after_reply:insert:text_inputs'].count,1);
   const card=calls.find(c=>c.path.endsWith('/message/reply')).body.messages[0];
-  assert.match(JSON.stringify(card),/今日累積|今日目標/);
-  assert.match(JSON.stringify(card),/還差/); assert.equal(card.quickReply.items.length,8);
+  assert.match(JSON.stringify(card),/已記錄・小花/);
+  assert.match(JSON.stringify(card),/看紀錄/);
+  assert.doesNotMatch(JSON.stringify(card),/今日累積|今日目標/);
+  assert.match(JSON.stringify(card),/水 20 ml/); assert.equal(card.quickReply.items.length,8);
   assert.equal((await getLogsForDay(DB,'s1',taipeiToday())).length,6);
   assert.equal(metric.records,1); assert.ok(metric.server_ms<=metric.line_accepted_ms);
   assert.doesNotMatch(JSON.stringify(metric),/fake-secret|fake-reply|testsingle|喝水20ml|小花/);

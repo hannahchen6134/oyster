@@ -893,10 +893,10 @@ async function handlePending(env, event, { db, user, pet, pets, lineUserId, owne
     if (updated.kcal) subParts.push(`${updated.kcal} kcal`);
     if (updated.category === 'food' && updated.waterMl) subParts.push(`含水 ${updated.waterMl} ml`);
     const categoryKey = updated.category === 'food' ? (updated.foodType === '乾糧' ? 'dry' : 'wet') : updated.category;
-    await replyOrPushFlex(env, event, recordFlex({
-      pet: cardPet, categoryKey, mainText: describeLog(updated), subText: subParts.join('・'),
+    await replyOrPushFlex(env, event, withFrequentRecords(recordFlex({
+      pet: cardPet, compact:true, categoryKey, mainText: describeLog(updated), subText: subParts.join('・'),
       summary, date: eventDate, logId: updated.logId, title: `✓ 已更新・${cardPet?.petName || '貓貓'}`
-    }), recordReply(describeLog(updated), cardPet, summary, [], eventDate));
+    }),cardPet.petId,{petName:cardPet.petName}), recordReply(describeLog(updated), cardPet, summary, [], eventDate));
     return true;
   }
 
@@ -3403,11 +3403,11 @@ export async function handleRecord(env, event, pet, record, lineUserId, opts = {
     }
     return { mainText, summary, eventDate, savedLog, addedWaterLog };
   }
-  // 單筆記錄：一律回完整卡片（不再忽大忽小分級）。純文字為 LINE 通知/無法顯示卡片時的備援。
+  // 單筆記錄：使用短成功卡，完整統計移至看紀錄。純文字為 LINE 通知/無法顯示卡片時的備援。
   const fallbackText = recordReply(description, pet, summary, hints, eventDate);
   const card = recordFlex({
-    pet, categoryKey, mainText,
-    subText: subParts.join('\n'),
+    pet, categoryKey, mainText, compact: true,
+    subText: [eventDateTime.slice(0,16),...subParts].join('\n'),
     addedWaterMl,
     summary, date: eventDate,
     logId: savedLog?.logId || '',
@@ -3635,7 +3635,7 @@ async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId, ow
   }
 
   if (query === 'help') {
-    await replyOrPushFlex(env, event, menuFlex(), helpText());
+    await replyOrPushFlex(env, event, quickRecordCarousel({siteUrl:await siteLink(env,baseUrl,lineUserId)}), howToUseText());
     return;
   }
 
@@ -3657,7 +3657,7 @@ async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId, ow
     await track(db, lineUserId, 'menu_review');
     const url = await siteLink(env, baseUrl, lineUserId);
     await replyOrPushFlex(env, event, reviewMenuFlex(url),
-      '想看哪種紀錄？\n· 吃過的食物 → 打「最近吃什麼」\n· 今日喝水／用藥／狀況 → 打「今天」\n· 完整紀錄 → 開管家後台');
+      '看紀錄：今天／近七天記錄／最近吃什麼。完整紀錄可進管家後台。');
     return;
   }
 
@@ -3668,7 +3668,7 @@ async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId, ow
 
   if (query === 'onboarding') {
     await track(db, lineUserId, 'onboarding_view');
-    await replyOrPushFlex(env, event, onboardingCarousel(pet?.petName || ''), onboardingText());
+    await replyOrPushFlex(env, event, quickRecordCarousel({siteUrl:await siteLink(env,baseUrl,lineUserId)}), howToUseText());
     return;
   }
 
