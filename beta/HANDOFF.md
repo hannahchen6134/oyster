@@ -154,17 +154,18 @@ LINE 使用者打字
 
 ---
 
-## 7. main 與部署狀態（接手第一件事要確認）
+## 7. main 與部署（main 為主）
 
-- 目前**線上跑的是「開發分支的工作區」**（最後版本見 `wrangler deployments` 或 Cloudflare Dashboard）。
-- **`main` 落後**於分支（停在 `be5f8d2`）。若要恢復「main＝線上」：
+- **`main` 已與最新開發成果對齊**，是**線上程式的真實來源**（本輪 LINE 體驗改版全部已合併進 main）。
+- **慣例（產品負責人指定）**：完成的工作**整理／合併回 `main`**，**部署從 `main`**：
   ```bash
-  git fetch origin
-  git checkout main && git merge --ff-only claude/cat-care-bot-deploy-df6jy4   # 線性可快轉
-  git push origin main
+  git checkout main && git pull origin main
+  cd beta && npm run deploy        # = npm test && wrangler deploy
   ```
-  之後可改成「合併到 main → 從 main 部署」。**動 main 前先跟產品負責人確認**（本專案規定
-  不隨意 push 到非指定分支）。
+- ⚠️ `wrangler deploy` 部署的是**當下工作區的檔案**（不是某個 git 分支名）——所以部署前務必先
+  `git checkout main` 並 `git pull`，確認工作區就是 main 最新，再 deploy。
+- 歷史備註：開發期間曾在 `claude/cat-care-bot-deploy-df6jy4`（鏡射 `claude/continue-0t38um`）上進行；
+  現已整理回 main，之後以 main 為準即可。
 
 ---
 
