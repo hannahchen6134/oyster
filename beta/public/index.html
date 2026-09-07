@@ -1269,7 +1269,36 @@
     #a4Export .purpose-a4 { width:794px; min-height:1123px; }
     .purpose-page footer { margin-top:20px; font-size:12px; color:#75644f; }
     #reportView details:not(.accordion) summary { cursor:pointer; min-height:36px; font-size:16px; }
-  #reportView .btn{width:auto;flex:0 1 auto;max-width:100%;white-space:normal}#reportView textarea{min-height:120px;resize:vertical}#reportView textarea[data-report-field="rawNotes"]{min-height:190px}.purpose-hint{font-size:13px;line-height:1.7;color:#776a59}#reportConfirmLabel{display:flex!important;gap:8px;align-items:flex-start}#reportConfirmed{width:20px;min-width:20px;height:20px;margin-top:4px}#reportShareList{overflow-wrap:anywhere}#reportShareList>div{border-bottom:1px solid #dacdb8;padding:14px 0}#qrDialog{width:min(460px,calc(100% - 72px));max-height:calc(100dvh - 72px);overflow:auto;border:1px solid #d9c7ad;border-radius:16px;padding:18px;background:#fffdf8;color:#463620}#qrDialog::backdrop{background:#30241988}#qrImage{width:100%;height:auto}#qrDialog .report-controls{display:flex;gap:10px;flex-wrap:wrap}#qrDialog button,#qrDialog a{font:inherit;max-width:100%;overflow-wrap:anywhere}#qrDialog .btn{width:auto}#qrLink{display:block;overflow-wrap:anywhere;font-size:13px;margin:12px 0}.purpose-heading h1{overflow-wrap:anywhere}@media(max-width:600px){#reportView .report-controls label{max-width:100%}#reportView select{width:100%;min-width:0}}
+  #reportView .btn{width:auto;flex:0 1 auto;max-width:100%;white-space:normal}#reportView textarea{min-height:120px;resize:vertical}#reportView textarea[data-report-field="rawNotes"]{min-height:112px}.purpose-hint{font-size:13px;line-height:1.7;color:#776a59}#reportConfirmLabel{display:flex!important;gap:8px;align-items:flex-start}#reportConfirmed{width:20px;min-width:20px;height:20px;margin-top:4px}#reportShareList{overflow-wrap:anywhere}#reportShareList>div{border-bottom:1px solid #dacdb8;padding:14px 0}#qrDialog{width:min(460px,calc(100% - 72px));max-height:calc(100dvh - 72px);overflow:auto;border:1px solid #d9c7ad;border-radius:16px;padding:18px;background:#fffdf8;color:#463620}#qrDialog::backdrop{background:#30241988}#qrImage{width:100%;height:auto}#qrDialog .report-controls{display:flex;gap:10px;flex-wrap:wrap}#qrDialog button,#qrDialog a{font:inherit;max-width:100%;overflow-wrap:anywhere}#qrDialog .btn{width:auto}#qrLink{display:block;overflow-wrap:anywhere;font-size:13px;margin:12px 0}.purpose-heading h1{overflow-wrap:anywhere}@media(max-width:600px){#reportView .report-controls label{max-width:100%}#reportView select{width:100%;min-width:0}}
+    /* 填寫區採緊湊一致的行列，不影響共用 Shell。 */
+    #reportWork > .report-controls { margin: 16px 0; }
+    #reportWork > .report-purpose-switch { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; padding:4px; background:var(--brand-tint); border-radius:var(--radius-sm); }
+    #reportWork .report-purpose-switch .btn { width:100%; padding:8px; min-height:42px; box-shadow:none; border-color:transparent; font-size:15px; }
+    #reportWork > .report-pet-toolbar { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:end; gap:12px; margin:18px 0 22px; }
+    #reportWork .report-pet-toolbar label { margin:0; font-size:13px; color:var(--muted); }
+    #reportWork .report-pet-toolbar select { display:block; width:100%; height:44px; margin-top:4px; padding:8px 10px; }
+    #reportWork .report-pet-toolbar .btn { min-height:44px; padding:8px 12px; font-size:14px; box-shadow:none; }
+    .care-prefill { background:var(--sheet-soft); border:1px solid var(--line); border-radius:var(--radius-sm); padding:16px; }
+    .care-prefill-head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+    .care-prefill-head h2 { font-size:17px; margin:0; }
+    .care-prefill-head h2::after { content:none; }
+    .care-prefill-head span { font-size:12px; color:var(--muted); white-space:nowrap; }
+    .care-prefill dl { margin:12px 0 0; }
+    .care-prefill dl > div { padding:10px 0; border-top:1px solid var(--line); }
+    .care-prefill dt { font-size:12px; color:var(--muted); }
+    .care-prefill dd { margin:3px 0 0; font-size:14px; line-height:1.7; white-space:pre-wrap; overflow-wrap:anywhere; }
+    .care-source { margin:8px 0 14px; }
+    .care-history { font-size:13px; border-bottom:1px solid var(--line); padding:0 0 12px; margin-bottom:20px; }
+    #reportView .care-history summary { font-size:13px; }
+    .care-history p { overflow-wrap:anywhere; }
+    #reportView .care-note-label { margin:20px 0 12px; font-weight:500; }
+    .care-note-label > span { display:block; margin:4px 0 8px; font-weight:400; }
+    #reportView textarea { font-size:16px; font-weight:400; line-height:1.65; padding:12px; }
+    #reportView textarea::placeholder { color:var(--muted); font-weight:400; }
+    #reportView .care-edit-actions { gap:8px; margin:12px 0 8px; }
+    #reportView .care-edit-actions .btn { font-size:14px; padding:8px 12px; }
+    #careToolStatus:empty { display:none; }
+    @media(max-width:370px){ #reportWork .report-pet-toolbar .btn { padding-inline:8px; } }
 </style>
 </head>
 <body>
@@ -1538,8 +1567,8 @@
         <button class="link-btn back-link" id="reportBackBtn" type="button">‹ 返回</button>
         <div id="reportPetChoice"></div>
         <div id="reportWork" class="hidden">
-          <div class="report-controls"><button class="btn btn-secondary" data-purpose="doctor" type="button">給醫生看</button><button class="btn btn-secondary" data-purpose="care" type="button">給照護者</button></div>
-          <div class="report-controls"><label>貓咪 <select id="reportCatSelect"></select></label><button class="btn btn-secondary" id="reportAddCat" type="button">＋ 新增貓咪</button></div><div id="reportEditor"></div>
+          <div class="report-controls report-purpose-switch"><button class="btn btn-secondary" data-purpose="doctor" type="button">給醫生看</button><button class="btn btn-secondary" data-purpose="care" type="button">給照護者</button></div>
+          <div class="report-controls report-pet-toolbar"><label>貓咪 <select id="reportCatSelect"></select></label><button class="btn btn-secondary" id="reportAddCat" type="button">＋ 新增貓咪</button></div><div id="reportEditor"></div>
           <div id="purposeRange" class="report-controls"><span>近期範圍</span><button data-purpose-days="7" type="button">7 天</button><button data-purpose-days="14" type="button">14 天</button><button data-purpose-days="30" type="button">30 天</button></div>
           <div id="reportStatus" role="status"></div>
           <article id="purposePreview"></article><label id="reportConfirmLabel"><input type="checkbox" id="reportConfirmed"> 我已確認這份報告的內容</label>
@@ -1629,8 +1658,8 @@
       eaten: { type: '', days: 30 }   // 「吃過的食物」：第一層品項摘要的類型過濾／天數（第二層逐餐上限存在各展開面板上）
     };
 
-    const reportModule = import('/report-purpose.js?v=20260907b');
-    const reportTools = import('/report-tools.js?v=20260907b');
+    const reportModule = import('/report-purpose.js?v=20260907c');
+    const reportTools = import('/report-tools.js?v=20260907c');
     const $ = (id) => document.getElementById(id);
 
     // ---------- 食物類型：網站端單一真相來源 ----------
@@ -4352,17 +4381,19 @@
       document.querySelectorAll('[data-purpose-days]').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.purposeDays) === days)));
       document.querySelectorAll('[data-purpose]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.purpose === purpose)));
       try {
-        const [mod, summary, highlights, weights, meds, vets] = await Promise.all([
+        const [mod, summary, highlights, weights, meds, vets, recent, saved] = await Promise.all([
           reportModule,
           api(`summary?petId=${encodeURIComponent(petId)}&from=${from}&to=${to}`),
           api(`highlights?petId=${encodeURIComponent(petId)}&days=${days}`),
           api(`weights?petId=${encodeURIComponent(petId)}`),
-          api(`meds?petId=${encodeURIComponent(petId)}`), api('vets')
+          api(`meds?petId=${encodeURIComponent(petId)}`), api('vets'),
+          purpose === 'care' ? api('recent?petId='+encodeURIComponent(petId)+'&limit=50').catch(()=>({logs:[],unavailable:true})) : Promise.resolve({logs:[]}),
+          purpose === 'care' ? api('care-template?petId='+encodeURIComponent(petId)).catch(()=>({template:null})) : Promise.resolve({template:null})
         ]);
         if (revision !== purposeRevision || !state.reportOpen || state.petId !== petId) return;
-        state.reportBundle = { pet, rows: summary.rows || [], highlights: highlights.logs || [], weights: weights.rows || [], from, to, days };
+        state.reportBundle = { pet, rows: summary.rows || [], highlights: highlights.logs || [], weights: weights.rows || [], recentLogs: recent.logs || [], from, to, days };
         const defaults = purpose === 'care' ? mod.careDefaults(pet, meds.rows, vets.rows) : { concern: localStorage.getItem(`vetAsk:${petId}`) || '' };
-        state.reportDraft = readPurposeDraft(defaults);
+        state.reportDraft = readPurposeDraft({ ...defaults, ...(saved.template?.draft || {}) });
         const fields = purpose === 'care' ? [
           ['feeding','餵食與飲水怎麼安排？','食物、份量、時間或特殊飲食，請由你確認'],
           ['medicine','用藥方式','已帶入這隻貓的用藥設定，請確認是否仍適用'],
@@ -4376,6 +4407,8 @@
         if (revision !== purposeRevision || state.petId !== petId) return;
         $('reportStatus').textContent = '';
         await renderPurposePreview();
+        if (revision !== purposeRevision || !state.reportOpen || state.petId !== petId) return;
+        if (purpose === 'care' && saved.template && $('careToolStatus')) $('careToolStatus').textContent = '已沿用這隻貓的範本，可直接確認或修改。';
         loadReportShares();
       } catch (error) {
         if (revision !== purposeRevision || !state.reportOpen) return;
@@ -4393,6 +4426,13 @@
         const notice = $('purposePreview').querySelector('.purpose-notice');
         notice.insertAdjacentHTML('beforeend', '<br><button id="completeFeeding" class="link-btn" type="button">補充餵食與飲水方式</button>');
       }
+      if (state.reportPurpose === 'care' && $('carePrefillSummary')) {
+        const tools = await reportTools;
+        if (!state.reportBundle || !state.reportOpen || !$('carePrefillSummary')) return;
+        $('carePrefillSummary').innerHTML = tools.carePrefill(state.reportDraft,esc);
+        const recent = mod.careRecentRecords(state.petId,state.reportBundle.recentLogs,state.reportBundle.from,state.reportBundle.to);
+        $('careRecentReference').innerHTML = recent.length ? '<details class="care-history"><summary>最近已記錄的吃喝與用藥 · 僅供參考</summary>'+recent.map(r=>'<p><strong>'+esc(r.label)+'</strong><br>'+esc(r.text)+'</p>').join('')+'<p class="purpose-hint">歷史紀錄不是本次照護指示；沒有紀錄不代表尚未完成。</p></details>' : '';
+      }
       $('purposeActions').classList.remove('hidden');
     }
     $('reportEditor').addEventListener('input', (event) => {
@@ -4406,6 +4446,7 @@
     document.addEventListener('click', async (event) => {
       const choice = event.target.closest('[data-choose-purpose]');
       if (choice) return openPurpose(choice.dataset.choosePurpose);
+      if (event.target.closest('#careEditOpen')) { $('careEditFold').open = true; $('careEditFold').scrollIntoView({block:'start'}); return; }
       if (event.target.closest('#completeFeeding')) {
         $('careEditFold').open = true;
         $('reportEditor').querySelector('[data-report-field="feeding"]').focus();
@@ -4442,7 +4483,7 @@
     function confirmReport() {
       if (!state.purposeData) { toast('請先等報告整理完成', true); return false; }
       if (!$('reportConfirmed').checked) { toast('請先確認報告內容，再勾選下方確認', true); $('reportConfirmLabel').scrollIntoView({ block:'center' }); return false; }
-      if (state.reportPurpose === 'care' && state.reportDraft.rawNotes?.trim() && !state.reportDraft.rawApplied) { toast('你貼上的說明尚未整理，請先按「整理說明」', true); return false; }
+      if (state.reportPurpose === 'care' && state.reportDraft.rawNotes?.trim() && !state.reportDraft.rawApplied) { toast('你貼上的說明尚未整理，請先按「整理補充」', true); return false; }
       return true;
     }
     $('reportCatSelect').addEventListener('change', () => {

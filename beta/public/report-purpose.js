@@ -12,7 +12,14 @@ export function careDefaults(pet, meds, vets) {
     emergency: vet ? [vet.hospitalName, vet.doctorName, vet.phone, vet.address].filter(Boolean).join(' · ') : ''
   };
 }
-export function purposeReport({ purpose = 'doctor', pet, rows = [], highlights = [], weights = [], draft = {}, from, to, days = 14 }) {
+export function careRecentRecords(petId, logs = [], from = '', to = '9999-12-31') {
+  const sorted = list(logs).filter(r => r.petId === petId && !r.isDeleted && clean(r.eventDateTime).slice(0,10) >= from && clean(r.eventDateTime).slice(0,10) <= to).sort((a,b) => clean(b.eventDateTime).localeCompare(clean(a.eventDateTime)));
+  return [['food','最近餵食紀錄'],['water','最近喝水紀錄'],['med','最近用藥紀錄']].flatMap(([category,label]) => {
+    const row = sorted.find(r => r.category === category);
+    return row ? [{label,text:`${row.eventDateTime}｜${[row.itemName,category === 'med' ? row.doseText : num(row.amount) > 0 ? `${row.amount}${row.unit || ''}` : '',category === 'med' ? row.medStatus || '狀態未填' : '',row.note].filter(Boolean).join(' · ') || '已記錄'}`}] : [];
+  });
+}
+export function purposeReport({ purpose = 'doctor', pet, rows = [], highlights = [], weights = [], recentLogs = [], draft = {}, from, to, days = 14 }) {
   const sections = [];
   const add = (title, items, kind = '') => {
     const values = list(items).map(clean).filter(Boolean);
@@ -25,6 +32,7 @@ export function purposeReport({ purpose = 'doctor', pet, rows = [], highlights =
   const eventText = (r) => `${r.eventDateTime}｜${labels[r.category] || '紀錄'}：${[r.itemName, num(r.amount) ? `${r.amount}${r.unit || ''}` : '', r.note].filter(Boolean).join('，') || '已記錄'}`;
   const abnormal = events.filter((r) => ['vomit','stool','urine','mood'].includes(r.category) && !/^(正常|成形|普通|良好)$/.test(clean(r.note))).sort((a,b) => b.eventDateTime.localeCompare(a.eventDateTime));
   if (purpose === 'care') {
+    add('交接前最近紀錄（非本次安排）', careRecentRecords(pet.petId,recentLogs,from,to).map(r=>`${r.label}：${r.text}`), 'history');
     add('餵食與飲水', [draft.feeding]);
     add('用藥方式', [draft.medicine]);
     add('用品位置', [draft.supplies]);

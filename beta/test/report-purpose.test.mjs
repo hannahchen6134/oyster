@@ -1,12 +1,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { purposeReport, careDefaults, reportPreview } from '../public/report-purpose.js';
+import { purposeReport, careDefaults, reportPreview, careRecentRecords } from '../public/report-purpose.js';
 import { buildA4Report } from '../public/a4-report.js';
 import { reportChoiceFlex } from '../src/flex.js';
 import worker, { handleTextMessage } from '../src/index.js';
 import { reportFixture } from './support/report-fixture.mjs';
 import { saveReportShot } from '../src/db.js';
 const base = {pet:{petId:'p1',petName:'蚵仔'},from:'2026-09-01',to:'2026-09-07',days:7};
+test('照護報告帶入最後已記錄事件，跨貓／刪除／未來紀錄排除；歷史不是餵食指示',()=>{
+  const logs=[{petId:'p1',category:'food',eventDateTime:'2026-09-06 08:00',itemName:'主食罐',amount:40,unit:'g'}, {petId:'p2',category:'food',eventDateTime:'2026-09-07 08:00',itemName:'別貓資料'}, {petId:'p1',category:'food',eventDateTime:'2026-10-01 08:00',itemName:'未來資料'}, {petId:'p1',category:'med',eventDateTime:'2026-09-07 08:00',itemName:'已刪除',isDeleted:1}, {petId:'p1',category:'med',eventDateTime:'2026-09-05 08:00',itemName:'藥A',medStatus:'未吃'}];
+  const recent=careRecentRecords('p1',logs,base.from,base.to);assert.equal(recent.length,2);assert.match(recent[0].text,/40g/);assert.match(recent[1].text,/未吃/);
+  const d=purposeReport({...base,purpose:'care',recentLogs:logs,draft:{}});const html=reportPreview(d);assert.match(html,/交接前最近紀錄（非本次安排）/);assert.doesNotMatch(html,/別貓資料|未來資料|已刪除|每天餵40/);assert.match(d.notice,/尚未填寫/);
+});
 test('醫生摘要先異常、含用藥與精確體重、過期和未來資料不混入', () => {
   const d = purposeReport({...base,draft:{concern:'想確認食量'},highlights:[{eventDateTime:'2026-09-06 08:00',category:'vomit',note:'白沫'},{eventDateTime:'2026-10-01',category:'vomit',note:'未來資料'}],weights:[{date:'2026-09-06',amount:4.27}],rows:[{date:'2026-09-06',entryCount:2,kcal:40,medJson:JSON.stringify([{name:'藥A',status:'已吃',dose:'1顆'}])}]});
   assert.equal(d.sections[0].title,'這次最想讓醫生知道');
