@@ -187,6 +187,11 @@ LINE 使用者打字
 5. **CJK 字型**：機器上有 `wqy-zenhei.ttc` 可作子集化來源；`pyftsubset`/fonttools 未安裝（要先裝）。
 6. **時間**：一律台北時間（`util.js` 用 UTC+8 位移，台灣無日光節約）。
 7. **多貓家庭**：記錄前可能要先選貓（既有流程），別另立一套。
+8. **後台登入仍需在 `/admin/login` 網址帶一次 `?key=`**：成功後換發 cookie，之後所有導覽／切換
+   都免帶金鑰（金鑰只在**登入那一次**出現在網址）。**目前沒有**「把金鑰打進表單、完全不進網址」
+   的 POST 登入頁——這是可選硬化項（未來可加 `GET /admin/login` 顯示表單 + `POST` 驗證設 cookie）。
+   不影響現有安全性：cookie 為 HttpOnly/Secure/SameSite、`?key=` 以 constant-time 比對，且 `?key=`
+   僅作 curl/JSON 端點的相容後路。
 
 ---
 
@@ -228,7 +233,8 @@ LINE 使用者打字
   `/admin/metrics`（JSON 彙總）、`/admin/line-token`（權杖健康檢查）。
 - 用 `ADMIN_KEY`（wrangler secret，≥8 碼）保護。**登入方式**：先開一次
   `/admin/login?key=<ADMIN_KEY>` → 換發 HttpOnly/Secure/SameSite cookie（8 小時），之後導覽免帶金鑰。
-  `?key=` 仍保留為 curl/JSON 端點的相容後路，但會把金鑰暴露在網址（瀏覽記錄/日誌），少用。
+  ⚠️ 金鑰**只在登入那一次**出現在網址；目前**無**「金鑰完全不進網址」的 POST 表單登入（見 §8-8，
+  屬可選硬化項）。`?key=` 也保留為 curl/JSON 端點的相容後路，但會把金鑰留在網址（瀏覽記錄/日誌），少用。
 - **輪替金鑰**（洩漏或定期）：`cd beta && wrangler secret put ADMIN_KEY`（輸入新值）→ 立即生效、舊金鑰即刻失效。
   ⚠️ 金鑰**絕不要貼進聊天、網址分享或截圖**；要傳連結請用 `/admin/login` 拿 cookie 後的乾淨網址。
 
