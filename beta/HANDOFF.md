@@ -197,3 +197,46 @@ LINE 使用者打字
 4. 任何改動：**先寫／改測試 → `npm test` 綠 → `npm run deploy`**；別跳過測試閘門、別碰 production。
 
 有背景脈絡在 `docs/`（付費方案、使用說明、資料備份與復原、LINE OA 介紹）與 `PRODUCT_ANALYSIS.md`。
+
+---
+
+## 10. 帳號與設定交接清單（**不在 repo 裡**，接手一定要另外取得）
+
+> 下面只列「需要什麼、在哪裡設定」，**不放任何金鑰內容**。金鑰值請由擁有者透過安全管道交付，
+> 或直接輪替後交付新值。
+
+### 10.1 Cloudflare（執行環境）
+- 帳號登入權（能進 Dashboard → Workers & Pages、D1）。
+- Worker：`cat-care-beta`。網址 `https://cat-care-beta.hannahchen6134.workers.dev`。
+- D1 資料庫：名稱 `cat-care-beta`，`database_id` 已在 `wrangler.toml`。**正式資料在這裡**。
+- 部署用憑證：`CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`（本機/CI 部署要）。
+- **方案**：目前免費即可運作；「近七天在 LINE 直接出折線圖圖片」需升級 **Workers Paid（US$5/月）**（見 §8-1）。
+- 備份/復原流程：`beta/docs/資料備份與復原.md`；`ops/backup-workflow.yml` 有備份工作流參考。
+
+### 10.2 LINE（前台通道）
+- **官方帳號（OA）**：basicId `@232mjffx`——需要 OA 管理權（名稱、大頭貼、好友訊息）。
+- **Messaging API channel** 的三個機密（見 §1，存 wrangler secret）：
+  `LINE_CHANNEL_SECRET`、`LINE_CHANNEL_ID`、`LINE_CHANNEL_ACCESS_TOKEN`。
+- **Webhook URL**：`https://cat-care-beta.hannahchen6134.workers.dev/webhook`（在 LINE Developers 設定、需開啟 Use webhook）。
+- **LIFF app**：`LIFF_ID = 2010761895-7VsJuJ3C`（`wrangler.toml`），所屬 Login channel `LIFF_CHANNEL_ID = 2010761895`。
+  - ⚠️ LINE 內建瀏覽器上方標題顯示的名稱是 **LIFF app 名稱**（在 LINE Developers Console 設定，
+    **不在程式碼**）。目前仍是舊名「喵喵照護安心管家」，要在 Console 改成「喵喵管家」。
+
+### 10.3 測試者後台 `/admin/*`（就是你在用的那個後台網頁，已在本 repo `src/index.js`）
+- 頁面：`/admin/testers`（測試者開通/關閉＋留存/使用數據，一頁看）、
+  `/admin/metrics`（JSON 彙總）、`/admin/line-token`（權杖健康檢查）。
+- 用 `ADMIN_KEY`（wrangler secret，≥8 碼）保護。**登入方式**：先開一次
+  `/admin/login?key=<ADMIN_KEY>` → 換發 HttpOnly/Secure/SameSite cookie（8 小時），之後導覽免帶金鑰。
+  `?key=` 仍保留為 curl/JSON 端點的相容後路，但會把金鑰暴露在網址（瀏覽記錄/日誌），少用。
+- **輪替金鑰**（洩漏或定期）：`cd beta && wrangler secret put ADMIN_KEY`（輸入新值）→ 立即生效、舊金鑰即刻失效。
+  ⚠️ 金鑰**絕不要貼進聊天、網址分享或截圖**；要傳連結請用 `/admin/login` 拿 cookie 後的乾淨網址。
+
+### 10.4 GitHub
+- Repo：`hannahchen6134/oyster`（Beta 程式在 `beta/`）。
+- 分支：開發 `claude/cat-care-bot-deploy-df6jy4`（鏡射 `claude/continue-0t38um`）；`main` 見 §7。
+
+### 10.5 交接時要做的動作（建議）
+1. 轉移或重設上述各平台的存取權（Cloudflare、LINE Developers、GitHub、OA 管理）。
+2. **輪替所有 wrangler secret**（`LINE_*`、`ADMIN_KEY`），用新值交付，避免沿用舊值。
+3. 確認 D1 有在備份（§10.1）。
+4. 決定 Workers 方案（是否升級付費以啟用 LINE 折線圖圖片）。
