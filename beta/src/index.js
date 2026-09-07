@@ -1158,6 +1158,14 @@ async function handlePostback(event, env, baseUrl) {
 
   // 其他狀況（較少記的）：點分類 → 常用描述，兩層即可
   if (action === 'recmore') {
+    // A menu is read-only: coalesce rapid duplicate taps even with distinct event IDs.
+    // Conditional UPSERT is atomic across Worker instances; never suppress actual records.
+    const now=Date.now();
+    const claim=await db.prepare(`INSERT INTO app_kv(k,v,updatedAt) VALUES (?,?,?)
+      ON CONFLICT(k) DO UPDATE SET v=excluded.v,updatedAt=excluded.updatedAt
+      WHERE CAST(app_kv.v AS INTEGER) <= ?`)
+      .bind(`msg:menu:recmore:${lineUserId}`,String(now+3000),new Date(now).toISOString(),now).run();
+    if(!claim.meta?.changes)return;
     await replyOrPushQuick(env, event, '其他狀況？點一個分類 👇', symptomCategoryQuick());
     return;
   }

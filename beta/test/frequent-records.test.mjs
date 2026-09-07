@@ -9,8 +9,8 @@ async function setup(run,actor='single'){
  globalThis.fetch=async(url,options={})=>{if(String(url).includes('/message/'))sent.push(JSON.parse(options.body));return new Response('{"richMenuId":"test-menu"}');};
  const event=()=>({source:{type:'user',userId:actor},replyToken:'test'});
  const say=async(text)=>{const id='frequent-'+crypto.randomUUID();await handleTextMessage({...event(),message:{id,text}},env,'https://local.test');return id;};
- const click=async(data)=>{
-  const body=JSON.stringify({events:[{...event(),type:'postback',webhookEventId:crypto.randomUUID(),postback:{data}}]});
+ const click=async(data,eventId=crypto.randomUUID())=>{
+  const body=JSON.stringify({events:[{...event(),type:'postback',webhookEventId:eventId,postback:{data}}]});
   const key=await crypto.subtle.importKey('raw',new TextEncoder().encode('test-secret'),{name:'HMAC',hash:'SHA-256'},false,['sign']);
   const sig=Buffer.from(await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(body))).toString('base64');
   const res=await worker.fetch(new Request('https://local.test/webhook',{method:'POST',headers:{'x-line-signature':sig},body}),env,{});assert.equal(res.status,200);
@@ -19,6 +19,21 @@ async function setup(run,actor='single'){
  const last=()=>sent.at(-1).messages.at(-1);
  try{await run({DB,env,sent,say,click,logs,last});}finally{globalThis.fetch=old;}
 }
+test('更多紀錄事件重送與不同事件同時到達，只回一次；稍後可再次開啟且不擋紀錄',()=>setup(async({click,sent,DB,say,logs,last})=>{
+ await Promise.all([click('action=recmore','repeat'),click('action=recmore','repeat'),click('action=recmore','other'),click('action=recmore','third')]);
+ assert.equal(sent.length,1);assert.equal(last().text,'其他狀況？點一個分類 👇');assert.equal(last().quickReply.items.length,5);
+ await say('水5');assert.equal(logs().length,1);
+ DB.prepare("UPDATE app_kv SET v='0' WHERE k='msg:menu:recmore:single'").run();
+ await click('action=recmore');assert.equal(sent.filter(p=>p.messages[0].text==='其他狀況？點一個分類 👇').length,2);
+}));
+test('更多紀錄 reply 明確失敗時只 push 一次，連續事件不再補送',()=>setup(async({click})=>{
+ const original=globalThis.fetch,calls=[];
+ globalThis.fetch=async(url,options)=>{
+  if(String(url).includes('/message/')){calls.push(String(url));return new Response('{}',{status:String(url).endsWith('/reply')?400:200});}
+  return original(url,options);
+ };
+ try{await click('action=recmore');await click('action=recmore');assert.equal(calls.filter(u=>u.endsWith('/reply')).length,1);assert.equal(calls.filter(u=>u.endsWith('/push')).length,1);}finally{globalThis.fetch=original;}
+}));
 test('自然語言主食31、水5與多筆照常，完成回讀包含貓與數字並再附八快捷',()=>setup(async({say,logs,last})=>{
  await say('主食31');assert.equal(logs()[0].foodType,'主食罐');assert.equal(logs()[0].amount,31);assert.match(JSON.stringify(last()),/小花/);assert.match(JSON.stringify(last()),/31/);assert.equal(last().quickReply.items.length,8);
  await say('水5');assert.equal(logs().at(-1).amount,5);assert.equal(logs().at(-1).category,'water');
