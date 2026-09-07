@@ -1,7 +1,7 @@
 import { appKvGet, appKvSet, listPets, getPet, getSummaries, listVetsByOwner, getUser } from './db.js';
 import { isBetaAllowed } from './plan.js';
 import { careDefaults, purposeReport } from '../public/report-purpose.js';
-import { handleReportApi, cleanDraft } from './report-sharing.js';
+import { handleReportApi, cleanDraft, classifyLines } from './report-sharing.js';
 import { renderReportImages } from './report-renderer.js';
 import { replyMessages, pushMessages, replyOrPush, replyOrPushFlex, showLoadingAnimation } from './line.js';
 import { taipeiToday, addDays } from './util.js';
@@ -17,6 +17,9 @@ function card(title,buttons,hint='') {
   ]}}};
 }
 const button=(flow,action,extra='')=>`action=${action}&flow=${flow.id}${extra}`;
+async function dbUpdateFlowId(db,actor,oldId,flow){
+  await db.prepare("UPDATE app_kv SET v=?,updatedAt=? WHERE k=? AND json_extract(v,'$.id')=?").bind(JSON.stringify(flow),new Date().toISOString(),flowKey(actor),oldId).run();
+}
 async function saveFlow(db,actor,flow,create=false){
   if(create)return appKvSet(db,flowKey(actor),JSON.stringify(flow));
   await db.prepare("UPDATE app_kv SET v=?,updatedAt=? WHERE k=? AND json_extract(v,'$.id')=?").bind(JSON.stringify(flow),new Date().toISOString(),flowKey(actor),flow.id).run();
@@ -56,11 +59,16 @@ export async function buildLineReport(db,owner,petId,purpose) {
   const weights=logs.results.filter(r=>r.category==='weight').map(r=>({...r,date:r.eventDateTime.slice(0,10)}));
   return {pet,draft,templateUpdatedAt:template?.updatedAt||null,snapshot:purposeReport({pet,purpose,rows,highlights,weights,recentLogs:logs.results,draft,from,to,days:14})};
 }
-async function askFeeding(env,event,flow,pet) {
+function missingCare(draft){
+  return [!draft.feeding?.trim()&&'餵食與補水方式',(!draft.medicine?.trim()||draft.medicine.includes('餵法待補'))&&'餵藥方法（不需用藥也請寫明）',!/(摸|抱|碰|喜歡|討厭|害怕|躲|個性|玩|安撫)/.test(draft.notes||'')&&'摸摸喜好與相處禁忌'].filter(Boolean);
+}
+async function askFeeding(env,event,flow,pet,draft={}) {
   flow.stage='feeding';await saveFlow(env.DB,event.source.userId,flow);
-  await replyOrPushFlex(env,event,card(`${pet.petName}這次怎麼餵？`,[
-    ['先出已有資料',button(flow,'reportGenerate','&skip=1')],['取消',button(flow,'reportCancel')]
-  ],'直接回覆食物、時間、份量與飲水安排，例如「早晚各餵主食罐 40g，水碗補滿」。不會從過去紀錄猜份量。'),'請直接回覆這次餵食與飲水安排，或輸入「取消」。');
+  const prompt=card(`補充${pet.petName}的照護說明`,[
+    ['填好後出圖',button(flow,'reportRecheck')],['取消',button(flow,'reportCancel')]
+  ],`還缺：${missingCare(draft).join('、')||'可直接貼上要更新的說明'}。\n直接回覆即可，已有資料不用重填。也可到後台補好範本，再回來點「填好後出圖」。`);
+  if(env.LIFF_ID)prompt.contents.body.contents.splice(-2,0,{type:'button',style:'secondary',action:{type:'uri',label:'到後台補照護資料',uri:`https://liff.line.me/${env.LIFF_ID}?go=care`}});
+  await replyOrPushFlex(env,event,prompt,'直接回覆缺少的照護說明，或輸入「取消」。');
 }
 export async function handleLineReportText(env,event,owner,text) {
   const flow=await read(env.DB,flowKey(event.source?.userId));
@@ -75,8 +83,8 @@ export async function handleLineReportText(env,event,owner,text) {
   if(!await allowed(env,event,owner))return true;
   const pet=await getPet(env.DB,flow.petId);
   if(!pet||pet.isDeleted||pet.ownerLineUserId!==owner){await replyOrPush(env,event,'貓咪資料已變更，請重新點「出報告」。');return true;}
-  if(!text.trim()||text.length>2000){await replyOrPush(env,event,'請用 2000 字以內補充這次餵食與飲水安排。');return true;}
-  flow.feeding=text.trim();flow.stage='confirm';await saveFlow(env.DB,event.source.userId,flow);
+  if(!text.trim()||text.length>2000){await replyOrPush(env,event,'請用 2000 字以內補充照護說明。');return true;}
+  flow.feeding=text.trim();flow.careDraft=classifyLines(text.trim());flow.stage='confirm';await saveFlow(env.DB,event.source.userId,flow);
   await replyOrPushFlex(env,event,card(`確認${pet.petName}的安排`,[
     ['確認並出圖',button(flow,'reportConfirm')],['重新填寫',button(flow,'reportEdit')],['取消',button(flow,'reportCancel')]
   ],flow.feeding+'\n\n確認後會存入這隻貓的照護範本，下次不用重填。'),'請點確認按鈕完成補充。');
@@ -105,14 +113,28 @@ export async function handleLineReportPostback(env,event,owner,data,render=rende
     if(!['doctor','care'].includes(data.get('purpose')))return;
     flow.purpose=data.get('purpose');flow.stage='ready';await saveFlow(env.DB,actor,flow);
     const bundle=await buildLineReport(env.DB,owner,flow.petId,flow.purpose);
-    if(flow.purpose==='care'&&!bundle.draft.feeding.trim())return askFeeding(env,event,flow,bundle.pet);
-  } else if(action==='reportEdit'&&flow.stage==='confirm') {
-    const bundle=await buildLineReport(env.DB,owner,flow.petId,'care');return askFeeding(env,event,flow,bundle.pet);
+    if(flow.purpose==='care'&&missingCare(bundle.draft).length)return askFeeding(env,event,flow,bundle.pet,bundle.draft);
+  } else if(action==='reportEdit'&&flow.purpose==='care'&&['confirm','done','ready'].includes(flow.stage)) {
+    if(flow.stage==='done'){const oldId=flow.id;flow.id=crypto.randomUUID();flow.sent=0;await dbUpdateFlowId(env.DB,actor,oldId,flow);}
+    const bundle=await buildLineReport(env.DB,owner,flow.petId,'care');return askFeeding(env,event,flow,bundle.pet,bundle.draft);
+  } else if(action==='reportRecheck'&&flow.stage==='feeding') {
+    const bundle=await buildLineReport(env.DB,owner,flow.petId,'care');
+    if(missingCare(bundle.draft).length)return askFeeding(env,event,flow,bundle.pet,bundle.draft);
+    flow.stage='ready';await saveFlow(env.DB,actor,flow);
   } else if(action==='reportConfirm'&&flow.stage==='confirm') {
     const bundle=await buildLineReport(env.DB,owner,flow.petId,'care');
-    await appKvSet(env.DB,`careTemplate:${owner}:${flow.petId}`,JSON.stringify({draft:{...bundle.draft,feeding:flow.feeding},updatedAt:new Date().toISOString()}));
+    const additions=flow.careDraft||{feeding:flow.feeding};
+    const merged=Object.fromEntries(Object.entries(additions).filter(([,v])=>v?.trim()).map(([k,v])=>[k,[...new Set([bundle.draft[k]?.replace(/(?: · )?餵法待補/g,''),v].filter(Boolean))].join('\n')]));
+    const draft=cleanDraft({...bundle.draft,...merged,rawNotes:flow.feeding,rawApplied:true});
+    await appKvSet(env.DB,`careTemplate:${owner}:${flow.petId}`,JSON.stringify({draft,updatedAt:new Date().toISOString()}));
+    if(missingCare(draft).length)return askFeeding(env,event,flow,bundle.pet,draft);
+    // Edited content is a new immutable report, never reuse the earlier image cache.
+    const oldId=flow.id;flow.id=crypto.randomUUID();flow.sent=0;
+    await dbUpdateFlowId(env.DB,actor,oldId,flow);
     flow.stage='ready';await saveFlow(env.DB,actor,flow);
-  } else if(action==='reportGenerate'&&(flow.stage==='ready'||(flow.stage==='feeding'&&data.get('skip')==='1'))) {
+  } else if(action==='reportGenerate'&&flow.stage==='feeding') {
+    const bundle=await buildLineReport(env.DB,owner,flow.petId,'care');return askFeeding(env,event,flow,bundle.pet,bundle.draft);
+  } else if(action==='reportGenerate'&&flow.stage==='ready') {
     flow.stage='ready';await saveFlow(env.DB,actor,flow);
   } else { await replyOrPush(env,event,'這一步已處理，請使用最新的按鈕，或重新點「出報告」。');return; }
   return deliverReport(env,event,flow,render);
@@ -144,7 +166,7 @@ async function deliverReport(env,event,flow,render) {
       manifest={count:pngs.length,expiresAt:share.expiresAt};await appKvSet(db,'lineReportImages:'+share.id,JSON.stringify(manifest));
     }
     const messages=Array.from({length:manifest.count},(_,i)=>({type:'image',originalContentUrl:`${base}${share.url}/image/${i}`,previewImageUrl:`${base}${share.url}/image/${i}`}));
-    messages.push({type:'text',text:`${bundle.pet.petName}的${stored.snapshot.reportName}\n共 ${manifest.count-1} 張報告＋1 張 QR Code，可直接儲存或轉傳。\n查看報告（7 天內有效）：${base}${share.url}`});
+    messages.push({type:'text',text:`${bundle.pet.petName}的${stored.snapshot.reportName}\n共 ${manifest.count-1} 張報告＋1 張 QR Code，可直接儲存或轉傳。\n查看報告（7 天內有效）：${base}${share.url}`,...(flow.purpose==='care'?{quickReply:{items:[{type:'action',action:{type:'postback',label:'補充照護說明',data:button(flow,'reportEdit'),displayText:'補充照護說明'}}]}}:{})});
     let sent=Number(flow.sent||0);
     for(let i=sent;i<messages.length;i+=5){
       const batch=messages.slice(i,i+5);

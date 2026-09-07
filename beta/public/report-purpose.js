@@ -1,4 +1,5 @@
 // 報告用途整理：只使用已授權取得的指定貓資料，不從歷史紀錄推論照護指示。
+import { cleanDoctorSource } from './doctor-report-data.js';
 const clean = (v) => String(v ?? '').trim();
 const list = (v) => Array.isArray(v) ? v : [];
 const num = (v) => Number.isFinite(Number(v)) ? Number(v) : 0;
@@ -7,7 +8,7 @@ export function careDefaults(pet, meds, vets) {
   const vet = list(vets).find((v) => v.vetId === pet.defaultVetId);
   return {
     feeding: '',
-    medicine: list(meds).filter((m) => !m.isDeleted && m.petId === pet.petId).map((m) => [m.medName, num(m.doseAmount) > 0 ? `${m.doseAmount}${m.doseUnit || ''}` : '', m.schedule, m.defaultTimes, m.instruction, m.note].filter(Boolean).join(' · ')).join('\n'),
+    medicine: list(meds).filter((m) => !m.isDeleted && m.petId === pet.petId).map((m) => [m.medName, num(m.doseAmount) > 0 ? `${m.doseAmount}${m.doseUnit || ''}` : '', m.schedule, m.defaultTimes, m.instruction || '餵法待補', /LINE.*引導建立/.test(m.note||'')?'':m.note].filter(Boolean).join(' · ')).join('\n'),
     notes: clean(pet.conditionNote),
     emergency: vet ? [vet.hospitalName, vet.doctorName, vet.phone, vet.address].filter(Boolean).join(' · ') : ''
   };
@@ -32,12 +33,15 @@ export function purposeReport({ purpose = 'doctor', pet, rows = [], highlights =
   const eventText = (r) => `${r.eventDateTime}｜${labels[r.category] || '紀錄'}：${[r.itemName, num(r.amount) ? `${r.amount}${r.unit || ''}` : '', r.note].filter(Boolean).join('，') || '已記錄'}`;
   const abnormal = events.filter((r) => ['vomit','stool','urine','mood'].includes(r.category) && !/^(正常|成形|普通|良好)$/.test(clean(r.note))).sort((a,b) => b.eventDateTime.localeCompare(a.eventDateTime));
   if (purpose === 'care') {
+    add('怎麼餵食與補水', [draft.feeding || '待爸媽補充：食物、時間、份量與補水方式。']);
+    add('怎麼餵藥', [draft.medicine || '待爸媽補充：是否需用藥；若需要，請填藥名、份量、時間與餵法。']);
+    const noteLines=clean(draft.notes).split(/\n|(?<=[。；])/u).filter(Boolean);
+    const habits=noteLines.filter(s=>/摸|抱|碰|喜歡|討厭|害怕|躲|個性|玩|安撫/.test(s));
+    add('摸摸喜好與相處方式', habits.length?habits:['待爸媽補充：喜歡摸哪裡、不能碰哪裡、怎麼安撫。']);
+    add('用品放哪裡', [draft.supplies || '待爸媽補充：食物、藥品、貓砂與清潔用品的位置。']);
+    add('其他照顧注意事項', noteLines.filter(s=>!habits.includes(s)));
+    add('緊急聯絡與處理方式', [draft.emergency || '待爸媽補充：聯絡人、電話與指定醫院。']);
     add('交接前最近紀錄（非本次安排）', careRecentRecords(pet.petId,recentLogs,from,to).map(r=>`${r.label}：${r.text}`), 'history');
-    add('餵食與飲水', [draft.feeding]);
-    add('用藥方式', [draft.medicine]);
-    add('用品位置', [draft.supplies]);
-    add('照顧注意事項', [draft.notes]);
-    add('緊急聯絡與處理方式', [draft.emergency]);
     // 明確區分過去的觀察，絕不作為未來的餵食／用藥命令。
     add('最近已記錄的狀況（供觀察）', abnormal.slice(0, 5).map(eventText), 'history');
   } else {
@@ -81,6 +85,7 @@ export function purposeReport({ purpose = 'doctor', pet, rows = [], highlights =
     generatedAt: new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Taipei' }).slice(0,16),
     dateRangeLabel: purpose === 'care' ? (clean(draft.period) ? `照護期間：${clean(draft.period)}` : `整理於 ${to}`) : `${from}－${to}（近 ${days} 天）`, rangeDays: days,
     sections,
+    ...(purpose==='doctor'?{doctorSource:cleanDoctorSource({from,to,rows:recent,weights})}:{}),
     empty: purpose !== 'care' && !recent.length && !events.length && !list(weights).some((w) => inRange(w.date)),
     notice: purpose === 'care' ? (!clean(draft.feeding) ? '餵食與飲水方式尚未填寫，請先向爸媽確認。' : '照護方式由爸媽確認；下方歷史狀況僅供觀察。') : '僅整理已記錄的事實；沒有紀錄不代表沒有發生。'
   };

@@ -1,9 +1,18 @@
 import puppeteer from '@cloudflare/puppeteer';
 import qrcode from '../public/qrcode.mjs';
 import { escapeReport as esc } from '../public/report-purpose.js';
+import { buildA4Report } from '../public/a4-report.js';
+import { doctorReportData } from '../public/doctor-report-data.js';
+import { reportA4Css } from '../public/report-a4-style.js';
 
 // No external assets or user URLs are fetched: only escaped snapshot text and our QR SVG.
 export function imageDocument(snapshot, url) {
+  const html=baseImageDocument(snapshot,url);
+  if(snapshot.purpose!=='doctor'||!snapshot.doctorSource)return html;
+  const built=buildA4Report(doctorReportData(snapshot));
+  return html.replace('</style>',`${reportA4Css}\n.a4-page{width:760px;min-height:0;overflow:visible;font:14px/1.4 sans-serif;--serif:serif}.a4-page section{padding:9px 11px 10px}.a4-page h2{font-size:17px}.a4-page p{white-space:normal}</style>`).replace('<div id="pages">',built.html.replaceAll('class="a4-page"','class="a4-page page"')+'<div id="pages">');
+}
+function baseImageDocument(snapshot, url) {
   const qr=qrcode(0,'M'); qr.addData(url,'Byte'); qr.make();
   const blocks=snapshot.sections.flatMap(section => section.items.flatMap((item,index) => {
     const chunks=Array.from(String(item)).reduce((a,c,i)=>{if(i%220===0)a.push('');a[a.length-1]+=c;return a;},[]);
@@ -39,7 +48,8 @@ export async function renderReportImages(env,snapshot,url) {
     await page.setViewport({width:760,height:1200,deviceScaleFactor:1});
     await page.setContent(imageDocument(snapshot,url),{waitUntil:'domcontentloaded',timeout:15000});
     await page.evaluate(()=>document.fonts.ready);
-    const count=await page.evaluate(paginateImages);
+    await page.evaluate(paginateImages);
+    const count=await page.$$eval('.page',pages=>pages.length-1);
     if(count>30)throw Error('report too long');
     const images=[];
     for(const element of await page.$$('.page')) {
