@@ -151,6 +151,11 @@ async function deliverReport(env,event,flow,render) {
     if(!latest||latest.id!==flow.id||['done','cancelled'].includes(latest.stage))return;
     if(await appKvGet(db,`lineReportDelivered:${flow.id}`))return;
     flow.sent=latest.sent||0;
+    if(event.replyToken){
+      await replyMessages(env,event.replyToken,[{type:'text',text:'正在整理報告圖片與 QR Code，完成後會直接傳在這裡。'}]);
+      // The reply token is consumed; final images and errors must use push once.
+      event={...event,replyToken:undefined};
+    }
     await showLoadingAnimation(env,actor);
     const bundle=await buildLineReport(db,flow.owner,flow.petId,flow.purpose);
     const base=String(env.APP_BASE_URL||'').replace(/\/$/,'')||new URL(event.__reportBaseUrl).origin;

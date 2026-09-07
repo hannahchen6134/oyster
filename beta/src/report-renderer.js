@@ -41,22 +41,40 @@ export function paginateImages() {
 }
 
 export async function renderReportImages(env,snapshot,url) {
+  const controller=new AbortController();let timer;
+  try{return await Promise.race([
+    renderImages(env,snapshot,url,controller.signal),
+    new Promise((_,reject)=>{timer=setTimeout(()=>{controller.abort();reject(Error('report render timeout'));},20000);})
+  ]);}finally{clearTimeout(timer);}
+}
+async function renderImages(env,snapshot,url,signal) {
   if(!env.REPORT_BROWSER)throw Error('REPORT_BROWSER unavailable');
   const browser=await puppeteer.launch(env.REPORT_BROWSER);
+  if(signal.aborted){void browser.close().catch(()=>{});throw Error('report render timeout');}
+  const abort=()=>{void browser.close().catch(()=>{});};signal.addEventListener('abort',abort,{once:true});
   try {
     const page=await browser.newPage();
     await page.setViewport({width:760,height:1200,deviceScaleFactor:1});
-    await page.setContent(imageDocument(snapshot,url),{waitUntil:'domcontentloaded',timeout:15000});
+    await page.setContent(imageDocument(snapshot,url).replace("default-src 'none';", "default-src 'none'; img-src data:;"),{waitUntil:'domcontentloaded',timeout:10000});
     await page.evaluate(()=>document.fonts.ready);
     await page.evaluate(paginateImages);
     const count=await page.$$eval('.page',pages=>pages.length-1);
     if(count>30)throw Error('report too long');
-    const images=[];
-    for(const element of await page.$$('.page')) {
-      const png=await element.screenshot({type:'png',encoding:'base64'});
-      if(png.length>1_300_000)throw Error('report image too large');
-      images.push(png);
-    }
+    // One remote screenshot, then crop inside the browser: avoid one slow CDP
+    // screenshot round trip for every report page.
+    const full=await page.screenshot({type:'png',encoding:'base64',fullPage:true});
+    const images=await page.evaluate(cropReportPages,full);
+    if(images.some(png=>png.length>1_300_000))throw Error('report image too large');
     return images;
-  } finally { await browser.close(); }
+  } finally {signal.removeEventListener('abort',abort);await browser.close();}
+}
+
+export async function cropReportPages(png){
+  const img=new Image();img.src='data:image/png;base64,'+png;await img.decode();
+  return [...document.querySelectorAll('.page')].map(element=>{
+    const r=element.getBoundingClientRect(),canvas=document.createElement('canvas');
+    canvas.width=Math.ceil(r.width);canvas.height=Math.ceil(r.height);
+    canvas.getContext('2d').drawImage(img,r.x+scrollX,r.y+scrollY,r.width,r.height,0,0,canvas.width,canvas.height);
+    return canvas.toDataURL('image/png').split(',')[1];
+  });
 }

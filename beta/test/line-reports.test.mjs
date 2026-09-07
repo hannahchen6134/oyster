@@ -53,6 +53,13 @@ test('醫生圖片與QR公開頁沿用A4趨勢、組成和明細，不只文字�
  assert.ok(snapshot.doctorSource.rows.length);const html=imageDocument(snapshot,url);assert.match(html,/a4-spark/);assert.match(html,/每日照護明細/);assert.match(html,/4.27/);
  const page=await publicReport(new Request(url),env,new URL(url));assert.match(await page.text(),/a4-spark/);
 }));
+test('醫生按鈕先回覆正在整理，產圖後push圖片，不重複使用reply token',()=>setup(async({sent,post})=>{
+ await post('reportPet',{petId:'p1'});let release,started;
+ const began=new Promise(r=>{started=r;});const rendering=new Promise(r=>{release=r;});
+ const work=post('reportPurpose',{purpose:'doctor'},async()=>{started();return rendering;});await began;
+ assert.match(sent.at(-1).messages[0].text,/正在整理報告圖片/);assert.equal(sent.at(-1).replyToken,'test');
+ release([png,png]);await work;assert.equal(sent.at(-1).to,'owner');assert.equal(sent.at(-1).replyToken,undefined);assert.equal(sent.at(-1).messages[0].type,'image');
+}));
 test('外家貓、共照者、過期流程不得生成分享報告',()=>setup(async({db,env,event,sent,post,flow})=>{
  await post('reportPet',{petId:'x1'});assert.equal((await flow()).stage,'pet');assert.match(JSON.stringify(sent.at(-1)),/無法存取/);
  await startLineReport(env,{...event,source:{type:'user',userId:'helper'}},'owner');assert.match(JSON.stringify(sent.at(-1)),/爸媽/);
