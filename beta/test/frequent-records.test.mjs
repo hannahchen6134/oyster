@@ -19,6 +19,11 @@ async function setup(run,actor='single'){
  const last=()=>sent.at(-1).messages.at(-1);
  try{await run({DB,env,sent,say,click,logs,last});}finally{globalThis.fetch=old;}
 }
+test('新舊報告文字入口都先回選貓卡，不開後台',()=>setup(async({say,last})=>{
+ for(const text of ['出報告','給醫生看','就醫使用','照護使用','給照護者']){
+  await say(text);assert.match(JSON.stringify(last()),/要整理哪隻貓/);assert.match(JSON.stringify(last()),/action=reportPet/);assert.doesNotMatch(JSON.stringify(last()),/"type":"uri"|liff.line.me/);
+ }
+}));
 test('更多紀錄事件重送與不同事件同時到達，只回一次；稍後可再次開啟且不擋紀錄',()=>setup(async({click,sent,DB,say,logs,last})=>{
  await Promise.all([click('action=recmore','repeat'),click('action=recmore','repeat'),click('action=recmore','other'),click('action=recmore','third')]);
  assert.equal(sent.length,1);assert.equal(last().text,'其他狀況？點一個分類 👇');assert.equal(last().quickReply.items.length,5);

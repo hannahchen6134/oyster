@@ -169,7 +169,7 @@ test('驗收：查詢指令', () => {
 test('圖文選單標籤＝送出詞，都對得上動作（自動回覆一致）', () => {
   assert.deepEqual(parseMessage('記一筆'), { type: 'query', query: 'recordMenu' });
   assert.deepEqual(parseMessage('今日記錄'), { type: 'query', query: 'today' });
-  assert.deepEqual(parseMessage('給醫生看'), { type: 'query', query: 'visit' });
+  assert.deepEqual(parseMessage('給醫生看'), { type: 'query', query: 'report' });
   assert.deepEqual(parseMessage('怎麼記'), { type: 'exampleMenu' });
 });
 

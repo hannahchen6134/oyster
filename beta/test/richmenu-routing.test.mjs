@@ -14,17 +14,17 @@ test('照護月曆 → calendar（在對話看月曆，不開網站）', () => {
   assert.equal(parseMessage('月曆').query, 'calendar', '舊詞仍相容');
 });
 
-test('出報告 → report（先問就醫／照護的入口）', () => {
+test('出報告 → report（先選貓咪的入口）', () => {
   assert.equal(parseMessage('出報告').query, 'report');
 });
 
-test('出報告的兩個分支各自走既有輸出：就醫→visit、照護→handoff', () => {
-  assert.equal(parseMessage('就醫報告').query, 'visit');
-  assert.equal(parseMessage('就醫使用').query, 'visit');
-  assert.equal(parseMessage('照護報告').query, 'handoff');
-  assert.equal(parseMessage('照護使用').query, 'handoff');
+test('舊報告指令統一進 LINE 選貓與出圖流程', () => {
+  assert.equal(parseMessage('就醫報告').query, 'report');
+  assert.equal(parseMessage('就醫使用').query, 'report');
+  assert.equal(parseMessage('照護報告').query, 'report');
+  assert.equal(parseMessage('照護使用').query, 'report');
 });
 
 test('給醫生看仍可用（出報告取代它進選單，但舊詞不失效）', () => {
-  assert.equal(parseMessage('給醫生看').query, 'visit');
+  assert.equal(parseMessage('給醫生看').query, 'report');
 });
