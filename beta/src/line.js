@@ -155,7 +155,7 @@ export async function replyOrPushFlex(env, event, flexMessage, fallbackText) {
     } catch (error) {
       console.warn('flex reply failed:', error.message);
       try {
-        await replyText(env, event.replyToken, fallbackText);
+        await replyMessages(env, event.replyToken, [{type:'text',text:truncate(fallbackText),...(flexMessage.quickReply?{quickReply:flexMessage.quickReply}:{})}]);
         return;
       } catch (textError) {
         console.warn('text reply failed too:', textError.message);
@@ -167,7 +167,7 @@ export async function replyOrPushFlex(env, event, flexMessage, fallbackText) {
     await pushMessages(env, targetId, [flexMessage]);
   } catch (error) {
     console.warn('flex push failed, fallback to text:', error.message);
-    await pushText(env, targetId, fallbackText);
+    await pushMessages(env, targetId, [{type:'text',text:truncate(fallbackText),...(flexMessage.quickReply?{quickReply:flexMessage.quickReply}:{})}]);
   }
 }
 

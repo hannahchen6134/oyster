@@ -1,5 +1,6 @@
 import { publicReport, purgeReports } from './report-sharing.js';
 import { startLineReport, handleLineReportPostback, handleLineReportText } from './line-reports.js';
+import { frequentRecordItems, withFrequentRecords } from './frequent-records.js';
 // 貓貓照護管家 Beta — Cloudflare Worker 入口
 // /webhook  → LINE Messaging API webhook（驗簽後直接處理、直接 reply，不需早回 ack）
 // /api/*    → 照護站 REST API
@@ -934,7 +935,8 @@ async function handlePending(env, event, { db, user, pet, pets, lineUserId, owne
   }
 
   if (pending.startsWith('amount|')) {
-    const base = pending.slice(7);
+    const [,base,boundPetId,startedAt] = pending.split('|');
+    if(startedAt && Date.now()-Number(startedAt)>PENDREC_TTL_MS){await clear();await replyOrPushQuick(env,event,'剛才的數量輸入已逾時，請重新選一個常用紀錄。',frequentRecordItems());return true;}
     const m = text.match(/^([0-9]+(?:\.[0-9]+)?)\s*(?:g|克|公克|ml|毫升)?$/i);
     if (!m) {
       // 開頭是數字卻格式跑掉 → 保留情境、溫柔再問一次，不清空
@@ -947,8 +949,15 @@ async function handlePending(env, event, { db, user, pet, pets, lineUserId, owne
     }
     await clear();
     const intent2 = parseMessage(`${base} ${m[1]}`);
-    if (intent2.type === 'record' && pet) {
-      await handleRecord(env, event, pet, intent2.record, ownerId, { fromButton: true, actorId: lineUserId, caregiverName, baseUrl });
+    if (intent2.type === 'record') {
+      const target=boundPetId?pets.find(p=>p.petId===boundPetId):pet;
+      if(boundPetId&&!target){await replyOrPush(env,event,'這隻貓的資料已變更，請重新點「記一筆」。');return true;}
+      if(!boundPetId&&needsCatPick(user,pets)){
+        await updateUser(db,lineUserId,{pendingAction:`pendrec:${JSON.stringify({r:intent2.record,t:Date.now()})}`});
+        await askWhichCat(env,event,pets);return true;
+      }
+      if(!target){await replyOrPush(env,event,'請先新增貓咪，再記錄。');return true;}
+      await handleRecord(env, event, target, intent2.record, ownerId, { fromButton: true, actorId: lineUserId, caregiverName, baseUrl });
       return true;
     }
     return false;
@@ -1004,7 +1013,7 @@ async function defaultPetId(db, lineUserId, ownerId) {
     const user = await getUser(db, lineUserId);
     const pets = await listPets(db, ownerId);
     const pet = await resolveDefaultPet(db, user, pets);
-    return pet?.petId || '';
+    return needsCatPick(user,pets)?'':pet?.petId || '';
   } catch (error) { return ''; }
 }
 // 多貓且此人「還沒明確選過要記哪一隻」時＝true：記錄前先問，避免默默記到第一隻（尤其是剛加入的共同照護者）
@@ -1044,50 +1053,17 @@ async function tryCompletePendingRecord(env, event, { db, user, pet, lineUserId,
   });
   return true;
 }
-// progressive disclosure：紀錄很少＝還在學，才顯示「怎麼打字記錄」教學鈕；上手後自動收起
-async function isBeginner(db, petId) {
-  if (!petId) return true;
-  try {
-    const r = await db.prepare('SELECT COUNT(*) c FROM logs WHERE petId = ? AND isDeleted = 0').bind(petId).first();
-    return (Number(r?.c) || 0) < 15;
-  } catch (error) { return false; }
-}
-const TEACH_BTN = qrPost('❓ 怎麼打字記錄', 'action=howtype', '怎麼打字記錄');
-// 一鍵捷徑：把「這隻貓最常記的吃喝藥」重建成可直接送出的指令，點一下就記好（也順便讓人記住指令長怎樣）
-async function quickShortcuts(db, petId) {
-  const DEFAULTS = ['水 20', '水 30', '罐頭 30', '乾糧 5', '藥 早 已吃'];
-  let cmds = [];
-  if (petId) {
-    try {
-      const { results } = await db.prepare(
-        `SELECT category, foodType, itemName, CAST(ROUND(amount) AS INTEGER) amt, medSlot, medStatus, COUNT(*) c, MAX(eventDateTime) t
-         FROM logs WHERE petId=? AND isDeleted=0 AND category IN ('water','food','med')
-         GROUP BY category, foodType, itemName, amt, medSlot, medStatus ORDER BY c DESC, t DESC LIMIT 10`
-      ).bind(petId).all();
-      for (const r of results || []) {
-        if (r.category === 'water' && r.amt > 0) cmds.push(`水 ${r.amt}`);
-        else if (r.category === 'food' && r.foodType && r.amt > 0) cmds.push(foodShortcutCmd(r.foodType, r.itemName, r.amt));
-        else if (r.category === 'med') cmds.push(`藥 ${[r.medSlot, r.medStatus || '已吃'].filter(Boolean).join(' ')}`.trim());
-      }
-    } catch (error) { /* 查不到就用預設 */ }
-  }
-  cmds = [...new Set(cmds)];
-  for (const d of DEFAULTS) { if (cmds.length >= 5) break; if (!cmds.includes(d)) cmds.push(d); }
-  return cmds.slice(0, 9).map((c) => qrMsg(c, c));
-}
 // 看不懂客戶輸入時的引導：不當死路，教打字 ＋ 這隻貓的一鍵捷徑，順手就能記
 export async function guideUnknown(env, event, petId) {
   const items = [
-    ...await quickShortcuts(env.DB, petId),
-    TEACH_BTN,
-    qrPost('其他狀況（吐/便…）', 'action=recmore', '其他狀況')
+    ...frequentRecordItems()
   ];
   await replyOrPushQuick(env, event,
     '我還沒聽懂這句 🙏\n'
     + '可以試著這樣說：\n'
     + '乾乾5、喝水30、嘔吐 白沫、最近吃什麼\n'
     + '（不用學格式，照平常講話就好）\n\n'
-    + '或點下面你常記的，一下就好：',
+    + '或點下面常用快捷，填這次的數量或情況：',
     items);
 }
 // 歡迎卡＋一鍵捷徑（P1-1：新朋友加入/解鎖就能直接記第一筆）
@@ -1095,7 +1071,7 @@ async function welcomeMsg(db, lineUserId, ownerId) {
   const w = welcomeFlex();
   try {
     const petId = await defaultPetId(db, lineUserId, ownerId);
-    w.quickReply = { items: [...await quickShortcuts(db, petId), TEACH_BTN] };
+    w.quickReply = { items: frequentRecordItems(petId) };
   } catch (error) { /* ignore */ }
   return w;
 }
@@ -1125,6 +1101,30 @@ async function handlePostback(event, env, baseUrl) {
   const ownerId = lineUserId ? await resolveDataOwner(db, lineUserId) : lineUserId;
 
   if (String(action).startsWith('report')) return handleLineReportPostback(env, { ...event, __reportBaseUrl: baseUrl }, ownerId, data);
+
+  if(action==='frequent') {
+    const user=await getUser(db,lineUserId);
+    if(!isBetaAllowed(user)){await replyOrPush(env,event,gateText());return;}
+    const pets=await listPets(db,ownerId),requested=data.get('petId');
+    const pet=requested?pets.find(p=>p.petId===requested):needsCatPick(user,pets)?null:await resolveDefaultPet(db,user,pets);
+    if(requested&&!pet){await replyOrPush(env,event,'找不到這隻貓，請重新點「記一筆」。');return;}
+    if(!pets.length){await replyOrPush(env,event,'先輸入「新增貓咪 名字」，就能開始記錄。');return;}
+    const kind=data.get('kind'),base={wet:'主食',dry:'乾乾',water:'水'}[kind];
+    if(!['wet','dry','water','med','urine','stool'].includes(kind))return;
+    // Leave a pending report form when starting a new daily-record action.
+    const reportRaw=await appKvGet(db,`lineReportFlow:${lineUserId}`);
+    if(reportRaw){const flow=JSON.parse(reportRaw);if(['feeding','confirm'].includes(flow.stage)){flow.stage='cancelled';await appKvSet(db,`lineReportFlow:${lineUserId}`,JSON.stringify(flow));}}
+    if(base){
+      await updateUser(db,lineUserId,{pendingAction:`amount|${base}|${pet?.petId||''}|${Date.now()}`});
+      await replyOrPushQuick(env,event,`${pet?pet.petName+'｜':''}${base}，要記多少${kind==='water'?' ml':'克'}？\n直接輸入數字，例如 ${kind==='water'?'5':'31'}。${pet?'':'\n填完再選要記給哪隻貓。'}`,[qrMsg('取消','取消')]);return;
+    }
+    const choices=kind==='med'?[['早・已吃','藥 早 已吃'],['晚・已吃','藥 晚 已吃'],['中午・已吃','藥 中午 已吃'],['未餵','藥 未餵']]
+      :kind==='urine'?[['正常','尿尿 正常'],['量少','尿尿 量少'],['只記有尿尿','尿尿']]
+      :kind==='stool'?[['正常','大便 正常'],['軟便','軟便'],['拉肚子','拉肚子'],['只記有便便','大便']]:null;
+    if(!choices)return;
+    await updateUser(db,lineUserId,{pendingAction:''});
+    await replyOrPushQuick(env,event,`${pet?pet.petName+'｜':''}${{med:'這次的藥？',urine:'尿尿情況？',stool:'便便情況？'}[kind]}\n點選實際情況才會記錄。`,choices.map(([label,command])=>qrMsg(label,pet?`${pet.petName} ${command}`:command)));return;
+  }
 
   // 一鍵把今日交班推播給所有共照夥伴（LINE 不能轉傳 Flex，改由機器人主動推）
   if (action === 'handoffShare') {
@@ -1895,7 +1895,7 @@ async function sendSmidSummaryCard(env, event, db, pet, smid, ownerId, baseUrl, 
   const summary = await recomputeDay(db, pet.petId, date);
   const siteUrl = await siteLink(env, baseUrl, lineUserId);
   const fallback = `本次共記錄 ${lines.length} 筆：\n${lines.map((l) => `· ${l}`).join('\n')}`;
-  await replyOrPushFlex(env, event, multiRecordFlex(pet, lines, summary, date, siteUrl, `smid=${smid}`), fallback);
+  await replyOrPushFlex(env, event, withFrequentRecords(multiRecordFlex(pet, lines, summary, date, siteUrl, `smid=${smid}`),pet.petId), fallback);
 }
 // 無類別詞品項候選反查 food_items：唯一精確→直接記；多筆/模糊→partial 讓使用者選；無命中→保留、告知。
 async function resolveCandidate(db, ownerId, cand) {
@@ -2079,7 +2079,7 @@ export async function recordMultiForPet(env, event, db, opts) {
   const fallback = `已記錄 ${lines.length} 筆：\n${lines.map((line) => `· ${line}`).join('\n')}`;
   const multiSiteUrl = await siteLink(env, baseUrl, lineUserId);
   const multiUndo = savedIds.length ? `smid=${smid}` : '';
-  await replyOrPushFlex(env, event, multiRecordFlex(pet, lines, lastSummary, lastDate, multiSiteUrl, multiUndo), fallback);
+  await replyOrPushFlex(env, event, withFrequentRecords(multiRecordFlex(pet, lines, lastSummary, lastDate, multiSiteUrl, multiUndo),pet.petId), fallback);
 }
 
 export async function handleTextMessage(event, env, baseUrl) {
@@ -2221,6 +2221,7 @@ export async function handleTextMessage(event, env, baseUrl) {
     }
   }
   if (switchTarget) {
+    if(String(user.pendingAction||'').startsWith('amount|')) await updateUser(db,lineUserId,{pendingAction:''});
     if (pets.length > 1) {
       // 若正在等「這筆記給哪隻貓？」（pendrec），使用者回貓名＝回答上一筆 → 優先完成那筆（重走 handleRecord），
       // 完成後把牠設成 active pet；之後的紀錄就直接記給牠，不必再問。沒有 pendrec 才是單純切換。
@@ -2273,12 +2274,8 @@ export async function handleTextMessage(event, env, baseUrl) {
       parseStatus: 'partial', failReason: 'unknown_food_expression', sourceMessageId: String(event.message?.id || ''),
       resolvedPetId: rpid, linkedLogId: '', parsedResult: JSON.stringify({ events: [], savedLogIds: [], unparsedSegments: [leadPartial.rest], awaitingAction: '', recognizedPetName: leadPartial.petName, rest: leadPartial.rest })
     });
-    // 下方捷徑一律「帶上這隻貓的名字」再送出（例：點「罐頭 30」實際送「蚵仔 罐頭 30」），
-    // 確保記到正確的貓；每個都是完整獨立指令，不靠任何暫存狀態，不會跨訊息污染或重複。
-    const shortcuts = (await quickShortcuts(db, rpid)).map((it) => ({
-      type: 'action',
-      action: { type: 'message', label: it.action.label, text: `${leadPartial.petName} ${it.action.text}` }
-    }));
+    // 只帶已辨認的 petId，點類型後再問數量，不猜原本尚未解析的份量。
+    const shortcuts = frequentRecordItems(rpid);
     await replyOrPushQuick(env, event,
       `我知道你要記錄「${leadPartial.petName}」，但還看不懂「${leadPartial.rest}」🙏\n`
       + `⚠️ 這筆尚未記錄。\n`
@@ -3348,7 +3345,7 @@ export async function handleRecord(env, event, pet, record, lineUserId, opts = {
   if (record.category === 'weight') {
     const wSite = await siteLink(env, opts.baseUrl, lineUserId);
     const wCard = weightAddedFlex({ pet, amount: record.amount, logId: savedLog?.logId || '', summary, date: eventDate, siteUrl: wSite });
-    await replyOrPushFlex(env, event, wCard, `已記錄・${pet?.petName || '貓貓'}\n體重 ${formatWeightKg(record.amount)} kg`);
+    await replyOrPushFlex(env, event, withFrequentRecords(wCard,pet.petId), `已記錄・${pet?.petName || '貓貓'}\n體重 ${formatWeightKg(record.amount)} kg`);
     if (opts.baseUrl) {
       try { await ensurePersonalRichMenu(env, opts.baseUrl, lineUserId); } catch (error) { console.error('personal richmenu refresh failed:', error.message); }
     }
@@ -3377,7 +3374,7 @@ export async function handleRecord(env, event, pet, record, lineUserId, opts = {
     warnNoKcal: record.category === 'food' && noKcal, foodType: record.foodType || '',
     estimated: record.category === 'food' && estimated, estKcalPerG
   });
-  await replyOrPushFlex(env, event, card, fallbackText);
+  await replyOrPushFlex(env, event, withFrequentRecords(card,pet.petId), fallbackText);
   // 記錄是每天最高頻的互動：順手把專屬圖文選單保持在最新版（版本相符時只是一次快取讀取，不重建）
   if (opts.baseUrl) {
     try { await ensurePersonalRichMenu(env, opts.baseUrl, lineUserId); } catch (error) { console.error('personal richmenu refresh failed:', error.message); }
@@ -3585,18 +3582,9 @@ async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId, ow
 
   if (query === 'recordMenu') {
     await track(db, lineUserId, 'menu_record');
-    // 「快速記錄」：先教最快的打字（和「如何記錄」一致），再給這隻貓的一鍵捷徑；點一下就記好
-    const petId = pet?.petId || '';
-    const shortcuts = await quickShortcuts(db, petId);
-    const beginner = await isBeginner(db, petId);
-    // 捷徑永遠在前（老手肌肉記憶）；教學鈕只在新手期出現，之後自動收起
-    const items = [...shortcuts, ...(beginner ? [TEACH_BTN] : []), qrPost('其他狀況（吐/便…）', 'action=recmore', '其他狀況')];
-    const text = beginner
-      ? '記錄超快，兩種都行 👇\n\n'
-        + '① 直接說（最快，不用學格式）：\n　主食3・喝水30・嘔吐 白沫\n　沒吃完：乾乾減5\n\n'
-        + '② 或點下面你常記的，一下就好：'
-      : '點你常記的，一下就好 👇\n（也可直接說：主食3・喝水30・嘔吐 白沫）';
-    await replyOrPushQuick(env, event, text, items);
+    const petId=needsCatPick(user,await listPets(db,ownerId))?'':pet?.petId||'';
+    const card=onboardCard({title:'記一筆',subtitle:`${petId?pet.petName+'｜':''}點下方常用快捷，再填這次的數量或情況。\n也可以直接打「主食31 水5」。`,rows:[[menuCell('更多紀錄','嘔吐、精神、備註等','更多紀錄',false,'','action=recmore')]],alt:'記一筆：主食、乾乾、水、藥、尿尿、便便'});
+    await replyOrPushFlex(env,event,withFrequentRecords(card,petId),'點下方常用快捷；也可直接輸入「主食31 水5」。');
     return;
   }
 
