@@ -1,6 +1,7 @@
 import { publicReport, purgeReports } from './report-sharing.js';
 import { startLineReport, handleLineReportPostback, handleLineReportText } from './line-reports.js';
-import { frequentRecordItems, withFrequentRecords } from './frequent-records.js';
+import { frequentRecordItems, withFrequentRecords, ALL_RECORDS } from './frequent-records.js';
+import { prepareShortcutProfile } from './record-shortcut-profile.js';
 import { LINE_EVENT, withLineEvent, afterEventReply, markEvent, measureEvent } from './line-event.js';
 // 貓貓照護管家 Beta — Cloudflare Worker 入口
 // /webhook  → LINE Messaging API webhook（驗簽後先回 ack，waitUntil 內記錄並 reply）
@@ -528,10 +529,12 @@ async function runDailyReminders(env) {
       const recipients = isCoCare ? circle : [ownerId];
       for (const recipient of recipients) {
         try {
-          await pushMessages(env, recipient, messages.slice(0, 5));
+          const batch = messages.slice(0, 5);
+          batch[batch.length-1] = withFrequentRecords(batch.at(-1),'',{persistent:false});
+          await pushMessages(env, recipient, batch);
         } catch (flexError) {
           console.warn('reminder flex failed, fallback to text:', flexError.message);
-          try { await pushText(env, recipient, textFallbacks.join('\n\n')); } catch (textErr) { console.error('reminder text failed:', textErr.message); }
+          try { await pushMessages(env, recipient, [withFrequentRecords({type:'text',text:textFallbacks.join('\n\n').slice(0,4900)})]); } catch (textErr) { console.error('reminder text failed:', textErr.message); }
         }
       }
       console.log(JSON.stringify({ step: 'reminder_sent', cards: messages.length, recipients: recipients.length }));
@@ -1008,13 +1011,7 @@ export function parseUndoIds(raw) {
 
 // 症狀類分類鈕（吃喝藥用一鍵捷徑，這裡只留較少用的狀況當安全網）
 function symptomCategoryQuick() {
-  return [
-    qrPost('嘔吐', 'action=rec&k=vomit', '嘔吐'),
-    qrPost('大小便', 'action=rec&k=stool', '大小便'),
-    qrPost('精神', 'action=rec&k=mood', '精神'),
-    qrPost('保健', 'action=rec&k=supplement', '保健'),
-    qrPost('備註', 'action=rec&k=note', '備註')
-  ];
+  return frequentRecordItems('','',ALL_RECORDS);
 }
 // 找出這隻貓的預設貓 id（給一鍵捷徑用）
 async function defaultPetId(db, lineUserId, ownerId) {
@@ -1120,7 +1117,7 @@ async function handlePostback(event, env, baseUrl) {
     if(requested&&!pet){await replyOrPush(env,event,'找不到這隻貓，請重新點「記一筆」。');return;}
     if(!pets.length){await replyOrPush(env,event,'先輸入「新增貓咪 名字」，就能開始記錄。');return;}
     const kind=data.get('kind'),base={wet:'主食',dry:'乾乾',water:'水'}[kind];
-    if(!['wet','dry','snack','water','med','urine','stool'].includes(kind))return;
+    if(!ALL_RECORDS.some(([,key])=>key===kind))return;
     // Leave a pending report form when starting a new daily-record action.
     const reportRaw=await appKvGet(db,`lineReportFlow:${lineUserId}`);
     if(reportRaw){const flow=JSON.parse(reportRaw);if(['feeding','confirm'].includes(flow.stage)){flow.stage='cancelled';await appKvSet(db,`lineReportFlow:${lineUserId}`,JSON.stringify(flow));}}
@@ -1156,7 +1153,7 @@ async function handlePostback(event, env, baseUrl) {
       await replyOrPush(env, event, '目前還沒有共照夥伴。到「設定 → 邀請夥伴」把家人或幫手加進來，就能一鍵傳給大家。');
       return;
     }
-    const card = handoffFlex(pet, dateLabel, data);
+    const card = withFrequentRecords(handoffFlex(pet, dateLabel, data),'',{persistent:false});
     let ok = 0;
     for (const rid of recipients) {
       try { await pushMessages(env, rid, [card]); ok += 1; } catch (error) { /* 個別失敗略過 */ }
@@ -1176,7 +1173,7 @@ async function handlePostback(event, env, baseUrl) {
       WHERE CAST(app_kv.v AS INTEGER) <= ?`)
       .bind(`msg:menu:recmore:${lineUserId}`,String(now+3000),new Date(now).toISOString(),now).run();
     if(!claim.meta?.changes)return;
-    await replyOrPushQuick(env, event, '其他狀況？點一個分類 👇', symptomCategoryQuick());
+    await replyOrPushQuick(env, event, '選一個類別，接著填數字或情況 👇', symptomCategoryQuick());
     return;
   }
   // 教打字：熟了直接打指令最快
@@ -1917,7 +1914,7 @@ async function sendSmidSummaryCard(env, event, db, pet, smid, ownerId, baseUrl, 
   const summary = await recomputeDay(db, pet.petId, date);
   const siteUrl = await siteLink(env, baseUrl, lineUserId);
   const fallback = `本次共記錄 ${lines.length} 筆：\n${lines.map((l) => `· ${l}`).join('\n')}`;
-  await replyOrPushFlex(env, event, withFrequentRecords(multiRecordFlex(pet, lines, summary, date, siteUrl, `smid=${smid}`),pet.petId), fallback);
+  await replyOrPushFlex(env, event, withFrequentRecords(multiRecordFlex(pet, lines, summary, date, siteUrl, `smid=${smid}`),pet.petId,{petName:pet.petName}), fallback);
 }
 // 無類別詞品項候選反查 food_items：唯一精確→直接記；多筆/模糊→partial 讓使用者選；無命中→保留、告知。
 async function resolveCandidate(db, ownerId, cand) {
@@ -2101,7 +2098,7 @@ export async function recordMultiForPet(env, event, db, opts) {
   const fallback = `已記錄 ${lines.length} 筆：\n${lines.map((line) => `· ${line}`).join('\n')}`;
   const multiSiteUrl = await siteLink(env, baseUrl, lineUserId);
   const multiUndo = savedIds.length ? `smid=${smid}` : '';
-  await replyOrPushFlex(env, event, withFrequentRecords(multiRecordFlex(pet, lines, lastSummary, lastDate, multiSiteUrl, multiUndo),pet.petId), fallback);
+  await replyOrPushFlex(env, event, withFrequentRecords(multiRecordFlex(pet, lines, lastSummary, lastDate, multiSiteUrl, multiUndo),pet.petId,{petName:pet.petName}), fallback);
 }
 
 export async function handleTextMessage(event, env, baseUrl) {
@@ -2117,7 +2114,7 @@ async function handleTextMessageInner(event, env, baseUrl) {
     return;
   }
 
-  const { user, created } = await ensureUser(db, lineUserId);
+  const { user, created } = await ensureUser(db, lineUserId, '', {shortcuts:true});
   markEvent(env, 'user_resolved');
   if (created) {
     const profile = await getProfile(env, lineUserId);
@@ -2183,6 +2180,7 @@ async function handleTextMessageInner(event, env, baseUrl) {
   }
 
   // 每個事件只維護一次；等紀錄者收到回覆後才讀快取／重建選單。
+  await prepareShortcutProfile(env,user,ownerId,pets,event);
   await maintainPersonalMenu(env, baseUrl, lineUserId);
 
   // 電腦登入：在電腦網站輸入這組碼即可登入（免把手機連結複製過去）
@@ -3349,10 +3347,10 @@ export async function handleRecord(env, event, pet, record, lineUserId, opts = {
       try {
         const who = opts.caregiverName || '共同照護者';
         const notifySiteUrl = await siteLink(env, opts.baseUrl, lineUserId);
-        await pushMessages(env, lineUserId, [careNotifyFlex(who, pet.petName, description, savedLog.logId, notifySiteUrl, summary)]);
+        await pushMessages(env, lineUserId, [withFrequentRecords(careNotifyFlex(who, pet.petName, description, savedLog.logId, notifySiteUrl, summary),'',{persistent:false})]);
       } catch (error) {
         console.error('care notify failed:', error.message);
-        await pushText(env, lineUserId, `📝 ${opts.caregiverName || '共同照護者'} 記錄了 ${pet.petName}：${description}`);
+        await pushMessages(env, lineUserId, [withFrequentRecords({type:'text',text:`📝 ${opts.caregiverName || '共同照護者'} 記錄了 ${pet.petName}：${description}`.slice(0,4900)})]);
       }
     });
   }
@@ -3386,7 +3384,7 @@ export async function handleRecord(env, event, pet, record, lineUserId, opts = {
     const wSite = await siteLink(env, opts.baseUrl, lineUserId);
     const wCard = weightAddedFlex({ pet, amount: record.amount, logId: savedLog?.logId || '', summary, date: eventDate, siteUrl: wSite });
     markEvent(env, 'flex_done');
-    await replyOrPushFlex(env, event, withFrequentRecords(wCard,pet.petId), `已記錄・${pet?.petName || '貓貓'}\n體重 ${formatWeightKg(record.amount)} kg`);
+    await replyOrPushFlex(env, event, withFrequentRecords(wCard,pet.petId,{petName:pet.petName}), `已記錄・${pet?.petName || '貓貓'}\n體重 ${formatWeightKg(record.amount)} kg`);
     if (opts.baseUrl) {
       await maintainPersonalMenu(env, opts.baseUrl, opts.actorId || lineUserId);
     }
@@ -3416,7 +3414,7 @@ export async function handleRecord(env, event, pet, record, lineUserId, opts = {
     estimated: record.category === 'food' && estimated, estKcalPerG
   });
   markEvent(env, 'flex_done');
-  await replyOrPushFlex(env, event, withFrequentRecords(card,pet.petId), fallbackText);
+  await replyOrPushFlex(env, event, withFrequentRecords(card,pet.petId,{petName:pet.petName}), fallbackText);
   if (opts.baseUrl) {
     await maintainPersonalMenu(env, opts.baseUrl, opts.actorId || lineUserId);
   }
@@ -3570,6 +3568,9 @@ export function buildFoodHistoryResult(rows, { scope = 'recent', sinceDays = 30,
 async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId, ownerId = lineUserId, intent = {}) {
   const db = env.DB;
   const today = taipeiToday();
+  if (pet && isBetaAllowed(user) && env[LINE_EVENT] && query !== 'report') {
+    env[LINE_EVENT].defaultQuickReply = {items:frequentRecordItems(pet.petId)};
+  }
 
   if (query === 'foodHistory') {
     if (!pet) { await replyOrPush(env, event, '還沒有貓貓資料，先幫貓貓建個檔吧！'); return; }
@@ -3628,8 +3629,8 @@ async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId, ow
   if (query === 'recordMenu') {
     await track(db, lineUserId, 'menu_record');
     const petId=needsCatPick(user,await listPets(db,ownerId))?'':pet?.petId||'';
-    const card=onboardCard({title:'記一筆',subtitle:`${petId?pet.petName+'｜':''}點主食、乾乾、乾糧、零食、水或藥，文字會帶入輸入框，補上份量或用藥情況再送出。\n例如「主食31 水5」或「藥 晚 已吃」。`,rows:[[menuCell('更多紀錄','嘔吐、精神、備註等','更多紀錄',false,'','action=recmore')]],alt:'記一筆：主食、乾乾、乾糧、零食、水、藥、尿尿、便便'});
-    await replyOrPushFlex(env,event,withFrequentRecords(card,petId),'點下方常用快捷；也可直接輸入「主食31 水5」。');
+    const card=onboardCard({title:'記一筆',subtitle:`${petId?pet.petName+'｜':''}點類別，文字帶入輸入框，補完再送出。\n例如「主食31」或「藥 晚 已吃」。`,alt:'記一筆：點常用類別，接著填數字或情況'});
+    await replyOrPushFlex(env,event,withFrequentRecords(card,petId,{petName:petId?pet.petName:''}),'點下方常用快捷；也可直接輸入「主食31 水5」。');
     return;
   }
 

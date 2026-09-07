@@ -6,12 +6,20 @@ import { newId, newToken, nowIso, addDays, taipeiNowDateTime, taipeiToday, rando
 
 // ---------- users ----------
 
-export async function getUser(db, lineUserId) {
+export async function getUser(db, lineUserId, { shortcuts = false } = {}) {
+  if (shortcuts) {
+    // Read the small per-actor cache in the existing user round trip; never scan
+    // record history on the reply path. Other callers keep the original shape.
+    try {
+      return await db.prepare(`SELECT users.*, (SELECT v FROM app_kv WHERE k = 'recordShortcuts:' || users.lineUserId) AS shortcutProfile
+        FROM users WHERE lineUserId = ?`).bind(lineUserId).first();
+    } catch { /* Optional cache unavailable: retain the original record flow. */ }
+  }
   return db.prepare('SELECT * FROM users WHERE lineUserId = ?').bind(lineUserId).first();
 }
 
-export async function ensureUser(db, lineUserId, displayName = '') {
-  const existing = await getUser(db, lineUserId);
+export async function ensureUser(db, lineUserId, displayName = '', options = {}) {
+  const existing = await getUser(db, lineUserId, options);
   if (existing) return { user: existing, created: false };
 
   const now = nowIso();
@@ -19,7 +27,7 @@ export async function ensureUser(db, lineUserId, displayName = '') {
     .prepare('INSERT INTO users (lineUserId, displayName, defaultPetId, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)')
     .bind(lineUserId, displayName, '', now, now)
     .run();
-  return { user: await getUser(db, lineUserId), created: true };
+  return { user: await getUser(db, lineUserId, options), created: true };
 }
 
 export async function updateUser(db, lineUserId, fields) {

@@ -3,6 +3,7 @@
 
 import { appKvGet, appKvSet } from './db.js';
 import { LINE_EVENT } from './line-event.js';
+import { personalizeFrequentMessage } from './frequent-records.js';
 
 const LINE_API_BASE = 'https://api.line.me/v2/bot';
 const LINE_OAUTH_URL = 'https://api.line.me/v2/oauth/accessToken';
@@ -117,6 +118,18 @@ function truncate(text) {
 async function callLineApi(env, path, body, options = {}) {
   const scope = env[LINE_EVENT];
   const delivery = path === '/message/reply' || (path === '/message/push' && body.to === scope?.actor);
+  // Only opted-in, authorized browsing flows get defaults. Preserve choice-specific
+  // quick replies and attach controls to the last message in a multi-message reply.
+  if (delivery && scope?.defaultQuickReply && body.messages?.length) {
+    const last = body.messages.at(-1);
+    if (!last.quickReply) {
+      const quickReply = body.messages.findLast(m => m.quickReply)?.quickReply || scope.defaultQuickReply;
+      body = {...body, messages:[...body.messages.slice(0,-1), {...last,quickReply}]};
+    }
+  }
+  if (delivery && scope?.shortcutEntries && body.messages) {
+    body={...body,messages:body.messages.map(message=>personalizeFrequentMessage(message,scope.shortcutEntries))};
+  }
   if (delivery && scope) { scope.deliveryStarted = true; scope.stopLoading?.(); }
   const token = await getAccessToken(env);
   // In particular, a slow token lookup must not launch loading after the reply.

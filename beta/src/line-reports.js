@@ -5,6 +5,8 @@ import { handleReportApi, cleanDraft, classifyLines } from './report-sharing.js'
 import { renderReportImages } from './report-renderer.js';
 import { replyMessages, pushMessages, replyOrPush, replyOrPushFlex, showLoadingAnimation } from './line.js';
 import { taipeiToday, addDays } from './util.js';
+import { frequentRecordItems } from './frequent-records.js';
+import { useShortcutProfile } from './record-shortcut-profile.js';
 
 const flowKey=id=>`lineReportFlow:${id}`;
 const encode=encodeURIComponent;
@@ -25,9 +27,11 @@ async function saveFlow(db,actor,flow,create=false){
   await db.prepare("UPDATE app_kv SET v=?,updatedAt=? WHERE k=? AND json_extract(v,'$.id')=?").bind(JSON.stringify(flow),new Date().toISOString(),flowKey(actor),flow.id).run();
 }
 async function allowed(env,event,owner) {
-  if(!isBetaAllowed(await getUser(env.DB,event.source?.userId))){await replyOrPush(env,event,'請先完成測試資格驗證，再使用出摘要。');return false;}
+  const user=await getUser(env.DB,event.source?.userId,{shortcuts:true});
+  if(!isBetaAllowed(user)){await replyOrPush(env,event,'請先完成測試資格驗證，再使用出摘要。');return false;}
   if(event.source?.type!=='user'){await replyOrPush(env,event,'請在與喵喵管家的一對一對話中出摘要。');return false;}
   if(event.source.userId!==owner){await replyOrPush(env,event,'請由貓咪爸媽產生可分享的摘要。');return false;}
+  useShortcutProfile(env,user,owner);
   return true;
 }
 export async function startLineReport(env,event,owner) {
@@ -171,7 +175,10 @@ async function deliverReport(env,event,flow,render) {
       manifest={count:pngs.length,expiresAt:share.expiresAt};await appKvSet(db,'lineReportImages:'+share.id,JSON.stringify(manifest));
     }
     const messages=Array.from({length:manifest.count},(_,i)=>({type:'image',originalContentUrl:`${base}${share.url}/image/${i}`,previewImageUrl:`${base}${share.url}/image/${i}`}));
-    messages.push({type:'text',text:`${bundle.pet.petName}的${stored.snapshot.reportName}\n共 ${manifest.count-1} 張摘要＋1 張 QR Code，可直接儲存或轉傳。\n查看摘要（7 天內有效）：${base}${share.url}`,...(flow.purpose==='care'?{quickReply:{items:[{type:'action',action:{type:'postback',label:'補充照護說明',data:button(flow,'reportEdit'),displayText:'補充照護說明'}}]}}:{})});
+    messages.push({type:'text',text:`${bundle.pet.petName}的${stored.snapshot.reportName}\n共 ${manifest.count-1} 張摘要＋1 張 QR Code，可直接儲存或轉傳。\n查看摘要（7 天內有效）：${base}${share.url}`,quickReply:{items:[
+      ...frequentRecordItems(),
+      ...(flow.purpose==='care'?[{type:'action',action:{type:'postback',label:'補充照護說明',data:button(flow,'reportEdit'),displayText:'補充照護說明'}}]:[])
+    ]}});
     let sent=Number(flow.sent||0);
     for(let i=sent;i<messages.length;i+=5){
       const batch=messages.slice(i,i+5);

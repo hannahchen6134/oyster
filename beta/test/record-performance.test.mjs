@@ -129,6 +129,8 @@ test('共照推送失敗仍保留記錄者回覆，爸媽通知沿用文字備�
   const deliveries=calls.filter(c=>c.path.includes('/message/'));
   assert.deepEqual(deliveries.map(c=>c.path.split('/').at(-1)),['reply','push','push']);
   assert.equal(deliveries[2].body.messages[0].type,'text');
+  assert.equal(deliveries[1].body.messages[0].quickReply.items.length,8);
+  assert.equal(deliveries[2].body.messages[0].quickReply.items.length,8);
 },{line:async c=>{if(c.path.endsWith('/push')&&c.body.messages[0].type==='flex')return new Response('{}',{status:400});}}));
 
 test('多筆只回一張、事件重送只記一次；summary仍等於正式logs重算', () => fixture(async ({send,calls,DB,originalPrepare,timings})=>{
@@ -147,6 +149,18 @@ test('無效webhook簽章不觸碰D1、不啟動loading', () => fixture(async ({
   const req=await send('水5',{invalid:true});await req.done;
   assert.equal(req.response.status,401);assert.equal(sql.length,0);assert.equal(calls.length,0);
 }));
+
+test('個人快捷統計慢或失敗仍先完成回覆，不增加回覆前D1往返',async()=>{
+  const blocked=gate(),started=gate();let replied=false;
+  await fixture(async({send,timings})=>{
+    const req=await send('水5');
+    try{await started.promise;assert.equal(replied,true);const entries=Object.entries(timings.at(-1).queries);assert.equal(entries.filter(([k])=>k.startsWith('before_reply:select:')).reduce((n,[,v])=>n+v.count,0),6);}
+    finally{blocked.release();await req.done;}
+  },{
+    sql:async q=>{if(q.startsWith('SELECT category,foodType,sourceMessageId,eventDateTime,createdAt FROM logs')){assert.equal(replied,true);started.release();await blocked.promise;throw Error('cache unavailable');}},
+    line:async c=>{if(c.path.endsWith('/message/reply'))replied=true;}
+  });
+});
 
 test('145/200顯示73%及還差55ml；達標後不顯示負差額',()=>{
   const args={pet:{petName:'測試',goalWaterMl:200},categoryKey:'water',mainText:'水20',summary:{totalWaterMl:145},date:taipeiToday()};
