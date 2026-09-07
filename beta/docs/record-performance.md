@@ -1,5 +1,17 @@
 # LINE 紀錄速度：第一批調整（2026-09-07）
 
+## 真實量測後的第二步：靠近資料庫執行
+
+第一批部署 `9740c0d` 後收到一筆真實食物紀錄：`server_ms=1956`、`line_accepted_ms=2036`。Worker 的 colo 是 NRT，D1 是 ENAM；各筆 D1 往返約 167–194ms，當日 summary 的查詢加 upsert 共 372ms。可取得的 SQL 執行時間約 0.2–1ms，尚不能把所有等待歸咎於 SQL 計算。使用者亦回報體感沒有明顯改善。
+
+唯讀 `SELECT 1` 的 metadata 確認 D1 primary 在 IAD（ENAM），沒有移動資料。因此第二步僅設定 `placement.region = "aws:us-east-1"`，要求 Cloudflare 在靠近北美東岸的機房執行現有 Worker。AWS 區域在此只是位置參照，沒有建立 AWS 服務，也沒有遷移 D1。先單獨驗證執行位置的效果，避免同時改加總與查詢造成無法比較。
+
+選用明確區域是因為主機位置已知；自動 Smart Placement 需要多地流量學習，可能不足以立即改善本次情境。這個設定可由移除 `[placement]` 並重新部署還原。Cron 不受 fetch placement 設定影響，靜態資產依 Cloudflare 的既有資產服務規則處理。[官方 Placement 說明](https://developers.cloudflare.com/workers/configuration/placement/)
+
+計時新增 `placement`（過濾後的 cf-placement）與 `db_colo`；`/healthz` 只新增公開的機房診斷欄位，不會查詢會員資料。需從 `placement` 確認實際執行位置，不能只用 `request.cf.colo` 推定已經搬近。**placement 開啟後的 server_ms 起點仍在 Worker 執行時，未包含入口轉送到執行機房的時間；所以前後不能單靠 server_ms 宣稱手機加速幅度。**須搭配 LINE 接受耗時、實際手機回饋與足夠樣本。
+
+下方為第一批改動說明。
+
 這一批縮短紀錄者等待確認卡的流程，同時保留本次內容、今日累積、目標、百分比與進度條。另補上「還差多少／已達目標」。沒有更換 parser、重寫每日加總、新增 schema 或 migration。
 
 ## 回覆順序

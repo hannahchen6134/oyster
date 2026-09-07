@@ -74,6 +74,7 @@ export async function withLineEvent(env, event, work, request = {}) {
           metric.rows_written += Number(meta.rows_written) || 0;
           metric.sql_ms = round(metric.sql_ms + (Number(meta.timings?.sql_duration_ms) || 0));
           if (meta.served_by_region) this.dbRegion = meta.served_by_region;
+          if (meta.served_by_colo) this.dbColo = meta.served_by_colo;
         }
         return result;
       } catch (error) { metric.errors++; throw error; }
@@ -92,7 +93,8 @@ export async function withLineEvent(env, event, work, request = {}) {
       type, version: 1, trace,
       status: scope.status, intent: scope.intent, records: scope.recordCount,
       categories: [...scope.categories], caregiver: scope.caregiver || false,
-      colo: request.colo || null, db_region: scope.dbRegion || null,
+      colo: request.colo || null, placement: request.placement || null,
+      db_region: scope.dbRegion || null, db_colo: scope.dbColo || null,
       server_ms: scope.firstReplyMs, line_accepted_ms: scope.acceptedReplyMs,
       marks: scope.marks, spans: scope.spans, queries: scope.queries, line: scope.line
     }));

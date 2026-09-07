@@ -82,9 +82,11 @@ export default {
   async fetch(request, env, ctx) {
     const receivedAt = performance.now();
     const url = new URL(request.url);
+    const placementHeader = request.headers.get('cf-placement') || '';
+    const placement = /^(?:remote|local)-[A-Z]{3}$/.test(placementHeader) ? placementHeader : null;
     if (url.pathname.startsWith('/r/')) return publicReport(request,env,url);
     if (url.pathname === '/webhook' && request.method === 'POST') {
-      return handleWebhook(request, env, url, ctx, { receivedAt, colo: request.cf?.colo });
+      return handleWebhook(request, env, url, ctx, { receivedAt, colo: request.cf?.colo, placement });
     }
     // 確保 tasks 表與 logs.sourceTaskId 已存在（冪等、每 isolate 一次），再進任何會寫 logs 的路徑
     await ensureTaskSchema(env.DB);
@@ -188,7 +190,7 @@ export default {
       });
     }
     if (url.pathname === '/healthz') {
-      return jsonResponse({ ok: true, service: 'cat-care-beta', now: new Date().toISOString() });
+      return jsonResponse({ ok: true, service: 'cat-care-beta', now: new Date().toISOString(), placement });
     }
     // 管理員登入：用 ?key= 換一張 cookie session 後導回後台（金鑰只在這一次的網址出現，之後靠 cookie）
     if (url.pathname === '/admin/login') {

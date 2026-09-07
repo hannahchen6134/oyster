@@ -3,6 +3,11 @@ main = "src/index.js"
 compatibility_date = "2026-07-01"
 compatibility_flags = ["nodejs_compat"]
 
+# Live record timing: ingress NRT -> D1 primary IAD costs ~170-190ms/query.
+# Run near the existing primary; this does not move D1 or static assets.
+[placement]
+region = "aws:us-east-1"
+
 [browser]
 binding = "REPORT_BROWSER"
 
