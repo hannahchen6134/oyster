@@ -1,10 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { reportFixture } from './support/report-fixture.mjs';
-import { startLineReport, handleLineReportPostback, handleLineReportText, buildLineReport } from '../src/line-reports.js';
+import { startLineReport, handleLineReportPostback, handleLineReportText, buildLineReport, reportPeriod } from '../src/line-reports.js';
 import { appKvGet, appKvSet } from '../src/db.js';
 import { publicReport, handleReportApi } from '../src/report-sharing.js';
 import worker from '../src/index.js';
+import { doctorReportData } from '../public/doctor-report-data.js';
 import { imageDocument } from '../src/report-renderer.js';
 const png='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a6AAAAABJRU5ErkJggg==';
 async function setup(run) {
@@ -12,8 +13,17 @@ async function setup(run) {
  globalThis.fetch=async(url,options)=>{if(String(url).includes('/message/'))sent.push(JSON.parse(options.body));return new Response('{}');};
  const event={source:{type:'user',userId:'owner'},replyToken:'test',__reportBaseUrl:'https://local.test'};
  const flow=async()=>JSON.parse(await appKvGet(db,'lineReportFlow:owner'));
- const post=async(action,extra={},render=async()=>[png,png])=>handleLineReportPostback(env,event,'owner',new URLSearchParams({action,flow:(await flow()).id,...extra}),render);
- try{await startLineReport(env,event,'owner');await run({db,env,sent,event,flow,post});}finally{globalThis.fetch=old;}
+ const rawPost=async(action,extra={},render=async()=>[png,png],date)=>handleLineReportPostback(env,{...event,...(date?{postback:{params:{date}}}:{})},'owner',new URLSearchParams({action,flow:(await flow()).id,...extra}),render);
+ // Existing delivery tests traverse the new date step with explicit fixture dates.
+ const post=async(action,extra={},render=async()=>[png,png])=>{
+  const wasPurpose=(await flow()).stage==='purpose';await rawPost(action,extra,render);
+  if(action==='reportPurpose'&&wasPurpose){
+   if(extra.purpose==='doctor')return rawPost('reportDays',{days:'30'},render);
+   await rawPost('reportDateStart',{},render,'2026-09-10');return rawPost('reportDateEnd',{},render,'2026-09-15');
+  }
+ };
+
+ try{await startLineReport(env,event,'owner');await run({db,env,sent,event,flow,post,rawPost});}finally{globalThis.fetch=old;}
 }
 test('LINE 選貓→選用途→摘要圖與QR；不建立登入連結，QR與圖同一份快照',()=>setup(async({db,env,sent,post,flow})=>{
  await post('reportPet',{petId:'p2'});assert.match(JSON.stringify(sent.at(-1)),/麵線的摘要要給誰/);assert.doesNotMatch(JSON.stringify(sent.at(-1)),/"type":"uri"/);
@@ -115,3 +125,23 @@ test('產圖期間連點只產生一次；新流程不被舊流程完成覆寫',
  await waiting;let duplicate=0;await post('reportGenerate',{},async()=>{duplicate++;return [png,png];});assert.equal(duplicate,0);
  await startLineReport(env,event,'owner');const newId=(await flow()).id;unblock();await first;assert.equal((await flow()).id,newId);assert.equal((await flow()).stage,'pet');
 }));
+
+test('醫生期間先選擇、記住每隻貓的設定；照護日期獨立',()=>setup(async({db,env,event,rawPost,flow,sent})=>{
+ await rawPost('reportPet',{petId:'p1'});await rawPost('reportPurpose',{purpose:'doctor'});
+ assert.equal((await flow()).stage,'period');assert.match(JSON.stringify(sent.at(-1)),/30 天（預設）/);
+ let snapshot;await rawPost('reportDays',{days:'21'},async(e,s)=>{snapshot=s;return [png,png];});
+ assert.equal(snapshot.rangeDays,21);assert.equal(reportPeriod(snapshot.doctorSource.from,snapshot.doctorSource.to).days,21);
+ await startLineReport(env,event,'owner');await rawPost('reportPet',{petId:'p1'});await rawPost('reportPurpose',{purpose:'doctor'});assert.match(JSON.stringify(sent.at(-1)),/21 天（預設）/);
+ await startLineReport(env,event,'owner');await rawPost('reportPet',{petId:'p2'});await rawPost('reportPurpose',{purpose:'doctor'});assert.match(JSON.stringify(sent.at(-1)),/30 天（預設）/);
+ await rawPost('reportCustom');await rawPost('reportDateStart',{},undefined,'2026-07-01');await rawPost('reportDateEnd',{},undefined,'2026-06-30');assert.equal((await flow()).stage,'dateEnd');
+ await rawPost('reportDateEnd',{},async(e,s)=>{snapshot=s;return [png,png];},'2026-08-15');assert.equal(snapshot.rangeDays,46);assert.equal(snapshot.doctorSource.from,'2026-07-01');assert.equal(snapshot.doctorSource.to,'2026-08-15');
+ const care=await buildLineReport(db,'owner','p1','care',{rangeFrom:'2026-10-01',rangeTo:'2026-10-20'});assert.match(care.snapshot.dateRangeLabel,/2026-10-01.*2026-10-20/);
+ assert.throws(()=>reportPeriod('2026-02-30','2026-03-01'));assert.throws(()=>reportPeriod('2026-01-01','2026-05-01'));
+}));
+
+test('A4 自訂長期間不截成31天；未記錄日期不當成零',()=>{
+ const rows=Array.from({length:60},(_,i)=>({date:new Date(Date.UTC(2026,5,1+i)).toISOString().slice(0,10),entryCount:1,totalWaterMl:i+1}));
+ const snapshot={purpose:'doctor',petName:'測試貓',rangeDays:61,doctorSource:{from:'2026-06-01',to:'2026-07-31',rows},sections:[]};
+ const data=doctorReportData(snapshot);assert.equal(data.water.points.length,61);assert.equal(data.daily.length,61);assert.equal(data.water.points.at(-1).value,null);assert.equal(data.daily[0].unrecorded,true);assert.equal(data.daily[1].waterMl,60);
+ assert.match(imageDocument(snapshot,'https://local.test/r/demo'),/未記錄/);
+});

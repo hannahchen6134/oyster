@@ -55,7 +55,7 @@ function cleanSnapshot(data,pet) {
   if(!data||!['doctor','care'].includes(data.purpose)||data.petId!==pet.petId)throw Error('摘要與貓咪不一致，請重新預覽');
   if(!Array.isArray(data.sections)||data.sections.length>30)throw Error('摘要段落太多');
   const sections=data.sections.map(s=>{if(!Array.isArray(s.items)||s.items.length>200)throw Error('摘要內容太多');return {title:text(s.title,100),kind:['detail','history','important'].includes(s.kind)?s.kind:'',items:s.items.map(v=>text(v,12000))};});
-  const snapshot={purpose:data.purpose,petName:pet.petName,reportName:data.purpose==='care'?'照護交接單':'就醫摘要',dateRangeLabel:text(data.dateRangeLabel,150),notice:text(data.notice,500),generatedAt:new Date().toISOString(),sections,empty:!!data.empty,rangeDays:[7,14,30].includes(data.rangeDays)?data.rangeDays:14};
+  const snapshot={purpose:data.purpose,petName:pet.petName,reportName:data.purpose==='care'?'照護交接單':'就醫摘要',dateRangeLabel:text(data.dateRangeLabel,150),notice:text(data.notice,500),generatedAt:new Date().toISOString(),sections,empty:!!data.empty,rangeDays:Number.isInteger(data.rangeDays)&&data.rangeDays>=1&&data.rangeDays<=90?data.rangeDays:30};
   if(data.purpose==='doctor'&&data.doctorSource)snapshot.doctorSource=cleanDoctorSource(data.doctorSource);
   if(JSON.stringify(snapshot).length>60000)throw Error('摘要內容太長，請縮短期間或文字');
   return snapshot;

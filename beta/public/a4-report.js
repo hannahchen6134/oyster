@@ -185,7 +185,7 @@ function dailyTable(rows) {
   const head = `<thead><tr>
     <th class="a4-td-date">日期</th><th>水分<small>ml</small></th><th>濕食/罐頭<small>g</small></th><th>乾糧<small>g</small></th><th>熱量<small>kcal</small></th>
   </tr></thead>`;
-  const body = rows.map((r) => `<tr>
+  const body = rows.map((r) => r.unrecorded ? `<tr><td class="a4-td-date">${esc(mmdd(r.date))}</td><td colspan="4">未記錄</td></tr>` : `<tr>
     <td class="a4-td-date">${esc(mmdd(r.date))}</td><td>${n0(r.waterMl)}</td><td>${n0(r.wetG)}</td><td>${n0(r.dryG)}</td><td>${r.kcalIncomplete && !(Number(r.kcal) > 0) ? '未設定' : n0(r.kcal)}${r.kcalIncomplete ? (Number(r.kcal) > 0 ? '+' : '') + '<sup class="a4-est-mark">未計</sup>' : (r.kcalEstimated ? '<sup class="a4-est-mark">估</sup>' : '')}</td>
   </tr>`).join('');
   return `<table class="a4-daily">${head}<tbody>${body}</tbody></table>`;
