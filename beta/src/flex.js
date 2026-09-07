@@ -1207,22 +1207,40 @@ export function recordTutorialFlex() {
 
 // 第一層只教開始方式；詳細格式保留在第二層及「完整記法」。
 export function quickRecordCarousel(opts = {}) {
-  const section = (title, description, action) => ({
-    type: 'box', layout: 'vertical', spacing: 'xs', margin: 'lg',
-    contents: [text(title, {size:'md',weight:'bold',color:C.brand,wrap:true}),
-      text(description,{size:'sm',color:C.inkSoft,wrap:true}),
-      ...(action ? [{type:'button',height:'sm',style:title.includes('快捷')?'primary':'link',color:C.brand,action}] : [])]
+  const line = (value, options={}) => text(value,{size:'16px',color:C.inkSoft,wrap:true,...options});
+  const actionRow = (title, description, action) => ({
+    type:'box',layout:'vertical',paddingTop:'12px',paddingBottom:'12px',spacing:'8px',action,
+    contents:[
+      {type:'box',layout:'horizontal',spacing:'12px',alignItems:'center',contents:[
+        line(title,{size:'18px',weight:'bold',color:C.brand,flex:1}),
+        line('›',{size:'24px',color:C.brand,flex:0})
+      ],paddingTop:'8px',paddingBottom:'8px'},
+      line(description)
+    ]
   });
   return bubble('🐱 喵喵管家怎麼用？直接記、常用快捷、近期紀錄、出摘要、管家後台', {
-    type:'bubble',size:'mega',body:{type:'box',layout:'vertical',paddingAll:'20px',backgroundColor:BODY_BG,contents:[
-      text('🐱 喵喵管家怎麼用？',{size:'lg',weight:'bold',color:C.brand,wrap:true}),
-      text('平常直接在 LINE 告訴我就好，不用特別學格式。',{size:'sm',color:C.ink,wrap:true,margin:'md'}),
-      section('✏️ 直接記','例如：主食31、水5、乾乾10、嘔吐 白沫'),
-      section('⚡ 常用快捷','點「記一筆」→ 點主食 → 補上數量、送出。下次繼續點，不用重打。',{type:'message',label:'記一筆・常用快捷',text:'記一筆'}),
-      section('📋 看最近狀況','看近七天每天的飲食、喝水紀錄。',{type:'message',label:'近七天記錄',text:'近七天記錄'}),
-      section('📄 要給醫生或照護者看','點「出摘要」選貓，再選「給醫生看」或「給照護者」，收到圖片與 QR Code。缺照護資料會先問你。',{type:'postback',label:'出摘要',data:'action=reportStart'}),
-      section('⚙️ 想看完整資料','完整紀錄、月曆和詳細設定，再進管家後台。',opts.siteUrl?{type:'uri',label:'管家後台',uri:opts.siteUrl}:{type:'message',label:'管家後台',text:'管家後台'})
-    ]},footer:{type:'box',layout:'vertical',backgroundColor:FOOTER_COLOR,contents:[{type:'button',height:'sm',style:'link',color:C.brand,action:{type:'message',label:'更多紀錄範例',text:'更多紀錄範例'}}]}
+    type:'bubble',size:'mega',
+    header:{type:'box',layout:'vertical',paddingAll:'22px',backgroundColor:C.brand,spacing:'10px',contents:[
+      line('🐱 喵喵管家怎麼用？',{size:'22px',weight:'bold',color:'#FFFFFF'}),
+      line('平常直接在 LINE 告訴我就好，不用特別學格式。',{color:'#FFFFFF'})
+    ]},
+    body:{type:'box',layout:'vertical',paddingAll:'20px',backgroundColor:BODY_BG,contents:[
+      line('✏️ 直接記',{size:'18px',weight:'bold',color:C.brand}),
+      {type:'box',layout:'vertical',margin:'12px',paddingAll:'16px',backgroundColor:C.soft,cornerRadius:'12px',spacing:'8px',contents:[
+        line('主食31　水5　乾乾10',{weight:'bold',color:C.ink}),line('嘔吐 白沫',{weight:'bold',color:C.ink})
+      ]},
+      {type:'box',layout:'vertical',margin:'20px',paddingAll:'16px',backgroundColor:C.tint,cornerRadius:'12px',spacing:'12px',contents:[
+        line('⚡ 常用快捷',{size:'18px',weight:'bold',color:C.brand}),
+        line('點主食 → 補數量 → 送出。\n下次繼續點，不用重打。'),
+        {type:'button',style:'primary',color:C.brand,action:{type:'message',label:'記一筆・常用快捷',text:'記一筆'}}
+      ]},
+      {type:'separator',margin:'24px',color:SEPARATOR},
+      actionRow('📋 近七天記錄','看每天的飲食、喝水紀錄。',{type:'message',label:'近七天記錄',text:'近七天記錄'}),
+      {type:'separator',color:SEPARATOR},
+      actionRow('📄 出摘要','選貓 → 給醫生看／給照護者。\n收到圖片與 QR Code；缺照護資料會先問你。',{type:'postback',label:'出摘要',data:'action=reportStart'}),
+      {type:'separator',color:SEPARATOR},
+      actionRow('⚙️ 管家後台','完整紀錄、月曆與詳細設定，需要時再進來。',opts.siteUrl?{type:'uri',label:'管家後台',uri:opts.siteUrl}:{type:'message',label:'管家後台',text:'管家後台'})
+    ]},footer:{type:'box',layout:'vertical',paddingAll:'12px',backgroundColor:FOOTER_COLOR,contents:[{type:'button',style:'link',color:C.brand,action:{type:'message',label:'更多紀錄範例',text:'更多紀錄範例'}}]}
   });
 }
 
@@ -1240,13 +1258,23 @@ export function recordExamplesText() {
   return '更多紀錄範例\n照自己的情況改好再送出；食物是克、水是 ml、體重是公斤。\n'+HELP_EXAMPLES.map(([label,examples])=>label+'：'+examples.join('／')).join('\n')+'\n補登、修正、品牌與多貓：輸入「完整記法」。';
 }
 export function recordExamplesFlex() {
-  const pages=[HELP_EXAMPLES.slice(0,4),HELP_EXAMPLES.slice(4)];
-  return bubble('更多紀錄範例：吃飯、喝水、藥物、大小便、嘔吐、體重', {type:'carousel',contents:pages.map((groups,i)=>({
-    type:'bubble',size:'mega',body:{type:'box',layout:'vertical',paddingAll:'20px',backgroundColor:BODY_BG,contents:[
-      text('更多紀錄範例 '+(i+1)+'/2',{size:'lg',weight:'bold',color:C.brand,wrap:true}),
-      text('點例句，改成自己的情況再送出。食物：克｜水：ml｜體重：公斤',{size:'sm',wrap:true,color:C.inkSoft,margin:'md'}),
-      ...groups.flatMap(([label,examples])=>[text(label,{size:'md',weight:'bold',color:C.brand,margin:'lg',wrap:true}),...examples.map(example=>({type:'button',style:'link',height:'sm',color:C.brand,action:{type:'postback',label:example,data:'action=fill',inputOption:'openKeyboard',fillInText:example}}))])
-    ]},footer:{type:'box',layout:'vertical',contents:[{type:'button',style:'link',height:'sm',color:C.brand,action:{type:'message',label:'完整記法・補登與修正',text:'完整記法'}}]}
+  const pages=[['吃飯・喝水',HELP_EXAMPLES.slice(0,2)],['藥物・大小便',HELP_EXAMPLES.slice(2,4)],['身體・其他紀錄',HELP_EXAMPLES.slice(4)]];
+  return bubble('更多紀錄範例：點例句，改好再送出', {type:'carousel',contents:pages.map(([title,groups],i)=>({
+    type:'bubble',size:'mega',
+    header:{type:'box',layout:'vertical',paddingAll:'20px',backgroundColor:C.brand,spacing:'8px',contents:[
+      text('紀錄範例 '+(i+1)+'/3',{size:'16px',color:'#FFFFFF',wrap:true}),
+      text(title,{size:'22px',weight:'bold',color:'#FFFFFF',wrap:true})
+    ]},
+    body:{type:'box',layout:'vertical',paddingAll:'20px',backgroundColor:BODY_BG,contents:[
+      text('點例句 → 改成自己的情況 → 送出',{size:'16px',wrap:true,color:C.inkSoft}),
+      ...groups.map(([label,examples])=>({type:'box',layout:'vertical',margin:'20px',spacing:'10px',contents:[
+        text(label+(label.includes('吃飯')?'（克）':label.includes('喝水')?'（ml）':label.includes('體重')?'（公斤）':''),{size:'18px',weight:'bold',color:C.brand,wrap:true}),
+        ...examples.map(example=>({type:'box',layout:'horizontal',paddingAll:'14px',spacing:'12px',alignItems:'center',backgroundColor:C.tint,cornerRadius:'10px',action:{type:'postback',label:example,data:'action=fill',inputOption:'openKeyboard',fillInText:example},contents:[
+          text(example,{size:'18px',color:C.ink,weight:'bold',wrap:true,flex:1}),
+          text('›',{size:'24px',color:C.brand,flex:0})
+        ]}))
+      ]}))
+    ]},footer:{type:'box',layout:'vertical',paddingAll:'12px',backgroundColor:FOOTER_COLOR,contents:[{type:'button',style:'link',color:C.brand,action:{type:'message',label:'完整記法・補登與修正',text:'完整記法'}}]}
   }))});
 }
 
