@@ -1,3 +1,4 @@
+import { publicReport, purgeReports } from './report-sharing.js';
 // 貓貓照護管家 Beta — Cloudflare Worker 入口
 // /webhook  → LINE Messaging API webhook（驗簽後直接處理、直接 reply，不需早回 ack）
 // /api/*    → 照護站 REST API
@@ -77,6 +78,7 @@ function isDuplicateMessage(messageId) {
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    if (url.pathname.startsWith('/r/')) return publicReport(request,env,url);
     // 確保 tasks 表與 logs.sourceTaskId 已存在（冪等、每 isolate 一次），再進任何會寫 logs 的路徑
     await ensureTaskSchema(env.DB);
 
@@ -412,6 +414,7 @@ export default {
 
   // 每晚 21:00（台北）：先主動確認/換新 LINE 權杖，再檢查照護提醒
   async scheduled(event, env, ctx) {
+    ctx.waitUntil(purgeReports(env.DB));
     ctx.waitUntil(
       getAccessToken(env).catch((error) => console.error('cron token warm-up failed:', error.message))
     );

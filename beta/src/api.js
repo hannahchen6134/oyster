@@ -1,3 +1,4 @@
+import { handleReportApi } from './report-sharing.js';
 // 照護站 REST API（Bearer session token 授權）
 // 所有資源都檢查擁有權：pet.ownerLineUserId 必須等於 session 使用者。
 
@@ -89,6 +90,7 @@ export async function handleApi(request, env, url) {
   const method = request.method;
 
   try {
+    if (['care-template','care-organize','report-shares'].includes(resource)) return handleReportApi(request,env,url,lineUserId,dataOwnerId);
     // 網站行為追蹤 beacon（登入者才記；失敗不影響）
     if (resource === 'track' && method === 'POST') {
       const body = await request.json().catch(() => ({}));

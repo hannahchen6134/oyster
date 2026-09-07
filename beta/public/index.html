@@ -1250,7 +1250,8 @@
     #a4Export .purpose-a4 { width:794px; min-height:1123px; }
     .purpose-page footer { margin-top:20px; font-size:12px; color:#75644f; }
     #reportView details summary { cursor:pointer; min-height:36px; font-size:16px; }
-  </style>
+  .report-mode .shell{width:min(920px,calc(100% - 72px));padding-top:36px}.report-mode #reportView{padding:18px;min-width:0}.report-mode #reportEditor,.report-mode #purposePreview{width:100%;min-width:0}.report-mode #reportView .btn{width:auto;flex:0 1 auto;max-width:100%;white-space:normal}.report-mode #reportView textarea{min-height:120px;resize:vertical}.report-mode #reportView textarea[data-report-field="rawNotes"]{min-height:190px}.purpose-hint{font-size:13px;line-height:1.7;color:#776a59}#reportConfirmLabel{display:flex!important;gap:8px;align-items:flex-start}#reportConfirmed{width:20px;min-width:20px;height:20px;margin-top:4px}#reportShareList{overflow-wrap:anywhere}#reportShareList>div{border-bottom:1px solid #dacdb8;padding:14px 0}#qrDialog{width:min(460px,calc(100% - 72px));max-height:calc(100dvh - 72px);overflow:auto;border:1px solid #d9c7ad;border-radius:16px;padding:18px;background:#fffdf8;color:#463620}#qrDialog::backdrop{background:#30241988}#qrImage{width:100%;height:auto}#qrDialog .report-controls{display:flex;gap:10px;flex-wrap:wrap}#qrDialog button,#qrDialog a{font:inherit;max-width:100%;overflow-wrap:anywhere}#qrDialog .btn{width:auto}#qrLink{display:block;overflow-wrap:anywhere;font-size:13px;margin:12px 0}.report-mode .purpose-heading h1{overflow-wrap:anywhere}@media(max-width:600px){#reportView .report-controls label{max-width:100%}#reportView select{width:100%;min-width:0}.report-mode .head{flex-wrap:wrap}.report-mode .purpose-section{padding:12px}.report-mode .report-controls{gap:8px}}
+</style>
 </head>
 <body>
   <div class="shell">
@@ -1519,16 +1520,17 @@
         <div id="reportPetChoice"></div>
         <div id="reportWork" class="hidden">
           <div class="report-controls"><button class="btn btn-secondary" data-purpose="doctor" type="button">給醫生看</button><button class="btn btn-secondary" data-purpose="care" type="button">給照護者</button></div>
-          <div id="reportEditor"></div>
+          <div class="report-controls"><label>貓咪 <select id="reportCatSelect"></select></label><button class="btn btn-secondary" id="reportAddCat" type="button">＋ 新增貓咪</button></div><div id="reportEditor"></div>
           <div id="purposeRange" class="report-controls"><span>近期範圍</span><button data-purpose-days="7" type="button">7 天</button><button data-purpose-days="14" type="button">14 天</button><button data-purpose-days="30" type="button">30 天</button></div>
           <div id="reportStatus" role="status"></div>
-          <article id="purposePreview"></article>
+          <article id="purposePreview"></article><label id="reportConfirmLabel"><input type="checkbox" id="reportConfirmed"> 我已確認這份報告的內容</label>
           <div id="purposeActions" class="report-controls hidden">
             <label>分享版面 <select id="purposeFormat"><option value="mobile">手機閱讀</option><option value="a4">A4 列印</option></select></label>
             <button class="btn btn-primary" id="purposeSave" type="button">分享／儲存圖片</button>
-            <button class="btn btn-secondary" id="purposeSend" type="button">傳到 LINE</button>
+            <button class="btn btn-secondary" id="purposeSend" type="button">傳到 LINE</button><button class="btn btn-secondary" id="purposeQr" type="button">產生 QR Code</button><label>連結有效期 <select id="shareDays"><option value="1">1 天</option><option value="7" selected>7 天</option><option value="30">30 天</option></select></label><p class="purpose-hint">取得連結或 QR Code 的人都能查看這份報告；到期或停用後失效。</p>
           </div>
         </div>
+        <details id="reportShareManage"><summary>已分享的報告</summary><div id="reportShareList"></div></details>
       </section>
 
       <!-- 設定 -->
@@ -1581,7 +1583,8 @@
   <!-- 存成圖片給醫生：同源本地檔，執行時不連外 -->
   <script src="/html-to-image.js"></script>
   <script type="module" src="/a4-report.js?v=20260907"></script>
-  <script>
+  <dialog id="qrDialog"><h2 id="qrTitle">分享報告</h2><p id="qrExpiry"></p><img id="qrImage" alt="掃碼查看報告"><a id="qrLink" target="_blank" rel="noreferrer"></a><div class="report-controls"><button class="btn btn-secondary" id="qrCopy" type="button">複製連結</button><a class="btn btn-secondary" id="qrDownload" download="report-qr.png">儲存 QR 圖片</a><button class="btn btn-primary" id="qrLine" type="button">傳到 LINE</button><button class="btn btn-secondary" id="qrClose" type="button">關閉</button></div><p class="purpose-hint">也可以長按圖片儲存。轉傳前請確認收件者。</p></dialog>
+<script>
     'use strict';
     const TOKEN_KEY = 'cat-care-beta-token';
 
@@ -1607,7 +1610,8 @@
       eaten: { type: '', days: 30 }   // 「吃過的食物」：第一層品項摘要的類型過濾／天數（第二層逐餐上限存在各展開面板上）
     };
 
-    const reportModule = import('/report-purpose.js?v=20260907');
+    const reportModule = import('/report-purpose.js?v=20260907b');
+    const reportTools = import('/report-tools.js?v=20260907b');
     const $ = (id) => document.getElementById(id);
 
     // ---------- 食物類型：網站端單一真相來源 ----------
@@ -1716,6 +1720,7 @@
     function switchTab(tab) {
       state.activeTab = tab;
       $('reportView').classList.add('hidden');
+      document.body.classList.remove('report-mode');
       state.reportOpen = false;
       document.querySelectorAll('.tabs .tab').forEach((el) => el.classList.toggle('active', el.dataset.tab === tab));
       $('todayView').classList.toggle('hidden', tab !== 'today');
@@ -4283,6 +4288,9 @@
         if (!wasOpen) history.replaceState({ ...history.state, reportTab: returnTab }, '', location.href);
         history.pushState({ reportPurpose: purpose, reportPet: chosen ? state.petId : '' }, '', location.href);
       }
+      document.body.classList.add('report-mode');
+      $('reportConfirmed').checked = false;
+      state.reportShareRequest = null;
       state.reportOpen = true;
       state.reportPurpose = purpose;
       document.querySelectorAll('.tabs .tab').forEach((b) => b.classList.remove('active'));
@@ -4312,6 +4320,8 @@
       const pet = currentPet();
       if (!pet) return;
       const petId = pet.petId;
+      $('reportCatSelect').innerHTML = state.pets.map(p => `<option value="${esc(p.petId)}">${esc(p.petName)}</option>`).join('');
+      $('reportCatSelect').value = petId;
       const days = state.reportRange || 14;
       const to = todayStr(), from = shiftDate(to, -(days - 1));
       $('reportWork').classList.remove('hidden');
@@ -4340,10 +4350,12 @@
         ] : [['concern','這次最想讓醫生知道什麼？','選填，例如這週食量減少，想請醫生確認']];
         const editorFields = fields.map(([key,label,hint]) => `<label>${label}<textarea data-report-field="${key}" maxlength="2000" placeholder="${hint}">${esc(state.reportDraft[key] || '')}</textarea></label>`).join('');
         $('reportEditor').innerHTML = purpose === 'care'
-          ? '<details id="careEditFold"><summary>這次有需要修改或補充嗎？</summary><p>已帶入現有設定；這次調整只用於這份照護說明。</p>' + editorFields + '</details>'
+          ? (await reportTools).careEditor(state.reportDraft, esc)
           : editorFields;
+        if (revision !== purposeRevision || state.petId !== petId) return;
         $('reportStatus').textContent = '';
         await renderPurposePreview();
+        loadReportShares();
       } catch (error) {
         if (revision !== purposeRevision || !state.reportOpen) return;
         state.purposeData = null;
@@ -4366,6 +4378,7 @@
       const key = event.target.dataset.reportField;
       if (!key || !state.reportBundle) return;
       state.reportDraft[key] = event.target.value;
+      $('reportConfirmed').checked = false; state.reportShareRequest = null;
       try { sessionStorage.setItem(purposeDraftKey(), JSON.stringify(state.reportDraft)); } catch {}
       renderPurposePreview();
     });
@@ -4392,8 +4405,8 @@
       if (event.target.closest('#purposeRetry')) return openPurpose(state.reportPurpose, true, false);
     });
     $('openReportBtn').addEventListener('click', () => openPurpose('choice'));
-    $('purposeSave').addEventListener('click', () => $('reportSaveBtn').click());
-    $('purposeSend').addEventListener('click', () => $('reportSendLineBtn').click());
+    $('purposeSave').addEventListener('click', () => { if (confirmReport()) $('reportSaveBtn').click(); });
+    $('purposeSend').addEventListener('click', () => { if (confirmReport()) $('reportSendLineBtn').click(); });
     $('reportBackBtn').addEventListener('click', () => history.back());
     window.addEventListener('popstate', (event) => {
       if (state.reportImageBox) {
@@ -4404,6 +4417,112 @@
       else if (state.reportOpen) { ++purposeRevision; switchTab(event.state?.reportTab || 'today'); }
     });
 
+
+    function confirmReport() {
+      if (!state.purposeData) { toast('請先等報告整理完成', true); return false; }
+      if (!$('reportConfirmed').checked) { toast('請先確認報告內容，再勾選下方確認', true); $('reportConfirmLabel').scrollIntoView({ block:'center' }); return false; }
+      if (state.reportPurpose === 'care' && state.reportDraft.rawNotes?.trim() && !state.reportDraft.rawApplied) { toast('你貼上的說明尚未整理，請先按「整理說明」', true); return false; }
+      return true;
+    }
+    $('reportCatSelect').addEventListener('change', () => {
+      const petId = $('reportCatSelect').value;
+      if (!state.pets.some(p => p.petId === petId)) return;
+      state.petId = petId; $('petSelect').value = petId; $('petTitle').textContent = currentPet().petName;
+      openPurpose(state.reportPurpose, true, false);
+    });
+    $('reportAddCat').addEventListener('click', () => {
+      openModal('新增貓咪', '<label>貓咪名字<input name="petName" maxlength="30" required placeholder="例如：麵線"></label>', async (form) => {
+        const name=String(new FormData(form).get('petName') || '').trim(); if (!name) throw Error('請填寫貓咪名字');
+        if (form.dataset.saving === 'true') return; form.dataset.saving='true';
+        try {
+        const result = await api('pets', {method:'POST',body:JSON.stringify({petName:name})});
+        await refreshPets();
+        const pet=state.pets.find(p=>p.petId===result.row?.petId) || state.pets.find(p=>p.petName===name);
+        if(pet) { state.petId=pet.petId; $('petSelect').value=pet.petId; $('petTitle').textContent=pet.petName; }
+        await openPurpose(state.reportPurpose, true, false);
+        } finally { form.dataset.saving='false'; }
+      });
+    });
+    let careBusy=false;
+    $('reportEditor').addEventListener('input', e => { if(e.target.dataset.reportField==='rawNotes') { state.reportDraft.rawApplied=false; persistCareDraft(); } });
+    function persistCareDraft() { try { sessionStorage.setItem(purposeDraftKey(),JSON.stringify(state.reportDraft)); } catch {} }
+    $('reportEditor').addEventListener('click', async e => {
+      const btn=e.target.closest('#careOrganize,#careTemplateSave,#careTemplateLoad');if(!btn||careBusy)return;
+      const revision=purposeRevision,petId=state.petId,source=JSON.stringify(state.reportDraft);
+      const draft=structuredClone(state.reportDraft),status=$('careToolStatus');careBusy=true;btn.disabled=true;
+      const stale=()=>revision!==purposeRevision||petId!==state.petId||source!==JSON.stringify(state.reportDraft);
+      try {
+        if(btn.id==='careTemplateSave') {
+          if(!Object.values(draft).some(v=>typeof v==='string'&&v.trim()))throw Error('先填寫照護說明，再儲存範本');
+          status.textContent='正在儲存這隻貓的範本⋯';
+          await api('care-template',{method:'PUT',body:JSON.stringify({petId,draft})});
+          if(revision===purposeRevision&&petId===state.petId)status.textContent='已儲存這隻貓的範本，下次可套用。';
+          return;
+        }
+        let result;
+        if(btn.id==='careOrganize') {
+          if(!draft.rawNotes?.trim())throw Error('請先貼上這隻貓的照護說明');
+          status.textContent='正在整理，原本的文字會保留⋯';
+          result=await api('care-organize',{method:'POST',signal:AbortSignal.timeout(22000),body:JSON.stringify({petId,rawNotes:draft.rawNotes})});
+          if(stale()){if(revision===purposeRevision)status.textContent='文字已變更，請重新整理最新內容。';return;}
+          for(const [key,value] of Object.entries(result.draft)){ if(value)state.reportDraft[key]=value; }
+          state.reportDraft.rawApplied=true;
+        } else {
+          status.textContent='正在讀取範本⋯';result=await api('care-template?petId='+encodeURIComponent(petId));
+          if(stale())return;
+          if(!result.template)throw Error('這隻貓還沒有範本，填寫後按「儲存為範本」即可');
+          if(!confirm('套用範本會替換目前這隻貓的草稿，要繼續嗎？')){status.textContent='已保留目前草稿';return;}
+          state.reportDraft=structuredClone(result.template.draft);
+          // Raw notes have not necessarily been organized in the saved template.
+          state.reportDraft.rawApplied=!state.reportDraft.rawNotes?.trim() || !!result.template.draft.rawApplied;
+        }
+        $('reportConfirmed').checked=false;state.reportShareRequest=null;persistCareDraft();
+        $('reportEditor').innerHTML=(await reportTools).careEditor(state.reportDraft,esc);
+        $('careEditFold').open=true;
+        $('careToolStatus').textContent=btn.id==='careOrganize'?(result.via==='ai'?'已用 AI 分類原文，請確認下方內容、份量及時間。':'已按關鍵字分類原文，請確認下方內容。'):'已套用範本，請確認本次是否需要修改。';
+        await renderPurposePreview();
+      }catch(error){if(revision===purposeRevision&&petId===state.petId)status.textContent=error.message;}
+      finally{careBusy=false;btn.disabled=false;}
+    });
+    async function loadReportShares() {
+      const petId=state.petId,revision=purposeRevision;
+      $('reportShareList').textContent='正在讀取⋯';
+      try{const result=await api('report-shares?petId='+encodeURIComponent(petId));if(revision!==purposeRevision||petId!==state.petId)return;
+        $('reportShareList').innerHTML=result.rows.length?result.rows.map(r=>`<div><strong>${esc(r.petName)} · ${r.purpose==='care'?'照護交接單':'就醫摘要'}</strong><p>${esc(new Date(r.createdAt).toLocaleString('zh-TW'))}</p><p>${r.revoked?'已停用':'有效至 '+esc(new Date(r.expiresAt).toLocaleString('zh-TW'))}</p>${r.revoked?'':`<button type="button" class="btn btn-secondary" data-show-qr="${esc(r.id)}" data-qr-label="${esc(r.petName+' · '+(r.purpose==='care'?'照護交接單':'就醫摘要'))}" data-qr-expiry="${esc(r.expiresAt)}">查看 QR Code</button> <button type="button" class="link-btn" data-revoke-report="${esc(r.id)}">停用</button>`}</div>`).join(''):'還沒有有效的分享報告。';
+      }catch(error){if(revision===purposeRevision)$('reportShareList').textContent=error.message;}
+    }
+    let qrBusy=false,qrData=null;
+    async function showQr(url,label,expiresAt) {
+      const png=await (await reportTools).qrPng(url,label);
+      qrData={png,url,label};$('qrImage').src=png;$('qrTitle').textContent=label;$('qrExpiry').textContent='有效至 '+new Date(expiresAt).toLocaleString('zh-TW');
+      $('qrLink').href=url;$('qrLink').textContent=url;$('qrDownload').href=png;$('qrDownload').download=a4SafeName(label)+'-QR.png';$('qrDialog').showModal();
+    }
+    $('purposeQr').addEventListener('click',async()=>{
+      if(qrBusy||!confirmReport())return;qrBusy=true;const btn=$('purposeQr');btn.disabled=true;
+      const petId=state.petId,revision=purposeRevision,snapshot=structuredClone(state.purposeData),days=Number($('shareDays').value);
+      const signature=JSON.stringify({snapshot,days});if(state.reportShareRequest?.signature!==signature)state.reportShareRequest={signature,key:crypto.randomUUID()};
+      try{const result=await api('report-shares',{method:'POST',headers:{'Idempotency-Key':state.reportShareRequest.key},body:JSON.stringify({petId,snapshot,days,confirmed:true})});
+        if(revision!==purposeRevision||petId!==state.petId)return;
+        await showQr(location.origin+result.url,snapshot.petName+' · '+snapshot.reportName,result.expiresAt);await loadReportShares();
+      }catch(error){toast(error.message,true);}finally{qrBusy=false;btn.disabled=false;}
+    });
+    $('reportShareList').addEventListener('click',async e=>{
+      const btn=e.target.closest('[data-revoke-report],[data-show-qr]');if(!btn||btn.disabled)return;btn.disabled=true;
+      try{if(btn.dataset.showQr){await showQr(location.origin+'/r/'+btn.dataset.showQr,btn.dataset.qrLabel,btn.dataset.qrExpiry);}
+        else if(confirm('停用後，這個連結與 QR Code 都無法再開啟。確定停用？')){await api('report-shares/'+btn.dataset.revokeReport,{method:'DELETE'});await loadReportShares();}
+      }catch(error){toast(error.message,true);}finally{btn.disabled=false;}
+    });
+    $('qrClose').onclick=()=>{$('qrDialog').close();};
+    $('qrCopy').onclick=async()=>{try{await navigator.clipboard.writeText(qrData.url);toast('已複製報告連結');}catch{toast('請長按下方連結複製',true);}};
+    $('qrLine').onclick=async()=>{
+      const btn=$('qrLine');if(btn.disabled||!qrData)return;btn.disabled=true;const snap={...qrData};
+      try{
+        if(!window.a4SendReport)await loadScript('/a4-report.js');
+        const url=await a4UploadShot(snap.png);const items=[{url,dataUrl:snap.png,src:snap.png,name:a4SafeName(snap.label)+'-QR.png'}];
+        const result=await window.a4SendReport(items,{origin:location.origin,canSend:()=>!!(window.liff&&state.liff?.inClient&&state.liff.ctxType!=='external'&&state.liff.chatWrite!=='unavailable'),send:messages=>window.liff.sendMessages(messages),canShare:()=>!!(window.liff&&state.liff?.canShare),share:messages=>window.liff.shareTargetPicker(messages),manual:its=>{$('qrDialog').close();showReportImages(its);}});
+        if(result.ok)toast('已完成 LINE 分享操作');
+      }catch{toast('暫時無法傳送，請先儲存 QR 圖片再分享',true);}finally{btn.disabled=false;}
+    };
 
     function loadScript(src) {
       return new Promise((resolve, reject) => {
@@ -5213,13 +5332,14 @@
       if (event.target === $('modalBackdrop')) closeModal();
     });
     $('modalSaveBtn').addEventListener('click', async () => {
-      if (!modalSaveHandler) return;
+      if (!modalSaveHandler || modalSaveBtn.disabled) return;
+      modalSaveBtn.disabled = true;
       try {
         await modalSaveHandler($('modalForm'));
         closeModal();
       } catch (error) {
         toast(error.message || '儲存失敗', true);
-      }
+      } finally { modalSaveBtn.disabled = false; }
     });
 
     document.addEventListener('keydown', (event) => {

@@ -17,7 +17,7 @@ test('照護說明不把曾經吃40g變成每天指示；只含本貓的設定',
   const defaults = careDefaults(base.pet,[{petId:'p1',medName:'本貓藥'},{petId:'p2',medName:'別貓藥'}],[]);
   assert.equal(defaults.feeding,''); assert.match(defaults.medicine,/本貓藥/); assert.doesNotMatch(defaults.medicine,/別貓/);
   const d = purposeReport({...base,purpose:'care',draft:defaults,rows:[{date:'2026-09-06',entryCount:1,dryFoodG:40}]});
-  assert.equal(d.reportName,'照護說明'); assert.doesNotMatch(reportPreview(d),/40|每日紀錄|熱量/); assert.match(d.notice,/向主人確認/);
+  assert.equal(d.reportName,'照護交接單'); assert.doesNotMatch(reportPreview(d),/40|每日紀錄|熱量/); assert.match(d.notice,/向主人確認/);
 });
 test('空醫生報告不塞空的體重或用藥區；補充文字安全跳脫', () => {
   const d = purposeReport({...base,draft:{concern:'<script>alert(1)</script>'}});

@@ -27,6 +27,7 @@ export function purposeReport({ purpose = 'doctor', pet, rows = [], highlights =
   if (purpose === 'care') {
     add('餵食與飲水', [draft.feeding]);
     add('用藥方式', [draft.medicine]);
+    add('用品位置', [draft.supplies]);
     add('照顧注意事項', [draft.notes]);
     add('緊急聯絡與處理方式', [draft.emergency]);
     // 明確區分過去的觀察，絕不作為未來的餵食／用藥命令。
@@ -68,9 +69,9 @@ export function purposeReport({ purpose = 'doctor', pet, rows = [], highlights =
   }
   return {
     purpose, petId: pet.petId, petName: pet.petName,
-    reportName: purpose === 'care' ? '照護說明' : '就醫摘要', source: '喵喵管家',
+    reportName: purpose === 'care' ? '照護交接單' : '就醫摘要', source: '喵喵管家',
     generatedAt: new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Taipei' }).slice(0,16),
-    dateRangeLabel: purpose === 'care' ? `整理於 ${to}` : `${from}－${to}（近 ${days} 天）`, rangeDays: days,
+    dateRangeLabel: purpose === 'care' ? (clean(draft.period) ? `照護期間：${clean(draft.period)}` : `整理於 ${to}`) : `${from}－${to}（近 ${days} 天）`, rangeDays: days,
     sections,
     empty: purpose !== 'care' && !recent.length && !events.length && !list(weights).some((w) => inRange(w.date)),
     notice: purpose === 'care' ? (!clean(draft.feeding) ? '餵食與飲水方式尚未填寫，請先向主人確認。' : '照護方式由主人確認；下方歷史狀況僅供觀察。') : '僅整理已記錄的事實；沒有紀錄不代表沒有發生。'
