@@ -599,7 +599,7 @@
     .eaten-empty { text-align: center; color: var(--muted); font-size: 13px; line-height: 1.7; padding: 20px 10px; }
     .eaten-empty b { color: var(--ink-soft); font-weight: 600; }
     /* 截圖用標題（平常隱藏，產生圖片時才插入） */
-    /* 產生好的報告圖：全螢幕顯示，長按即可存到相簿 */
+    /* 產生好的摘要圖：全螢幕顯示，長按即可存到相簿 */
     .imgbox { position: fixed; inset: 0; z-index: 90; background: rgba(20, 16, 12, 0.86); display: flex; flex-direction: column; }
     .imgbox-bar { flex: 0 0 auto; display: flex; gap: 8px; align-items: center; padding: 12px 14px; }
     .imgbox-hint { flex: 1; color: #fff; font-size: 12.5px; line-height: 1.5; }
@@ -616,7 +616,7 @@
     .cap-header { display: none; padding: 2px 2px 14px; }
     .cap-title { font-size: 18px; font-weight: 700; color: var(--brand); }
     .cap-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
-    /* 產生圖片中：隱藏互動控制與操作說明，只留報告內容 */
+    /* 產生圖片中：隱藏互動控制與操作說明，只留摘要內容 */
     .capturing .cap-hide, .capturing .fold-toggle, .capturing #addVisitBtn,
     .capturing #labItemSelect { display: none !important; }
     .capturing .cap-gone { display: none !important; }   /* 截圖時隱藏沒資料的整個區塊（例如無看診紀錄） */
@@ -625,7 +625,7 @@
     /* 存圖時停用摺疊展開動畫：近日健康明細是唯一「截圖當下才被打開」的區塊，
        若還在 foldReveal（從 opacity:0 淡入）就被截，內容會變空白 → 強制立即全顯示 */
     .capturing .fold-body { animation: none !important; opacity: 1 !important; transform: none !important; }
-    /* 截圖時給報告左右留白，內容才不會貼邊（畫面上靠外層容器 padding，截 #trendView 會失去） */
+    /* 截圖時給摘要左右留白，內容才不會貼邊（畫面上靠外層容器 padding，截 #trendView 會失去） */
     #trendView.capturing { padding: 0 16px 12px; }
     /* 回診重點：只列須注意事件；漏藥補一條紅旗（截圖給醫生用） */
     .vh-flags { margin: 0 0 10px; padding: 11px 14px; border-radius: var(--radius); font-size: 13px; line-height: 1.6; }
@@ -1209,6 +1209,9 @@
       .a4-tag.t-note { background: #F4EDE0; color: #7A4E20; }
       .a4-tag.t-med, .a4-tag.t-warn2 { background: #F1E7F4; color: #6f4e86; border-color: #E2D3EA; }
 
+    #purposePreviewFold>summary{cursor:pointer;padding:16px 0;color:#734921}
+    #purposePreview .a4-page{width:100%;min-height:0;padding:16px;overflow:visible}
+    @media(max-width:600px){#purposePreview .a4-metrics,#purposePreview .a4-comp{grid-template-columns:1fr}#purposePreview .a4-head{align-items:start;gap:12px;flex-wrap:wrap}}
     @media (max-width: 760px) {
       .quick-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
       .qbtn { min-height: 46px; font-size: clamp(12.5px, 3.5vw, 14px); }
@@ -1452,11 +1455,11 @@
 
       <!-- 回診 -->
       <section class="panel hidden" id="trendView">
-        <button id="openReportBtn" class="btn btn-primary" type="button">出報告</button>
+        <button id="openReportBtn" class="btn btn-primary" type="button">出摘要</button>
         <div class="report-actions cap-hide hidden">
-          <button class="btn btn-primary" id="reportSaveBtn" type="button">💾 儲存完整報告</button>
+          <button class="btn btn-primary" id="reportSaveBtn" type="button">💾 儲存完整摘要</button>
           <button class="btn btn-secondary" id="reportSendLineBtn" type="button">📤 傳到 LINE</button>
-          <p class="report-hint">可儲存成圖片，也可以直接傳到 LINE 分享給醫生。多頁報告會完整保留每一頁。</p>
+          <p class="report-hint">可儲存成圖片，也可以直接傳到 LINE 分享給醫生。多頁摘要會完整保留每一頁。</p>
         </div>
         <div class="report-range cap-hide">
           <span class="report-range-label">統計範圍</span>
@@ -1571,14 +1574,14 @@
           <div class="report-controls report-pet-toolbar"><label>貓咪 <select id="reportCatSelect"></select></label><button class="btn btn-secondary" id="reportAddCat" type="button">＋ 新增貓咪</button></div><div id="reportEditor"></div>
           <div id="purposeRange" class="report-controls"><span>近期範圍</span><button data-purpose-days="7" type="button">7 天</button><button data-purpose-days="14" type="button">14 天</button><button data-purpose-days="30" type="button">30 天</button></div>
           <div id="reportStatus" role="status"></div>
-          <article id="purposePreview"></article><label id="reportConfirmLabel"><input type="checkbox" id="reportConfirmed"> 我已確認這份報告的內容</label>
+          <details id="purposePreviewFold"><summary>預覽摘要</summary><article id="purposePreview"></article></details><label id="reportConfirmLabel"><input type="checkbox" id="reportConfirmed"> 我已確認這份摘要的內容</label>
           <div id="purposeActions" class="report-controls hidden">
             <label>分享版面 <select id="purposeFormat"><option value="mobile">手機閱讀</option><option value="a4">A4 列印</option></select></label>
             <button class="btn btn-primary" id="purposeSave" type="button">分享／儲存圖片</button>
-            <button class="btn btn-secondary" id="purposeSend" type="button">傳到 LINE</button><button class="btn btn-secondary" id="purposeQr" type="button">產生 QR Code</button><label>連結有效期 <select id="shareDays"><option value="1">1 天</option><option value="7" selected>7 天</option><option value="30">30 天</option></select></label><p class="purpose-hint">取得連結或 QR Code 的人都能查看這份報告；到期或停用後失效。</p>
+            <button class="btn btn-secondary" id="purposeSend" type="button">傳到 LINE</button><button class="btn btn-secondary" id="purposeQr" type="button">產生 QR Code</button><label>連結有效期 <select id="shareDays"><option value="1">1 天</option><option value="7" selected>7 天</option><option value="30">30 天</option></select></label><p class="purpose-hint">取得連結或 QR Code 的人都能查看這份摘要；到期或停用後失效。</p>
           </div>
         </div>
-        <details id="reportShareManage" class="accordion"><summary aria-expanded="false" aria-controls="reportShareList"><span>已分享的報告</span><svg class="accordion-chevron" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 7 5 5 5-5"/></svg></summary><div id="reportShareList"><p class="muted">目前還沒有已分享的報告</p></div></details>
+        <details id="reportShareManage" class="accordion"><summary aria-expanded="false" aria-controls="reportShareList"><span>已分享的摘要</span><svg class="accordion-chevron" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 7 5 5 5-5"/></svg></summary><div id="reportShareList"><p class="muted">目前還沒有已分享的摘要</p></div></details>
       </section>
 
       <!-- 設定 -->
@@ -1631,7 +1634,7 @@
   <!-- 存成圖片給醫生：同源本地檔，執行時不連外 -->
   <script src="/html-to-image.js"></script>
   <script type="module" src="/a4-report.js?v=20260907"></script>
-  <dialog id="qrDialog"><h2 id="qrTitle">分享報告</h2><p id="qrExpiry"></p><img id="qrImage" alt="掃碼查看報告"><a id="qrLink" target="_blank" rel="noreferrer"></a><div class="report-controls"><button class="btn btn-secondary" id="qrCopy" type="button">複製連結</button><a class="btn btn-secondary" id="qrDownload" download="report-qr.png">儲存 QR 圖片</a><button class="btn btn-primary" id="qrLine" type="button">傳到 LINE</button><button class="btn btn-secondary" id="qrClose" type="button">關閉</button></div><p class="purpose-hint">也可以長按圖片儲存。轉傳前請確認收件者。</p></dialog>
+  <dialog id="qrDialog"><h2 id="qrTitle">分享摘要</h2><p id="qrExpiry"></p><img id="qrImage" alt="掃碼查看摘要"><a id="qrLink" target="_blank" rel="noreferrer"></a><div class="report-controls"><button class="btn btn-secondary" id="qrCopy" type="button">複製連結</button><a class="btn btn-secondary" id="qrDownload" download="report-qr.png">儲存 QR 圖片</a><button class="btn btn-primary" id="qrLine" type="button">傳到 LINE</button><button class="btn btn-secondary" id="qrClose" type="button">關閉</button></div><p class="purpose-hint">也可以長按圖片儲存。轉傳前請確認收件者。</p></dialog>
 <script>
     'use strict';
     const TOKEN_KEY = 'cat-care-beta-token';
@@ -2960,7 +2963,7 @@
       });
       const container = $('trendCharts');
       container.innerHTML = '';
-      // 體重放最上面：稀疏量測點連線、min–max 軸才看得出變化；標題列只附趨勢徽章（報告頁不放記錄按鈕）
+      // 體重放最上面：稀疏量測點連線、min–max 軸才看得出變化；標題列只附趨勢徽章（摘要頁不放記錄按鈕）
       const wmap = new Map((state.weights || []).map((w) => [w.date, Number(w.amount)]).filter(([, v]) => v > 0));
       const wValues = dates.map((d) => (wmap.has(d) ? wmap.get(d) : null));
       container.appendChild(lineChart({
@@ -3699,7 +3702,7 @@
       const container = $('settingsList');
       const groups = labsByDate(state.labs);
       if (!groups.length) {
-        container.innerHTML = '<div class="empty">還沒有血檢紀錄，按右上「＋ 新增」輸入第一份報告。</div>';
+        container.innerHTML = '<div class="empty">還沒有血檢紀錄，按右上「＋ 新增」輸入第一份摘要。</div>';
         return;
       }
       container.innerHTML = groups.map(([date, rows]) => {
@@ -3736,7 +3739,7 @@
         ${LAB_PRESETS.map(presetRow).join('')}
         <div class="muted" style="font-size:12px;margin:8px 0 6px">其他項目（自訂）</div>
         ${customRow(extraRows[0], 0)}${customRow(extraRows[1], 1)}`;
-      openModal(date ? `編輯 ${date} 血檢` : '新增血檢報告', html, async () => {
+      openModal(date ? `編輯 ${date} 血檢` : '新增血檢摘要', html, async () => {
         const items = [];
         for (const [name, unit] of LAB_PRESETS) {
           const value = document.querySelector(`[data-lab-item="${name}"]`).value.trim();
@@ -3859,7 +3862,7 @@
       ['回診與健康', [
         ['vets', '醫院與醫生', '常去的醫院聯絡資料'],
         ['visits', '看診紀錄', '每次看診的醫囑與下次回診日'],
-        ['labs', '血檢紀錄', '輸入報告數值，趨勢圖在「回診」頁']
+        ['labs', '血檢紀錄', '輸入摘要數值，趨勢圖在「回診」頁']
       ]],
       ['日常小幫手', [
         ['goals', '每日目標', '水分熱量目標與每天該餵的藥'],
@@ -4075,7 +4078,7 @@
       }
 
       if (state.settingsTab === 'labs') {
-        $('settingsHint').textContent = '一次輸入一份報告，填有驗的項目就好；趨勢圖在「回診」頁。';
+        $('settingsHint').textContent = '一次輸入一份摘要，填有驗的項目就好；趨勢圖在「回診」頁。';
         $('settingsAddBtn').classList.remove('hidden');
         state.labs = (await api(`labs?petId=${state.petId}`)).rows;
         renderLabsList();
@@ -4319,7 +4322,7 @@
       location.reload();
     });
 
-    // 沿用已登入者可讀的既有 API，不建立公開帳號／報告網址或資料庫欄位。
+    // 沿用已登入者可讀的既有 API，不建立公開帳號／摘要網址或資料庫欄位。
     let purposeRevision = 0;
     function purposeDraftKey() {
       return `reportDraft:${state.user?.lineUserId || ''}:${state.petId}:${state.reportPurpose}`;
@@ -4344,12 +4347,12 @@
       const revision = ++purposeRevision;
       ['todayView','calendarView','trendView','settingsView'].forEach((id) => $(id).classList.add('hidden'));
       $('reportView').classList.remove('hidden');
-      $('pageMode').textContent = '出報告';
+      $('pageMode').textContent = '出摘要';
       $('purposeActions').classList.add('hidden');
       $('purposePreview').innerHTML = '';
       $('reportPetChoice').innerHTML = '';
       $('reportShareManage').open = false;
-      $('reportShareList').textContent = '目前還沒有已分享的報告';
+      $('reportShareList').textContent = '目前還沒有已分享的摘要';
       if (purpose === 'choice') {
         $('reportWork').classList.add('hidden');
         $('reportPetChoice').innerHTML = '<h2>這次要給誰？</h2><button class="btn btn-primary" data-choose-purpose="doctor" type="button">🏥 給醫生看</button><p>整理近期狀況、異常、用藥與重要變化</p><button class="btn btn-secondary" data-choose-purpose="care" type="button">🐾 給照護者</button><p>家人、朋友或貓保姆照顧時使用</p>';
@@ -4363,7 +4366,7 @@
       }
       if (state.pets.length > 1 && !chosen) {
         $('reportWork').classList.add('hidden');
-        $('reportPetChoice').innerHTML = '<h2>要整理哪隻貓？</h2><div class="pet-options">' + state.pets.map((p) => `<button class="btn btn-secondary pet-option" data-report-pet="${esc(p.petId)}" type="button"><span>${esc(p.petName)}</span></button>`).join('') + '</div>';
+        $('reportPetChoice').innerHTML = '<h2>需要分享哪隻貓的摘要？</h2><div class="pet-options">' + state.pets.map((p) => `<button class="btn btn-secondary pet-option" data-report-pet="${esc(p.petId)}" type="button"><span>${esc(p.petName)}</span></button>`).join('') + '</div>';
         loadReportShares();
         return;
       }
@@ -4421,7 +4424,8 @@
       const mod = await reportModule;
       if (!state.reportBundle || !state.reportOpen) return;
       state.purposeData = mod.purposeReport({ ...state.reportBundle, purpose: state.reportPurpose, draft: state.reportDraft });
-      $('purposePreview').innerHTML = mod.reportPreview(state.purposeData) + (state.purposeData.empty && state.reportRange !== 30 ? '<button data-purpose-days="30" class="btn btn-secondary" type="button">改看 30 天</button>' : '');
+      $('purposePreviewFold').open = state.reportPurpose === 'doctor';
+      $('purposePreview').innerHTML = (state.reportPurpose === 'doctor' ? (await import('./a4-report.js')).buildA4Report(state.purposeData).html : mod.reportPreview(state.purposeData)) + (state.purposeData.empty && state.reportRange !== 30 ? '<button data-purpose-days="30" class="btn btn-secondary" type="button">改看 30 天</button>' : '');
       if (state.reportPurpose === 'care' && !String(state.reportDraft.feeding || '').trim()) {
         const notice = $('purposePreview').querySelector('.purpose-notice');
         notice.insertAdjacentHTML('beforeend', '<br><button id="completeFeeding" class="link-btn" type="button">補充餵食與飲水方式</button>');
@@ -4481,8 +4485,8 @@
 
 
     function confirmReport() {
-      if (!state.purposeData) { toast('請先等報告整理完成', true); return false; }
-      if (!$('reportConfirmed').checked) { toast('請先確認報告內容，再勾選下方確認', true); $('reportConfirmLabel').scrollIntoView({ block:'center' }); return false; }
+      if (!state.purposeData) { toast('請先等摘要整理完成', true); return false; }
+      if (!$('reportConfirmed').checked) { toast('請先確認摘要內容，再勾選下方確認', true); $('reportConfirmLabel').scrollIntoView({ block:'center' }); return false; }
       if (state.reportPurpose === 'care' && state.reportDraft.rawNotes?.trim() && !state.reportDraft.rawApplied) { toast('你貼上的說明尚未整理，請先按「整理補充」', true); return false; }
       return true;
     }
@@ -4516,9 +4520,20 @@
       try {
         if(btn.id==='careTemplateSave') {
           if(!Object.values(draft).some(v=>typeof v==='string'&&v.trim()))throw Error('先填寫照護說明，再儲存範本');
+          if(draft.rawNotes?.trim()&&!draft.rawApplied){
+            status.textContent='正在整理並儲存⋯';
+            const organized=await api('care-organize',{method:'POST',signal:AbortSignal.timeout(22000),body:JSON.stringify({petId,rawNotes:draft.rawNotes})});
+            if(stale())return;
+            for(const [key,value] of Object.entries(organized.draft||{}))if(value)draft[key]=value;
+            draft.rawApplied=true;
+          }
           status.textContent='正在儲存這隻貓的範本⋯';
           await api('care-template',{method:'PUT',body:JSON.stringify({petId,draft})});
-          if(revision===purposeRevision&&petId===state.petId)status.textContent='已儲存這隻貓的範本，下次可套用。';
+          if(!stale()){
+            state.reportDraft=draft;persistCareDraft();$('reportConfirmed').checked=false;
+            $('reportEditor').innerHTML=(await reportTools).careEditor(draft,esc);
+            await renderPurposePreview();$('careToolStatus').textContent='已整理並儲存，下次會自動帶入。';
+          }
           return;
         }
         let result;
@@ -4540,7 +4555,7 @@
         }
         $('reportConfirmed').checked=false;state.reportShareRequest=null;persistCareDraft();
         $('reportEditor').innerHTML=(await reportTools).careEditor(state.reportDraft,esc);
-        $('careEditFold').open=true;
+        $('careEditFold').open=false;
         $('careToolStatus').textContent=btn.id==='careOrganize'?(result.via==='ai'?'已用 AI 分類原文，請確認下方內容、份量及時間。':'已按關鍵字分類原文，請確認下方內容。'):'已套用範本，請確認本次是否需要修改。';
         await renderPurposePreview();
       }catch(error){if(revision===purposeRevision&&petId===state.petId)status.textContent=error.message;}
@@ -4553,7 +4568,7 @@
       const petId=state.petId,revision=purposeRevision;
       $('reportShareList').textContent='正在讀取⋯';
       try{const result=await api('report-shares?petId='+encodeURIComponent(petId));if(revision!==purposeRevision||petId!==state.petId)return;
-        $('reportShareList').innerHTML=result.rows.length?result.rows.map(r=>`<div><strong>${esc(r.petName)} · ${r.purpose==='care'?'照護交接單':'就醫摘要'}</strong><p>${esc(new Date(r.createdAt).toLocaleString('zh-TW'))}</p><p>${r.revoked?'已停用':'有效至 '+esc(new Date(r.expiresAt).toLocaleString('zh-TW'))}</p>${r.revoked?'':`<button type="button" class="btn btn-secondary" data-show-qr="${esc(r.id)}" data-qr-label="${esc(r.petName+' · '+(r.purpose==='care'?'照護交接單':'就醫摘要'))}" data-qr-expiry="${esc(r.expiresAt)}">查看 QR Code</button> <button type="button" class="link-btn" data-revoke-report="${esc(r.id)}">停用</button>`}</div>`).join(''):'<p class="muted">目前還沒有已分享的報告</p>';
+        $('reportShareList').innerHTML=result.rows.length?result.rows.map(r=>`<div><strong>${esc(r.petName)} · ${r.purpose==='care'?'照護交接單':'就醫摘要'}</strong><p>${esc(new Date(r.createdAt).toLocaleString('zh-TW'))}</p><p>${r.revoked?'已停用':'有效至 '+esc(new Date(r.expiresAt).toLocaleString('zh-TW'))}</p>${r.revoked?'':`<button type="button" class="btn btn-secondary" data-show-qr="${esc(r.id)}" data-qr-label="${esc(r.petName+' · '+(r.purpose==='care'?'照護交接單':'就醫摘要'))}" data-qr-expiry="${esc(r.expiresAt)}">查看 QR Code</button> <button type="button" class="link-btn" data-revoke-report="${esc(r.id)}">停用</button>`}</div>`).join(''):'<p class="muted">目前還沒有已分享的摘要</p>';
       }catch(error){if(revision===purposeRevision)$('reportShareList').textContent=error.message;}
     }
     let qrBusy=false,qrData=null;
@@ -4578,7 +4593,7 @@
       }catch(error){toast(error.message,true);}finally{btn.disabled=false;}
     });
     $('qrClose').onclick=()=>{$('qrDialog').close();};
-    $('qrCopy').onclick=async()=>{try{await navigator.clipboard.writeText(qrData.url);toast('已複製報告連結');}catch{toast('請長按下方連結複製',true);}};
+    $('qrCopy').onclick=async()=>{try{await navigator.clipboard.writeText(qrData.url);toast('已複製摘要連結');}catch{toast('請長按下方連結複製',true);}};
     $('qrLine').onclick=async()=>{
       const btn=$('qrLine');if(btn.disabled||!qrData)return;btn.disabled=true;const snap={...qrData};
       try{
@@ -4781,7 +4796,7 @@
           el.classList.toggle('active', el === rangeBtn));
         return loadTrend();
       }
-      // 單一統計範圍：一顆鈕改 reportRange，整份報告（趨勢/組成/回診重點/明細/匯出）一起重載
+      // 單一統計範圍：一顆鈕改 reportRange，整份摘要（趨勢/組成/回診重點/明細/匯出）一起重載
       const rrBtn = event.target.closest('#reportRangeChips [data-range]');
       if (rrBtn) {
         state.reportRange = Number(rrBtn.dataset.range) || 14;
@@ -4790,7 +4805,7 @@
         return loadTrend();
       }
 
-      // 吃過的食物：類型過濾（只重載第一層品項摘要，其餘報告不動）
+      // 吃過的食物：類型過濾（只重載第一層品項摘要，其餘摘要不動）
       const eTypeBtn = event.target.closest('#eatenTypeChips [data-type]');
       if (eTypeBtn) {
         state.eaten.type = eTypeBtn.dataset.type || '';
@@ -5053,7 +5068,7 @@
     // 存成圖片給醫生：把「回診」整頁（所有摺疊都展開、隱藏操作鈕）轉成一張圖，
     // 然後把圖直接顯示在畫面上讓使用者「長按儲存」——這招在 LINE 內建瀏覽器也有效，
     // 不倚賴 a[download]（內建瀏覽器常擋下載）也不倚賴檔案分享（多數 webview 不支援）。
-    // ── A4 報告：把畫面上「已算好的」report data 蒐集成一份物件，交給 buildA4Report 排版（不重算、不改數值）──
+    // ── A4 摘要：把畫面上「已算好的」report data 蒐集成一份物件，交給 buildA4Report 排版（不重算、不改數值）──
     function a4DeltaPct(values, sparse) {
       const nums = values.filter((v) => v != null);
       if (nums.length < 2) return null;
@@ -5134,7 +5149,7 @@
       for (const node of nodes) {
         const w = node.offsetWidth || 794;
         if (!(w > 0)) { console.error('[A4] 匯出節點寬度為 0，版面未渲染'); throw new Error('a4_zero_width'); }
-        if (!mobile && node.scrollHeight > 1125) throw new Error('報告內容超出頁面，請改用手機閱讀版面');
+        if (!mobile && node.scrollHeight > 1125) throw new Error('摘要內容超出頁面，請改用手機閱讀版面');
         const ratio = TARGET_W / w;                       // 讓來源寬度剛好放大到 2480
         const dataUrl = await window.htmlToImage.toPng(node, { pixelRatio: ratio, backgroundColor: '#FFFDF8', skipFonts: true });
         maxSrcLen = Math.max(maxSrcLen, (dataUrl || '').length);
@@ -5145,7 +5160,7 @@
         ctx.drawImage(img, 0, 0, TARGET_W, dh);           // 等比填滿寬度、頂端對齊；不足處留白底、超出裁掉
         out.push(canvas.toDataURL('image/png'));
       }
-      // 空白報告防呆：來源圖太小＝渲染失敗（全白/只有外框），不得當成功；改丟錯讓呼叫端顯示明確錯誤
+      // 空白摘要防呆：來源圖太小＝渲染失敗（全白/只有外框），不得當成功；改丟錯讓呼叫端顯示明確錯誤
       if (maxSrcLen < 3000) { console.error('[A4] 產出圖片疑似空白（來源長度 ' + maxSrcLen + '）'); throw new Error('a4_blank'); }
       host.innerHTML = '';
       return { pngs: out, pages: built.pages };
@@ -5153,14 +5168,14 @@
 
     // 兩個入口共用同一套產圖流程（a4RenderPages），各自防連點，互斥避免同時觸發。
     let reportSending = false;   // 「傳到 LINE」處理中
-    let reportSaving = false;    // 「儲存完整報告」處理中
+    let reportSaving = false;    // 「儲存完整摘要」處理中
 
-    // 主要入口：按「儲存完整報告」→ 產生所有 A4 頁 → 直接顯示每一頁供長按／分享儲存（不經 LINE、不上傳 /shot）。
-    // 儲存圖片不需要先傳 LINE；多頁報告每一頁都完整保留。沿用既有產圖（a4RenderPages）與儲存 UI（showReportImages）。
+    // 主要入口：按「儲存完整摘要」→ 產生所有 A4 頁 → 直接顯示每一頁供長按／分享儲存（不經 LINE、不上傳 /shot）。
+    // 儲存圖片不需要先傳 LINE；多頁摘要每一頁都完整保留。沿用既有產圖（a4RenderPages）與儲存 UI（showReportImages）。
     $('reportSaveBtn').addEventListener('click', async () => {
       if (reportSaving || reportSending) return;    // 防連點：任一入口處理中就忽略後續點擊
       const btn = $('reportSaveBtn');
-      if (!window.htmlToImage || typeof window.buildA4Report !== 'function') { toast('報告功能還在載入，請稍等一下再按', true); return; }
+      if (!window.htmlToImage || typeof window.buildA4Report !== 'function') { toast('摘要功能還在載入，請稍等一下再按', true); return; }
       if (state.reportOpen ? !state.purposeData : !state.trendRows) { toast('資料還在載入，請稍等一下再按', true); return; }
       const snap = {
         petId: state.petId,
@@ -5176,11 +5191,11 @@
       trackEvent('report_save');
       const orig = btn.textContent;
       btn.disabled = true; btn.textContent = '整理中…';
-      const loading = showLoadingOverlay('正在整理完整報告⋯');
+      const loading = showLoadingOverlay('正在整理完整摘要⋯');
       try {
         const { pngs, pages } = await a4RenderPages(snap.data);   // 用 snapshot 資料渲染
         if (!pngs.length) { loading.remove(); alert('這個瀏覽器產出的圖片是空白的，請改用一般瀏覽器（Safari／Chrome）開，或先用手機截圖。'); return; }
-        if (pngs.length < pages) { loading.remove(); console.error('[A4] 頁數不符 pages=' + pages + ' pngs=' + pngs.length); alert(`第 ${pngs.length + 1} 頁產生失敗，請重新產生報告。`); return; }
+        if (pngs.length < pages) { loading.remove(); console.error('[A4] 頁數不符 pages=' + pages + ' pngs=' + pngs.length); alert(`第 ${pngs.length + 1} 頁產生失敗，請重新產生摘要。`); return; }
         const base = `${a4SafeName(petName)}_${snap.data.reportName || "回診摘要"}_${snap.today}`;
         const names = window.a4PageFilenames(base, pngs.length);
         loading.remove();
@@ -5189,8 +5204,8 @@
         showReportImages(items);
       } catch (error) {
         loading.remove();
-        console.error('[A4] 儲存完整報告失敗：', error);
-        alert('報告產生失敗，請重新嘗試。');
+        console.error('[A4] 儲存完整摘要失敗：', error);
+        alert('摘要產生失敗，請重新嘗試。');
       } finally {
         btn.disabled = false; btn.textContent = orig; reportSaving = false;
       }
@@ -5201,7 +5216,7 @@
     $('reportSendLineBtn').addEventListener('click', async () => {
       if (reportSending || reportSaving) return;    // 防連點：任一入口處理中就忽略後續點擊
       const btn = $('reportSendLineBtn');
-      if (!window.htmlToImage || typeof window.buildA4Report !== 'function') { toast('報告功能還在載入，請稍等一下再按', true); return; }
+      if (!window.htmlToImage || typeof window.buildA4Report !== 'function') { toast('摘要功能還在載入，請稍等一下再按', true); return; }
       if (state.reportOpen ? !state.purposeData : !state.trendRows) { toast('資料還在載入，請稍等一下再按', true); return; }
       // ── snapshot：同步固定本次的 petId／範圍／日期／資料，整個產圖・上傳・傳送都用它（產圖中切換毛孩也不混用）──
       const snap = {
@@ -5218,11 +5233,11 @@
       trackEvent('report_send_line');
       const orig = btn.textContent;
       btn.disabled = true; btn.textContent = '整理中…';
-      const loading = showLoadingOverlay('正在整理完整報告⋯');
+      const loading = showLoadingOverlay('正在整理完整摘要⋯');
       try {
         const { pngs, pages } = await a4RenderPages(snap.data);   // 用 snapshot 資料渲染，不吃後續 state 變動
         if (!pngs.length) { loading.remove(); alert('這個瀏覽器產出的圖片是空白的，請改用一般瀏覽器（Safari／Chrome）開，或先用手機截圖。'); return; }
-        if (pngs.length < pages) { loading.remove(); console.error('[A4] 頁數不符 pages=' + pages + ' pngs=' + pngs.length); alert(`第 ${pngs.length + 1} 頁產生失敗，請重新產生報告。`); return; }
+        if (pngs.length < pages) { loading.remove(); console.error('[A4] 頁數不符 pages=' + pages + ' pngs=' + pngs.length); alert(`第 ${pngs.length + 1} 頁產生失敗，請重新產生摘要。`); return; }
         const base = `${a4SafeName(petName)}_${snap.data.reportName || "回診摘要"}_${snap.today}`;
         const names = window.a4PageFilenames(base, pngs.length);
         // 先把「所有頁」都上傳完成，全部處理完才送 LINE：不邊傳邊送、不缺頁、保序。
@@ -5246,7 +5261,7 @@
         }
         loading.remove();
         // 送出前再次驗證 snapshot 的貓仍屬本家庭（避免產圖中切換毛孩導致傳錯）
-        if (!(state.pets || []).some((p) => p.petId === snap.petId)) { alert('偵測到貓咪已切換，為避免傳錯，請重新產生報告。'); return; }
+        if (!(state.pets || []).some((p) => p.petId === snap.petId)) { alert('偵測到貓咪已切換，為避免傳錯，請重新產生摘要。'); return; }
         const deps = {
           origin: location.origin,
           // sendMessages 值得嘗試的情境（在 LINE App 內、非外部瀏覽器、授權非明確 unavailable）；
@@ -5258,19 +5273,19 @@
           manual: (its) => showReportImages(its)          // 最後 fallback：頁面多頁圖片、長按/分享儲存（保留全部頁）
         };
         const r = await window.a4SendReport(items, deps);
-        if (r.ok && r.method === 'send') toast('完整報告已傳到聊天室');
+        if (r.ok && r.method === 'send') toast('完整摘要已傳到聊天室');
         else if (r.ok && r.method === 'share') toast('已開啟分享面板，請選擇要傳送的對象');
         else if (r.method === 'manual') {
-          if (r.reason === 'too_many_pages') toast('報告超過 LINE 單次傳送上限（5 頁），請從下方分享完整報告', true);
-          else if (r.reason === 'image_too_large') toast('部分頁面圖片過大無法直接傳 LINE，請從下方分享完整報告', true);
+          if (r.reason === 'too_many_pages') toast('摘要超過 LINE 單次傳送上限（5 頁），請從下方分享完整摘要', true);
+          else if (r.reason === 'image_too_large') toast('部分頁面圖片過大無法直接傳 LINE，請從下方分享完整摘要', true);
           else if (r.reason === 'upload_incomplete') toast('部分頁面上傳未完成，已改用逐頁儲存', true);
           else toast('這支手機無法直接傳到聊天室，已顯示每一頁供長按／分享儲存');
         }
         else if (r.reason === 'aborted') { /* 使用者自行取消，不打擾 */ }
       } catch (error) {
         loading.remove();
-        console.error('[A4] 傳送完整報告失敗：', error);
-        alert('報告傳送失敗，請重新嘗試。');
+        console.error('[A4] 傳送完整摘要失敗：', error);
+        alert('摘要傳送失敗，請重新嘗試。');
       } finally {
         btn.disabled = false; btn.textContent = orig; reportSending = false;
       }
@@ -5279,7 +5294,7 @@
     function showLoadingOverlay(mainText) {
       const box = document.createElement('div');
       box.className = 'imgbox';
-      box.innerHTML = `<div class="imgbox-loadwrap"><div class="imgbox-spin"></div><div class="imgbox-loadtext">${esc(mainText || '正在整理完整報告⋯')}<br><span>等資料、圖表與上傳都完成才會傳送，約需幾秒</span></div></div>`;
+      box.innerHTML = `<div class="imgbox-loadwrap"><div class="imgbox-spin"></div><div class="imgbox-loadtext">${esc(mainText || '正在整理完整摘要⋯')}<br><span>等資料、圖表與上傳都完成才會傳送，約需幾秒</span></div></div>`;
       document.body.appendChild(box);
       return box;
     }
@@ -5329,7 +5344,7 @@
         </div>`).join('');
       // navigator.share 會開系統分享面板（不一定直接寫相簿），文案用「分享／儲存」較不誤導
       const hint = multi
-        ? `這份報告共有 ${items.length} 張，請分別「分享／儲存」每一頁，或按「一次分享全部」。若分享面板沒有直接存相簿，可長按圖片存到相簿。`
+        ? `這份摘要共有 ${items.length} 張，請分別「分享／儲存」每一頁，或按「一次分享全部」。若分享面板沒有直接存相簿，可長按圖片存到相簿。`
         : '按「分享／儲存這張」，或長按圖片存到相簿。';
       box.innerHTML = `
         <div class="imgbox-bar">

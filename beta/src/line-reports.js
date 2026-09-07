@@ -25,15 +25,15 @@ async function saveFlow(db,actor,flow,create=false){
   await db.prepare("UPDATE app_kv SET v=?,updatedAt=? WHERE k=? AND json_extract(v,'$.id')=?").bind(JSON.stringify(flow),new Date().toISOString(),flowKey(actor),flow.id).run();
 }
 async function allowed(env,event,owner) {
-  if(!isBetaAllowed(await getUser(env.DB,event.source?.userId))){await replyOrPush(env,event,'請先完成測試資格驗證，再使用出報告。');return false;}
-  if(event.source?.type!=='user'){await replyOrPush(env,event,'請在與喵喵管家的一對一對話中出報告。');return false;}
-  if(event.source.userId!==owner){await replyOrPush(env,event,'請由貓咪爸媽產生可分享的報告。');return false;}
+  if(!isBetaAllowed(await getUser(env.DB,event.source?.userId))){await replyOrPush(env,event,'請先完成測試資格驗證，再使用出摘要。');return false;}
+  if(event.source?.type!=='user'){await replyOrPush(env,event,'請在與喵喵管家的一對一對話中出摘要。');return false;}
+  if(event.source.userId!==owner){await replyOrPush(env,event,'請由貓咪爸媽產生可分享的摘要。');return false;}
   return true;
 }
 export async function startLineReport(env,event,owner) {
   if(!await allowed(env,event,owner))return;
   const pets=await listPets(env.DB,owner);
-  if(!pets.length){await replyOrPush(env,event,'先新增貓咪，就可以整理報告。請輸入「新增貓咪」。');return;}
+  if(!pets.length){await replyOrPush(env,event,'先新增貓咪，就可以整理摘要。請輸入「新增貓咪」。');return;}
   const flow={id:crypto.randomUUID(),owner,stage:'pet',expiresAt:Date.now()+30*60000};
   await saveFlow(env.DB,event.source.userId,flow,true);
   await choosePets(env,event,flow,pets,0);
@@ -42,7 +42,7 @@ async function choosePets(env,event,flow,pets,offset) {
   const buttons=pets.slice(offset,offset+8).map(p=>[p.petName,button(flow,'reportPet',`&petId=${encode(p.petId)}`)]);
   if(offset+8<pets.length)buttons.push(['下一頁貓咪',button(flow,'reportPets',`&offset=${offset+8}`)]);
   if(offset>0)buttons.push(['上一頁貓咪',button(flow,'reportPets',`&offset=${Math.max(0,offset-8)}`)]);
-  await replyOrPushFlex(env,event,card('要整理哪隻貓？',buttons,'先選貓咪，再選用途。報告圖片與 QR Code 都會傳在這裡。'),'請重新點「出報告」選擇貓咪。');
+  await replyOrPushFlex(env,event,card('需要分享哪隻貓的摘要？',buttons,'先選貓咪，再選用途。摘要圖片與 QR Code 都會傳在這裡。'),'請重新點「出摘要」選擇貓咪。');
 }
 export async function buildLineReport(db,owner,petId,purpose) {
   const pet=await getPet(db,petId);
@@ -73,16 +73,16 @@ async function askFeeding(env,event,flow,pet,draft={}) {
 export async function handleLineReportText(env,event,owner,text) {
   const flow=await read(env.DB,flowKey(event.source?.userId));
   if(!flow||flow.owner!==owner||flow.stage!=='feeding'||flow.expiresAt<Date.now())return false;
-  if(['出報告','取消','算了'].includes(text)){
+  if(['出摘要','出報告','取消','算了'].includes(text)){
     flow.stage='cancelled';await saveFlow(env.DB,event.source.userId,flow);
-    if(text==='出報告')return false;
+    if(text==='出摘要'||text==='出報告')return false;
     await replyOrPush(env,event,'已取消這次補充。');return true;
   }
   // Menu commands stay commands; do not accidentally save a navigation command as care instructions.
   if(['記一筆','近七天記錄','管家後台','照護站','怎麼記','照護月曆','今天'].includes(text)){flow.stage='cancelled';await saveFlow(env.DB,event.source.userId,flow);return false;}
   if(!await allowed(env,event,owner))return true;
   const pet=await getPet(env.DB,flow.petId);
-  if(!pet||pet.isDeleted||pet.ownerLineUserId!==owner){await replyOrPush(env,event,'貓咪資料已變更，請重新點「出報告」。');return true;}
+  if(!pet||pet.isDeleted||pet.ownerLineUserId!==owner){await replyOrPush(env,event,'貓咪資料已變更，請重新點「出摘要」。');return true;}
   if(!text.trim()||text.length>2000){await replyOrPush(env,event,'請用 2000 字以內補充照護說明。');return true;}
   flow.feeding=text.trim();flow.careDraft=classifyLines(text.trim());flow.stage='confirm';await saveFlow(env.DB,event.source.userId,flow);
   await replyOrPushFlex(env,event,card(`確認${pet.petName}的安排`,[
@@ -94,20 +94,20 @@ export async function handleLineReportPostback(env,event,owner,data,render=rende
   if(!await allowed(env,event,owner))return;
   const actor=event.source.userId,flow=await read(env.DB,flowKey(actor)),action=data.get('action');
   if(!flow||flow.owner!==owner||flow.id!==data.get('flow')||flow.expiresAt<Date.now()){
-    await replyOrPush(env,event,'這張選擇卡已過期，請重新點「出報告」。');return;
+    await replyOrPush(env,event,'這張選擇卡已過期，請重新點「出摘要」。');return;
   }
-  if(action==='reportCancel'){flow.stage='cancelled';await saveFlow(env.DB,actor,flow);await replyOrPush(env,event,'已取消這次報告。');return;}
+  if(action==='reportCancel'){flow.stage='cancelled';await saveFlow(env.DB,actor,flow);await replyOrPush(env,event,'已取消這次摘要。');return;}
   if(action==='reportPets'&&flow.stage==='pet'){
     const pets=await listPets(env.DB,owner),offset=Math.max(0,Number(data.get('offset'))||0);
     return choosePets(env,event,flow,pets,Math.min(offset,Math.max(0,pets.length-1)));
   }
   if(action==='reportPet'&&flow.stage==='pet') {
     const pet=await getPet(env.DB,data.get('petId')||'');
-    if(!pet||pet.isDeleted||pet.ownerLineUserId!==owner){await replyOrPush(env,event,'無法存取這隻貓。請重新點「出報告」。');return;}
+    if(!pet||pet.isDeleted||pet.ownerLineUserId!==owner){await replyOrPush(env,event,'無法存取這隻貓。請重新點「出摘要」。');return;}
     flow.petId=pet.petId;flow.stage='purpose';await saveFlow(env.DB,actor,flow);
-    return replyOrPushFlex(env,event,card(`${pet.petName}的報告要給誰？`,[
+    return replyOrPushFlex(env,event,card(`${pet.petName}的摘要要給誰？`,[
       ['給醫生看',button(flow,'reportPurpose','&purpose=doctor')],['給照護者',button(flow,'reportPurpose','&purpose=care')]
-    ],'給醫生：近 14 天紀錄。給照護者：已存照護安排與近期狀況。\n選好就傳圖片＋QR Code；分享連結有效 7 天，持有連結的人可以閱讀。'),'請重新點「出報告」選擇用途。');
+    ],'給醫生：近 14 天紀錄。給照護者：已存照護安排與近期狀況。\n選好就傳圖片＋QR Code；分享連結有效 7 天，持有連結的人可以閱讀。'),'請重新點「出摘要」選擇用途。');
   }
   if(action==='reportPurpose'&&flow.stage==='purpose') {
     if(!['doctor','care'].includes(data.get('purpose')))return;
@@ -136,7 +136,7 @@ export async function handleLineReportPostback(env,event,owner,data,render=rende
     const bundle=await buildLineReport(env.DB,owner,flow.petId,'care');return askFeeding(env,event,flow,bundle.pet,bundle.draft);
   } else if(action==='reportGenerate'&&flow.stage==='ready') {
     flow.stage='ready';await saveFlow(env.DB,actor,flow);
-  } else { await replyOrPush(env,event,'這一步已處理，請使用最新的按鈕，或重新點「出報告」。');return; }
+  } else { await replyOrPush(env,event,'這一步已處理，請使用最新的按鈕，或重新點「出摘要」。');return; }
   return deliverReport(env,event,flow,render);
 }
 
@@ -145,14 +145,14 @@ async function deliverReport(env,event,flow,render) {
   // Atomic lease across isolates prevents double taps from running two browsers or sending two reports.
   const lock=`lineReportLock:${flow.id}`,now=Date.now();
   const acquired=await db.prepare(`INSERT INTO app_kv(k,v,updatedAt) VALUES (?,?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v,updatedAt=excluded.updatedAt WHERE CAST(app_kv.v AS INTEGER)<? RETURNING k`).bind(lock,String(now+90000),new Date().toISOString(),now).first();
-  if(!acquired){await replyOrPush(env,event,'報告正在整理中，請稍等一下。');return;}
+  if(!acquired){await replyOrPush(env,event,'摘要正在整理中，請稍等一下。');return;}
   try {
     const latest=await read(db,flowKey(actor));
     if(!latest||latest.id!==flow.id||['done','cancelled'].includes(latest.stage))return;
     if(await appKvGet(db,`lineReportDelivered:${flow.id}`))return;
     flow.sent=latest.sent||0;
     if(event.replyToken){
-      await replyMessages(env,event.replyToken,[{type:'text',text:'正在整理報告圖片與 QR Code，完成後會直接傳在這裡。'}]);
+      await replyMessages(env,event.replyToken,[{type:'text',text:'正在整理摘要圖片與 QR Code，完成後會直接傳在這裡。'}]);
       // The reply token is consumed; final images and errors must use push once.
       event={...event,replyToken:undefined};
     }
@@ -171,7 +171,7 @@ async function deliverReport(env,event,flow,render) {
       manifest={count:pngs.length,expiresAt:share.expiresAt};await appKvSet(db,'lineReportImages:'+share.id,JSON.stringify(manifest));
     }
     const messages=Array.from({length:manifest.count},(_,i)=>({type:'image',originalContentUrl:`${base}${share.url}/image/${i}`,previewImageUrl:`${base}${share.url}/image/${i}`}));
-    messages.push({type:'text',text:`${bundle.pet.petName}的${stored.snapshot.reportName}\n共 ${manifest.count-1} 張報告＋1 張 QR Code，可直接儲存或轉傳。\n查看報告（7 天內有效）：${base}${share.url}`,...(flow.purpose==='care'?{quickReply:{items:[{type:'action',action:{type:'postback',label:'補充照護說明',data:button(flow,'reportEdit'),displayText:'補充照護說明'}}]}}:{})});
+    messages.push({type:'text',text:`${bundle.pet.petName}的${stored.snapshot.reportName}\n共 ${manifest.count-1} 張摘要＋1 張 QR Code，可直接儲存或轉傳。\n查看摘要（7 天內有效）：${base}${share.url}`,...(flow.purpose==='care'?{quickReply:{items:[{type:'action',action:{type:'postback',label:'補充照護說明',data:button(flow,'reportEdit'),displayText:'補充照護說明'}}]}}:{})});
     let sent=Number(flow.sent||0);
     for(let i=sent;i<messages.length;i+=5){
       const batch=messages.slice(i,i+5);
@@ -184,6 +184,6 @@ async function deliverReport(env,event,flow,render) {
   } catch(error) {
     console.warn('line report generation failed:',error.message);
     flow.stage='ready';await saveFlow(db,actor,flow);
-    await replyOrPushFlex(env,event,card('報告暫時沒有完成',[[flow.sent?'補傳剩餘圖片':'重新產生',button(flow,'reportGenerate')]],'資料仍保留。請稍後再試，完成後會直接傳回這裡。'),'報告暫時沒有完成，請稍後重新點「出報告」。');
+    await replyOrPushFlex(env,event,card('摘要暫時沒有完成',[[flow.sent?'補傳剩餘圖片':'重新產生',button(flow,'reportGenerate')]],'資料仍保留。請稍後再試，完成後會直接傳回這裡。'),'摘要暫時沒有完成，請稍後重新點「出摘要」。');
   } finally {await db.prepare('DELETE FROM app_kv WHERE k=?').bind(lock).run();}
 }

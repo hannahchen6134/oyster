@@ -4,6 +4,7 @@
 // 版面：第1頁 頁首＋體重/水分/熱量趨勢；第2頁起 水分來源＋飲食組成＋回診重點；之後 每日照護明細。
 
 import { escapeReport, reportSectionHtml } from './report-purpose.js';
+import { doctorReportData } from './doctor-report-data.js';
 const DAILY_PER_PAGE = 26;   // 每頁明細列數（A4 下 ≥8.5pt 仍清楚）
 const DIGEST_PER_PAGE = 16;  // 每頁回診重點列數
 
@@ -70,7 +71,7 @@ function fullHeader(d) {
         </div>
       </div>
       <div class="a4-head-meta">
-        <div><b>報告期間：</b>${esc(d.dateRangeLabel || '—')}</div>
+        <div><b>摘要期間：</b>${esc(d.dateRangeLabel || '—')}</div>
         <div><b>產生日期：</b>${esc(d.generatedAt || '')}</div>
         <div><b>資料來源：</b>${esc(d.source || '喵喵管家')}</div>
       </div>
@@ -82,7 +83,7 @@ function miniHeader(d) {
 function pageFooter(d, pageNo, totalPages) {
   return `
     <footer class="a4-foot">
-      <p class="a4-disc">※ 本報告整理自飼主日常紀錄，可能存在遺漏或誤差，僅供回診溝通與照護參考，不作為診斷依據，實際狀況請由獸醫師判斷。</p>
+      <p class="a4-disc">※ 本摘要整理自飼主日常紀錄，可能存在遺漏或誤差，僅供回診溝通與照護參考，不作為診斷依據，實際狀況請由獸醫師判斷。</p>
       <div class="a4-foot-row"><span>${esc(d.source || '喵喵管家')}</span><span>${esc(d.generatedAt || '')}</span><span>${pageNo}／${totalPages}</span></div>
     </footer>`;
 }
@@ -197,6 +198,7 @@ function estCompositionH(d) { const c = d.composition || {}; if (!c.hasData) ret
 
 // 依內容高度把區塊「一頁塞滿才換頁」，杜絕每頁只放一區塊而下方大片空白。回傳 { html, pages }。
 export function buildA4Report(data) {
+  if(data?.purpose==='doctor'&&data.doctorSource)return buildA4Report(doctorReportData(data));
   if (Array.isArray(data?.sections)) return buildPurposePages(data);
   const d = data || {};
   const digest = (Array.isArray(d.digest) ? d.digest : []).slice()
@@ -274,9 +276,9 @@ export function buildPurposePages(data) {
   return { html, pages: pages.length };
 }
 
-// 多頁報告的檔名：單頁＝base.png；多頁＝base_1.png、base_2.png…（每頁獨立、可辨識頁碼）
+// 多頁摘要的檔名：單頁＝base.png；多頁＝base_1.png、base_2.png…（每頁獨立、可辨識頁碼）
 export function a4PageFilenames(base, total) {
-  const b = String(base || '報告');
+  const b = String(base || '摘要');
   const n = Math.max(1, Number(total) || 1);
   if (n === 1) return [`${b}.png`];
   return Array.from({ length: n }, (_, i) => `${b}_${i + 1}.png`);
@@ -304,7 +306,7 @@ export async function a4SharePage(items, idx, deps) {
   return { shared: 0, name: it.name, needManual: true }; // 不支援分享 → 提示長按這一頁
 }
 
-// ── 傳完整報告到 LINE（liff.sendMessages 主流程）的可測純函式 ──────────────────
+// ── 傳完整摘要到 LINE（liff.sendMessages 主流程）的可測純函式 ──────────────────
 const A4_SEND_MAX = 5;                 // LINE 一次 sendMessages/shareTargetPicker 上限
 const A4_PREVIEW_MAX_BYTES = 1024 * 1024; // previewImageUrl 上限 1MB
 

@@ -17,7 +17,7 @@ test('範本依貓與爸媽隔離，保留整理狀態；共照者不得發布',
  assert.equal((await call('/api/care-template?petId=p1','GET',undefined,'')).status,401);
  assert.equal((await call('/api/care-template','PUT',{petId:'p1',draft:{feeding:'x'.repeat(6001)}})).status,400);
 });
-test('公開報告固定當下內容，白名單去除內部欄位，HTML轉義，訪客不能寫',async()=>{
+test('公開摘要固定當下內容，白名單去除內部欄位，HTML轉義，訪客不能寫',async()=>{
  const {call,DB}=await setup();const created=await (await call('/api/report-shares','POST',{petId:'p1',snapshot,confirmed:true})).json();assert.match(created.url,/^\/r\/[a-f0-9]{32}$/);
  const page=await call(created.url,'GET',undefined,'');assert.equal(page.status,200);const html=await page.text();assert.match(html,/蚵仔/);assert.match(html,/&lt;script&gt;/);assert.doesNotMatch(html,/<script>|NEVER_STORE|偽造名字|ownerLineUserId|testowner/);assert.match(page.headers.get('cache-control'),/no-store/);assert.equal(page.headers.get('referrer-policy'),'no-referrer');
  assert.doesNotMatch(await appKvGet(DB,'reportShare:'+created.id),/NEVER_STORE/);
@@ -30,7 +30,7 @@ test('分享需確認與正確家庭、正確petId；醫生/照護用途獨立',
  assert.equal((await call('/api/report-shares','POST',{petId:'p1',snapshot,confirmed:true},'teststranger')).status,403);
  const doctor=await (await call('/api/report-shares','POST',{petId:'p1',snapshot:{...snapshot,purpose:'doctor'},confirmed:true})).json();assert.match(await (await call(doctor.url)).text(),/就醫摘要/);
 });
-test('重試與平行重送回同一份不可变報告',async()=>{
+test('重試與平行重送回同一份不可变摘要',async()=>{
  const {call}=await setup();const key=crypto.randomUUID();const results=await Promise.all(Array.from({length:5},()=>call('/api/report-shares','POST',{petId:'p1',snapshot,confirmed:true},'testowner',key).then(r=>r.json())));assert.equal(new Set(results.map(r=>r.id)).size,1);
  const retried=await (await call('/api/report-shares','POST',{petId:'p1',snapshot:{...snapshot,sections:[]},confirmed:true},'testowner',key)).json();assert.equal(retried.id,results[0].id);assert.match(await (await call(retried.url)).text(),/4.27/);
 });
@@ -48,7 +48,7 @@ test('AI僅回傳分類ID，不可新增數字或遺漏原文；故障走明確�
  const classified=classifyLines('甲。乙。丙。',{feeding:[0,0],medicine:[0],notes:[2]});assert.equal(classified.notes,'甲。\n乙。\n丙。');
 });
 test('AI每天限次、空白或過大輸入拒絕',async()=>{const {call}=await setup();assert.equal((await call('/api/care-organize','POST',{petId:'p1',rawNotes:''})).status,400);for(let i=0;i<10;i++)assert.equal((await call('/api/care-organize','POST',{petId:'p1',rawNotes:'餵食'})).status,200);assert.equal((await call('/api/care-organize','POST',{petId:'p1',rawNotes:'餵食'})).status,429);});
-test('QR矩陣含足夠留白，獨立解碼器可還原精確報告連結',()=>{
+test('QR矩陣含足夠留白，獨立解碼器可還原精確摘要連結',()=>{
  const url='https://cat-care-beta.hannahchen6134.workers.dev/r/0123456789abcdef0123456789abcdef';
  const qr=qrcode(0,'M');qr.addData(url,'Byte');qr.make();const count=qr.getModuleCount(),scale=8,pad=4,size=(count+pad*2)*scale,data=new Uint8ClampedArray(size*size*4).fill(255);
  for(let y=0;y<count;y++)for(let x=0;x<count;x++)if(qr.isDark(y,x))for(let dy=0;dy<scale;dy++)for(let dx=0;dx<scale;dx++){const i=(((y+pad)*scale+dy)*size+(x+pad)*scale+dx)*4;data[i]=data[i+1]=data[i+2]=0;}

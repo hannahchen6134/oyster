@@ -1,4 +1,4 @@
-// 報告用途整理：只使用已授權取得的指定貓資料，不從歷史紀錄推論照護指示。
+// 摘要用途整理：只使用已授權取得的指定貓資料，不從歷史紀錄推論照護指示。
 import { cleanDoctorSource } from './doctor-report-data.js';
 const clean = (v) => String(v ?? '').trim();
 const list = (v) => Array.isArray(v) ? v : [];

@@ -435,7 +435,7 @@ export async function purgeOldSeenMessages(db, olderThanIso) {
   } catch (error) { /* 清理失敗不影響主流程 */ }
 }
 
-// 報告截圖暫存：把即時算好的 PNG 存起來，讓 LINE 內建瀏覽器能以「真圖片」長按儲存。
+// 摘要截圖暫存：把即時算好的 PNG 存起來，讓 LINE 內建瀏覽器能以「真圖片」長按儲存。
 // id 是長亂數（能力憑證），短期有效、每晚清掉。
 async function ensureShotTable(db) {
   await db.prepare(

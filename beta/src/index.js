@@ -139,7 +139,7 @@ export default {
     if (url.pathname.startsWith('/api/')) {
       return handleApi(request, env, url);
     }
-    // 報告截圖：POST 存 PNG（要登入）→ 回一個「真圖片」網址；GET 用長亂數 id 取圖，
+    // 摘要截圖：POST 存 PNG（要登入）→ 回一個「真圖片」網址；GET 用長亂數 id 取圖，
     // 讓 LINE 內建瀏覽器能用「長按圖片 → 儲存到相簿」（data 網址在部分瀏覽器無法長按存）。
     if (url.pathname === '/shot' && request.method === 'POST') {
       const token = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
@@ -422,7 +422,7 @@ export default {
     );
     // 清掉 2 天前的訊息冪等紀錄，避免 app_kv 無限成長
     ctx.waitUntil(purgeOldSeenMessages(env.DB, `${addDays(taipeiToday(), -2)}T00:00:00.000Z`));
-    // 清掉 1 天前的報告截圖暫存（存圖是即時用途，不需長期保留）
+    // 清掉 1 天前的摘要截圖暫存（存圖是即時用途，不需長期保留）
     ctx.waitUntil(purgeOldShots(env.DB, `${addDays(taipeiToday(), -1)}T00:00:00.000Z`));
     // 清掉 1 天前的匯出 CSV 暫存（下載完即可清）
     ctx.waitUntil(purgeOldExports(env.DB, `${addDays(taipeiToday(), -1)}T00:00:00.000Z`));
@@ -1100,6 +1100,7 @@ async function handlePostback(event, env, baseUrl) {
   // 共同照護者操作時解析到飼主本人（飼主本人時 ownerId === lineUserId，行為不變）
   const ownerId = lineUserId ? await resolveDataOwner(db, lineUserId) : lineUserId;
 
+  if(action==='reportStart')return startLineReport(env,event,ownerId);
   if (String(action).startsWith('report')) return handleLineReportPostback(env, { ...event, __reportBaseUrl: baseUrl }, ownerId, data);
 
   if(action==='frequent') {
@@ -3400,11 +3401,11 @@ export async function handleRecord(env, event, pet, record, lineUserId, opts = {
 // 選單設計版本：改了選單圖片或區塊配置就把這個數字 +1，
 // 現有使用者的快取版本不符就會強制重建，改版才推得到所有人。
 // v6：更新選單圖（更深色版，使用者指定）。按鈕送出詞與標籤維持一致。
-// v8：LINE 體驗改版——記一筆／近七天記錄／出報告 ・ 管家後台／說明・怎麼記／照護月曆。
-//     今日記錄→近七天記錄（既有 week 卡）、給醫生看→出報告（就醫／照護）、
+// v8：LINE 體驗改版——記一筆／近七天記錄／出摘要 ・ 管家後台／說明・怎麼記／照護月曆。
+//     今日記錄→近七天記錄（既有 week 卡）、給醫生看→出摘要（就醫／照護）、
 //     照護站→管家後台、拿掉與趨勢／後台重複的「記錄回顧」，右下改為「照護月曆」（在對話看）。
 // v9：重新綁定既有六格與 LIFF 直開；圖片與標籤不變。
-const RICHMENU_VERSION = 9;
+const RICHMENU_VERSION = 10;
 
 async function ensurePersonalRichMenu(env, baseUrl, lineUserId) {
   const db = env.DB;
@@ -3428,11 +3429,11 @@ async function ensurePersonalRichMenu(env, baseUrl, lineUserId) {
   const menu = {
     size: { width: W, height: H }, selected: true, name: `owner-${lineUserId.slice(-8)}`, chatBarText: '選單',
     // v8：上排＝每天要做的（留對話），下排＝查看與前往
-    // 送出的字＝選單標籤（自動回覆一致）：記一筆／近七天記錄／出報告 ・ 說明・怎麼記／照護月曆
+    // 送出的字＝選單標籤（自動回覆一致）：記一筆／近七天記錄／出摘要 ・ 說明・怎麼記／照護月曆
     areas: [
       cell(0, 0, send('記一筆')),                  // 記一筆 → 快速記錄選單
       cell(1, 0, send('近七天記錄')),              // 近七天記錄 → 近 7 天卡（week）
-      cell(2, 0, send('出報告')),                  // 出報告 → 就醫／照護 二選一
+      cell(2, 0, {type:'postback',data:'action=reportStart'}), // 直接啟動摘要，不觸發文字關鍵字自動回覆
       cell(0, 1, { type: 'uri', uri: site }),      // 管家後台（網站）
       cell(1, 1, send('怎麼記')),                  // 說明・怎麼記 → 可點範例卡
       cell(2, 1, send('照護月曆'))                 // 照護月曆 → 在對話看月曆

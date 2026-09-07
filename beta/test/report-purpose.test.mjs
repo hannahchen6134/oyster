@@ -7,7 +7,7 @@ import worker, { handleTextMessage } from '../src/index.js';
 import { reportFixture } from './support/report-fixture.mjs';
 import { saveReportShot } from '../src/db.js';
 const base = {pet:{petId:'p1',petName:'蚵仔'},from:'2026-09-01',to:'2026-09-07',days:7};
-test('照護報告帶入最後已記錄事件，跨貓／刪除／未來紀錄排除；歷史不是餵食指示',()=>{
+test('照護摘要帶入最後已記錄事件，跨貓／刪除／未來紀錄排除；歷史不是餵食指示',()=>{
   const logs=[{petId:'p1',category:'food',eventDateTime:'2026-09-06 08:00',itemName:'主食罐',amount:40,unit:'g'}, {petId:'p2',category:'food',eventDateTime:'2026-09-07 08:00',itemName:'別貓資料'}, {petId:'p1',category:'food',eventDateTime:'2026-10-01 08:00',itemName:'未來資料'}, {petId:'p1',category:'med',eventDateTime:'2026-09-07 08:00',itemName:'已刪除',isDeleted:1}, {petId:'p1',category:'med',eventDateTime:'2026-09-05 08:00',itemName:'藥A',medStatus:'未吃'}];
   const recent=careRecentRecords('p1',logs,base.from,base.to);assert.equal(recent.length,2);assert.match(recent[0].text,/40g/);assert.match(recent[1].text,/未吃/);
   const d=purposeReport({...base,purpose:'care',recentLogs:logs,draft:{}});const html=reportPreview(d);assert.match(html,/交接前最近紀錄（非本次安排）/);assert.doesNotMatch(html,/別貓資料|未來資料|已刪除|每天餵40/);assert.match(d.notice,/尚未填寫/);
@@ -24,7 +24,7 @@ test('照護說明不把曾經吃40g變成每天指示；只含本貓的設定',
   const d = purposeReport({...base,purpose:'care',draft:defaults,rows:[{date:'2026-09-06',entryCount:1,dryFoodG:40}]});
   assert.equal(d.reportName,'照護交接單'); assert.doesNotMatch(reportPreview(d),/40|每日紀錄|熱量/); assert.match(d.notice,/向爸媽確認/);
 });
-test('空醫生報告不塞空的體重或用藥區；補充文字安全跳脫', () => {
+test('空醫生摘要不塞空的體重或用藥區；補充文字安全跳脫', () => {
   const d = purposeReport({...base,draft:{concern:'<script>alert(1)</script>'}});
   assert.equal(d.empty,true); assert.equal(d.sections.length,1); const html=reportPreview(d);
   assert.match(html,/最近 7 天沒有足夠紀錄/); assert.doesNotMatch(html,/<script>|尚無體重|用藥紀錄/);
@@ -39,7 +39,7 @@ test('兩種輸出長文字分頁且全文保留，不裁切末尾', () => {
     const built=buildA4Report({...d,outputFormat}); assert.ok(built.pages>1); assert.match(built.html,/最後一句/); assert.equal((built.html.match(/餵食說明/g)||[]).length,400);
   }
 });
-test('報告既有 API 維持家庭隔離；爸媽與共照可讀、陌生人不可讀', async () => {
+test('摘要既有 API 維持家庭隔離；爸媽與共照可讀、陌生人不可讀', async () => {
   const db=await reportFixture();
   for(const token of ['testowner','testhelper','teststranger','']) {
     for(const route of ['summary?petId=p1&from=2026-01-01&to=2026-12-31','highlights?petId=p1&days=14','weights?petId=p1','meds?petId=p1']) {
@@ -48,15 +48,16 @@ test('報告既有 API 維持家庭隔離；爸媽與共照可讀、陌生人不
     }
   }
 });
-test('LINE 出報告先選貓；用途與圖片流程留在對話，不開後台', async () => {
+test('LINE 出摘要先選貓；用途與圖片流程留在對話，不開後台', async () => {
   const db=await reportFixture(), sent=[], menus=[]; const old=globalThis.fetch;
   globalThis.fetch=async(url,options={})=>{ if(String(url).includes('/message/'))sent.push(JSON.parse(options.body)); if(String(url).endsWith('/richmenu') && options.method==='POST') menus.push(JSON.parse(options.body));return new Response('{"richMenuId":"test-menu"}',{status:200}); };
   try {
-    await handleTextMessage({source:{type:'user',userId:'owner'},replyToken:'test',message:{id:'report1',text:'出報告'}},{DB:db,LINE_CHANNEL_ACCESS_TOKEN:'test',LIFF_ID:'test-liff',ASSETS:{fetch:async()=>new Response('png')}},'https://local.test');
-    assert.match(JSON.stringify(sent),/要整理哪隻貓/); assert.match(JSON.stringify(sent),/action=reportPet/); assert.match(JSON.stringify(sent),/petId=p1/); assert.match(JSON.stringify(sent),/petId=p2/); assert.doesNotMatch(JSON.stringify(sent),/go=doctor|go=care|"type":"uri"/);
+    await handleTextMessage({source:{type:'user',userId:'owner'},replyToken:'test',message:{id:'report1',text:'出摘要'}},{DB:db,LINE_CHANNEL_ACCESS_TOKEN:'test',LIFF_ID:'test-liff',ASSETS:{fetch:async()=>new Response('png')}},'https://local.test');
+    assert.match(JSON.stringify(sent),/需要分享哪隻貓的摘要/); assert.match(JSON.stringify(sent),/action=reportPet/); assert.match(JSON.stringify(sent),/petId=p1/); assert.match(JSON.stringify(sent),/petId=p2/); assert.doesNotMatch(JSON.stringify(sent),/go=doctor|go=care|"type":"uri"/);
     assert.equal(menus.length,1);
-    assert.deepEqual(menus[0].areas.map((a)=>a.action.type),['message','message','message','uri','message','message']);
-    assert.deepEqual(menus[0].areas.filter((a)=>a.action.type==='message').map((a)=>a.action.text),['記一筆','近七天記錄','出報告','怎麼記','照護月曆']);
+    assert.deepEqual(menus[0].areas.map((a)=>a.action.type),['message','message','postback','uri','message','message']);
+    assert.equal(menus[0].areas[2].action.data,'action=reportStart');
+    assert.deepEqual(menus[0].areas.filter((a)=>a.action.type==='message').map((a)=>a.action.text),['記一筆','近七天記錄','怎麼記','照護月曆']);
     assert.equal(menus[0].areas[3].action.uri,'https://liff.line.me/test-liff');
   } finally { globalThis.fetch=old; }
 });

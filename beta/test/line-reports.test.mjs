@@ -15,8 +15,8 @@ async function setup(run) {
  const post=async(action,extra={},render=async()=>[png,png])=>handleLineReportPostback(env,event,'owner',new URLSearchParams({action,flow:(await flow()).id,...extra}),render);
  try{await startLineReport(env,event,'owner');await run({db,env,sent,event,flow,post});}finally{globalThis.fetch=old;}
 }
-test('LINE 選貓→選用途→報告圖與QR；不建立登入連結，QR與圖同一份快照',()=>setup(async({db,env,sent,post,flow})=>{
- await post('reportPet',{petId:'p2'});assert.match(JSON.stringify(sent.at(-1)),/麵線的報告要給誰/);assert.doesNotMatch(JSON.stringify(sent.at(-1)),/"type":"uri"/);
+test('LINE 選貓→選用途→摘要圖與QR；不建立登入連結，QR與圖同一份快照',()=>setup(async({db,env,sent,post,flow})=>{
+ await post('reportPet',{petId:'p2'});assert.match(JSON.stringify(sent.at(-1)),/麵線的摘要要給誰/);assert.doesNotMatch(JSON.stringify(sent.at(-1)),/"type":"uri"/);
  let snap,url;await post('reportPurpose',{purpose:'doctor'},async(e,s,u)=>{snap=s;url=u;return [png,png];});
  assert.equal(snap.petName,'麵線');assert.doesNotMatch(JSON.stringify(snap),/測試藥p1/);assert.match(JSON.stringify(snap),/4.27/);assert.equal((await flow()).stage,'done');
  const messages=sent.at(-1).messages;assert.equal(messages.filter(m=>m.type==='image').length,2);assert.equal(messages[0].originalContentUrl,url+'/image/0');assert.match(messages.at(-1).text,/QR Code/);
@@ -57,10 +57,10 @@ test('醫生按鈕先回覆正在整理，產圖後push圖片，不重複使用r
  await post('reportPet',{petId:'p1'});let release,started;
  const began=new Promise(r=>{started=r;});const rendering=new Promise(r=>{release=r;});
  const work=post('reportPurpose',{purpose:'doctor'},async()=>{started();return rendering;});await began;
- assert.match(sent.at(-1).messages[0].text,/正在整理報告圖片/);assert.equal(sent.at(-1).replyToken,'test');
+ assert.match(sent.at(-1).messages[0].text,/正在整理摘要圖片/);assert.equal(sent.at(-1).replyToken,'test');
  release([png,png]);await work;assert.equal(sent.at(-1).to,'owner');assert.equal(sent.at(-1).replyToken,undefined);assert.equal(sent.at(-1).messages[0].type,'image');
 }));
-test('外家貓、共照者、過期流程不得生成分享報告',()=>setup(async({db,env,event,sent,post,flow})=>{
+test('外家貓、共照者、過期流程不得生成分享摘要',()=>setup(async({db,env,event,sent,post,flow})=>{
  await post('reportPet',{petId:'x1'});assert.equal((await flow()).stage,'pet');assert.match(JSON.stringify(sent.at(-1)),/無法存取/);
  await startLineReport(env,{...event,source:{type:'user',userId:'helper'}},'owner');assert.match(JSON.stringify(sent.at(-1)),/爸媽/);
  const f=await flow();f.expiresAt=0;await appKvSet(db,'lineReportFlow:owner',JSON.stringify(f));await post('reportPet',{petId:'p1'});assert.match(JSON.stringify(sent.at(-1)),/已過期/);
@@ -78,7 +78,7 @@ test('真實驗簽 webhook 的選貓 postback 路由接到 LINE 用途卡',()=>s
  const key=await crypto.subtle.importKey('raw',new TextEncoder().encode('test-secret'),{name:'HMAC',hash:'SHA-256'},false,['sign']);
  const sig=Buffer.from(await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(body))).toString('base64');
  const res=await worker.fetch(new Request('https://local.test/webhook',{method:'POST',headers:{'x-line-signature':sig},body}),{...env,LINE_CHANNEL_SECRET:'test-secret'},{});
- assert.equal(res.status,200);assert.match(JSON.stringify(sent.at(-1)),/蚵仔的報告要給誰/);assert.match(JSON.stringify(sent.at(-1)),/reportPurpose/);assert.doesNotMatch(JSON.stringify(sent.at(-1)),/"type":"uri"/);
+ assert.equal(res.status,200);assert.match(JSON.stringify(sent.at(-1)),/蚵仔的摘要要給誰/);assert.match(JSON.stringify(sent.at(-1)),/reportPurpose/);assert.doesNotMatch(JSON.stringify(sent.at(-1)),/"type":"uri"/);
 }));
 test('產圖期間連點只產生一次；新流程不被舊流程完成覆寫',()=>setup(async({env,event,sent,post,flow})=>{
  await post('reportPet',{petId:'p1'});

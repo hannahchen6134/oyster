@@ -32,11 +32,11 @@ function baseData(over = {}) {
 }
 const occ = (s, sub) => s.split(sub).length - 1;
 
-test('回傳 { html, pages }，四大區塊＋頁首（毛孩/報告名/期間/產生日期/來源）＋頁尾免責齊全', () => {
+test('回傳 { html, pages }，四大區塊＋頁首（毛孩/摘要名/期間/產生日期/來源）＋頁尾免責齊全', () => {
   const { html, pages } = buildA4Report(baseData());
   assert.equal(typeof html, 'string');
   assert.ok(pages >= 2);
-  for (const s of ['蚵仔', '回診摘要', '報告期間：', '產生日期：', '資料來源：', '體重・飲水・熱量趨勢', '飲食與水分組成', '回診重點事項', '每日照護明細']) {
+  for (const s of ['蚵仔', '回診摘要', '摘要期間：', '產生日期：', '資料來源：', '體重・飲水・熱量趨勢', '飲食與水分組成', '回診重點事項', '每日照護明細']) {
     assert.ok(html.includes(s), `應含「${s}」`);
   }
   assert.ok(html.includes('2026/07/23－2026/08/05（近 14 天）'), '頁首顯示實際統計期間');
@@ -213,7 +213,7 @@ test('三頁：一次分享包含 3 個 File；每頁也可分別儲存', async 
   for (let i = 0; i < 3; i += 1) { const d = mockDeps(false); await a4SharePage(items, i, d); assert.deepEqual(d.calls, [[items[i].name]], `第 ${i + 1} 張綁定自己那頁`); }
 });
 
-// ── 傳完整報告到 LINE（liff.sendMessages 主流程 + fallback）測試（規格 H）──────────────
+// ── 傳完整摘要到 LINE（liff.sendMessages 主流程 + fallback）測試（規格 H）──────────────
 const itemsN = (n) => Array.from({ length: n }, (_, i) => ({ url: `/shot/p${i + 1}`, previewUrl: '', dataUrl: `d${i + 1}`, name: `r_${i + 1}.png` }));
 function sendMock(over = {}) {
   const calls = { send: [], share: [], manual: [] };

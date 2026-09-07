@@ -35,10 +35,10 @@ test('A4 匯出：離屏容器 #a4Export 放畫面外、模組已引入、且移
   assert.ok(/position:\s*fixed/.test(m[0]) && /left:\s*-\d{5,}px/.test(m[0]), '#a4Export 必須離屏（fixed + 大負 left）');
   // 已改為單一「存成照片給醫生」，移除「列印／下載 A4」按鈕
   assert.ok(!html.includes('reportPrintBtn'), '不得再有列印 A4 按鈕');
-  // 主操作＝儲存完整報告（存成圖片，不需先傳 LINE）；傳到 LINE 降為次要分享；文案不再把 LINE 當唯一用途
-  assert.ok(html.includes('儲存完整報告'), '主按鈕＝儲存完整報告');
+  // 主操作＝儲存完整摘要（存成圖片，不需先傳 LINE）；傳到 LINE 降為次要分享；文案不再把 LINE 當唯一用途
+  assert.ok(html.includes('儲存完整摘要'), '主按鈕＝儲存完整摘要');
   assert.ok(html.includes('id="reportSendLineBtn"') && html.includes('傳到 LINE'), '次要入口＝傳到 LINE');
-  assert.ok(!html.includes('傳完整報告到我的 LINE'), '主按鈕不再是「傳完整報告到我的 LINE」');
+  assert.ok(!html.includes('傳完整摘要到我的 LINE'), '主按鈕不再是「傳完整摘要到我的 LINE」');
   assert.ok(/可儲存成圖片，也可以直接傳到 LINE/.test(html), '說明文：可儲存成圖片，也可以直接傳到 LINE');
   // A4 版面模組已引入（允許帶 cache-busting 版本參數）
   assert.ok(/src="\/a4-report\.js(\?v=[^"]*)?"/.test(html), '需引入 a4-report.js 模組');
@@ -118,8 +118,8 @@ test('A4 存圖：每頁有「儲存第N張」鈕綁 data-idx，逐頁用 a4Shar
   assert.ok(/a4PageFilenames\(base, pngs\.length\)/.test(html), '用 a4PageFilenames 產生每頁檔名');
 });
 
-// 儲存完整報告（主要入口）：存成圖片，不經 LINE、不上傳 /shot，沿用 a4RenderPages + showReportImages
-test('儲存完整報告：主按鈕存圖不經 LINE、防連點、snapshot 資料渲染、多頁完整保留', () => {
+// 儲存完整摘要（主要入口）：存成圖片，不經 LINE、不上傳 /shot，沿用 a4RenderPages + showReportImages
+test('儲存完整摘要：主按鈕存圖不經 LINE、防連點、snapshot 資料渲染、多頁完整保留', () => {
   const fn = html.slice(html.indexOf("$('reportSaveBtn').addEventListener"), html.indexOf("$('reportSendLineBtn').addEventListener"));
   // 防連點：與「傳到 LINE」互斥
   assert.ok(/let reportSaving = false/.test(html) && /if \(reportSaving \|\| reportSending\) return/.test(fn), '需有防連點鎖（與傳 LINE 互斥）');
@@ -147,7 +147,7 @@ test('傳到 LINE：次要入口文案、防連點鎖、snapshot 資料渲染、
   // 送前再次確認 snapshot 的貓仍屬本家庭
   assert.ok(/some\(\(p\) => p\.petId === snap\.petId\)/.test(fn), '送出前再驗貓仍在家庭');
   // 處理中/成功文案
-  assert.ok(/正在整理完整報告/.test(fn) && /完整報告已傳到聊天室/.test(fn), '處理中與成功文案');
+  assert.ok(/正在整理完整摘要/.test(fn) && /完整摘要已傳到聊天室/.test(fn), '處理中與成功文案');
 });
 
 test('傳到 LINE：先全部上傳、再用 a4SendReport 一次送；deps 綁 liff.sendMessages＋fallback', () => {
@@ -169,7 +169,7 @@ test('傳到 LINE：先全部上傳、再用 a4SendReport 一次送；deps 綁 l
   assert.ok(/oversize: true/.test(fn), '超規格頁標記 oversize（轉 manual）');
   // 結果文案：>5 頁 too_many_pages、圖過大 image_too_large 都明確要求改用分享
   assert.ok(/too_many_pages/.test(fn) && /image_too_large/.test(fn), '超上限/過大都有明確提示');
-  assert.ok(/請從下方分享完整報告/.test(fn), '超上限提示改用分享完整報告');
+  assert.ok(/請從下方分享完整摘要/.test(fn), '超上限提示改用分享完整摘要');
   // LIFF init：用 permission.query('chat_message.write') 取授權狀態，不用 isApiAvailable('sendMessages')
   assert.ok(/permission\.query\('chat_message\.write'\)/.test(html), 'init 用 permission.query 取 chat_message.write 授權');
 });

@@ -52,23 +52,23 @@ async function organize(env, raw) {
   return {draft:classifyLines(raw,assignments),via};
 }
 function cleanSnapshot(data,pet) {
-  if(!data||!['doctor','care'].includes(data.purpose)||data.petId!==pet.petId)throw Error('報告與貓咪不一致，請重新預覽');
-  if(!Array.isArray(data.sections)||data.sections.length>30)throw Error('報告段落太多');
-  const sections=data.sections.map(s=>{if(!Array.isArray(s.items)||s.items.length>200)throw Error('報告內容太多');return {title:text(s.title,100),kind:['detail','history','important'].includes(s.kind)?s.kind:'',items:s.items.map(v=>text(v,12000))};});
+  if(!data||!['doctor','care'].includes(data.purpose)||data.petId!==pet.petId)throw Error('摘要與貓咪不一致，請重新預覽');
+  if(!Array.isArray(data.sections)||data.sections.length>30)throw Error('摘要段落太多');
+  const sections=data.sections.map(s=>{if(!Array.isArray(s.items)||s.items.length>200)throw Error('摘要內容太多');return {title:text(s.title,100),kind:['detail','history','important'].includes(s.kind)?s.kind:'',items:s.items.map(v=>text(v,12000))};});
   const snapshot={purpose:data.purpose,petName:pet.petName,reportName:data.purpose==='care'?'照護交接單':'就醫摘要',dateRangeLabel:text(data.dateRangeLabel,150),notice:text(data.notice,500),generatedAt:new Date().toISOString(),sections,empty:!!data.empty,rangeDays:[7,14,30].includes(data.rangeDays)?data.rangeDays:14};
   if(data.purpose==='doctor'&&data.doctorSource)snapshot.doctorSource=cleanDoctorSource(data.doctorSource);
-  if(JSON.stringify(snapshot).length>60000)throw Error('報告內容太長，請縮短期間或文字');
+  if(JSON.stringify(snapshot).length>60000)throw Error('摘要內容太長，請縮短期間或文字');
   return snapshot;
 }
 export async function handleReportApi(request,env,url,actor,owner) {
   // 公開分享與範本修改僅限爸媽，既有共同照護者仍可使用原本圖片流程。
-  if(actor!==owner)return fail('請由爸媽管理照護範本與公開報告',403);
+  if(actor!==owner)return fail('請由爸媽管理照護範本與公開摘要',403);
   const resource=url.pathname.split('/')[2],id=url.pathname.split('/')[3]||'';
   try{
     if(resource==='report-shares'&&request.method==='DELETE'){
-      if(!/^[a-f0-9]{32}$/.test(id))return fail('找不到報告',404);
+      if(!/^[a-f0-9]{32}$/.test(id))return fail('找不到摘要',404);
       const raw=await appKvGet(env.DB,prefix+id),row=raw&&JSON.parse(raw);
-      if(!row||row.owner!==owner)return fail('找不到報告',404);
+      if(!row||row.owner!==owner)return fail('找不到摘要',404);
       row.revoked=true;row.snapshot=null;await appKvSet(env.DB,prefix+id,JSON.stringify(row));return json({ok:true});
     }
     const body=['POST','PUT'].includes(request.method)?await bodyJson(request):{};
@@ -90,15 +90,15 @@ export async function handleReportApi(request,env,url,actor,owner) {
         return json({ok:true,rows:results.map(r=>{const v=JSON.parse(r.v);return {id:r.k.slice(prefix.length),petName:pet.petName,purpose:v.purpose,expiresAt:v.expiresAt,createdAt:v.createdAt,revoked:!!v.revoked};})});
       }
       if(request.method==='POST'){
-        if(body.confirmed!==true)return fail('請先確認報告內容');
-        const requestId=request.headers.get('Idempotency-Key');if(!/^[a-f0-9-]{32,36}$/.test(requestId||''))return fail('請重新產生報告');
+        if(body.confirmed!==true)return fail('請先確認摘要內容');
+        const requestId=request.headers.get('Idempotency-Key');if(!/^[a-f0-9-]{32,36}$/.test(requestId||''))return fail('請重新產生摘要');
         // deterministic opaque capability for this owner + request. Retries return same immutable snapshot.
         const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(`${owner}:${requestId}`));
         const token=Array.from(new Uint8Array(digest).slice(0,16),v=>v.toString(16).padStart(2,'0')).join('');
         const existing=await appKvGet(env.DB,prefix+token);
-        if(existing){const row=JSON.parse(existing);if(row.revoked||row.expiresAt<=new Date().toISOString())return fail('這份報告已失效，請重新產生');return json({ok:true,id:token,url:`/r/${token}`,expiresAt:row.expiresAt});}
+        if(existing){const row=JSON.parse(existing);if(row.revoked||row.expiresAt<=new Date().toISOString())return fail('這份摘要已失效，請重新產生');return json({ok:true,id:token,url:`/r/${token}`,expiresAt:row.expiresAt});}
         const snapshot=cleanSnapshot(body.snapshot,pet);
-        if(await limited(env.DB,`share:${owner}`,30,86400))return fail('今天產生的報告較多，請先使用已有的報告連結',429);
+        if(await limited(env.DB,`share:${owner}`,30,86400))return fail('今天產生的摘要較多，請先使用已有的摘要連結',429);
         const now=new Date().toISOString(),days=[1,7,30].includes(body.days)?body.days:7,expiresAt=new Date(Date.now()+days*86400000).toISOString();
         const row={owner,petId,purpose:snapshot.purpose,snapshot,createdAt:now,expiresAt,revoked:false};
         await env.DB.prepare(`INSERT INTO app_kv(k,v,updatedAt) VALUES (?,?,?) ON CONFLICT(k) DO NOTHING`).bind(prefix+token,JSON.stringify(row),now).run();
@@ -107,7 +107,7 @@ export async function handleReportApi(request,env,url,actor,owner) {
       }
     }
     return fail('不支援的操作',405);
-  }catch(error){return fail(error instanceof SyntaxError?'內容格式不正確':/文字太長|缺少內容|內容太長|請填寫|報告/.test(error.message)?error.message:'暫時無法完成，請稍後再試');}
+  }catch(error){return fail(error instanceof SyntaxError?'內容格式不正確':/文字太長|缺少內容|內容太長|請填寫|摘要/.test(error.message)?error.message:'暫時無法完成，請稍後再試');}
 }
 export async function publicReport(request,env,url) {
   const headers={'content-type':'text/html; charset=utf-8','cache-control':'private, no-store, max-age=0','referrer-policy':'no-referrer','x-robots-tag':'noindex, nofollow, noarchive','x-content-type-options':'nosniff','content-security-policy':"default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"};
@@ -127,8 +127,8 @@ export async function publicReport(request,env,url) {
     return new Response(request.method==='HEAD'?null:png,{headers:{'content-type':'image/png','cache-control':'private, no-store','x-robots-tag':'noindex, nofollow','x-content-type-options':'nosniff'}});
   }
   const charts=valid&&row.snapshot.doctorSource?`<style>${reportA4Css}.a4-doc{overflow-x:auto}.a4-page{min-height:0;font:14px/1.4 sans-serif;--serif:serif}</style>${buildA4Report(doctorReportData(row.snapshot)).html}`:'';
-  const content=valid?charts+reportPreview(row.snapshot)+`<footer>這是產生當下的報告，之後的修改不會自動更新。<br>有效至 ${escapeReport(new Date(row.expiresAt).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}))}（台北時間）</footer>`:'<h1>這份報告已無法開啟</h1><p>連結可能已到期或被爸媽停用，請向爸媽索取新版。</p>';
-  const html=`<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>喵喵管家｜分享報告</title><style>*{box-sizing:border-box}body{margin:0;padding:36px;background:#f2ece1;color:#403526;font:16px/1.8 system-ui,sans-serif}main{max-width:720px;margin:auto;overflow-wrap:anywhere}h1{font-size:28px}h2{font-size:20px}p{white-space:pre-wrap}.purpose-section{background:#fffdf8;border:1px solid #e1d3bc;border-radius:14px;padding:20px;margin:16px 0}.purpose-heading{border-bottom:2px solid #845a31}.purpose-notice,footer{font-size:13px;color:#776a59}summary{cursor:pointer;padding:12px 0}footer{margin:28px 0}</style><main>${content}</main></html>`;
+  const content=valid?(charts||reportPreview(row.snapshot))+`<footer>這是產生當下的摘要，之後的修改不會自動更新。<br>有效至 ${escapeReport(new Date(row.expiresAt).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}))}（台北時間）</footer>`:'<h1>這份摘要已無法開啟</h1><p>連結可能已到期或被爸媽停用，請向爸媽索取新版。</p>';
+  const html=`<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>喵喵管家｜分享摘要</title><style>*{box-sizing:border-box}body{margin:0;padding:36px;background:#f2ece1;color:#403526;font:16px/1.8 system-ui,sans-serif}main{max-width:720px;margin:auto;overflow-wrap:anywhere}h1{font-size:28px}h2{font-size:20px}p{white-space:pre-wrap}.purpose-section{background:#fffdf8;border:1px solid #e1d3bc;border-radius:14px;padding:20px;margin:16px 0}.purpose-heading{border-bottom:2px solid #845a31}.purpose-notice,footer{font-size:13px;color:#776a59}summary{cursor:pointer;padding:12px 0}footer{margin:28px 0}</style><main>${content}</main></html>`;
   return new Response(request.method==='HEAD'?null:html,{status:valid?200:410,headers});
 }
 

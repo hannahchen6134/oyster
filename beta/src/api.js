@@ -630,7 +630,7 @@ async function handleLabs(db, request, url, method, resourceId, lineUserId) {
     return jsonResponse({ ok: true, rows: results || [] });
   }
 
-  // 一次存一份報告：覆蓋同一天既有的項目
+  // 一次存一份摘要：覆蓋同一天既有的項目
   if (method === 'POST' && resourceId === 'bulk') {
     const body = await request.json();
     const petId = String(body.petId || '');
@@ -666,7 +666,7 @@ async function handleLabs(db, request, url, method, resourceId, lineUserId) {
     return jsonResponse({ ok: true, saved });
   }
 
-  // 刪除某一天的整份報告：DELETE /api/labs/date?petId=&date=
+  // 刪除某一天的整份摘要：DELETE /api/labs/date?petId=&date=
   if (method === 'DELETE' && resourceId === 'date') {
     const petId = url.searchParams.get('petId') || '';
     const date = url.searchParams.get('date') || '';

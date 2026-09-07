@@ -19,7 +19,7 @@ export function weightEquals(a, b) {
   return Math.round(x * 100) === Math.round(y * 100);
 }
 
-// 報告截圖是否已過期（預設建立後 6 小時失效）。即使 D1 尚未被 cron 實體清除，過期就不再供圖。
+// 摘要截圖是否已過期（預設建立後 6 小時失效）。即使 D1 尚未被 cron 實體清除，過期就不再供圖。
 // createdAt 為 ISO 字串；壞掉/缺失一律視為過期（安全預設，不供圖）。
 export function shotExpired(createdAtIso, nowMs = Date.now(), maxAgeMs = 6 * 60 * 60 * 1000) {
   const t = Date.parse(String(createdAtIso || ''));

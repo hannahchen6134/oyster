@@ -17,6 +17,6 @@ export function doctorReportData(snapshot){
  return {petName:snapshot.petName,reportName:'回診摘要',source:'喵喵管家',dateRangeLabel:snapshot.dateRangeLabel,rangeDays:snapshot.rangeDays,generatedAt:snapshot.generatedAt,
  weight:metric('weight'),water:metric('totalWaterMl'),kcal:{...metric('kcal'),estimated:rows.some(r=>r.kcalEstimated),incomplete:rows.some(r=>r.kcalIncomplete)},
  composition:{hasData:own+food+dry+wet+other>0,water:{total:own+food,own,food},food:{total:dry+wet+other,dry,wet,other}},
- digest:(snapshot.sections||[]).filter(s=>/異常|重要|用藥/.test(s.title)).flatMap(s=>s.items.map(text=>({date:'',typeLabel:s.title,text}))),
+ digest:(snapshot.sections||[]).filter(s=>!/體重紀錄|飲食與飲水紀錄變化|每日紀錄/.test(s.title)).flatMap(s=>s.items.map(text=>({date:'',typeLabel:s.title,text}))),
  daily:rows.filter(r=>r.entryCount>0).reverse().map(r=>({date:r.date,waterMl:r.totalWaterMl,wetG:r.wetFoodG+r.foodWaterMl,dryG:r.dryFoodG,kcal:r.kcal,kcalEstimated:!!r.kcalEstimated,kcalIncomplete:r.kcalIncomplete}))};
 }

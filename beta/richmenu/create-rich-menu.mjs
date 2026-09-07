@@ -42,7 +42,7 @@ const menu = {
   areas: [
     cell(0, 0, send('記一筆')),                  // 記一筆
     cell(1, 0, send('近七天記錄')),              // 近七天記錄（week 卡）
-    cell(2, 0, send('出報告')),                  // 出報告（就醫／照護）
+    cell(2, 0, {type:'postback',data:'action=reportStart'}), // 直接啟動摘要
     // 管家後台：直接開網站（回訪者已登入一點就進；新朋友會看到登入引導頁）
     cell(0, 1, { type: 'uri', uri: siteUrl }),
     cell(1, 1, send('怎麼記')),                  // 說明・怎麼記

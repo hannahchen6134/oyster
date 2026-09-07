@@ -69,7 +69,7 @@ test('getLogsForDay 帶出 foodKcalPerGram；品牌筆不算估算、純類型�
   assert.equal(s.kcalEstimated, true, '有乾糧純類型筆 → 含估算');
 });
 
-test('recomputeDay 落地 kcalEstimated、getSummaries 讀得到（週/月/報告可用）', async () => {
+test('recomputeDay 落地 kcalEstimated、getSummaries 讀得到（週/月/摘要可用）', async () => {
   const { db, pet } = await seed();
   await food(db, pet, { foodId: '', foodType: '罐頭', amount: 40, when: '2026-08-10 09:00' });
   await recomputeDay(db, pet.petId, '2026-08-10');

@@ -19,9 +19,12 @@ async function setup(run,actor='single'){
  const last=()=>sent.at(-1).messages.at(-1);
  try{await run({DB,env,sent,say,click,logs,last});}finally{globalThis.fetch=old;}
 }
-test('新舊報告文字入口都先回選貓卡，不開後台',()=>setup(async({say,last})=>{
- for(const text of ['出報告','給醫生看','就醫使用','照護使用','給照護者']){
-  await say(text);assert.match(JSON.stringify(last()),/要整理哪隻貓/);assert.match(JSON.stringify(last()),/action=reportPet/);assert.doesNotMatch(JSON.stringify(last()),/"type":"uri"|liff.line.me/);
+test('摘要選單使用專用 postback 直接選貓，不需要文字指令',()=>setup(async({click,last})=>{
+ await click('action=reportStart');assert.match(JSON.stringify(last()),/需要分享哪隻貓的摘要/);assert.doesNotMatch(JSON.stringify(last()),/"type":"uri"/);
+}));
+test('新舊摘要文字入口都先回選貓卡，不開後台',()=>setup(async({say,last})=>{
+ for(const text of ['出摘要','出報告','給醫生看','就醫使用','照護使用','給照護者']){
+  await say(text);assert.match(JSON.stringify(last()),/需要分享哪隻貓的摘要/);assert.match(JSON.stringify(last()),/action=reportPet/);assert.doesNotMatch(JSON.stringify(last()),/"type":"uri"|liff.line.me/);
  }
 }));
 test('更多紀錄事件重送與不同事件同時到達，只回一次；稍後可再次開啟且不擋紀錄',()=>setup(async({click,sent,DB,say,logs,last})=>{
@@ -97,7 +100,7 @@ test('近七天、照護月曆、LIFF與共照API仍可使用；後台入口保�
  const me=await worker.fetch(new Request('https://local.test/api/me',{headers:{authorization:'Bearer testhelper'}}),env,{});assert.equal(me.status,200);assert.match(await me.text(),/蚵仔/);
  await say('管家後台');assert.match(JSON.stringify(last()),/https:\/\/liff.line.me\/test-liff/);
 }));
-test('從照護報告補填切換到藥物快捷，不會把用藥文字存成餵食範本',()=>setup(async({DB,say,click,logs})=>{
+test('從照護摘要補填切換到藥物快捷，不會把用藥文字存成餵食範本',()=>setup(async({DB,say,click,logs})=>{
  DB.prepare('INSERT INTO app_kv(k,v,updatedAt) VALUES (?,?,?)').bind('lineReportFlow:single',JSON.stringify({id:'test',owner:'single',petId:'s1',stage:'feeding',expiresAt:Date.now()+60000}),new Date().toISOString()).run();
  await click('action=frequent&kind=med&petId=s1');await say('小花 藥 晚 已吃');assert.equal(logs().length,1);assert.equal(logs()[0].category,'med');assert.equal(DB.prepare("SELECT v FROM app_kv WHERE k='careTemplate:single:s1'").first(),null);
 }));
