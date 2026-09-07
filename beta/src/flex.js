@@ -1205,6 +1205,36 @@ export function recordTutorialFlex() {
     { type: 'bubble', size: 'mega', header: header('完整記法・照平常說就好'), body, footer });
 }
 
+// 保留既有教學內容，但每次只顯示使用者選的分類。
+export function detailedHelpFlex(topic = '') {
+  const original = recordTutorialFlex().contents;
+  const groups=[];
+  for (const item of original.body.contents) {
+    if(item.type==='separator') { groups.push([]); continue; }
+    if(groups.length) groups.at(-1).push(structuredClone(item));
+  }
+  const labels=groups.map(g=>g[0].text);
+  const selected=groups.find(g=>g[0].text===topic);
+  const choose=label=>({type:'message',label,text:'記法：'+label});
+  const title=selected?topic:'想看哪一種記法？';
+  let contents;
+  if(selected){
+    contents=selected.slice(1).map(item=>{
+      if(item.type==='box') return {type:'box',layout:'vertical',margin:'12px',paddingAll:'12px',backgroundColor:C.tint,cornerRadius:'8px',spacing:'4px',contents:item.contents.map((t,i)=>({...t,size:'16px',wrap:true,flex:undefined,align:'start',color:i?C.inkSoft:C.ink}))};
+      return {...item,size:'16px',color:C.inkSoft,wrap:true};
+    });
+    if(topic===labels[0]) contents.push({...original.footer.contents[0],size:'14px',color:C.inkSoft,margin:'12px'});
+  }else{
+    contents=[text('選一項就好，不用全部看完。',{size:'16px',color:C.inkSoft,wrap:true})];
+    for(let i=0;i<labels.length;i+=2) contents.push({type:'box',layout:'horizontal',spacing:'8px',margin:'8px',contents:labels.slice(i,i+2).map(label=>({type:'box',layout:'vertical',flex:1,paddingAll:'12px',backgroundColor:C.tint,cornerRadius:'8px',action:choose(label),contents:[text(label,{size:'16px',color:C.brand,wrap:true})]}))});
+  }
+  return bubble(title,{type:'bubble',size:'mega',header:header(title),body:{type:'box',layout:'vertical',paddingAll:'16px',backgroundColor:BODY_BG,contents},footer:{type:'box',layout:'vertical',contents:[{type:'button',height:'sm',style:'link',color:C.brand,action:{type:'message',label:selected?'其他記法':'先記一筆',text:selected?'完整記法':'記一筆'}}]}});
+}
+export function detailedHelpText(topic='') {
+  const card=detailedHelpFlex(topic);const collect=o=>!o||typeof o!=='object'?[]:[...(o.type==='text'?[o.text]:[]),...Object.values(o).flatMap(v=>Array.isArray(v)?v.flatMap(collect):collect(v))];
+  return collect(card).join('\n')+'\n輸入「完整記法」選其他分類。';
+}
+
 // 第一層只教開始方式；詳細格式保留在第二層及「完整記法」。
 export function quickRecordCarousel(opts = {}) {
   const line = (value, options={}) => text(value,{size:'16px',color:C.inkSoft,wrap:true,...options});
@@ -1261,17 +1291,17 @@ export function recordExamplesFlex() {
   const pages=[['吃飯・喝水',HELP_EXAMPLES.slice(0,2)],['藥物・大小便',HELP_EXAMPLES.slice(2,4)],['身體・其他紀錄',HELP_EXAMPLES.slice(4)]];
   return bubble('更多紀錄範例：點例句，改好再送出', {type:'carousel',contents:pages.map(([title,groups],i)=>({
     type:'bubble',size:'mega',
-    header:{type:'box',layout:'vertical',paddingAll:'20px',backgroundColor:C.brand,spacing:'8px',contents:[
-      text('紀錄範例 '+(i+1)+'/3',{size:'16px',color:'#FFFFFF',wrap:true}),
-      text(title,{size:'22px',weight:'bold',color:'#FFFFFF',wrap:true})
+    header:{type:'box',layout:'vertical',paddingAll:'16px',backgroundColor:C.brand,spacing:'4px',contents:[
+      text('紀錄範例 '+(i+1)+'/3',{size:'14px',color:'#FFFFFF',wrap:true}),
+      text(title,{size:'19px',weight:'bold',color:'#FFFFFF',wrap:true})
     ]},
-    body:{type:'box',layout:'vertical',paddingAll:'20px',backgroundColor:BODY_BG,contents:[
-      text('點例句 → 改成自己的情況 → 送出',{size:'16px',wrap:true,color:C.inkSoft}),
-      ...groups.map(([label,examples])=>({type:'box',layout:'vertical',margin:'20px',spacing:'10px',contents:[
-        text(label+(label.includes('吃飯')?'（克）':label.includes('喝水')?'（ml）':label.includes('體重')?'（公斤）':''),{size:'18px',weight:'bold',color:C.brand,wrap:true}),
-        ...examples.map(example=>({type:'box',layout:'horizontal',paddingAll:'14px',spacing:'12px',alignItems:'center',backgroundColor:C.tint,cornerRadius:'10px',action:{type:'postback',label:example,data:'action=fill',inputOption:'openKeyboard',fillInText:example},contents:[
-          text(example,{size:'18px',color:C.ink,weight:'bold',wrap:true,flex:1}),
-          text('›',{size:'24px',color:C.brand,flex:0})
+    body:{type:'box',layout:'vertical',paddingAll:'16px',backgroundColor:BODY_BG,contents:[
+      text('點例句，改好再送出',{size:'16px',wrap:true,color:C.inkSoft}),
+      ...groups.map(([label,examples])=>({type:'box',layout:'vertical',margin:'12px',spacing:'6px',contents:[
+        text(label+(label.includes('吃飯')?'（克）':label.includes('喝水')?'（ml）':label.includes('體重')?'（公斤）':''),{size:'16px',weight:'bold',color:C.brand,wrap:true}),
+        ...examples.map(example=>({type:'box',layout:'horizontal',paddingAll:'10px',spacing:'12px',alignItems:'center',backgroundColor:C.tint,cornerRadius:'10px',action:{type:'postback',label:example,data:'action=fill',inputOption:'openKeyboard',fillInText:example},contents:[
+          text(example,{size:'16px',color:C.ink,wrap:true,flex:1}),
+          text('›',{size:'20px',color:C.brand,flex:0})
         ]}))
       ]}))
     ]},footer:{type:'box',layout:'vertical',paddingAll:'12px',backgroundColor:FOOTER_COLOR,contents:[{type:'button',style:'link',color:C.brand,action:{type:'message',label:'完整記法・補登與修正',text:'完整記法'}}]}

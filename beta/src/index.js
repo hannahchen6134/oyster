@@ -14,7 +14,7 @@ import { handleApi } from './api.js';
 import { verifyLineSignature, replyOrPush, replyOrPushQuick, replyOrPushFlex, replyMessages, pushText, pushMessages, getProfile, getAccessToken, checkAccessToken, showLoadingAnimation, startRecordLoading } from './line.js';
 import { hasAnyReminder, parseReminderSettings, buildReminderLines, reminderMessage, visitReminderMessage } from './reminders.js';
 import { shortDate } from './replies.js';
-import { reportChoiceFlex, recordFlex, recordFlexCompact, foodDisambigFlex, multiRecordFlex, undoConfirmFlex, todayFlex, handoffFlex, websiteFlex, menuFlex, recordMenuFlex, recordTutorialFlex, quickRecordCarousel, howToUseText, recordExamplesFlex, recordExamplesText, weekFlex, monthFlex, recentFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, onboardingCarousel, menuCell, exampleCard, petDataFlex, deletedCard, confirmDeleteFlex, careNotifyFlex, careInviteFlex, weightModifyConfirmFlex, weightNoRecordFlex, weightAddedFlex, weightModifiedFlex, foodTimelineFlex, foodEditMenuFlex, foodBrandPickFlex, reviewMenuFlex } from './flex.js';
+import { reportChoiceFlex, recordFlex, recordFlexCompact, foodDisambigFlex, multiRecordFlex, undoConfirmFlex, todayFlex, handoffFlex, websiteFlex, menuFlex, recordMenuFlex, recordTutorialFlex, detailedHelpFlex, detailedHelpText, quickRecordCarousel, howToUseText, recordExamplesFlex, recordExamplesText, weekFlex, monthFlex, recentFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, onboardingCarousel, menuCell, exampleCard, petDataFlex, deletedCard, confirmDeleteFlex, careNotifyFlex, careInviteFlex, weightModifyConfirmFlex, weightNoRecordFlex, weightAddedFlex, weightModifiedFlex, foodTimelineFlex, foodEditMenuFlex, foodBrandPickFlex, reviewMenuFlex } from './flex.js';
 import { isBetaAllowed, normalizeCode, gateText } from './plan.js';
 import {
   ensureUser, updateUser, getUser, listPets, createPet, resolveDefaultPet, getPet, updatePetFields, createFoodItem, createMedItem,
@@ -2279,8 +2279,9 @@ async function handleTextMessageInner(event, env, baseUrl) {
     await replyOrPushFlex(env, event, recordExamplesFlex(), recordExamplesText());
     return;
   }
-  if (['完整記法', '完整記錄', '所有記法', '記法大全'].includes(text)) {
-    await replyOrPushFlex(env, event, recordTutorialFlex(), recordTutorial());
+  if (['完整記法', '完整記錄', '所有記法', '記法大全'].includes(text) || /^記法[:：]/.test(text)) {
+    const topic = /^記法[:：]/.test(text) ? text.slice(3) : '';
+    await replyOrPushFlex(env, event, detailedHelpFlex(topic), detailedHelpText(topic));
     return;
   }
   if (text === '如何記餵藥' || text === '如何記藥') {
