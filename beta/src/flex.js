@@ -1205,90 +1205,49 @@ export function recordTutorialFlex() {
     { type: 'bubble', size: 'mega', header: header('完整記法・照平常說就好'), body, footer });
 }
 
-// 如何記錄：左右滑動的分類卡，三類用不同色系明確區隔（常用／進階記法／進階功能）
+// 第一層只教開始方式；詳細格式保留在第二層及「完整記法」。
 export function quickRecordCarousel(opts = {}) {
-  // 三種色系主題：綠（常用）→ 琥珀（進階記法）→ 深棕（進階功能）
-  const THEME = {
-    common: { grad: { type: 'linearGradient', angle: '135deg', startColor: '#8A5A2C', endColor: '#6A4119' }, pillBg: '#F3E7D6', pillFg: '#7A4E20', body: '#FBF7F0', chipBg: '#F3E7D6', chipFg: '#7A4E20', border: '#E9DAC4' },
-    skill:  { grad: { type: 'linearGradient', angle: '135deg', startColor: '#C0863E', endColor: '#9A6526' }, pillBg: '#F7EAD6', pillFg: '#8A5E1E', body: '#FDF9F2', chipBg: '#F6EAD7', chipFg: '#8A5E1E', border: '#EAD9BE' },
-    feature:{ grad: { type: 'linearGradient', angle: '135deg', startColor: '#5A3A22', endColor: '#3A2416' }, pillBg: '#EDE3D6', pillFg: '#5A3617', body: '#FBF7F2', chipBg: '#EDE3D6', chipFg: '#5A3617', border: '#E4D6C6' }
-  };
-  // 大色塊分類標頭：左邊序號圓、右邊分類名＋副標
-  const catHeader = (grad, num, title, sub) => ({
-    type: 'box', layout: 'horizontal', background: grad, paddingAll: '16px', paddingStart: '18px', spacing: 'md', alignItems: 'center',
-    contents: [
-      { type: 'box', layout: 'vertical', flex: 0, width: '34px', height: '34px', backgroundColor: '#FFFFFF', cornerRadius: '999px', justifyContent: 'center',
-        contents: [text(num, { size: 'lg', weight: 'bold', color: '#3A2416', align: 'center' })] },
-      { type: 'box', layout: 'vertical', flex: 1, contents: [
-        text(title, { size: 'lg', weight: 'bold', color: '#FFFFFF' }),
-        text(sub, { size: 'xxs', color: '#FFFFFFCC', margin: 'xs', wrap: true })
-      ] }
-    ]
+  const section = (title, description, action) => ({
+    type: 'box', layout: 'vertical', spacing: 'xs', margin: 'lg',
+    contents: [text(title, {size:'md',weight:'bold',color:C.brand,wrap:true}),
+      text(description,{size:'sm',color:C.inkSoft,wrap:true}),
+      ...(action ? [{type:'button',height:'sm',style:title.includes('快捷')?'primary':'link',color:C.brand,action}] : [])]
   });
-  // 範例列：點了把字「帶進輸入框」讓使用者改好再送（fillInText），不會直接記錄假資料
-  const line = (t, cmd, desc, fillText) => ({
-    type: 'box', layout: 'horizontal', alignItems: 'center', spacing: 'md', margin: 'md', paddingAll: '10px',
-    backgroundColor: '#FFFFFF', cornerRadius: '12px', borderColor: t.border, borderWidth: '1px',
-    action: { type: 'postback', label: cmd.slice(0, 20), data: 'action=fill', inputOption: 'openKeyboard', fillInText: fillText || cmd },
-    contents: [
-      { type: 'box', layout: 'vertical', flex: 0, backgroundColor: t.chipBg, cornerRadius: '8px',
-        paddingAll: '7px', paddingStart: '12px', paddingEnd: '12px',
-        contents: [text(cmd, { size: 'sm', weight: 'bold', color: t.chipFg, wrap: false })] },
-      text(desc, { size: 'xs', color: C.muted, flex: 1, gravity: 'center', wrap: true }),
-      text('›', { size: 'lg', color: '#D8CDBA', flex: 0, gravity: 'center' })
-    ]
+  return bubble('🐱 喵喵管家怎麼用？直接記、常用快捷、近期紀錄、出摘要、管家後台', {
+    type:'bubble',size:'mega',body:{type:'box',layout:'vertical',paddingAll:'20px',backgroundColor:BODY_BG,contents:[
+      text('🐱 喵喵管家怎麼用？',{size:'lg',weight:'bold',color:C.brand,wrap:true}),
+      text('平常直接在 LINE 告訴我就好，不用特別學格式。',{size:'sm',color:C.ink,wrap:true,margin:'md'}),
+      section('✏️ 直接記','例如：主食31、水5、乾乾10、嘔吐 白沫'),
+      section('⚡ 常用快捷','點「記一筆」→ 點主食 → 補上數量、送出。下次繼續點，不用重打。',{type:'message',label:'記一筆・常用快捷',text:'記一筆'}),
+      section('📋 看最近狀況','看近七天每天的飲食、喝水紀錄。',{type:'message',label:'近七天記錄',text:'近七天記錄'}),
+      section('📄 要給醫生或照護者看','點「出摘要」選貓，再選「給醫生看」或「給照護者」，收到圖片與 QR Code。缺照護資料會先問你。',{type:'postback',label:'出摘要',data:'action=reportStart'}),
+      section('⚙️ 想看完整資料','完整紀錄、月曆和詳細設定，再進管家後台。',opts.siteUrl?{type:'uri',label:'管家後台',uri:opts.siteUrl}:{type:'message',label:'管家後台',text:'管家後台'})
+    ]},footer:{type:'box',layout:'vertical',backgroundColor:FOOTER_COLOR,contents:[{type:'button',height:'sm',style:'link',color:C.brand,action:{type:'message',label:'更多紀錄範例',text:'更多紀錄範例'}}]}
   });
+}
 
-  const t1 = THEME.common;
-  const bubble1 = {
-    type: 'bubble', size: 'mega', header: catHeader(t1.grad, '1', '常用', '每天這樣打就好'),
-    body: { type: 'box', layout: 'vertical', paddingAll: '16px', backgroundColor: t1.body, contents: [
-      text('不用學格式，照平常說就好。點一句會帶進輸入框，改好再送出', { size: 'xxs', color: C.muted, wrap: true }),
-      line(t1, '主食3', '吃飯（不用寫「克」）'),
-      line(t1, '乾乾10', '吃乾糧'),
-      line(t1, '喝水30', '喝水'),
-      line(t1, '嘔吐 白沫', '狀況＋描述'),
-      line(t1, '乾乾減5', '沒吃完／要修正'),
-      line(t1, '最近吃什麼', '回頭查'),
-      text('症狀多寫幾個字，會自動整理進回顧的「給醫生的注意事項」', { size: 'xxs', color: C.muted, wrap: true, margin: 'md' })
-    ] }
-  };
-  const t2 = THEME.skill;
-  const bubble2 = {
-    type: 'bubble', size: 'mega', header: catHeader(t2.grad, '2', '進階記法', '品牌・加水・補登・換貓'),
-    body: { type: 'box', layout: 'vertical', paddingAll: '16px', backgroundColor: t2.body, contents: [
-      text('需要時再用，記得更完整', { size: 'xxs', color: C.muted, wrap: true }),
-      line(t2, '希爾斯10', '有建品牌就直接打名字'),
-      line(t2, '罐罐剩10', '沒吃完剩多少'),
-      line(t2, '昨天 21:30 喝水30', '補登・指定時間'),
-      line(t2, opts.petName || '貓貓名字', '換一隻貓記（打名字）', opts.petName || ''),
-      text('常吃固定一款？到管家後台設成「預設食物」，之後只打「乾乾3」就自動套用；沒設定也能先記，沒有品牌實際熱量時系統會標示粗估。', { size: 'xxs', color: C.muted, wrap: true, margin: 'md' })
-    ] },
-    footer: { type: 'box', layout: 'horizontal', paddingAll: '10px', backgroundColor: FOOTER_COLOR, contents: [
-      { type: 'button', height: 'sm', style: 'primary', color: t2.grad.endColor,
-        action: { type: 'message', label: '完整記法', text: '完整記法' } }
-    ] }
-  };
-  const t3 = THEME.feature;
-  const featBtn = (label, sendText) => ({
-    type: 'button', height: 'sm', style: 'primary', color: t3.grad.endColor, margin: 'md',
-    action: { type: 'message', label: label.slice(0, 20), text: sendText }
-  });
-  const bubble3 = {
-    type: 'bubble', size: 'mega', header: catHeader(t3.grad, '3', '進階功能', '管家後台・多人照護'),
-    body: { type: 'box', layout: 'vertical', paddingAll: '16px', backgroundColor: t3.body, contents: [
-      text('開網站看整理、找人一起照護', { size: 'xxs', color: C.muted, wrap: true }),
-      // 有 LIFF 連結就直接開（免登入、少跳一則回覆）；沒有才退回文字指令
-      opts.siteUrl
-        ? { type: 'button', height: 'sm', style: 'primary', color: t3.grad.endColor, margin: 'md',
-            action: { type: 'uri', label: '🐾 開啟管家後台（免登入）', uri: opts.siteUrl } }
-        : featBtn('🐾 開啟管家後台', '照護站'),
-      featBtn('🤝 邀請一起照護（多人）', '邀請'),
-      featBtn('💻 用電腦登入', '電腦登入')
-    ] }
-  };
-  return bubble('怎麼記：① 直接說（主食3・喝水30・嘔吐 白沫・最近吃什麼）② 進階（品牌・剩多少・補登・換貓）③ 管家後台・多人照護',
-    { type: 'carousel', contents: [bubble1, bubble2, bubble3] });
+export function howToUseText() {
+  return '🐱 喵喵管家怎麼用？\n平常直接在 LINE 告訴我就好，不用特別學格式。\n✏️ 直接記：主食31、水5、乾乾10、嘔吐 白沫\n⚡ 輸入「記一筆」→ 點主食 → 補數量送出。\n📋 輸入「近七天記錄」看每天飲食、喝水。\n📄 輸入「出摘要」→ 選貓 → 給醫生看／給照護者，收到圖片與 QR Code；缺照護資料會先問你。\n⚙️ 完整紀錄、月曆與設定：輸入「管家後台」。\n更多例句：輸入「更多紀錄範例」。';
+}
+
+export const HELP_EXAMPLES = [
+  ['🍚 吃飯',['主食31','乾乾10','零食3']], ['💧 喝水',['水5']],
+  ['💊 藥物',['藥早已吃']], ['🚽 尿尿／便便',['尿尿','大便 偏軟']],
+  ['🤮 嘔吐',['嘔吐 白沫']], ['⚖️ 體重',['體重4.25']],
+  ['其他紀錄',['精神 活動力差','益生菌','備註 今天梳毛']]
+];
+export function recordExamplesText() {
+  return '更多紀錄範例\n照自己的情況改好再送出；食物是克、水是 ml、體重是公斤。\n'+HELP_EXAMPLES.map(([label,examples])=>label+'：'+examples.join('／')).join('\n')+'\n補登、修正、品牌與多貓：輸入「完整記法」。';
+}
+export function recordExamplesFlex() {
+  const pages=[HELP_EXAMPLES.slice(0,4),HELP_EXAMPLES.slice(4)];
+  return bubble('更多紀錄範例：吃飯、喝水、藥物、大小便、嘔吐、體重', {type:'carousel',contents:pages.map((groups,i)=>({
+    type:'bubble',size:'mega',body:{type:'box',layout:'vertical',paddingAll:'20px',backgroundColor:BODY_BG,contents:[
+      text('更多紀錄範例 '+(i+1)+'/2',{size:'lg',weight:'bold',color:C.brand,wrap:true}),
+      text('點例句，改成自己的情況再送出。食物：克｜水：ml｜體重：公斤',{size:'sm',wrap:true,color:C.inkSoft,margin:'md'}),
+      ...groups.flatMap(([label,examples])=>[text(label,{size:'md',weight:'bold',color:C.brand,margin:'lg',wrap:true}),...examples.map(example=>({type:'button',style:'link',height:'sm',color:C.brand,action:{type:'postback',label:example,data:'action=fill',inputOption:'openKeyboard',fillInText:example}}))])
+    ]},footer:{type:'box',layout:'vertical',contents:[{type:'button',style:'link',height:'sm',color:C.brand,action:{type:'message',label:'完整記法・補登與修正',text:'完整記法'}}]}
+  }))});
 }
 
 export function menuFlex() {

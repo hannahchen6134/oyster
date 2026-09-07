@@ -9,15 +9,12 @@ import { quickRecordCarousel, exampleCard, recordTutorialFlex, onboardingCarouse
 
 const J = (o) => JSON.stringify(o);
 
-test('怎麼記（quickRecordCarousel）第一層：口語核心例句，且不留舊 lead 例句', () => {
-  const j = J(quickRecordCarousel({ petName: '蚵仔' }));
-  for (const ex of ['主食3', '乾乾10', '喝水30', '嘔吐 白沫', '最近吃什麼', '乾乾減5']) {
-    assert.ok(j.includes(ex), `應含「${ex}」`);
-  }
-  assert.ok(!j.includes('水 60'), '不留舊 lead「水 60」');
-  assert.ok(!j.includes('罐頭 皇家 30'), '不把「罐頭 皇家 30」當第一層 lead');
-  // 進階層：預設食物＋沒設定也能先記＋粗估
-  assert.ok(j.includes('預設食物') && j.includes('沒設定也能先記') && j.includes('粗估'), '進階層應說明預設/沒設定也能先記/粗估');
+test('怎麼記第一層：五個開始方式，詳細設定不塞進第一層', () => {
+  const message = quickRecordCarousel({siteUrl:'https://liff.line.me/test'});
+  const j = J(message);
+  assert.equal(message.contents.type,'bubble');
+  for (const ex of ['主食31','乾乾10','水5','嘔吐 白沫','常用快捷','近七天記錄','出摘要','管家後台','更多紀錄範例']) assert.ok(j.includes(ex),ex);
+  for (const obsolete of ['免登入','進階功能','就醫使用','照護使用','預設食物']) assert.ok(!j.includes(obsolete),obsolete);
 });
 
 test('範例（exampleCard）：口語核心例句，不留舊格式 lead', () => {

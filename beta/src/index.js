@@ -14,7 +14,7 @@ import { handleApi } from './api.js';
 import { verifyLineSignature, replyOrPush, replyOrPushQuick, replyOrPushFlex, replyMessages, pushText, pushMessages, getProfile, getAccessToken, checkAccessToken, showLoadingAnimation, startRecordLoading } from './line.js';
 import { hasAnyReminder, parseReminderSettings, buildReminderLines, reminderMessage, visitReminderMessage } from './reminders.js';
 import { shortDate } from './replies.js';
-import { reportChoiceFlex, recordFlex, recordFlexCompact, foodDisambigFlex, multiRecordFlex, undoConfirmFlex, todayFlex, handoffFlex, websiteFlex, menuFlex, recordMenuFlex, recordTutorialFlex, quickRecordCarousel, weekFlex, monthFlex, recentFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, onboardingCarousel, menuCell, exampleCard, petDataFlex, deletedCard, confirmDeleteFlex, careNotifyFlex, careInviteFlex, weightModifyConfirmFlex, weightNoRecordFlex, weightAddedFlex, weightModifiedFlex, foodTimelineFlex, foodEditMenuFlex, foodBrandPickFlex, reviewMenuFlex } from './flex.js';
+import { reportChoiceFlex, recordFlex, recordFlexCompact, foodDisambigFlex, multiRecordFlex, undoConfirmFlex, todayFlex, handoffFlex, websiteFlex, menuFlex, recordMenuFlex, recordTutorialFlex, quickRecordCarousel, howToUseText, recordExamplesFlex, recordExamplesText, weekFlex, monthFlex, recentFlex, reminderFlex, visitReminderFlex, welcomeFlex, onboardCard, onboardingCarousel, menuCell, exampleCard, petDataFlex, deletedCard, confirmDeleteFlex, careNotifyFlex, careInviteFlex, weightModifyConfirmFlex, weightNoRecordFlex, weightAddedFlex, weightModifiedFlex, foodTimelineFlex, foodEditMenuFlex, foodBrandPickFlex, reviewMenuFlex } from './flex.js';
 import { isBetaAllowed, normalizeCode, gateText } from './plan.js';
 import {
   ensureUser, updateUser, getUser, listPets, createPet, resolveDefaultPet, getPet, updatePetFields, createFoodItem, createMedItem,
@@ -2272,7 +2272,11 @@ async function handleTextMessageInner(event, env, baseUrl) {
   // 說明選單卡的教學子頁
   if (['如何記錄', '如何紀錄', '如何記', '怎麼記', '怎麼記錄', '記法', '記錄方式', '怎麼用'].includes(text)) {
     const howtoSiteUrl = await siteLink(env, baseUrl, lineUserId);
-    await replyOrPushFlex(env, event, quickRecordCarousel({ petName: pet?.petName || '', siteUrl: howtoSiteUrl }), recordTutorial());
+    await replyOrPushFlex(env, event, quickRecordCarousel({ petName: pet?.petName || '', siteUrl: howtoSiteUrl }), howToUseText());
+    return;
+  }
+  if (text === '更多紀錄範例') {
+    await replyOrPushFlex(env, event, recordExamplesFlex(), recordExamplesText());
     return;
   }
   if (['完整記法', '完整記錄', '所有記法', '記法大全'].includes(text)) {
