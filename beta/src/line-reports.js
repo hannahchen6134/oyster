@@ -49,7 +49,6 @@ async function choosePets(env,event,flow,pets,offset) {
   if(offset>0)buttons.push(['上一頁貓咪',button(flow,'reportPets',`&offset=${Math.max(0,offset-8)}`)]);
   await replyOrPushFlex(env,event,card('需要分享哪隻貓的摘要？',buttons,'先選貓咪，再選用途。摘要圖片與 QR Code 都會傳在這裡。'),'請重新點「出摘要」選擇貓咪。');
 }
-const periodKey=(owner,petId)=>`doctorPeriod:${owner}:${petId}`;
 export function reportPeriod(from,to,{future=false}={}) {
   const valid=d=>/^\d{4}-\d{2}-\d{2}$/.test(d||'')&&Number.isFinite(Date.parse(d+'T00:00:00Z'))&&new Date(d+'T00:00:00Z').toISOString().slice(0,10)===d;
   const days=(Date.parse(to)-Date.parse(from))/86400000+1;
@@ -58,24 +57,12 @@ export function reportPeriod(from,to,{future=false}={}) {
 }
 async function askPeriod(env,event,flow) {
   flow.stage='period';await saveFlow(env.DB,event.source.userId,flow);
-  const pref=await read(env.DB,periodKey(flow.owner,flow.petId));
-  const days=[7,14,21,30].includes(pref?.days)?pref.days:30;
-  const options=[[`近 ${days} 天（預設）`,button(flow,'reportDays',`&days=${days}`)],...[7,14,21,30].filter(d=>d!==days).map(d=>[`近 ${d} 天`,button(flow,'reportDays',`&days=${d}`)])];
-  if(pref?.from&&pref?.to)options.unshift(['上次自訂期間',button(flow,'reportSavedPeriod')]);
-  options.push(['自訂日期',button(flow,'reportCustom')],['取消',button(flow,'reportCancel')]);
-  return replyOrPushFlex(env,event,card('要整理哪段時間？',options,'沿用 A4 回診摘要。選好期間後直接傳圖片與 QR Code。'),'請點選摘要期間。');
-}
-async function askDate(env,event,flow,end=false) {
-  flow.stage=end?'dateEnd':'dateStart';await saveFlow(env.DB,event.source.userId,flow);
-  const care=flow.purpose==='care',today=taipeiToday();
-  const message=card(end?'選擇結束日期':care?'這次從哪天開始照護？':'選擇回顧起始日期',[['取消',button(flow,'reportCancel')]],end?`開始：${flow.rangeFrom}；最多 90 天。`:'選好開始與結束日期後繼續。');
-  message.contents.body.contents.splice(-1,0,{type:'button',style:'primary',color:'#734921',action:{type:'datetimepicker',label:end?'選結束日期':'選開始日期',data:button(flow,end?'reportDateEnd':'reportDateStart'),mode:'date',initial:end?flow.rangeFrom:today,...(end?{min:flow.rangeFrom,max:care?addDays(flow.rangeFrom,89):[today,addDays(flow.rangeFrom,89)].sort()[0]}:care?{}:{max:today})}});
-  return replyOrPushFlex(env,event,message,'請使用日期選擇按鈕。');
+  const options=[['往前 14 天',button(flow,'reportDays','&days=14')],['往前一個月',button(flow,'reportDays','&days=30')]];
+  return replyOrPushFlex(env,event,card('需要哪段時間的摘要？',options,'從今天往前整理 14 天或 30 天，不用自己選日期。'),'請點選往前 14 天或往前一個月。');
 }
 async function beginDatedReport(env,event,flow,render) {
   const care=flow.purpose==='care';const range=reportPeriod(flow.rangeFrom,flow.rangeTo,{future:care});
   flow.rangeDays=range.days;flow.stage='ready';await saveFlow(env.DB,event.source.userId,flow);
-  if(!care)await appKvSet(env.DB,periodKey(flow.owner,flow.petId),JSON.stringify(flow.presetDays?{days:flow.presetDays}:{from:range.from,to:range.to}));
   const bundle=await buildLineReport(env.DB,flow.owner,flow.petId,flow.purpose,flow);
   if(care&&missingCare(bundle.draft).length)return askFeeding(env,event,flow,bundle.pet,bundle.draft);
   return deliverReport(env,event,flow,render);
@@ -84,7 +71,7 @@ export async function buildLineReport(db,owner,petId,purpose,period={}) {
   const pet=await getPet(db,petId);
   if(!pet||pet.isDeleted||pet.ownerLineUserId!==owner)throw Error('forbidden pet');
   const fallbackDays=purpose==='doctor'?30:14;
-  const {from,to,days}=purpose==='doctor'&&period.rangeFrom?reportPeriod(period.rangeFrom,period.rangeTo):{to:taipeiToday(),from:addDays(taipeiToday(),1-fallbackDays),days:fallbackDays};
+  const {from,to,days}=period.rangeFrom?reportPeriod(period.rangeFrom,period.rangeTo):{to:taipeiToday(),from:addDays(taipeiToday(),1-fallbackDays),days:fallbackDays};
   const [rows,logs,meds,vets,template]=await Promise.all([
     getSummaries(db,petId,from,to),
     db.prepare('SELECT * FROM logs WHERE petId=? AND isDeleted=0 AND substr(eventDateTime,1,10)>=? AND substr(eventDateTime,1,10)<=? ORDER BY eventDateTime DESC').bind(petId,from,to).all(),
@@ -92,10 +79,9 @@ export async function buildLineReport(db,owner,petId,purpose,period={}) {
     listVetsByOwner(db,owner),read(db,`careTemplate:${owner}:${petId}`)
   ]);
   const draft=cleanDraft({...careDefaults(pet,meds.results,vets),...(template?.draft||{})});
-  if(purpose==='care'&&period.rangeFrom){reportPeriod(period.rangeFrom,period.rangeTo,{future:true});draft.period=`${period.rangeFrom} ～ ${period.rangeTo}`;}
   const highlights=logs.results.filter(r=>['vomit','vaccine','deworm','note','mood'].includes(r.category)||(['stool','urine'].includes(r.category)&&r.note));
   const weights=logs.results.filter(r=>r.category==='weight').map(r=>({...r,date:r.eventDateTime.slice(0,10)}));
-  return {pet,draft,templateUpdatedAt:template?.updatedAt||null,snapshot:purposeReport({pet,purpose,rows,highlights,weights,recentLogs:logs.results,draft,from,to,days})};
+  return {pet,draft,templateUpdatedAt:template?.updatedAt||null,snapshot:{...purposeReport({pet,purpose,rows,highlights,weights,recentLogs:logs.results,draft,from,to,days}),...(purpose==='care'?{dateRangeLabel:`近期紀錄：${from} ～ ${to}（近 ${days} 天）`}:{})}};
 }
 function missingCare(draft){
   return [!draft.feeding?.trim()&&'餵食與補水方式',(!draft.medicine?.trim()||draft.medicine.includes('餵法待補'))&&'餵藥方法（不需用藥也請寫明）',!/(摸|抱|碰|喜歡|討厭|害怕|躲|個性|玩|安撫|相處方式)/.test(draft.notes||'')&&'摸摸喜好與相處禁忌'].filter(Boolean);
@@ -176,32 +162,18 @@ export async function handleLineReportPostback(env,event,owner,data,render=rende
     flow.petId=pet.petId;flow.stage='purpose';await saveFlow(env.DB,actor,flow);
     return replyOrPushFlex(env,event,card(`${pet.petName}的摘要要給誰？`,[
       ['給醫生看',button(flow,'reportPurpose','&purpose=doctor')],['給照護者',button(flow,'reportPurpose','&purpose=care')]
-    ],'給醫生：選回顧期間。給照護者：選本次照護日期。\n完成後傳圖片＋QR Code；分享連結有效 7 天。'),'請重新點「出摘要」選擇用途。');
+    ],'選擇往前 14 天或往前一個月。\n完成後傳圖片＋QR Code；分享連結有效 7 天。'),'請重新點「出摘要」選擇用途。');
   }
   if(action==='reportPurpose'&&flow.stage==='purpose') {
     if(!['doctor','care'].includes(data.get('purpose')))return;
     flow.purpose=data.get('purpose');
-    if(flow.purpose==='doctor')return askPeriod(env,event,flow);
-    return askDate(env,event,flow);
-  } else if(action==='reportDays'&&flow.stage==='period'&&flow.purpose==='doctor') {
-    const days=Number(data.get('days'));if(![7,14,21,30].includes(days))return;
+    return askPeriod(env,event,flow);
+  } else if(action==='reportDays'&&flow.stage==='period') {
+    const days=Number(data.get('days'));if(![14,30].includes(days))return;
     flow.presetDays=days;flow.rangeTo=taipeiToday();flow.rangeFrom=addDays(flow.rangeTo,1-days);
     return beginDatedReport(env,event,flow,render);
-  } else if(action==='reportSavedPeriod'&&flow.stage==='period'&&flow.purpose==='doctor') {
-    const saved=await read(env.DB,periodKey(owner,flow.petId));
-    try{reportPeriod(saved?.from,saved?.to);}catch{return askPeriod(env,event,flow);}
-    flow.rangeFrom=saved.from;flow.rangeTo=saved.to;delete flow.presetDays;
-    return beginDatedReport(env,event,flow,render);
-  } else if(action==='reportCustom'&&flow.stage==='period') {
-    delete flow.presetDays;return askDate(env,event,flow);
-  } else if(action==='reportDateStart'&&flow.stage==='dateStart') {
-    const date=event.postback?.params?.date;
-    try{reportPeriod(date,date,{future:flow.purpose==='care'});}catch{return askDate(env,event,flow);}
-    flow.rangeFrom=date;return askDate(env,event,flow,true);
-  } else if(action==='reportDateEnd'&&flow.stage==='dateEnd') {
-    const date=event.postback?.params?.date;
-    try{reportPeriod(flow.rangeFrom,date,{future:flow.purpose==='care'});}catch{return askDate(env,event,flow,true);}
-    flow.rangeTo=date;return beginDatedReport(env,event,flow,render);
+  } else if(['reportSavedPeriod','reportCustom','reportDateStart','reportDateEnd'].includes(action)&&['period','dateStart','dateEnd'].includes(flow.stage)) {
+    return askPeriod(env,event,flow);
   } else if(action==='reportEdit'&&flow.purpose==='care'&&['confirm','done','ready'].includes(flow.stage)) {
     if(flow.stage==='done'){const oldId=flow.id;flow.id=crypto.randomUUID();flow.sent=0;await dbUpdateFlowId(env.DB,actor,oldId,flow);}
     const bundle=await buildLineReport(env.DB,owner,flow.petId,'care',flow);return askFeeding(env,event,flow,bundle.pet,bundle.draft);
@@ -268,6 +240,10 @@ async function deliverReport(env,event,flow,render) {
       ...frequentRecordItems(),
       ...(flow.purpose==='care'?[{type:'action',action:{type:'postback',label:'補充照護說明',data:button(flow,'reportEdit'),displayText:'補充照護說明'}}]:[])
     ]}});
+    if(env.LIFF_ID){
+      const last=messages.at(-1);
+      messages[messages.length-1]={type:'flex',altText:last.text.slice(0,400),quickReply:last.quickReply,contents:{type:'bubble',body:{type:'box',layout:'vertical',paddingAll:'20px',spacing:'md',contents:[{type:'text',text:last.text,wrap:true,size:'sm',color:'#5C4A38'},{type:'button',style:'secondary',action:{type:'uri',label:'查看詳細資料',uri:'https://liff.line.me/'+env.LIFF_ID}}]}}};
+    }
     let sent=Number(flow.sent||0);
     for(let i=sent;i<messages.length;i+=5){
       const batch=messages.slice(i,i+5);

@@ -18,8 +18,7 @@ async function setup(run) {
  const post=async(action,extra={},render=async()=>[png,png])=>{
   const wasPurpose=(await flow()).stage==='purpose';await rawPost(action,extra,render);
   if(action==='reportPurpose'&&wasPurpose){
-   if(extra.purpose==='doctor')return rawPost('reportDays',{days:'30'},render);
-   await rawPost('reportDateStart',{},render,'2026-09-10');return rawPost('reportDateEnd',{},render,'2026-09-15');
+   return rawPost('reportDays',{days:extra.purpose==='doctor'?'30':'14'},render);
   }
  };
 
@@ -126,17 +125,16 @@ test('產圖期間連點只產生一次；新流程不被舊流程完成覆寫',
  await startLineReport(env,event,'owner');const newId=(await flow()).id;unblock();await first;assert.equal((await flow()).id,newId);assert.equal((await flow()).stage,'pet');
 }));
 
-test('醫生期間先選擇、記住每隻貓的設定；照護日期獨立',()=>setup(async({db,env,event,rawPost,flow,sent})=>{
- await rawPost('reportPet',{petId:'p1'});await rawPost('reportPurpose',{purpose:'doctor'});
- assert.equal((await flow()).stage,'period');assert.match(JSON.stringify(sent.at(-1)),/30 天（預設）/);
- let snapshot;await rawPost('reportDays',{days:'21'},async(e,s)=>{snapshot=s;return [png,png];});
- assert.equal(snapshot.rangeDays,21);assert.equal(reportPeriod(snapshot.doctorSource.from,snapshot.doctorSource.to).days,21);
- await startLineReport(env,event,'owner');await rawPost('reportPet',{petId:'p1'});await rawPost('reportPurpose',{purpose:'doctor'});assert.match(JSON.stringify(sent.at(-1)),/21 天（預設）/);
- await startLineReport(env,event,'owner');await rawPost('reportPet',{petId:'p2'});await rawPost('reportPurpose',{purpose:'doctor'});assert.match(JSON.stringify(sent.at(-1)),/30 天（預設）/);
- await rawPost('reportCustom');await rawPost('reportDateStart',{},undefined,'2026-07-01');await rawPost('reportDateEnd',{},undefined,'2026-06-30');assert.equal((await flow()).stage,'dateEnd');
- await rawPost('reportDateEnd',{},async(e,s)=>{snapshot=s;return [png,png];},'2026-08-15');assert.equal(snapshot.rangeDays,46);assert.equal(snapshot.doctorSource.from,'2026-07-01');assert.equal(snapshot.doctorSource.to,'2026-08-15');
- const care=await buildLineReport(db,'owner','p1','care',{rangeFrom:'2026-10-01',rangeTo:'2026-10-20'});assert.match(care.snapshot.dateRangeLabel,/2026-10-01.*2026-10-20/);
- assert.throws(()=>reportPeriod('2026-02-30','2026-03-01'));assert.throws(()=>reportPeriod('2026-01-01','2026-05-01'));
+test('醫生與照護者只選14或30天，舊日期按鈕回到簡單選項',()=>setup(async({db,env,event,rawPost,flow,sent})=>{
+ for(const purpose of ['doctor','care']){
+  await startLineReport(env,event,'owner');await rawPost('reportPet',{petId:'p1'});await rawPost('reportPurpose',{purpose});
+  assert.equal((await flow()).stage,'period');const text=JSON.stringify(sent.at(-1));assert.match(text,/往前 14 天/);assert.match(text,/往前一個月/);assert.doesNotMatch(text,/datetimepicker|reportCustom|reportSavedPeriod/);
+  await rawPost('reportCustom');assert.equal((await flow()).stage,'period');
+  await rawPost('reportDays',{days:'14'});const f=await flow();assert.equal(reportPeriod(f.rangeFrom,f.rangeTo).days,14);
+  const bundle=await buildLineReport(db,'owner','p1',purpose,f);assert.equal(bundle.snapshot.rangeDays,14);
+ }
+ env.LIFF_ID='test-liff';await startLineReport(env,event,'owner');await rawPost('reportPet',{petId:'p1'});await rawPost('reportPurpose',{purpose:'doctor'});await rawPost('reportDays',{days:'30'});
+ assert.match(JSON.stringify(sent.at(-1)),/查看詳細資料/);assert.ok(JSON.stringify(sent.at(-1)).includes('https://liff.line.me/test-liff'));
 }));
 
 test('A4 自訂長期間不截成31天；未記錄日期不當成零',()=>{
