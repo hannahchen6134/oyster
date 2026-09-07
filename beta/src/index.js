@@ -2269,6 +2269,14 @@ async function handleTextMessageInner(event, env, baseUrl) {
     text = '今天';
   }
 
+  // 教學在 handleQuery 之前就回覆；在這裡明確加入常用快捷，
+  // 不把預設快捷套到選貓、數量確認或照護問答等互動流程。
+  const isTeaching = ['如何記錄','如何紀錄','如何記','怎麼記','怎麼記錄','記法','記錄方式','怎麼用',
+    '更多紀錄範例','完整記法','完整記錄','所有記法','記法大全','如何記餵藥','如何記藥'].includes(text) || /^記法[:：]/.test(text);
+  if (isTeaching && pet && isBetaAllowed(user) && env[LINE_EVENT]) {
+    env[LINE_EVENT].defaultQuickReply = {items:frequentRecordItems(pet.petId)};
+  }
+
   // 說明選單卡的教學子頁
   if (['如何記錄', '如何紀錄', '如何記', '怎麼記', '怎麼記錄', '記法', '記錄方式', '怎麼用'].includes(text)) {
     const howtoSiteUrl = await siteLink(env, baseUrl, lineUserId);

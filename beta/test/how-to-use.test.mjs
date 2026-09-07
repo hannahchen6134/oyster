@@ -18,6 +18,9 @@ test('新手說明所有文字入口通往現有功能，閱讀不新增紀錄',
   for(const [command,expected] of [['怎麼記','喵喵管家怎麼用'],['完整記法','想看哪一種記法'],['記法：補登・指定時間','昨天 21:30 喝水30'],['記一筆','主食'],['摘要','需要分享哪隻貓'],['出報告','需要分享哪隻貓'],['更多紀錄範例','更多紀錄範例'],['近七天記錄','近 7 天'],['管家後台','https://liff.line.me/test-liff']]){
    sent.length=0;await handleTextMessage({source:{type:'user',userId:'single'},replyToken:'test',message:{id:'help-'+crypto.randomUUID(),text:command}},env,'https://local.test');
    assert.ok(JSON.stringify(sent).includes(expected),command+': '+JSON.stringify(sent));
+   const shortcuts=sent.at(-1)?.messages.at(-1)?.quickReply?.items;
+   if(['摘要','出報告'].includes(command)) assert.ok(!shortcuts?.some(i=>i.action.data?.includes('action=frequent')),command+' 必須保留選貓流程');
+   else assert.ok(shortcuts?.some(i=>i.action.data?.includes('action=frequent')),command+' 回覆後應補回常用快捷');
   }
   assert.equal(DB.prepare('SELECT COUNT(*) n FROM logs').first().n,before);
  }finally{globalThis.fetch=old;}
