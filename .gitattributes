@@ -1,0 +1,17 @@
+# 統一換行為 LF：避免 Windows 檢出成 CRLF 造成測試字串比對誤判（跨平台一致）。
+* text=auto eol=lf
+
+# 二進位檔不要做任何換行轉換
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.webp binary
+*.pdf  binary
+*.ttf  binary
+*.ttc  binary
+*.otf  binary
+*.woff  binary
+*.woff2 binary
+*.wasm binary

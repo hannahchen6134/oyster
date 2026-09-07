@@ -30,6 +30,9 @@ npm run dev           # 本機 wrangler dev
 ```
 
 - **部署一定走 `npm run deploy`**（會先跑測試當閘門）。`deploy:notest` 只在你很確定時用。
+- **換行（Windows 注意）**：repo 根目錄有 `.gitattributes` 強制文字檔以 **LF** 檢出，避免 CRLF
+  造成字串比對測試誤判。若你**在加入 .gitattributes 前**就已用 CRLF 檢出過，跑一次
+  `git add --renormalize . && git checkout -- .`（或重新 clone）把工作區換回 LF，再 `npm test`。
 - **憑證**：`CLOUDFLARE_API_TOKEN`／`CLOUDFLARE_ACCOUNT_ID` 由環境提供；本機你要自己設定或 `wrangler login`。
 - **機密（絕不寫進 repo）**：用 `wrangler secret put`：
   - `LINE_CHANNEL_SECRET`（webhook 驗簽＋權杖自動換發）
