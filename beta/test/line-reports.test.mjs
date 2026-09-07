@@ -44,12 +44,37 @@ test('照護只補缺項；已填餵食保留，後台填完重讀，不用輸�
  env.LIFF_ID='test-liff';
  await appKvSet(db,'careTemplate:owner:p1',JSON.stringify({draft:{feeding:'早晚主食40g',medicine:'藥拌罐頭'}}));
  await post('reportPet',{petId:'p1'});await post('reportPurpose',{purpose:'care'});
- assert.equal((await flow()).stage,'feeding');const prompt=JSON.stringify(sent.at(-1));assert.match(prompt,/還缺：摸摸喜好/);assert.match(prompt,/到後台補照護資料/);assert.doesNotMatch(prompt,/先出已有資料/);
+ assert.equal((await flow()).stage,'feeding');const prompt=JSON.stringify(sent.at(-1));assert.match(prompt,/還缺：摸摸喜好/);assert.match(prompt,/也可開啟照護資料填寫/);assert.doesNotMatch(prompt,/先出已有資料|填好後出圖|"style":"secondary"/);
  await post('reportRecheck');assert.equal((await flow()).stage,'feeding');
  await handleLineReportText(env,event,'owner','喜歡摸下巴，不能碰肚子。');await post('reportConfirm');assert.equal((await flow()).stage,'done');
  const d=JSON.parse(await appKvGet(db,'careTemplate:owner:p1')).draft;assert.equal(d.feeding,'早晚主食40g');assert.match(d.medicine,/藥拌罐頭/);assert.match(d.notes,/不能碰肚子/);
  const bundle=await buildLineReport(db,'owner','p1','care');assert.equal(bundle.snapshot.sections[0].title,'怎麼餵食與補水');assert.ok(bundle.snapshot.sections.findIndex(s=>s.kind==='history')>3);
 }));
+test('缺三項逐題回答，空的帶入文字不算答案，最後確認一次才存範本並送圖QR',()=>setup(async({db,env,event,sent,post,flow})=>{
+ env.LIFF_ID='test-liff';db.prepare("UPDATE meds SET instruction='' WHERE petId='p1'").run();
+ await post('reportPet',{petId:'p1'});await post('reportPurpose',{purpose:'care'});
+ assert.equal((await flow()).careQuestion,'feeding');
+ const n=sent.length;await post('reportInput');assert.equal(sent.length,n);
+ await handleLineReportText(env,event,'owner','餵食：');assert.equal((await flow()).careQuestion,'feeding');assert.equal((await flow()).careDraft,undefined);
+ await handleLineReportText(env,event,'owner','餵食：早晚各40g，水碗補滿');assert.equal((await flow()).careQuestion,'medicine');
+ await handleLineReportText(env,event,'owner','餵食：水碗放客廳');assert.equal((await flow()).careQuestion,'medicine');assert.equal((await flow()).careDraft.medicine,'');
+ await handleLineReportText(env,event,'owner','餵藥：不用吃藥');assert.equal((await flow()).careQuestion,'notes');
+ await handleLineReportText(env,event,'owner','相處方式：不親人，沒有特別禁忌');assert.equal((await flow()).stage,'confirm');
+ assert.equal(await appKvGet(db,'careTemplate:owner:p1'),null);assert.match(JSON.stringify(sent.at(-1)),/早晚各40g/);
+ await post('reportConfirm');assert.equal((await flow()).stage,'done');assert.equal(sent.at(-1).messages.filter(m=>m.type==='image').length,2);
+ const draft=JSON.parse(await appKvGet(db,'careTemplate:owner:p1')).draft;assert.match(draft.feeding,/早晚各40g/);assert.match(draft.medicine,/不用吃藥/);assert.match(draft.notes,/不親人/);
+}));
+
+test('重按舊出圖卡轉為補填，之後重讀缺資料只給短提示；網頁存範本後直接出圖',()=>setup(async({db,env,sent,post,flow})=>{
+ env.LIFF_ID='test-liff';await post('reportPet',{petId:'p1'});await post('reportPurpose',{purpose:'care'});
+ const legacy=await flow();delete legacy.careQuestion;await appKvSet(db,'lineReportFlow:owner',JSON.stringify(legacy));
+ await post('reportRecheck');assert.equal((await flow()).careQuestion,'feeding');assert.match(JSON.stringify(sent.at(-1)),/直接在 LINE 回答/);
+ await post('reportRecheck');assert.equal(sent.at(-1).messages[0].type,'text');assert.match(sent.at(-1).messages[0].text,/還沒讀到完整資料/);
+ const request=new Request('https://local.test/api/care-template?petId=p1',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({draft:{feeding:'早晚40g，水補滿',medicine:'藥拌罐頭',notes:'喜歡摸下巴'}})});
+ const saved=await handleReportApi(request,env,new URL(request.url),'owner','owner');assert.equal(saved.status,200);
+ await post('reportRecheck');assert.equal((await flow()).stage,'done');assert.equal(sent.at(-1).messages.filter(m=>m.type==='image').length,2);
+}));
+
 test('醫生圖片與QR公開頁沿用A4趨勢、組成和明細，不只文字摘要',()=>setup(async({db,env,post})=>{
  await post('reportPet',{petId:'p1'});let snapshot,url;await post('reportPurpose',{purpose:'doctor'},async(e,s,u)=>{snapshot=s;url=u;return [png,png];});
  assert.ok(snapshot.doctorSource.rows.length);const html=imageDocument(snapshot,url);assert.match(html,/a4-spark/);assert.match(html,/每日照護明細/);assert.match(html,/4.27/);
