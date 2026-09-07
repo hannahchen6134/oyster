@@ -1,3 +1,4 @@
+import { restoreCompletionShortcuts } from './completion-shortcuts.js';
 import { publicReport, purgeReports } from './report-sharing.js';
 import { startLineReport, handleLineReportPostback, handleLineReportText } from './line-reports.js';
 import { frequentRecordItems, withFrequentRecords, ALL_RECORDS } from './frequent-records.js';
@@ -758,6 +759,7 @@ async function handlePending(env, event, { db, user, pet, pets, lineUserId, owne
         rows: [[menuCell('安心上手', '上手小教學', '安心上手'), menuCell('開啟管家後台', '看看長什麼樣子', '照護站')]]
       }), '好，想開始時輸入「安心上手」');
     } else {
+      if (pet) await restoreCompletionShortcuts(env, event, user, pet.petId);
       await replyOrPushFlex(env, event, doneCard(pet?.petName || '貓貓'), '好，隨時打「水 60」開始記錄');
     }
     return true;
@@ -867,9 +869,10 @@ async function handlePending(env, event, { db, user, pet, pets, lineUserId, owne
     // 沿用 applyWeightModify（含相同值護欄）：相同值不更新、不動 updatedAt，只回讀
     const res = await applyWeightModify(db, { logId, amount: newAmount, ownerId, actorId: lineUserId });
     if (!res.ok) { await replyOrPush(env, event, res.reason === 'bad_amount' ? '體重數字看起來怪怪的，請重新輸入一次。' : '找不到那筆體重紀錄了。'); return true; }
-    if (res.unchanged) { await replyOrPush(env, event, `這筆體重已經是 ${formatWeightKg(res.newKg)}kg。`); return true; }
+    if (res.unchanged) { await restoreCompletionShortcuts(env, event, user); await replyOrPush(env, event, `這筆體重已經是 ${formatWeightKg(res.newKg)}kg。`); return true; }
     const cardPet = await getPet(db, res.log.petId);
     const site = await siteLink(env, baseUrl, lineUserId);
+    await restoreCompletionShortcuts(env, event);
     await replyOrPushFlex(env, event,
       weightModifiedFlex({ pet: cardPet, oldKg: res.oldKg, newKg: res.newKg, recordDate: res.log.eventDateTime, logId: res.log.logId, siteUrl: site }),
       `已修改${cardPet?.petName || '貓貓'}最近一次體重 ${formatWeightKg(res.oldKg)} → ${formatWeightKg(res.newKg)} kg`);
@@ -892,6 +895,7 @@ async function handlePending(env, event, { db, user, pet, pets, lineUserId, owne
     const subParts = [];
     if (updated.kcal) subParts.push(`${updated.kcal} kcal`);
     if (updated.category === 'food' && updated.waterMl) subParts.push(`含水 ${updated.waterMl} ml`);
+    await restoreCompletionShortcuts(env, event, user, cardPet?.petId);
     const categoryKey = updated.category === 'food' ? (updated.foodType === '乾糧' ? 'dry' : 'wet') : updated.category;
     await replyOrPushFlex(env, event, recordFlex({
       pet: cardPet, categoryKey, mainText: describeLog(updated), subText: subParts.join('・'),
@@ -1395,6 +1399,7 @@ async function handlePostback(event, env, baseUrl) {
     }
     // 重複點同一張確認卡、資料已是該值 → 不再更新、不動 updatedAt，只回讀（冪等）
     if (res.unchanged) {
+      await restoreCompletionShortcuts(env, event);
       await replyOrPush(env, event, `這筆體重已經是 ${formatWeightKg(res.newKg)}kg。`);
       return;
     }
@@ -1406,6 +1411,7 @@ async function handlePostback(event, env, baseUrl) {
     });
     const cardPet = await getPet(db, res.log.petId);
     const site = await siteLink(env, baseUrl, lineUserId);
+    await restoreCompletionShortcuts(env, event);
     await replyOrPushFlex(env, event,
       weightModifiedFlex({ pet: cardPet, oldKg: res.oldKg, newKg: res.newKg, recordDate: res.log.eventDateTime, logId: res.log.logId, siteUrl: site }),
       `已修改${cardPet?.petName || '貓貓'}最近一次體重 ${formatWeightKg(res.oldKg)} → ${formatWeightKg(res.newKg)} kg（紀錄日期 ${String(res.log.eventDateTime).slice(0, 10)}）`);
@@ -1431,10 +1437,11 @@ async function handlePostback(event, env, baseUrl) {
       parsedResult: JSON.stringify({ events: [{ category: 'weight', op: 'add_today', amount }], savedLogIds: [res.saved.logId], unparsedSegments: [], awaitingAction: '' })
     });
     const site = await siteLink(env, baseUrl, lineUserId);
+    await restoreCompletionShortcuts(env, event);
     await replyOrPushFlex(env, event, weightAddedFlex({ pet: chosen, amount, logId: res.saved.logId, summary: res.summary, date: res.date, siteUrl: site }), `已記錄・${chosen.petName}\n體重 ${formatWeightKg(amount)} kg`);
     return;
   }
-  if (action === 'wCancel') { await replyOrPush(env, event, '好，體重先不改也不記 👌'); return; }
+  if (action === 'wCancel') { await restoreCompletionShortcuts(env, event); await replyOrPush(env, event, '好，體重先不改也不記 👌'); return; }
   // 「改重量／再修改」：進入等待輸入新體重（沿用 pendingAction 機制）
   if (action === 'wEditAsk') {
     const logId = data.get('logId') || '';
@@ -1524,6 +1531,7 @@ async function handlePostback(event, env, baseUrl) {
     return;
   }
   if (action === 'cancelDel') {
+    await restoreCompletionShortcuts(env, event);
     await replyOrPush(env, event, '好，這筆先保留著 👌');
     return;
   }
@@ -1542,6 +1550,7 @@ async function handlePostback(event, env, baseUrl) {
     }
     // 不論結果都回一張安心卡（避免使用者卡住沒反應）
     const url = await siteLink(env, baseUrl, lineUserId);
+    await restoreCompletionShortcuts(env, event);
     await replyOrPushFlex(env, event, deletedCard(url),
       '已刪除剛剛的資料囉。若要再調整，請開啟管家後台。');
   }
@@ -1557,6 +1566,7 @@ async function handlePostback(event, env, baseUrl) {
     if (!items.length) {
       // 已全部刪除後重複點擊：依「原本這次操作的筆數」回單/多筆訊息（savedLogIds 不隨軟刪消失）。
       const origN = smid ? (await savedLogIdsBySmid(db, smid, ownerId)).length : parseUndoIds(data.get('ids') || '').length;
+      await restoreCompletionShortcuts(env, event);
       await replyOrPush(env, event, origN >= 2 ? '這次紀錄已經刪除了 👌' : '這筆紀錄已經刪除了 👌');
       return;
     }
@@ -1572,16 +1582,17 @@ async function handlePostback(event, env, baseUrl) {
       return;
     }
     const undone = await applyUndo(db, items, lineUserId); // 確認後才軟刪＋重算受影響貓/日期
+    await restoreCompletionShortcuts(env, event);
     const doneHead = undone.length >= 2 ? `🗑 已刪除這次 ${undone.length} 筆紀錄：` : '🗑 已刪除這筆紀錄：';
     await replyOrPush(env, event, `${doneHead}\n${undone.map((l) => `· ${describeLog(l)}`).join('\n')}`);
     return;
   }
-  if (action === 'undoCancel') { await replyOrPush(env, event, '好，這次紀錄先保留著 👌'); return; }
+  if (action === 'undoCancel') { await restoreCompletionShortcuts(env, event); await replyOrPush(env, event, '好，這次紀錄先保留著 👌'); return; }
   // 品項確認卡「取消」：只取消被點的那一筆（pid）；已成功的水／其他片段保留，明確回讀讓使用者不用猜。
   if (action === 'foodCancel') {
     const smid = data.get('smid') || '';
     const pid = data.get('pid') || '';
-    if (!smid || !pid) { await replyOrPush(env, event, '好，這筆先不記 👌'); return; } // legacy 無 pid（item_lookup／泡水取消）
+    if (!smid || !pid) { await restoreCompletionShortcuts(env, event); await replyOrPush(env, event, '好，這筆先不記 👌'); return; } // legacy 無 pid（item_lookup／泡水取消）
     const pendings = await smidPendingFoods(db, smid, ownerId);
     const entry = pendings.find((p) => p.id === pid);
     // 狀態機：找不到（含跨家庭）／已 confirmed／已 cancelled → 不動作，回「已處理」
@@ -1603,6 +1614,7 @@ async function handlePostback(event, env, baseUrl) {
     const cancelledItems = newPendings.filter((p) => p.status === 'cancelled');
     const cancelDesc = cancelledItems.map((p) => `${p.typedName || p.itemName || ''}${p.foodType || ''} ${p.grams}g`.replace(/\s+/g, ' ').trim()).join('、');
     const keptDesc = kept.map((l) => describeLog(l)).join('、');
+    await restoreCompletionShortcuts(env, event);
     await replyOrPush(env, event, kept.length ? `本次已記錄 ${keptDesc}；${cancelDesc} 未記錄。` : `${cancelDesc} 未記錄。`);
     return;
   }
@@ -1627,7 +1639,7 @@ async function handlePostback(event, env, baseUrl) {
   }
 
   // 「乾乾-N／主食-N」的短確認卡「不是」：不動任何紀錄，明確回讀讓使用者安心。
-  if (action === 'adjustCancel') { await replyOrPush(env, event, '好，沒有改動任何紀錄 👌'); return; }
+  if (action === 'adjustCancel') { await restoreCompletionShortcuts(env, event); await replyOrPush(env, event, '好，沒有改動任何紀錄 👌'); return; }
 
   // 食物時間軸「你是指哪一款？」選定某品項 → 顯示該品項的逐筆時間軸（唯讀；只查所選貓與該 foodId）。
   if (action === 'foodTimelinePick') {
@@ -1679,6 +1691,7 @@ async function handlePostback(event, env, baseUrl) {
     const subParts = [];
     if (updated.kcal) subParts.push(`${updated.kcal} kcal`);
     if (updated.waterMl) subParts.push(`含水 ${updated.waterMl} ml`);
+    await restoreCompletionShortcuts(env, event);
     await replyOrPushFlex(env, event, recordFlex({
       pet: cardPet, categoryKey: isWetFoodType(updated.foodType) ? 'wet' : 'dry', mainText: describeLog(updated),
       subText: subParts.join('・'), summary, date: eventDate, logId: updated.logId, title: `✓ 已改品牌・${cardPet?.petName || '貓貓'}`
@@ -1721,7 +1734,7 @@ async function handlePostback(event, env, baseUrl) {
     }
     return;
   }
-  if (action === 'aliasCancel') { await replyOrPush(env, event, '好，這筆先不記 👌'); return; }
+  if (action === 'aliasCancel') { await restoreCompletionShortcuts(env, event); await replyOrPush(env, event, '好，這筆先不記 👌'); return; }
 
   // P0-2：「改 品名 N」多餐符合時，使用者從確認卡選定要改哪一餐 → 改成 N。
   // mode=subtract 時（超口語「別名減N／別名-N」的確認）改為從實吃量扣掉 N，其餘一律預設改成 N。
@@ -2262,6 +2275,7 @@ async function handleTextMessageInner(event, env, baseUrl) {
       // 明確告訴使用者「怎麼切回去」：把其他貓的名字列出來當切換方法（切換是持續生效的，別讓人忘了切回）
       const others = pets.filter((p) => p.petId !== switchTarget.petId).map((p) => p.petName).filter(Boolean);
       const backHint = others.length ? `\n\n👉 想換回其他貓，打名字就好：${others.join('、')}` : '';
+      await restoreCompletionShortcuts(env, event, user, switchTarget.petId);
       await replyOrPush(env, event, `✓ 已切換，接下來都記給「${switchTarget.petName}」🐈\n現在打「水 20」「罐頭 30」就會記到牠。${backHint}`);
       return;
     }
@@ -2942,6 +2956,7 @@ export async function applyAdjustToLog(env, event, db, target, intent, actorId) 
     logId: updated.logId,
     title: `✓ 已更新・${cardPet?.petName || '貓貓'}`
   });
+  await restoreCompletionShortcuts(env, event);
   await replyOrPushFlex(env, event, card, fallbackText);
 }
 
@@ -3032,6 +3047,7 @@ async function handleDeleteLast(env, event, lineUserId, actorId = lineUserId) {
   await softDeleteLog(db, last.logId, actorId);
   const summary = await recomputeDay(db, last.petId, String(last.eventDateTime).slice(0, 10));
   if (last.category === 'weight') await resyncPetWeight(db, last.petId); // 目前體重回退上一筆
+  await restoreCompletionShortcuts(env, event);
   await replyOrPush(env, event, `🗑 已刪除上一筆\n${describeLog(last)}\n\n今日水分 ${summary.totalWaterMl} ml\n熱量 ${summary.kcal} kcal`);
 }
 

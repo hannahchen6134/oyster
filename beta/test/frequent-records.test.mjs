@@ -159,3 +159,24 @@ test('切換貓後重用舊卡片，帶入卡片上的貓名，不會默默寫�
  await say('麵線');await click(water.data);await say(water.fillInText+'3');
  assert.equal(logs().at(-1).petId,'p1');assert.equal(logs().at(-1).amount,3);
 },'owner'));
+
+test('修改完成補回快捷，詢問數量與刪除確認不插入常用選項；原總計卡保留',()=>setup(async({say,click,logs,last})=>{
+ await say('水5');const log=logs()[0];
+ await click(`action=editAmount&logId=${log.logId}`);assert.match(last().text,/要改成多少/);assert.equal(last().quickReply,undefined);
+ await say('8');assert.equal(logs()[0].amount,8);assert.equal(last().quickReply.items.length,8);assert.match(JSON.stringify(last().contents),/今日|水分/);
+ await click(`action=delAsk&logId=${log.logId}`);assert.equal(last().quickReply,undefined);
+ await click('action=cancelDel');assert.equal(last().quickReply.items.length,8);assert.equal(logs().length,1);
+ await click(`action=delLog&logId=${log.logId}`);assert.equal(logs().length,0);assert.equal(last().quickReply.items.length,8);
+}));
+test('取消與撤銷完成恢復快捷；撤銷確認保留專用卡片',()=>setup(async({say,click,logs,last})=>{
+ for(const a of ['wCancel','undoCancel','adjustCancel','aliasCancel','foodCancel']){await click(`action=${a}`);assert.equal(last().quickReply.items.length,8,a);}
+ await say('水5');const id=logs()[0].logId;
+ await click(`action=undoOp&ids=${id}`);assert.equal(last().quickReply,undefined);
+ await click(`action=undoDo&ids=${id}`);assert.equal(logs().length,0);assert.equal(last().quickReply.items.length,8);
+ await click('action=frequent&kind=water');await say('取消');assert.equal(last().quickReply.items.length,8);
+}));
+test('切貓完成立即恢復快捷，下一筆仍記在新選擇的貓',()=>setup(async({say,last,logs})=>{
+ await say('蚵仔');assert.equal(last().quickReply.items.length,8);
+ await say('麵線');assert.ok(last().quickReply.items.some(i=>i.action.label==='水'));assert.ok(last().quickReply.items.some(i=>i.action.label==='更多紀錄'));
+ await say('水5');assert.equal(logs()[0].petId,'p2');
+},'owner'));

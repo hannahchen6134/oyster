@@ -1,3 +1,4 @@
+import { restoreCompletionShortcuts } from './completion-shortcuts.js';
 import { appKvGet, appKvSet, listPets, getPet, getSummaries, listVetsByOwner, getUser } from './db.js';
 import { isBetaAllowed } from './plan.js';
 import { careDefaults, purposeReport } from '../public/report-purpose.js';
@@ -136,7 +137,7 @@ export async function handleLineReportText(env,event,owner,text) {
   if(['出摘要','出報告','取消','算了'].includes(text)){
     flow.stage='cancelled';await saveFlow(env.DB,event.source.userId,flow);
     if(text==='出摘要'||text==='出報告')return false;
-    await replyOrPush(env,event,'已取消這次補充。');return true;
+    await restoreCompletionShortcuts(env,event);await replyOrPush(env,event,'已取消這次補充。');return true;
   }
   // Menu commands stay commands; do not accidentally save a navigation command as care instructions.
   if(/^記法[:：]/.test(text) || ['記一筆','近七天記錄','管家後台','照護站','怎麼記','更多紀錄範例','完整記法','照護月曆','今天'].includes(text)){flow.stage='cancelled';await saveFlow(env.DB,event.source.userId,flow);return false;}
@@ -163,7 +164,7 @@ export async function handleLineReportPostback(env,event,owner,data,render=rende
   if(!flow||flow.owner!==owner||flow.id!==data.get('flow')||flow.expiresAt<Date.now()){
     await replyOrPush(env,event,'這張選擇卡已過期，請重新點「出摘要」。');return;
   }
-  if(action==='reportCancel'){flow.stage='cancelled';await saveFlow(env.DB,actor,flow);await replyOrPush(env,event,'已取消這次摘要。');return;}
+  if(action==='reportCancel'){flow.stage='cancelled';await saveFlow(env.DB,actor,flow);await restoreCompletionShortcuts(env,event);await replyOrPush(env,event,'已取消這次摘要。');return;}
   if(action==='reportInput'&&flow.stage==='feeding')return; // native keyboard only, no duplicate card
   if(action==='reportPets'&&flow.stage==='pet'){
     const pets=await listPets(env.DB,owner),offset=Math.max(0,Number(data.get('offset'))||0);
