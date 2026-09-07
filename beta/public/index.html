@@ -1658,8 +1658,8 @@
       eaten: { type: '', days: 30 }   // 「吃過的食物」：第一層品項摘要的類型過濾／天數（第二層逐餐上限存在各展開面板上）
     };
 
-    const reportModule = import('/report-purpose.js?v=20260907c');
-    const reportTools = import('/report-tools.js?v=20260907c');
+    const reportModule = import('/report-purpose.js?v=20260907d');
+    const reportTools = import('/report-tools.js?v=20260907d');
     const $ = (id) => document.getElementById(id);
 
     // ---------- 食物類型：網站端單一真相來源 ----------
@@ -4398,7 +4398,7 @@
           ['feeding','餵食與飲水怎麼安排？','食物、份量、時間或特殊飲食，請由你確認'],
           ['medicine','用藥方式','已帶入這隻貓的用藥設定，請確認是否仍適用'],
           ['notes','有什麼要特別注意？','貓砂、最近狀況、個性習慣或禁忌'],
-          ['emergency','緊急時怎麼聯絡？','主人聯絡方式、醫院或你希望的處理方式']
+          ['emergency','緊急時怎麼聯絡？','爸媽聯絡方式、醫院或你希望的處理方式']
         ] : [['concern','這次最想讓醫生知道什麼？','選填，例如這週食量減少，想請醫生確認']];
         const editorFields = fields.map(([key,label,hint]) => `<label>${label}<textarea data-report-field="${key}" maxlength="2000" placeholder="${hint}">${esc(state.reportDraft[key] || '')}</textarea></label>`).join('');
         $('reportEditor').innerHTML = purpose === 'care'

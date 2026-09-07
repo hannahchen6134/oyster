@@ -22,7 +22,7 @@ test('照護說明不把曾經吃40g變成每天指示；只含本貓的設定',
   const defaults = careDefaults(base.pet,[{petId:'p1',medName:'本貓藥'},{petId:'p2',medName:'別貓藥'}],[]);
   assert.equal(defaults.feeding,''); assert.match(defaults.medicine,/本貓藥/); assert.doesNotMatch(defaults.medicine,/別貓/);
   const d = purposeReport({...base,purpose:'care',draft:defaults,rows:[{date:'2026-09-06',entryCount:1,dryFoodG:40}]});
-  assert.equal(d.reportName,'照護交接單'); assert.doesNotMatch(reportPreview(d),/40|每日紀錄|熱量/); assert.match(d.notice,/向主人確認/);
+  assert.equal(d.reportName,'照護交接單'); assert.doesNotMatch(reportPreview(d),/40|每日紀錄|熱量/); assert.match(d.notice,/向爸媽確認/);
 });
 test('空醫生報告不塞空的體重或用藥區；補充文字安全跳脫', () => {
   const d = purposeReport({...base,draft:{concern:'<script>alert(1)</script>'}});
@@ -39,7 +39,7 @@ test('兩種輸出長文字分頁且全文保留，不裁切末尾', () => {
     const built=buildA4Report({...d,outputFormat}); assert.ok(built.pages>1); assert.match(built.html,/最後一句/); assert.equal((built.html.match(/餵食說明/g)||[]).length,400);
   }
 });
-test('報告既有 API 維持家庭隔離；主人與共照可讀、陌生人不可讀', async () => {
+test('報告既有 API 維持家庭隔離；爸媽與共照可讀、陌生人不可讀', async () => {
   const db=await reportFixture();
   for(const token of ['testowner','testhelper','teststranger','']) {
     for(const route of ['summary?petId=p1&from=2026-01-01&to=2026-12-31','highlights?petId=p1&days=14','weights?petId=p1','meds?petId=p1']) {

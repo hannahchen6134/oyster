@@ -6,9 +6,9 @@ import {classifyLines,purgeReports} from '../src/report-sharing.js';
 import {appKvGet,appKvSet} from '../src/db.js';
 import qrcode from '../public/qrcode.mjs';
 import jsQR from 'jsqr';
-const snapshot={petId:'p1',purpose:'care',dateRangeLabel:'這週',notice:'主人確認',rangeDays:7,sections:[{title:'餵食',items:['<script>alert(1)</script> 4.27 g']}],secret:'NEVER_STORE',petName:'偽造名字'};
+const snapshot={petId:'p1',purpose:'care',dateRangeLabel:'這週',notice:'爸媽確認',rangeDays:7,sections:[{title:'餵食',items:['<script>alert(1)</script> 4.27 g']}],secret:'NEVER_STORE',petName:'偽造名字'};
 async function setup(ai){const DB=await reportFixture(),env={DB,AI:ai};return {DB,call:async(path,method='GET',body,token='testowner',key=crypto.randomUUID())=>worker.fetch(new Request('https://care.example'+path,{method,headers:{Authorization:'Bearer '+token,'Content-Type':'application/json','Idempotency-Key':key},body:body===undefined?undefined:JSON.stringify(body)}),env,{waitUntil(){}})};}
-test('範本依貓與主人隔離，保留整理狀態；共照者不得發布',async()=>{
+test('範本依貓與爸媽隔離，保留整理狀態；共照者不得發布',async()=>{
  const {call}=await setup();assert.equal((await call('/api/care-template','PUT',{petId:'p1',draft:{feeding:'蚵仔',rawApplied:true}})).status,200);
  assert.equal((await (await call('/api/care-template?petId=p1')).json()).template.draft.feeding,'蚵仔');
  assert.equal((await (await call('/api/care-template?petId=p1')).json()).template.draft.rawApplied,true);
@@ -34,7 +34,7 @@ test('重試與平行重送回同一份不可变報告',async()=>{
  const {call}=await setup();const key=crypto.randomUUID();const results=await Promise.all(Array.from({length:5},()=>call('/api/report-shares','POST',{petId:'p1',snapshot,confirmed:true},'testowner',key).then(r=>r.json())));assert.equal(new Set(results.map(r=>r.id)).size,1);
  const retried=await (await call('/api/report-shares','POST',{petId:'p1',snapshot:{...snapshot,sections:[]},confirmed:true},'testowner',key)).json();assert.equal(retried.id,results[0].id);assert.match(await (await call(retried.url)).text(),/4.27/);
 });
-test('主人可停用，陌生人無法停用或列出，過期不再提供內容',async()=>{
+test('爸媽可停用，陌生人無法停用或列出，過期不再提供內容',async()=>{
  const {call,DB}=await setup();const made=await (await call('/api/report-shares','POST',{petId:'p1',snapshot,confirmed:true})).json();assert.equal((await call('/api/report-shares/'+made.id,'DELETE',undefined,'teststranger')).status,404);
  assert.equal((await call('/api/report-shares?petId=p1','GET',undefined,'teststranger')).status,403);
  assert.equal((await call('/api/report-shares/'+made.id,'DELETE')).status,200);assert.equal((await call(made.url)).status,410);assert.equal(JSON.parse(await appKvGet(DB,'reportShare:'+made.id)).snapshot,null);

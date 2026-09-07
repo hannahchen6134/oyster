@@ -57,8 +57,8 @@ function cleanSnapshot(data,pet) {
   return snapshot;
 }
 export async function handleReportApi(request,env,url,actor,owner) {
-  // 公開分享與範本修改僅限主人，既有共同照護者仍可使用原本圖片流程。
-  if(actor!==owner)return fail('請由主人管理照護範本與公開報告',403);
+  // 公開分享與範本修改僅限爸媽，既有共同照護者仍可使用原本圖片流程。
+  if(actor!==owner)return fail('請由爸媽管理照護範本與公開報告',403);
   const resource=url.pathname.split('/')[2],id=url.pathname.split('/')[3]||'';
   try{
     if(resource==='report-shares'&&request.method==='DELETE'){
@@ -112,7 +112,7 @@ export async function publicReport(request,env,url) {
   const row=raw?JSON.parse(raw):null;
   const pet=row?await getPet(env.DB,row.petId):null;
   const valid=row&&!row.revoked&&row.expiresAt>new Date().toISOString()&&pet?.ownerLineUserId===row.owner;
-  const content=valid?reportPreview(row.snapshot)+`<footer>這是產生當下的報告，之後的修改不會自動更新。<br>有效至 ${escapeReport(new Date(row.expiresAt).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}))}（台北時間）</footer>`:'<h1>這份報告已無法開啟</h1><p>連結可能已到期或被主人停用，請向主人索取新版。</p>';
+  const content=valid?reportPreview(row.snapshot)+`<footer>這是產生當下的報告，之後的修改不會自動更新。<br>有效至 ${escapeReport(new Date(row.expiresAt).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}))}（台北時間）</footer>`:'<h1>這份報告已無法開啟</h1><p>連結可能已到期或被爸媽停用，請向爸媽索取新版。</p>';
   const html=`<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>喵喵管家｜分享報告</title><style>*{box-sizing:border-box}body{margin:0;padding:36px;background:#f2ece1;color:#403526;font:16px/1.8 system-ui,sans-serif}main{max-width:720px;margin:auto;overflow-wrap:anywhere}h1{font-size:28px}h2{font-size:20px}p{white-space:pre-wrap}.purpose-section{background:#fffdf8;border:1px solid #e1d3bc;border-radius:14px;padding:20px;margin:16px 0}.purpose-heading{border-bottom:2px solid #845a31}.purpose-notice,footer{font-size:13px;color:#776a59}summary{cursor:pointer;padding:12px 0}footer{margin:28px 0}</style><main>${content}</main></html>`;
   return new Response(request.method==='HEAD'?null:html,{status:valid?200:410,headers});
 }

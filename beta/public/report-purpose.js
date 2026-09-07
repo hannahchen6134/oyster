@@ -82,7 +82,7 @@ export function purposeReport({ purpose = 'doctor', pet, rows = [], highlights =
     dateRangeLabel: purpose === 'care' ? (clean(draft.period) ? `照護期間：${clean(draft.period)}` : `整理於 ${to}`) : `${from}－${to}（近 ${days} 天）`, rangeDays: days,
     sections,
     empty: purpose !== 'care' && !recent.length && !events.length && !list(weights).some((w) => inRange(w.date)),
-    notice: purpose === 'care' ? (!clean(draft.feeding) ? '餵食與飲水方式尚未填寫，請先向主人確認。' : '照護方式由主人確認；下方歷史狀況僅供觀察。') : '僅整理已記錄的事實；沒有紀錄不代表沒有發生。'
+    notice: purpose === 'care' ? (!clean(draft.feeding) ? '餵食與飲水方式尚未填寫，請先向爸媽確認。' : '照護方式由爸媽確認；下方歷史狀況僅供觀察。') : '僅整理已記錄的事實；沒有紀錄不代表沒有發生。'
   };
 }
 export function reportSectionHtml(section) {
