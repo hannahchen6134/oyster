@@ -53,7 +53,9 @@ test('照護只補缺項；已填餵食保留，後台填完重讀，不用輸�
 test('醫生圖片與QR公開頁沿用A4趨勢、組成和明細，不只文字摘要',()=>setup(async({db,env,post})=>{
  await post('reportPet',{petId:'p1'});let snapshot,url;await post('reportPurpose',{purpose:'doctor'},async(e,s,u)=>{snapshot=s;url=u;return [png,png];});
  assert.ok(snapshot.doctorSource.rows.length);const html=imageDocument(snapshot,url);assert.match(html,/a4-spark/);assert.match(html,/每日照護明細/);assert.match(html,/4.27/);
- const page=await publicReport(new Request(url),env,new URL(url));assert.match(await page.text(),/a4-spark/);
+ assert.doesNotMatch(html,/id="(?:source|pages|heading)"/,'doctor must not create the additional text-summary renderer');
+ assert.equal((html.match(/id="qr"/g)||[]).length,1);
+ const page=await publicReport(new Request(url),env,new URL(url));const publicHtml=await page.text();assert.match(publicHtml,/a4-spark/);assert.doesNotMatch(publicHtml,/class="purpose-section"/);
 }));
 test('醫生按鈕先回覆正在整理，產圖後push圖片，不重複使用reply token',()=>setup(async({sent,post})=>{
  await post('reportPet',{petId:'p1'});let release,started;
