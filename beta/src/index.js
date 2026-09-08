@@ -73,7 +73,7 @@ document.getElementById('keyFile').addEventListener('change',async function(){
  field.value=candidate;updateStatus();field.focus();
  }catch{statusText.textContent='無法讀取檔案，請重新選擇';}
 });
-</script><p>這是管理者專用入口，與爸媽使用的管家頁面不同。</p></main></html>`,{status,headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','referrer-policy':'no-referrer','x-frame-options':'DENY'}});
+</script><p>這是管理者專用入口，與爸媽使用的管家頁面不同。</p></main></html>`,{status,headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','referrer-policy':'same-origin','x-frame-options':'DENY'}});
 }
 
 async function adminAuth(env, request, url) {
