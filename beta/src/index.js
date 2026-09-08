@@ -1,3 +1,4 @@
+import { loadAdminTrends, renderAdminTrends } from './admin-trends.js';
 import { adminStyles } from './admin-styles.js';
 import { customerPanel, touchCustomer, markDownload } from './customer-management.js';
 import { restoreCompletionShortcuts } from './completion-shortcuts.js';
@@ -383,7 +384,7 @@ export default {
   <p class="sub">查看客戶使用情況與資料下載。</p>
   <nav class="admin-nav" aria-label="後台分頁"><button type="button" aria-pressed="true" aria-controls="customersPane" data-pane="customersPane">客戶管理</button><button type="button" aria-pressed="false" aria-controls="analysisPane" data-pane="analysisPane">使用分析</button></nav>
   <div id="customersPane"><div class="stats">${stat(rows.length,'總客戶')}${stat(activeCount,'近7天有記錄')}${stat(joinedCount,'尚未記錄')}</div>${await customerPanel(db)}</div>
-  <div id="analysisPane" hidden><h2>使用分析</h2><p class="muted">累積至今的紀錄與操作次數；次數不等於使用人數。</p><p class="mini">總紀錄 ${totalRecords} 筆 · 已開通 ${onCount} 人 · 至少2天有記錄 ${retained2d} 人 · 至少7天有記錄 ${retained7d} 人</p>${usageSections}</div>
+  <div id="analysisPane" hidden>${renderAdminTrends(await loadAdminTrends(db))}<h2 class="sec-title">累積使用概況</h2><p class="muted">累積至今的紀錄與操作次數；次數不等於使用人數。</p><p class="mini">總紀錄 ${totalRecords} 筆 · 已開通 ${onCount} 人 · 至少2天有記錄 ${retained2d} 人 · 至少7天有記錄 ${retained7d} 人</p>${usageSections}</div>
   <p class="foot">管理者專用 · 不顯示健康紀錄內容</p>
   <script>document.querySelectorAll('[data-pane]').forEach(button=>button.addEventListener('click',()=>{document.querySelectorAll('[data-pane]').forEach(b=>{const selected=b===button;b.setAttribute('aria-pressed',String(selected));document.getElementById(b.dataset.pane).hidden=!selected;});}));</script>
 </body></html>`;
