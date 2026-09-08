@@ -2232,7 +2232,7 @@ async function handleTextMessageInner(event, env, baseUrl) {
   // 多貓咪：
   //  - 只打貓咪名（如「蚵仔」）→ 切換「目前登記的貓」，之後每筆都記給牠（與網站同步）
   //  - 名字前綴（如「冠關 水 20」）→ 只有這一則記給那隻，不改預設
-  if (await measureEvent(env, 'summary_flow', () => handleLineReportText(env, event, ownerId, text))) return;
+  if (await measureEvent(env, 'summary_flow', () => handleLineReportText(env, event, ownerId, text, pets))) return;
   let pet = await resolveDefaultPet(db, user, pets);
   // 「把炭吉體重改成6公斤」：把/幫 開頭時，剝掉動詞助詞讓貓名回句首，交既有貓名前綴流程（僅在剝完真的接已知貓名時）。
   if (/^(?:請幫|請|把|幫)/.test(text)) {

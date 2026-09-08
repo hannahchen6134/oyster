@@ -115,9 +115,18 @@ async function askFeeding(env,event,flow,pet,draft={}) {
   prompt.quickReply={items:frequentRecordItems(pet.petId,pet.petName)};
   await replyOrPushFlex(env,event,prompt,hint);
 }
-export async function handleLineReportText(env,event,owner,text) {
+export async function handleLineReportText(env,event,owner,text,knownPets=[]) {
   const flow=await read(env.DB,flowKey(event.source?.userId));
   if(!flow||flow.owner!==owner||flow.stage!=='feeding'||flow.expiresAt<Date.now())return false;
+  // Explicit daily amounts and known cat switches must not become care instructions.
+  // Care prose (e.g. 早晚主食40g) and 餵食：... remain in the care flow.
+  const cats=knownPets.filter(p=>!p.isDeleted).sort((a,b)=>b.petName.length-a.petName.length);
+  const named=cats.find(p=>text===p.petName||text.startsWith(p.petName+' '));
+  const daily=named?text.slice(named.petName.length).trim():text.trim();
+  if ((named&&!daily) || /^(?:主食|副食)\s*(?:\d+(?:\.\d+)?)?\s*水\s*(?:\d+(?:\.\d+)?)?$/.test(daily) || /^(?:(?:主食|副食|乾乾|乾糧|零食|喝水|水|體重)\s*\d+(?:\.\d+)?\s*(?:ml|g|kg|克|毫升|公斤)?\s*)+$/i.test(daily)) {
+    flow.stage='cancelled';await saveFlow(env.DB,event.source.userId,flow);return false;
+  }
+
   if(['填好後出圖','確認並出圖','重新讀取照護資料'].includes(text.trim())){
     await replyOrPush(env,event,'還需要照護方式的內容。請直接回答上一題，或先在網頁儲存範本，再點「已在網頁儲存，重新讀取」。');return true;
   }

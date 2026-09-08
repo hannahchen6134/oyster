@@ -262,3 +262,18 @@ test('新手點排便快捷可先選情況，選完才建貓及紀錄',()=>setup
  assert.match(last().text,/便便情況/);assert.equal(logs().length,0);
  await say(last().quickReply.items.find(i=>i.action.label==='正常').action.text);assert.equal(logs().length,1);assert.equal(logs()[0].category,'stool');
 },'helper'));
+
+
+test('摘要補填途中直接打日常數量，不會被吞成照護說明',()=>setup(async({DB,say,logs,last})=>{
+ for(const command of ['水5','小花 主食31 水5']){
+  DB.prepare("INSERT OR REPLACE INTO app_kv(k,v,updatedAt) VALUES (?,?,?)").bind('lineReportFlow:single',JSON.stringify({id:'daily',owner:'single',petId:'s1',stage:'feeding',careQuestion:'feeding',expiresAt:Date.now()+60000}),new Date().toISOString()).run();
+  const n=logs().length;await say(command);assert.equal(logs().length,n+(command.includes('主食')?2:1));assert.ok(last().quickReply.items.length);
+  const flow=JSON.parse(DB.prepare("SELECT v FROM app_kv WHERE k='lineReportFlow:single'").first().v);assert.equal(flow.stage,'cancelled');assert.equal(flow.careDraft,undefined);
+ }
+}));
+
+
+test('照護補問途中漏填的組合仍走補數量，不寫成照護安排',()=>setup(async({DB,say,last,logs})=>{
+ DB.prepare("INSERT OR REPLACE INTO app_kv(k,v,updatedAt) VALUES (?,?,?)").bind('lineReportFlow:single',JSON.stringify({owner:'single',petId:'s1',stage:'feeding',careQuestion:'feeding',expiresAt:Date.now()+60000}),new Date().toISOString()).run();
+ await say('小花 主食31\n水');assert.equal(logs().length,0);assert.match(last().text,/水量還沒填/);assert.equal(last().quickReply.items[0].action.fillInText,'小花 主食31\n水');
+}));
