@@ -1,3 +1,4 @@
+import { adminStyles } from './admin-styles.js';
 import { customerPanel, touchCustomer, markDownload } from './customer-management.js';
 import { restoreCompletionShortcuts } from './completion-shortcuts.js';
 import { publicReport, purgeReports } from './report-sharing.js';
@@ -338,33 +339,6 @@ export default {
         const joinedCount = rows.filter((r) => Number(r.recs) === 0).length;
         const stat = (n, label) => `<div class="stat"><div class="stat-n">${n}</div><div class="stat-l">${label}</div></div>`;
         // 只留 4 個最重要的數字，其餘（開通數、回訪）收成一行小字
-        const statsBar = `<div class="stats">
-          ${stat(rows.length, '總人數')}
-          ${stat(activeCount, '活躍使用者')}
-          ${stat(joinedCount, '只加入沒用')}
-          ${stat(totalRecords, '總筆數')}
-        </div>
-        <div class="mini">已開通 ${onCount} · 回訪 ≥2天 ${retained2d} · ≥7天 ${retained7d}</div>`;
-        const cardHtml = (r) => {
-          const on = Number(r.betaAccess) === 1;
-          const label = esc(r.displayName) || mask(r.lineUserId);
-          const href = `/admin/testers?user=${encodeURIComponent(r.lineUserId)}&access=${on ? 0 : 1}`;
-          const confirmMsg = `確定要${on ? '關閉' : '開通'}「${label}」嗎？`;
-          return `<div class="row${on ? '' : ' off'}">
-            <div class="info">
-              <div class="name">${esc(r.displayName) || '（未命名）'}</div>
-              <div class="meta">${r.pets ? '🐈 ' + esc(r.pets) + ' · ' : ''}${Number(r.recs) || 0} 筆 · ${esc(r.lastDay) || '—'}</div>
-            </div>
-            <a class="btn ${on ? 'btn-off' : 'btn-on'}" href="${href}" onclick="return confirm('${confirmMsg}')">${on ? '關閉' : '開通'}</a>
-          </div>`;
-        };
-        const groups = { active: [], dormant: [], joined: [] };
-        rows.forEach((r) => { groups[classify(r).key].push(cardHtml(r)); });
-        const section = (title, arr) => arr.length ? `<div class="sec-title">${title}（${arr.length}）</div>${arr.join('')}` : '';
-        const cards = section('🟢 使用者・活躍（近 7 天有記錄）', groups.active)
-          + section('🟡 用過・近期沒動', groups.dormant)
-          + section('⚪ 只加入・還沒用', groups.joined);
-
         // ---- 功能使用量測 ----
         // 最常記什麼：記錄類別分佈（含 LINE 與網站）
         const catRes = await db.prepare(
@@ -404,52 +378,14 @@ export default {
           <div class="mini">有幫手家庭平均記錄 ${avgDays(helperOwners).toFixed(1)} 天　·　單獨顧 ${avgDays(soloOwners).toFixed(1)} 天</div>`;
         const html = `<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">
-<title>測試者管理</title><style>
-  :root{--brand:#734921}
-  *{box-sizing:border-box;margin:0}
-  body{font-family:-apple-system,"PingFang TC","Noto Sans TC",sans-serif;background:#efe9dd;color:#1b1d1a;padding:18px;max-width:560px;margin:0 auto}
-  h1{font-size:19px;color:#734921;margin-bottom:4px}
-  .sub{font-size:12.5px;color:#6b6e63;margin-bottom:16px}
-  .row{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #e2e0d6;border-radius:14px;padding:13px 14px;margin-bottom:9px;box-shadow:0 4px 12px rgba(115,73,33,.05)}
-  .row.off{opacity:.62}
-  .info{flex:1;min-width:0}
-  .name{font-size:15px;font-weight:600}
-  .uid{font-size:11px;color:#a0a396;font-weight:400;margin-left:4px}
-  .meta{font-size:12px;color:#6b6e63;margin-top:3px}
-  .act{display:flex;flex-direction:column;align-items:flex-end;gap:7px;flex:0 0 auto}
-  .badge{font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:999px}
-  .b-on{background:#e5efe2;color:#3f7a3a}.b-off{background:#eee;color:#8a8a82}
-  .tag{font-size:10px;font-weight:600;padding:1px 7px;border-radius:999px;margin-left:6px;white-space:nowrap;vertical-align:middle}
-  .b-active{background:#e5efe2;color:#3f7a3a}
-  .b-dormant{background:#fbf0d8;color:#9a6a1e}
-  .b-joined{background:#eee;color:#8a8a82}
-  .btn{display:inline-block;font-size:13px;font-weight:600;padding:7px 16px;border-radius:999px;text-decoration:none;-webkit-tap-highlight-color:transparent}
-  .btn-off{background:#fdecec;color:#c0392b;border:1px solid #f2c9c4}
-  .btn-on{background:#734921;color:#fff}
-  .empty{color:#6b6e63;font-size:14px;text-align:center;padding:40px 0}
-  .foot{font-size:11.5px;color:#9a9d90;margin-top:16px;line-height:1.7}
-  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px}
-  .stat{background:#fff;border:1px solid #e2e0d6;border-radius:12px;padding:11px 6px;text-align:center;box-shadow:0 4px 12px rgba(115,73,33,.05)}
-  .stat-n{font-size:21px;font-weight:700;color:#734921;line-height:1.1}
-  .stat-l{font-size:11px;color:#6b6e63;margin-top:3px}
-  .mini{font-size:11.5px;color:#9a9d90;text-align:center;margin-bottom:18px}
-  .sec-title{font-size:13px;font-weight:700;color:#734921;margin:18px 2px 9px}
-  .ucard{background:#fff;border:1px solid #e2e0d6;border-radius:14px;padding:12px 14px;box-shadow:0 4px 12px rgba(115,73,33,.05)}
-  .ubar{display:flex;align-items:center;gap:10px;padding:5px 0;font-size:13px}
-  .ubar .ul{flex:0 0 82px;color:#3a3d34}
-  .ubar .ut{flex:1;height:8px;background:#f0ece2;border-radius:999px;overflow:hidden}
-  .ubar .uf{display:block;height:100%;background:linear-gradient(90deg,#b98a4e,#734921);border-radius:999px}
-  .ubar .uv{flex:0 0 auto;font-weight:700;color:#734921;min-width:30px;text-align:right}
-  @media(max-width:420px){.stats{grid-template-columns:repeat(2,1fr)}}
-</style></head><body>
-  <h1>🐾 測試者管理</h1>
-  <div class="sub">留存數據、功能使用、共同照護一頁看完。下方可開通／關閉。只動存取權，看不到任何健康紀錄內容。</div>
-  ${statsBar}
-  ${await customerPanel(db)}
-  ${usageSections}
-  <div class="sec-title">測試者名單</div>
-  ${cards || '<div class="empty">還沒有任何使用者</div>'}
-  <div class="foot">此頁僅供管理員，請勿外流。停用後對方在 LINE 會被擋在門檻外、看不到任何內容，但資料保留；重新「開通」即可恢復。</div>
+<title>喵喵管家｜客戶管理</title><style>${adminStyles}</style></head><body>
+  <h1>喵喵管家 · 管理後台</h1>
+  <p class="sub">查看客戶使用情況與資料下載。</p>
+  <nav class="admin-nav" aria-label="後台分頁"><button type="button" aria-pressed="true" aria-controls="customersPane" data-pane="customersPane">客戶管理</button><button type="button" aria-pressed="false" aria-controls="analysisPane" data-pane="analysisPane">使用分析</button></nav>
+  <div id="customersPane"><div class="stats">${stat(rows.length,'總客戶')}${stat(activeCount,'近7天有記錄')}${stat(joinedCount,'尚未記錄')}</div>${await customerPanel(db)}</div>
+  <div id="analysisPane" hidden><h2>使用分析</h2><p class="muted">累積至今的紀錄與操作次數；次數不等於使用人數。</p><p class="mini">總紀錄 ${totalRecords} 筆 · 已開通 ${onCount} 人 · 至少2天有記錄 ${retained2d} 人 · 至少7天有記錄 ${retained7d} 人</p>${usageSections}</div>
+  <p class="foot">管理者專用 · 不顯示健康紀錄內容</p>
+  <script>document.querySelectorAll('[data-pane]').forEach(button=>button.addEventListener('click',()=>{document.querySelectorAll('[data-pane]').forEach(b=>{const selected=b===button;b.setAttribute('aria-pressed',String(selected));document.getElementById(b.dataset.pane).hidden=!selected;});}));</script>
 </body></html>`;
         return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8', ...(setCookie ? { 'set-cookie': setCookie } : {}) } });
       } catch (error) {

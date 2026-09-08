@@ -11,7 +11,7 @@ test('activity is monotonic and export download checks owner',async()=>{
  assert.equal(await markDownload(db,'stranger','one'),false);
  assert.equal(await markDownload(db,'owner','one'),true);
  const html=await customerPanel(db);
- assert.ok(html.includes('使用路徑')); assert.ok(html.includes('資料下載歷程'));
+ assert.ok(html.includes('操作路徑')); assert.ok(html.includes('資料下載歷程'));
 });
 test('retention never infers old untracked usage and handles leap anniversary',()=>{
  assert.equal(retentionStatus(null).key,'unknown');
