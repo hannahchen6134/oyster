@@ -1121,7 +1121,6 @@ async function handlePostback(event, env, baseUrl) {
     const pets=await listPets(db,ownerId),requested=data.get('petId');
     const pet=requested?pets.find(p=>p.petId===requested):needsCatPick(user,pets)?null:await resolveDefaultPet(db,user,pets);
     if(requested&&!pet){await replyOrPush(env,event,'找不到這隻貓，請重新點「記一筆」。');return;}
-    if(!pets.length){await replyOrPush(env,event,'先輸入「新增貓咪 名字」，就能開始記錄。');return;}
     const kind=data.get('kind'),base={wet:'主食',dry:'乾乾',water:'水'}[kind];
     if(!ALL_RECORDS.some(([,key])=>key===kind))return;
     // Leave a pending report form when starting a new daily-record action.

@@ -243,3 +243,22 @@ test('跳過取名可直接記；生日補填中也可直接回到日常紀錄',
  await say('記生日');await say('主食31 水5');assert.equal(logs().length,3);
  assert.equal(DB.prepare("SELECT pendingAction FROM users WHERE lineUserId='helper'").first().pendingAction,'');
 },'helper'));
+
+
+test('新手真正點快捷不被取名擋住、不先建貓；填完才建立第一筆',()=>setup(async({DB,say,click,last,logs,sent})=>{
+ DB.prepare("DELETE FROM care_members WHERE memberLineUserId='helper'").run();
+ await say('記一筆');const items=last().quickReply.items;
+ for(const label of ['主食','主食＋水','副食＋水','水','乾乾','藥']){
+  const a=items.find(i=>i.action.label===label).action;const n=sent.length;await click(a.data);assert.equal(sent.length,n,label+'不得再問取名');
+  assert.equal(logs().length,0);assert.equal(DB.prepare("SELECT COUNT(*) n FROM pets WHERE ownerLineUserId='helper'").first().n,0);
+ }
+ const a=items.find(i=>i.action.label==='主食＋水').action;
+ await say(a.fillInText.replace('\n','31\n')+'5');assert.equal(logs().length,2);
+ assert.equal(DB.prepare("SELECT COUNT(*) n FROM pets WHERE ownerLineUserId='helper'").first().n,1);assert.ok(last().quickReply.items.length);
+},'helper'));
+test('新手點排便快捷可先選情況，選完才建貓及紀錄',()=>setup(async({DB,say,click,last,logs})=>{
+ DB.prepare("DELETE FROM care_members WHERE memberLineUserId='helper'").run();
+ await say('記一筆');await click(last().quickReply.items.find(i=>i.action.label==='便便').action.data);
+ assert.match(last().text,/便便情況/);assert.equal(logs().length,0);
+ await say(last().quickReply.items.find(i=>i.action.label==='正常').action.text);assert.equal(logs().length,1);assert.equal(logs()[0].category,'stool');
+},'helper'));
