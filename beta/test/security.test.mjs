@@ -172,3 +172,13 @@ test('/api/login-code：同一 IP 短時間內狂試 → 429（暴力猜碼被�
   }
   assert.ok(got429, '連續嘗試應在上限後回 429');
 });
+
+test('管理者可使用登入表單，金鑰不進入網址',async()=>{
+ const page=await worker.fetch(new Request('https://x/admin/login'),adminEnv(),ctx);
+ assert.equal(page.status,200); assert.match(await page.text(),/type="password"/);
+ const response=await worker.fetch(new Request('https://x/admin/login',{method:'POST',headers:{origin:'https://x'},body:new URLSearchParams({key:ADMIN_KEY})}),adminEnv(),ctx);
+ assert.equal(response.status,303); assert.equal(response.headers.get('location'),'/admin/testers');
+ assert.match(response.headers.get('set-cookie'),/HttpOnly/);
+ const denied=await worker.fetch(new Request('https://x/admin/login',{method:'POST',headers:{origin:'https://evil.test'},body:new URLSearchParams({key:ADMIN_KEY})}),adminEnv(),ctx);
+ assert.equal(denied.status,403);
+});

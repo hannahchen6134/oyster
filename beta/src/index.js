@@ -43,6 +43,10 @@ const LINE_ADD_URL = 'https://line.me/R/ti/p/@232mjffx';
 
 // 管理員驗證：優先 cookie session（/admin/login 換發，金鑰不再掛網址），否則沿用 ?key=（constant-time 比對）。
 // 回 { ok, viaCookie }。ADMIN_KEY 少於 8 碼一律拒絕（等於沒設好就不開後台）。
+function adminLoginPage(message = '請輸入原本的管理金鑰。登入有效期為 8 小時。', status = 200) {
+  return new Response(`<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>喵喵管家｜管理者登入</title><style>body{margin:0;padding:36px 24px;background:#f5efe4;color:#614322;font:16px/1.7 sans-serif}main{max-width:420px;margin:40px auto;background:#fffdf8;padding:28px;border-radius:18px}h1{font-size:24px}input,button{box-sizing:border-box;width:100%;font:inherit;padding:12px;border:1px solid #cbbda9;border-radius:8px}button{margin-top:20px;background:#734921;color:white;cursor:pointer}</style><main><h1>管理者登入</h1><p>${message}</p><form method="post" action="/admin/login"><label for="key">管理金鑰</label><input id="key" name="key" type="password" autocomplete="current-password" required><button type="submit">登入後台</button></form><p>這是管理者專用入口，與爸媽使用的管家頁面不同。</p></main></html>`,{status,headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','referrer-policy':'no-referrer','x-frame-options':'DENY'}});
+}
+
 async function adminAuth(env, request, url) {
   const key = String(env.ADMIN_KEY || '');
   if (key.length < 8) return { ok: false, viaCookie: false };
@@ -199,12 +203,16 @@ export default {
     // 管理員登入：用 ?key= 換一張 cookie session 後導回後台（金鑰只在這一次的網址出現，之後靠 cookie）
     if (url.pathname === '/admin/login') {
       const key = String(env.ADMIN_KEY || '');
-      const qk = url.searchParams.get('key');
+      if (request.method === 'GET' && !url.searchParams.has('key')) return adminLoginPage();
+      if (!['GET','POST'].includes(request.method)) return new Response(null,{status:405});
+      if (request.method === 'POST' && request.headers.get('origin') && request.headers.get('origin') !== url.origin) return adminLoginPage('請從此網站重新登入。',403);
+      const qk = request.method === 'POST' ? String((await request.formData()).get('key') || '') : url.searchParams.get('key');
       if (key.length < 8 || qk == null || !constantTimeEqual(qk, key)) {
-        return new Response('403 Forbidden', { status: 403, headers: { 'content-type': 'text/plain; charset=utf-8' } });
+        return adminLoginPage('登入已失效或金鑰不正確，請重新登入。',403);
       }
       const cookie = await issueAdminCookieIfNeeded(env, { ok: true, viaCookie: false });
-      return new Response(null, { status: 302, headers: { location: '/admin/testers', ...(cookie ? { 'set-cookie': cookie } : {}) } });
+      if (!cookie) return adminLoginPage('登入暫時無法完成，請稍後再試。',503);
+      return new Response(null, { status: request.method === 'POST' ? 303 : 302, headers: { location: '/admin/testers', 'set-cookie': cookie, 'cache-control':'no-store' } });
     }
     // 權杖健康檢查（不外洩權杖本身），用 ADMIN_KEY／cookie session 保護（不可用測試者也有的邀請碼）
     if (url.pathname === '/admin/line-token') {
@@ -257,7 +265,7 @@ export default {
     if (url.pathname === '/admin/testers') {
       const auth = await adminAuth(env, request, url);
       if (!auth.ok) {
-        return new Response('403 Forbidden', { status: 403, headers: { 'content-type': 'text/plain; charset=utf-8' } });
+        return adminLoginPage('登入已失效或金鑰不正確，請重新登入。',403);
       }
       // 由 ?key= 進來時順手發一張 cookie，之後所有導覽／切換連結都不必再帶金鑰
       const setCookie = await issueAdminCookieIfNeeded(env, auth);
