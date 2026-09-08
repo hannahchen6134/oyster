@@ -44,10 +44,23 @@ const LINE_ADD_URL = 'https://line.me/R/ti/p/@232mjffx';
 // 管理員驗證：優先 cookie session（/admin/login 換發，金鑰不再掛網址），否則沿用 ?key=（constant-time 比對）。
 // 回 { ok, viaCookie }。ADMIN_KEY 少於 8 碼一律拒絕（等於沒設好就不開後台）。
 function adminLoginPage(message = '請輸入原本的管理金鑰。登入有效期為 8 小時。', status = 200) {
-  return new Response(`<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>喵喵管家｜管理者登入</title><style>body{margin:0;padding:36px 24px;background:#f5efe4;color:#614322;font:16px/1.7 sans-serif}main{max-width:420px;margin:40px auto;background:#fffdf8;padding:28px;border-radius:18px}h1{font-size:24px}input,button{box-sizing:border-box;width:100%;font:inherit;padding:12px;border:1px solid #cbbda9;border-radius:8px}button{margin-top:20px;background:#734921;color:white;cursor:pointer}</style><main><h1>管理者登入</h1><p>${message}</p><form method="post" action="/admin/login"><label for="key">管理金鑰</label><input id="key" name="key" type="password" autocomplete="current-password" required><p id="keyStatus" role="status" aria-live="polite">尚未輸入金鑰</p><label for="keyFile">貼上沒成功？選擇下載的金鑰檔案</label><input id="keyFile" type="file" accept=".txt,text/plain"><button type="submit">登入後台</button></form><script>
+  return new Response(`<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>喵喵管家｜管理者登入</title><style>body{margin:0;padding:36px 24px;background:#f5efe4;color:#614322;font:16px/1.7 sans-serif}main{max-width:420px;margin:40px auto;background:#fffdf8;padding:28px;border-radius:18px}h1{font-size:24px}input,button{box-sizing:border-box;width:100%;font:inherit;padding:12px;border:1px solid #cbbda9;border-radius:8px}button{margin-top:20px;background:#734921;color:white;cursor:pointer}</style><main><h1>管理者登入</h1><p>${message}</p><form method="post" action="/admin/login"><label for="key">管理金鑰</label><input id="key" name="key" type="password" autocomplete="current-password" autocapitalize="none" spellcheck="false" required><button id="showKey" type="button" style="width:auto;margin:8px 0;padding:6px 12px;background:transparent;color:#734921">顯示金鑰</button><p id="keyStatus" role="status" aria-live="polite">尚未輸入金鑰</p><details><summary>其他登入方式</summary><label for="keyFile">從金鑰檔案帶入</label><input id="keyFile" type="file" accept=".txt,text/plain"></details><button type="submit">登入後台</button></form><script>
 const field=document.getElementById('key'),statusText=document.getElementById('keyStatus');
 function updateStatus(){statusText.textContent=field.value.trim().length?'已帶入 '+field.value.trim().length+' 個字，請按登入':'尚未輸入金鑰';}
 field.addEventListener('input',updateStatus);
+field.addEventListener('paste',function(event){
+ const pasted=event.clipboardData?.getData('text/plain');
+ if(!pasted)return;
+ event.preventDefault();
+ const lines=pasted.split(/\\r?\\n/).map(s=>s.trim()).filter(Boolean);
+ const marker=lines.findIndex(s=>s==='管理金鑰：');
+ field.value=(marker>=0?lines[marker+1]:pasted)?.trim()||'';
+ updateStatus();
+});
+document.getElementById('showKey').addEventListener('click',function(){
+ const show=field.type==='password';field.type=show?'text':'password';
+ this.textContent=show?'隱藏金鑰':'顯示金鑰';
+});
 document.getElementById('keyFile').addEventListener('change',async function(){
  const file=this.files[0];if(!file)return;
  if(file.size>16384){statusText.textContent='請選擇管理金鑰文字檔';return;}
