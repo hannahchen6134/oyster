@@ -1107,7 +1107,15 @@ async function handlePostback(event, env, baseUrl) {
   const data = new URLSearchParams(String(event.postback?.data || ''));
   const action = data.get('action');
 
-  if (action === 'fillFood' || action === 'fill') return; // 只是把文字填進輸入框，不需回覆
+  if (action === 'fillFood' || action === 'fill') {
+    // Example buttons start daily input too: discard stale prompts, not care data.
+    const user=await getUser(db,lineUserId);
+    if(!isBetaAllowed(user))return;
+    if(user.pendingAction)await updateUser(db,lineUserId,{pendingAction:''});
+    const raw=await appKvGet(db,`lineReportFlow:${lineUserId}`);
+    if(raw){const flow=JSON.parse(raw);if(['feeding','confirm'].includes(flow.stage)){flow.stage='cancelled';await appKvSet(db,`lineReportFlow:${lineUserId}`,JSON.stringify(flow));}}
+    return; // Native fill only; no duplicate message or record.
+  }
 
   // 共同照護者操作時解析到飼主本人（飼主本人時 ownerId === lineUserId，行為不變）
   const ownerId = lineUserId ? await resolveDataOwner(db, lineUserId) : lineUserId;

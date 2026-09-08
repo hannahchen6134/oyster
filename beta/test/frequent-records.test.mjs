@@ -284,3 +284,18 @@ test('六格直填組合不等待回覆；切貓後送出沿用新對象',()=>se
  await click('action=frequent&kind=wet&combo=wetWater&input=fill');assert.equal(sent.length,n);
  await say('主食31\n水5');assert.equal(logs().length,2);assert.ok(logs().every(l=>l.petId==='p2'));
 },'owner'));
+
+
+test('教學例句離開舊照護補問與生日等待，不新增訊息或誤寫範本',()=>setup(async({DB,say,click,last,logs,sent})=>{
+ DB.prepare("INSERT OR REPLACE INTO app_kv(k,v,updatedAt) VALUES (?,?,?)").bind('lineReportFlow:single',JSON.stringify({owner:'single',petId:'s1',stage:'feeding',expiresAt:Date.now()+60000}),new Date().toISOString()).run();
+ DB.prepare("UPDATE users SET pendingAction='birthday' WHERE lineUserId='single'").run();
+ const n=sent.length;await click('action=fill');assert.equal(sent.length,n);assert.equal(logs().length,0);
+ assert.equal(DB.prepare("SELECT pendingAction FROM users WHERE lineUserId='single'").first().pendingAction,'');
+ await say('藥 早 已吃');assert.equal(logs().length,1);assert.equal(logs()[0].category,'med');assert.ok(last().quickReply.items.length);
+ assert.equal(JSON.parse(DB.prepare("SELECT v FROM app_kv WHERE k='lineReportFlow:single'").first().v).careDraft,undefined);
+}));
+test('照護補問時直接記藥仍是日常紀錄，不當作餵藥方法',()=>setup(async({DB,say,logs})=>{
+ DB.prepare("INSERT OR REPLACE INTO app_kv(k,v,updatedAt) VALUES (?,?,?)").bind('lineReportFlow:single',JSON.stringify({owner:'single',petId:'s1',stage:'feeding',expiresAt:Date.now()+60000}),new Date().toISOString()).run();
+ await say('小花 藥 晚 已吃');assert.equal(logs().length,1);assert.equal(logs()[0].category,'med');
+ assert.equal(JSON.parse(DB.prepare("SELECT v FROM app_kv WHERE k='lineReportFlow:single'").first().v).careDraft,undefined);
+}));

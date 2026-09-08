@@ -123,7 +123,7 @@ export async function handleLineReportText(env,event,owner,text,knownPets=[]) {
   const cats=knownPets.filter(p=>!p.isDeleted).sort((a,b)=>b.petName.length-a.petName.length);
   const named=cats.find(p=>text===p.petName||text.startsWith(p.petName+' '));
   const daily=named?text.slice(named.petName.length).trim():text.trim();
-  if ((named&&!daily) || /^(?:主食|副食)\s*(?:\d+(?:\.\d+)?)?\s*水\s*(?:\d+(?:\.\d+)?)?$/.test(daily) || /^(?:(?:主食|副食|乾乾|乾糧|零食|喝水|水|體重)\s*\d+(?:\.\d+)?\s*(?:ml|g|kg|克|毫升|公斤)?\s*)+$/i.test(daily)) {
+  if (/^藥\s*(?:早|中午|晚)?\s*(?:已吃|未餵|吐掉|拒吃)$/.test(daily) || (named&&!daily) || /^(?:主食|副食)\s*(?:\d+(?:\.\d+)?)?\s*水\s*(?:\d+(?:\.\d+)?)?$/.test(daily) || /^(?:(?:主食|副食|乾乾|乾糧|零食|喝水|水|體重)\s*\d+(?:\.\d+)?\s*(?:ml|g|kg|克|毫升|公斤)?\s*)+$/i.test(daily)) {
     flow.stage='cancelled';await saveFlow(env.DB,event.source.userId,flow);return false;
   }
 
