@@ -70,7 +70,9 @@ export function personalizeFrequentMessage(message,entries) {
     const petId=old?new URLSearchParams(old.action.data).get('petId'):'';
     const fill=items.find(i=>common(i.action)&&i.action.fillInText);
     const petName=fill?.action.fillInText.trimEnd().slice(0,-fill.action.label.length).trim()||'';
-    result={...result,quickReply:{items:[...frequentRecordItems(petId,petName,entries),...items.filter(i=>!common(i.action)&&!combo(i.action)&&!more(i.action))].slice(0,13)}};
+    const first=items.findIndex(i=>common(i.action)||combo(i.action)||more(i.action));
+    const extra=i=>!common(i.action)&&!combo(i.action)&&!more(i.action);
+    result={...result,quickReply:{items:[...items.slice(0,first).filter(extra),...frequentRecordItems(petId,petName,entries),...items.slice(first).filter(extra)].slice(0,13)}};
   }
   const body=message.contents?.body;
   if(body?.contents){

@@ -210,3 +210,17 @@ test('底部快捷切貓後帶新貓名，更多紀錄也相同；自己打字�
  await click('action=recmore');assert.equal(last().quickReply.items.find(i=>i.action.label==='體重').action.fillInText,'麵線 體重');
  await say('水5');assert.equal(logs()[0].petId,'p2');
 },'owner'));
+
+
+test('多則回覆未設定預設快捷時，仍把既有快捷放到最後一則',()=>setup(async({env,sent})=>{
+ const quickReply={items:frequentRecordItems('s1','小花')};
+ await replyMessages(env,'test',[{type:'text',text:'已記錄',quickReply},{type:'text',text:'完成'}]);
+ assert.deepEqual(sent.at(-1).messages.at(-1).quickReply,quickReply);
+}));
+test('組合漏填只補缺項，保留數字且不部分寫入',()=>setup(async({say,last,click,logs})=>{
+ for(const [draft,missing,filled] of [['小花 主食31\n水','水量','小花 主食31\n水5'],['小花 副食\n水5','副食克數','小花 副食20\n水5']]){
+  const n=logs().length;await say(draft);assert.equal(logs().length,n);assert.match(last().text,new RegExp(missing+'還沒填'));assert.match(last().text,/尚未記錄/);
+  const a=last().quickReply.items[0].action;assert.equal(a.fillInText,draft);assert.equal(a.displayText,undefined);await click(a.data);assert.equal(logs().length,n);
+  await say(filled);assert.equal(logs().length,n+2);assert.ok(last().quickReply.items.length>0);
+ }
+}));

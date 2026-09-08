@@ -120,10 +120,11 @@ async function callLineApi(env, path, body, options = {}) {
   const delivery = path === '/message/reply' || (path === '/message/push' && body.to === scope?.actor);
   // Only opted-in, authorized browsing flows get defaults. Preserve choice-specific
   // quick replies and attach controls to the last message in a multi-message reply.
-  if (delivery && scope?.defaultQuickReply && body.messages?.length) {
+  if (delivery && body.messages?.length) {
     const last = body.messages.at(-1);
-    if (!last.quickReply) {
-      const quickReply = body.messages.findLast(m => m.quickReply)?.quickReply || scope.defaultQuickReply;
+    if (!last.quickReply?.items?.length) {
+      const quickReply = body.messages.findLast(m => m.quickReply?.items?.length)?.quickReply || scope?.defaultQuickReply;
+      if (quickReply?.items?.length)
       body = {...body, messages:[...body.messages.slice(0,-1), {...last,quickReply}]};
     }
   }

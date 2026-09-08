@@ -2370,6 +2370,20 @@ async function handleTextMessageInner(event, env, baseUrl) {
     return;
   }
 
+  // Incomplete two-label shortcut: keep entered amounts without partially saving.
+  const unfinishedCombo = text.match(/^(主食|副食)\s*(\d+(?:\.\d+)?)?\s*水\s*(\d+(?:\.\d+)?)?$/);
+  if (unfinishedCombo && (!unfinishedCombo[2] || !unfinishedCombo[3])) {
+    const [,food,grams,water] = unfinishedCombo;
+    const missing = [!grams ? food+'克數' : '', !water ? '水量' : ''].filter(Boolean).join('、');
+    const prefix = pet && (explicitPet || !needsCatPick(user,pets)) ? pet.petName+' ' : '';
+    const draft = prefix+food+(grams||'')+'\n水'+(water||'');
+    await replyOrPushQuick(env,event,`${missing}還沒填。這次尚未記錄。\n點「補數量」帶回原文，已填的數量會保留。`,[
+      {type:'action',action:{type:'postback',label:'補數量',data:'action=fill',inputOption:'openKeyboard',fillInText:draft}},
+      ...frequentRecordItems(prefix?pet.petId:'',prefix?pet.petName:'')
+    ]);
+    return;
+  }
+
   const intent = parseMessage(text);
   if (env[LINE_EVENT]) env[LINE_EVENT].intent = intent.type;
   markEvent(env, 'parser_done');
