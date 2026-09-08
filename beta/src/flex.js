@@ -1261,13 +1261,13 @@ export function quickRecordCarousel(opts = {}) {
       ]},
       {type:'box',layout:'vertical',margin:'20px',paddingAll:'16px',backgroundColor:C.tint,cornerRadius:'12px',spacing:'12px',contents:[
         line('⚡ 常用快捷',{size:'18px',weight:'bold',color:C.brand}),
-        line('點主食 → 補數量 → 送出。\n下次繼續點，不用重打。'),
+        line('點「主食＋水」→ 帶入「主食0水0」。\n把 0 改成數量，再送出；副食＋水也一樣。'),
         {type:'button',style:'primary',color:C.brand,action:{type:'message',label:'記一筆・常用快捷',text:'記一筆'}}
       ]},
       {type:'separator',margin:'24px',color:SEPARATOR},
       actionRow('📋 近七天記錄','看每天的飲食、喝水紀錄。',{type:'message',label:'近七天記錄',text:'近七天記錄'}),
       {type:'separator',color:SEPARATOR},
-      actionRow('📄 出摘要','選貓 → 給醫生看／給照護者。\n收到圖片與 QR Code；缺照護資料會先問你。',{type:'postback',label:'出摘要',data:'action=reportStart'}),
+      actionRow('📄 出摘要','選貓、用途，再選 14 天或一個月。\n收到圖片與 QR Code；需要詳細再開後台。',{type:'postback',label:'出摘要',data:'action=reportStart'}),
       {type:'separator',color:SEPARATOR},
       actionRow('⚙️ 管家後台','完整紀錄、月曆與詳細設定，需要時再進來。',opts.siteUrl?{type:'uri',label:'管家後台',uri:opts.siteUrl}:{type:'message',label:'管家後台',text:'管家後台'})
     ]},footer:{type:'box',layout:'vertical',paddingAll:'12px',backgroundColor:FOOTER_COLOR,contents:[{type:'button',style:'link',color:C.brand,action:{type:'message',label:'更多紀錄範例',text:'更多紀錄範例'}}]}
@@ -1275,17 +1275,17 @@ export function quickRecordCarousel(opts = {}) {
 }
 
 export function howToUseText() {
-  return '🐱 喵喵管家怎麼用？\n平常直接在 LINE 告訴我就好，不用特別學格式。\n✏️ 直接記：主食31、水5、乾乾10、嘔吐 白沫\n⚡ 輸入「記一筆」→ 點主食 → 補數量送出。\n📋 輸入「近七天記錄」看每天飲食、喝水。\n📄 輸入「出摘要」→ 選貓 → 給醫生看／給照護者，收到圖片與 QR Code；缺照護資料會先問你。\n⚙️ 完整紀錄、月曆與設定：輸入「管家後台」。\n更多例句：輸入「更多紀錄範例」。';
+  return '🐱 喵喵管家怎麼用？\n平常直接在 LINE 告訴我就好，不用特別學格式。\n✏️ 直接記：主食31、水5、乾乾10、嘔吐 白沫\n⚡ 點「記一筆」→「主食＋水」→ 帶入「主食0水0」，把 0 改成數量再送出。副食＋水也一樣；不要連點兩個快捷，以免覆蓋未送出的文字。\n📋 輸入「近七天記錄」看每天飲食、喝水。\n📄 輸入「出摘要」→ 選貓 → 給醫生看／給照護者 → 14 天／一個月，收到圖片與 QR Code；詳細資料再開後台，缺照護說明會先問你。\n⚙️ 完整紀錄、月曆與設定：輸入「管家後台」。\n更多例句：輸入「更多紀錄範例」。';
 }
 
 export const HELP_EXAMPLES = [
-  ['🍚 吃飯',['主食31','乾乾10','零食3']], ['💧 喝水',['水5']],
+  ['🍚 吃飯',['主食0水0','副食0水0','乾乾10','零食3']], ['💧 喝水',['水5']],
   ['💊 藥物',['藥早已吃']], ['🚽 尿尿／便便',['尿尿','大便 偏軟']],
   ['🤮 嘔吐',['嘔吐 白沫']], ['⚖️ 體重',['體重4.25']],
   ['其他紀錄',['精神 活動力差','益生菌','備註 今天梳毛']]
 ];
 export function recordExamplesText() {
-  return '更多紀錄範例\n照自己的情況改好再送出；食物是克、水是 ml、體重是公斤。\n'+HELP_EXAMPLES.map(([label,examples])=>label+'：'+examples.join('／')).join('\n')+'\n補登、修正、品牌與多貓：輸入「完整記法」。';
+  return '更多紀錄範例\n把範本的 0 改成數量再送出，例如主食31水5；食物是克、水是 ml、體重是公斤。\n'+HELP_EXAMPLES.map(([label,examples])=>label+'：'+examples.join('／')).join('\n')+'\n補登、修正、品牌與多貓：輸入「完整記法」。';
 }
 export function recordExamplesFlex() {
   const pages=[['吃飯・喝水',HELP_EXAMPLES.slice(0,2)],['藥物・大小便',HELP_EXAMPLES.slice(2,4)],['身體・其他紀錄',HELP_EXAMPLES.slice(4)]];
@@ -1296,7 +1296,7 @@ export function recordExamplesFlex() {
       text(title,{size:'19px',weight:'bold',color:'#FFFFFF',wrap:true})
     ]},
     body:{type:'box',layout:'vertical',paddingAll:'16px',backgroundColor:BODY_BG,contents:[
-      text('點例句，改好再送出',{size:'16px',wrap:true,color:C.inkSoft}),
+      text('點例句帶入輸入框；把 0 改成數量再送出',{size:'16px',wrap:true,color:C.inkSoft}),
       ...groups.map(([label,examples])=>({type:'box',layout:'vertical',margin:'12px',spacing:'6px',contents:[
         text(label+(label.includes('吃飯')?'（克）':label.includes('喝水')?'（ml）':label.includes('體重')?'（公斤）':''),{size:'16px',weight:'bold',color:C.brand,wrap:true}),
         ...examples.map(example=>({type:'box',layout:'horizontal',paddingAll:'10px',spacing:'12px',alignItems:'center',backgroundColor:C.tint,cornerRadius:'10px',action:{type:'postback',label:example,data:'action=fill',inputOption:'openKeyboard',fillInText:example},contents:[

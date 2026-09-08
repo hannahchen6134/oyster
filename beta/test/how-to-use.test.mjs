@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import {handleTextMessage} from '../src/index.js';
 import {reportFixture} from './support/report-fixture.mjs';
 import {parseMessage} from '../src/parser.js';
-import {detailedHelpFlex,HELP_EXAMPLES,recordExamplesFlex,quickRecordCarousel} from '../src/flex.js';
+import {detailedHelpFlex,HELP_EXAMPLES,recordExamplesFlex,quickRecordCarousel,howToUseText} from '../src/flex.js';
 test('新手例句全部可以記錄；填入例句不直接送出',()=>{
- for(const [,examples] of HELP_EXAMPLES) for(const example of examples) assert.equal(parseMessage(example).type,'record',example);
+ for(const [,examples] of HELP_EXAMPLES) for(const example of examples) assert.equal(parseMessage(example.replaceAll('0','1')).type,example.includes('0水0')?'multiRecord':'record',example);
  const actions=[];const walk=o=>{if(!o||typeof o!=='object')return;if(o.action)actions.push(o.action);Object.values(o).forEach(v=>Array.isArray(v)?v.forEach(walk):walk(v));};walk(recordExamplesFlex());
  for(const a of actions.filter(a=>a.type==='postback')){assert.equal(a.data,'action=fill');assert.equal(a.inputOption,'openKeyboard');assert.ok(a.fillInText);assert.equal(a.displayText,undefined);}
 });
@@ -29,3 +29,5 @@ test('新手說明所有文字入口通往現有功能，閱讀不新增紀錄',
 
 
 test('完整記法先選分類，每次只顯示該類內容',()=>{const menu=JSON.stringify(detailedHelpFlex());assert.ok(menu.includes('想看哪一種記法'));assert.ok(!menu.includes('主食3'));const card=JSON.stringify(detailedHelpFlex('補登・指定時間'));assert.ok(card.includes('昨天 21:30 喝水30'));assert.ok(!card.includes('藥 心臟藥'));assert.ok(card.includes('其他記法'));});
+
+test('怎麼記與文字備援教0範本，不教無標示的兩個數字',()=>{for(const s of [JSON.stringify(quickRecordCarousel()),howToUseText()]){assert.match(s,/主食0水0/);assert.match(s,/副食/);assert.match(s,/改成數量/);assert.doesNotMatch(s,/31 5|填兩個數字/);}});
