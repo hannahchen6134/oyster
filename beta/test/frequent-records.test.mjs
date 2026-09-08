@@ -224,3 +224,22 @@ test('組合漏填只補缺項，保留數字且不部分寫入',()=>setup(async
   await say(filled);assert.equal(logs().length,n+2);assert.ok(last().quickReply.items.length>0);
  }
 }));
+
+
+test('新手不填資料直接記兩次，只建立一隻貓且不追問生日',()=>setup(async({DB,say,last,logs})=>{
+ DB.prepare("DELETE FROM care_members WHERE memberLineUserId='helper'").run();
+ await say('記一筆');assert.ok(last().quickReply?.items.length);
+ await say('主食31 水5');assert.equal(logs().length,2);assert.ok(last().quickReply?.items.length);
+ await say('水3');assert.equal(logs().length,3);
+ const pets=DB.prepare("SELECT * FROM pets WHERE ownerLineUserId='helper'").all().results;assert.equal(pets.length,1);assert.equal(pets[0].petName,'貓貓');assert.ok(logs().every(l=>l.petId===pets[0].petId));
+ assert.equal(DB.prepare("SELECT pendingAction FROM users WHERE lineUserId='helper'").first().pendingAction,'');
+},'helper'));
+
+
+test('跳過取名可直接記；生日補填中也可直接回到日常紀錄',()=>setup(async({DB,say,last,logs})=>{
+ DB.prepare("DELETE FROM care_members WHERE memberLineUserId='helper'").run();
+ await say('幫貓貓建檔');await say('跳過');assert.match(JSON.stringify(last()),/先記一筆/);
+ await say('水5');assert.equal(logs().length,1);
+ await say('記生日');await say('主食31 水5');assert.equal(logs().length,3);
+ assert.equal(DB.prepare("SELECT pendingAction FROM users WHERE lineUserId='helper'").first().pendingAction,'');
+},'helper'));

@@ -23,7 +23,7 @@ test('§17 主指引不把有歧義的「主食-3」當主教學案例（但示�
 test('§15 welcomeText 以自然語言為核心，含新例句', () => {
   const w = welcomeText();
   assert.ok(/不用背指令|照平常說話|不用學格式/.test(w), '歡迎訊息應強調自然語言');
-  for (const ex of ['主食3', '巔峰羊35']) assert.ok(w.includes(ex), `歡迎訊息應含「${ex}」`);
+  for (const ex of ['主食31 水5', '記一筆']) assert.ok(w.includes(ex), `歡迎訊息應含「${ex}」`);
   // 醫療免責與定期回診提醒不得被移除
   assert.ok(w.includes('獸醫') && w.includes('回診'));
 });

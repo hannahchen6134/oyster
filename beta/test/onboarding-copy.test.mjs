@@ -12,11 +12,11 @@ import { petAddedCard, namePromptCard, guideUnknown } from '../src/index.js';
 
 const json = (o) => JSON.stringify(o);
 
-test('第一則歡迎訊息：主軸「不用先設定／照平常說話」＋三個例子＋單步取名 CTA', () => {
+test('第一則歡迎訊息：主軸「不用先設定／照平常說話」＋三個例子＋直接記錄 CTA', () => {
   const w = json(welcomeFlex());
   assert.ok(/不用先設定|照平常說話/.test(w), '應強調不用先設定、照平常說話');
   for (const ex of ['乾乾5', '喝水30', '嘔吐 白沫']) assert.ok(w.includes(ex), `歡迎訊息應示範「${ex}」`);
-  assert.ok(w.includes('幫貓貓取名開始'), '主 CTA 應是單步取名');
+  assert.ok(w.includes('記一筆'), '主 CTA 直接記錄');assert.ok(!w.includes('幫貓貓取名開始'));
   assert.ok(!w.includes('3 個小問題'), '不得再把建檔講成「3 個小問題」');
 });
 

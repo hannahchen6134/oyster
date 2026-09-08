@@ -1036,15 +1036,15 @@ export function welcomeFlex() {
       // 先讓人看到「原來這麼簡單」——三個一看就懂的例子（吃飯／喝水／狀況）
       { type: 'box', layout: 'vertical', backgroundColor: C.tint, cornerRadius: '10px', paddingAll: '12px', margin: 'lg', spacing: 'xs',
         contents: [
-          text('之後想記，直接打：', { size: 'xs', color: C.muted, wrap: true }),
+          text('現在就能記，直接打：', { size: 'xs', color: C.muted, wrap: true }),
           text('乾乾5　·　喝水30　·　嘔吐 白沫', { size: 'sm', weight: 'bold', color: C.brand, wrap: true })
         ] },
-      // 唯一要先做的一步＝告訴我貓咪名字（不是「3 個小問題」）
-      { type: 'box', layout: 'horizontal', margin: 'lg', contents: [menuCell('幫貓貓取名開始', '打個名字就能用了', '幫貓貓建檔', true)] },
+      // First action records; profile information is optional.
+      { type: 'box', layout: 'horizontal', margin: 'lg', contents: [menuCell('記一筆', '點快捷，補數量就好', '記一筆', true)] },
       { type: 'box', layout: 'horizontal', margin: 'md', contents: [menuCell('先看看怎麼用', '更多可以怎麼說', '安心上手')] }
     ]
   };
-  return bubble(`歡迎加入${BRAND.name}！先幫貓貓取個名字就能開始記`, { type: 'bubble', size: 'mega', header: header('歡迎加入'), body });
+  return bubble(`歡迎加入${BRAND.name}！不用先填資料，直接開始記`, { type: 'bubble', size: 'mega', header: header('歡迎加入'), body });
 }
 
 // ---------- 說明選單卡 ----------

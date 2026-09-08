@@ -754,10 +754,10 @@ async function handlePending(env, event, { db, user, pet, pets, lineUserId, owne
     await clear();
     if (pending === 'petname' && !pets.length) {
       await replyOrPushFlex(env, event, onboardCard({
-        title: '好，先自己逛逛',
-        subtitle: '想開始時輸入「安心上手」，我都在',
-        rows: [[menuCell('安心上手', '上手小教學', '安心上手'), menuCell('開啟管家後台', '看看長什麼樣子', '照護站')]]
-      }), '好，想開始時輸入「安心上手」');
+        title: '好，先記一筆',
+        subtitle: '直接傳「主食31 水5」，貓名之後再補。',
+        rows: [[menuCell('記一筆', '點快捷，補數量', '記一筆', true)]]
+      }), '直接傳「主食31 水5」，貓名之後再補。');
     } else {
       if (pet) await restoreCompletionShortcuts(env, event, user, pet.petId);
       await replyOrPushFlex(env, event, doneCard(pet?.petName || '貓貓'), '好，隨時打「水 60」開始記錄');
