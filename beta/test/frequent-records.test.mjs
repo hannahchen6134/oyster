@@ -181,12 +181,12 @@ test('切貓完成立即恢復快捷，下一筆仍記在新選擇的貓',()=>se
  await say('水5');assert.equal(logs()[0].petId,'p2');
 },'owner'));
 
-test('組合帶入0範本但不送出；修改兩個數字後正確記錄，預設0不建檔',()=>setup(async({say,click,last,logs})=>{
+test('組合帶入兩行無數字且不送出；補數量後正確記錄，空範本不建檔',()=>setup(async({say,click,last,logs})=>{
  await say('記一筆');
  for(const [label,type] of [['主食＋水','主食罐'],['副食＋水','副食罐']]){
   const a=last().quickReply.items.find(i=>i.action.label===label).action;
-  assert.equal(a.fillInText,'小花 '+label.replace('＋','0')+'0');assert.equal(a.displayText,undefined);const n=logs().length;await click(a.data);assert.equal(logs().length,n);
-  await say(a.fillInText);assert.equal(logs().length,n);await click(a.data);await say(a.fillInText.replace('0','31.5').replace(/0$/,'5'));const added=logs().slice(n);assert.equal(added.length,2);assert.ok(added.some(l=>l.foodType===type&&l.amount===31.5));assert.ok(added.some(l=>l.category==='water'&&l.amount===5));
+  assert.equal(a.fillInText,'小花 '+label.replace('＋','\n'));assert.equal(a.displayText,undefined);const n=logs().length;await click(a.data);assert.equal(logs().length,n);
+  await say(a.fillInText);assert.equal(logs().length,n);await click(a.data);await say(a.fillInText.replace('\n','31.5\n')+'5');const added=logs().slice(n);assert.equal(added.length,2);assert.ok(added.some(l=>l.foodType===type&&l.amount===31.5));assert.ok(added.some(l=>l.category==='water'&&l.amount===5));
  }
  const n=logs().length;await say('主食＋水 31');assert.equal(logs().length,n);
 }));
@@ -194,19 +194,19 @@ test('照護補問卡顯示常用快捷，點組合後不把紀錄當照護安�
  await say('出摘要');let card=JSON.stringify(last());const find=(name)=>JSON.parse(card).contents.body.contents.find(x=>x.action?.data?.includes('action='+name))?.action.data;
  await click(find('reportPet'));card=JSON.stringify(last());await click(find('reportPurpose').replace('purpose=doctor','purpose=care'));card=JSON.stringify(last());await click(find('reportDays'));
  assert.ok(last().quickReply.items.some(i=>i.action.label==='主食＋水'));
- const a=last().quickReply.items.find(i=>i.action.label==='主食＋水').action;await click(a.data);await say(a.fillInText.replace('0','31').replace(/0$/,'5'));assert.equal(logs().length,2);
+ const a=last().quickReply.items.find(i=>i.action.label==='主食＋水').action;await click(a.data);await say(a.fillInText.replace('\n','31\n')+'5');assert.equal(logs().length,2);
  assert.equal(JSON.parse(DB.prepare("SELECT v FROM app_kv WHERE k='lineReportFlow:single'").first().v).stage,'cancelled');
 }));
 
 test('舊卡片的組合帶貓名，換貓後仍記在原貓；多填數字不部分寫入',()=>setup(async({say,click,last,logs})=>{
  await say('蚵仔');await say('水2');const cells=last().contents.body.contents.at(-1).contents.slice(1).flatMap(r=>r.contents);const a=cells.find(c=>c.action?.label==='副食＋水').action;
- assert.equal(a.fillInText,'蚵仔 副食0水0');await say('麵線');await click(a.data);const n=logs().length;await say(a.fillInText.replace('0','20').replace(/0$/,'3'));assert.equal(logs().length,n+2);assert.ok(logs().slice(n).every(l=>l.petId==='p1'));
+ assert.equal(a.fillInText,'蚵仔 副食\n水');await say('麵線');await click(a.data);const n=logs().length;await say(a.fillInText.replace('\n','20\n')+'3');assert.equal(logs().length,n+2);assert.ok(logs().slice(n).every(l=>l.petId==='p1'));
  const count=logs().length;await say('主食＋水 31 5 8');assert.equal(logs().length,count);
 },'owner'));
 
 test('底部快捷切貓後帶新貓名，更多紀錄也相同；自己打字仍可省略',()=>setup(async({say,click,last,logs})=>{
  await say('蚵仔');assert.equal(last().quickReply.items.find(i=>i.action.label==='水').action.fillInText,'蚵仔 水');
- await say('麵線');assert.equal(last().quickReply.items.find(i=>i.action.label==='主食＋水').action.fillInText,'麵線 主食0水0');
+ await say('麵線');assert.equal(last().quickReply.items.find(i=>i.action.label==='主食＋水').action.fillInText,'麵線 主食\n水');
  await click('action=recmore');assert.equal(last().quickReply.items.find(i=>i.action.label==='體重').action.fillInText,'麵線 體重');
  await say('水5');assert.equal(logs()[0].petId,'p2');
 },'owner'));

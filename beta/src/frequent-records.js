@@ -16,7 +16,7 @@ export function frequentRecordItems(petId='',petName='',entries=FREQUENT_RECORDS
   return shortcutEntries(entries).map(([label,kind])=>{
     if(kind==='more')return {type:'action',action:{type:'postback',label:'更多紀錄',data:'action=recmore',displayText:'更多紀錄'}};
     const combo=['wetWater','sideWater'].includes(kind);
-    const input=combo?(kind==='wetWater'?'主食0水0':'副食0水0'):label;
+    const input=combo?(kind==='wetWater'?'主食\n水':'副食\n水'):label;
     const fill=!['urine','stool'].includes(kind);
     return {type:'action',action:{
       type:'postback',label,data:`action=frequent&kind=${combo?'wet':kind}${combo?'&combo='+kind:''}${petId&&(!fill||petName)?'&petId='+encodeURIComponent(petId):''}${fill?'&input=fill':''}`,
@@ -37,7 +37,7 @@ export function withFrequentRecords(message,petId='',{persistent=true,petName=''
     const grid={type:'box',layout:'vertical',spacing:'sm',margin:'lg',contents:[
       {type:'box',layout:'vertical',spacing:'xs',contents:[
         {type:'text',text:petName?`再幫${petName}記一筆`:'再記一筆',size:'sm',weight:'bold',color:'#5C4A38',wrap:true},
-        {type:'text',text:'組合會帶入「主食0水0」，把 0 改成數量再送出',size:'xs',color:'#5C4A38',wrap:true}
+        {type:'text',text:'點快捷，在文字後補數量，再送出。',size:'xs',color:'#5C4A38',wrap:true}
       ]},...rows
     ]};
     result.contents={...message.contents,body:{...message.contents.body,contents:[...message.contents.body.contents,grid]}};
