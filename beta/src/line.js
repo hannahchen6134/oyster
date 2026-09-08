@@ -137,6 +137,13 @@ async function callLineApi(env, path, body, options = {}) {
   if (delivery) scope?.beforeDelivery();
   const start = performance.now();
   const metric = { kind: path === '/chat/loading/start' ? 'loading' : delivery ? 'reply' : 'notify', ms: 0, status: null };
+  if (body.messages) {
+    // Delivery diagnostics only: no IDs, message text, amounts, or action data.
+    metric.transport = path.endsWith('/reply') ? 'reply' : 'push';
+    metric.messages = body.messages.length;
+    metric.quickReplies = body.messages.map(m => m.quickReply?.items?.length || 0);
+    metric.lastType = body.messages.at(-1)?.type || 'none';
+  }
   if (scope) scope.line.push(metric);
   try {
     const response = await fetch(`${LINE_API_BASE}${path}`, {

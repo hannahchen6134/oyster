@@ -72,6 +72,10 @@ test('喝水完成回覆前降為6讀3寫，保留總計、目標、差額與快
   assert.match(JSON.stringify(card),/還差/); assert.equal(card.quickReply.items.length,10);
   assert.equal((await getLogsForDay(DB,'s1',taipeiToday())).length,6);
   assert.equal(metric.records,1); assert.ok(metric.server_ms<=metric.line_accepted_ms);
+  const delivery = metric.line.find(m=>m.transport==='reply');
+  assert.equal(delivery.messages,1);
+  assert.deepEqual(delivery.quickReplies,[card.quickReply.items.length]);
+  assert.equal(delivery.lastType,'flex');
   assert.doesNotMatch(JSON.stringify(metric),/fake-secret|fake-reply|testsingle|喝水20ml|小花/);
 }));
 

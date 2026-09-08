@@ -3520,6 +3520,7 @@ async function ensurePersonalRichMenu(env, baseUrl, lineUserId) {
     method: 'POST', headers: { 'Content-Type': 'image/png' }, body: imgBytes
   });
   await lineApi(`https://api.line.me/v2/bot/user/${lineUserId}/richmenu/${menuId}`, { method: 'POST' });
+  markEvent(env, 'richmenu_relinked');
 
   // 清掉這位使用者的舊專屬選單，避免堆積
   if (cached) {
