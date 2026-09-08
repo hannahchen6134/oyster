@@ -44,7 +44,23 @@ const LINE_ADD_URL = 'https://line.me/R/ti/p/@232mjffx';
 // 管理員驗證：優先 cookie session（/admin/login 換發，金鑰不再掛網址），否則沿用 ?key=（constant-time 比對）。
 // 回 { ok, viaCookie }。ADMIN_KEY 少於 8 碼一律拒絕（等於沒設好就不開後台）。
 function adminLoginPage(message = '請輸入原本的管理金鑰。登入有效期為 8 小時。', status = 200) {
-  return new Response(`<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>喵喵管家｜管理者登入</title><style>body{margin:0;padding:36px 24px;background:#f5efe4;color:#614322;font:16px/1.7 sans-serif}main{max-width:420px;margin:40px auto;background:#fffdf8;padding:28px;border-radius:18px}h1{font-size:24px}input,button{box-sizing:border-box;width:100%;font:inherit;padding:12px;border:1px solid #cbbda9;border-radius:8px}button{margin-top:20px;background:#734921;color:white;cursor:pointer}</style><main><h1>管理者登入</h1><p>${message}</p><form method="post" action="/admin/login"><label for="key">管理金鑰</label><input id="key" name="key" type="password" autocomplete="current-password" required><button type="submit">登入後台</button></form><p>這是管理者專用入口，與爸媽使用的管家頁面不同。</p></main></html>`,{status,headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','referrer-policy':'no-referrer','x-frame-options':'DENY'}});
+  return new Response(`<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>喵喵管家｜管理者登入</title><style>body{margin:0;padding:36px 24px;background:#f5efe4;color:#614322;font:16px/1.7 sans-serif}main{max-width:420px;margin:40px auto;background:#fffdf8;padding:28px;border-radius:18px}h1{font-size:24px}input,button{box-sizing:border-box;width:100%;font:inherit;padding:12px;border:1px solid #cbbda9;border-radius:8px}button{margin-top:20px;background:#734921;color:white;cursor:pointer}</style><main><h1>管理者登入</h1><p>${message}</p><form method="post" action="/admin/login"><label for="key">管理金鑰</label><input id="key" name="key" type="password" autocomplete="current-password" required><p id="keyStatus" role="status" aria-live="polite">尚未輸入金鑰</p><label for="keyFile">貼上沒成功？選擇下載的金鑰檔案</label><input id="keyFile" type="file" accept=".txt,text/plain"><button type="submit">登入後台</button></form><script>
+const field=document.getElementById('key'),statusText=document.getElementById('keyStatus');
+function updateStatus(){statusText.textContent=field.value.trim().length?'已帶入 '+field.value.trim().length+' 個字，請按登入':'尚未輸入金鑰';}
+field.addEventListener('input',updateStatus);
+document.getElementById('keyFile').addEventListener('change',async function(){
+ const file=this.files[0];if(!file)return;
+ if(file.size>16384){statusText.textContent='請選擇管理金鑰文字檔';return;}
+ try{
+ const text=await file.text();
+ const lines=text.split(/\\r?\\n/).map(s=>s.trim()).filter(Boolean);
+ const marker=lines.findIndex(s=>s==='管理金鑰：');
+ const candidate=marker>=0?lines[marker+1]:(lines.length===1?lines[0]:'');
+ if(!candidate||!/^[A-Za-z0-9_-]{8,256}$/.test(candidate)){statusText.textContent='檔案格式不符，請選擇先前提供的管理金鑰檔';return;}
+ field.value=candidate;updateStatus();field.focus();
+ }catch{statusText.textContent='無法讀取檔案，請重新選擇';}
+});
+</script><p>這是管理者專用入口，與爸媽使用的管家頁面不同。</p></main></html>`,{status,headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','referrer-policy':'no-referrer','x-frame-options':'DENY'}});
 }
 
 async function adminAuth(env, request, url) {
@@ -206,7 +222,7 @@ export default {
       if (request.method === 'GET' && !url.searchParams.has('key')) return adminLoginPage();
       if (!['GET','POST'].includes(request.method)) return new Response(null,{status:405});
       if (request.method === 'POST' && request.headers.get('origin') && request.headers.get('origin') !== url.origin) return adminLoginPage('請從此網站重新登入。',403);
-      const qk = request.method === 'POST' ? String((await request.formData()).get('key') || '') : url.searchParams.get('key');
+      const qk = request.method === 'POST' ? String((await request.formData()).get('key') || '').trim() : url.searchParams.get('key');
       if (key.length < 8 || qk == null || !constantTimeEqual(qk, key)) {
         return adminLoginPage('登入已失效或金鑰不正確，請重新登入。',403);
       }
