@@ -46,7 +46,7 @@ test('現有照護範本直接出圖；多頁全數分批傳回，重點擊不�
  await appKvSet(db,'careTemplate:owner:p1',JSON.stringify({draft:{feeding:'依已確認安排餵食',medicine:'藥拌罐頭',notes:'喜歡摸下巴'},updatedAt:new Date().toISOString()}));
  await post('reportPet',{petId:'p1'});let calls=0;await post('reportPurpose',{purpose:'care'},async()=>{calls++;return Array(7).fill(png);});
  assert.equal(calls,1);assert.equal((await flow()).stage,'done');assert.equal(sent.flatMap(s=>s.messages).filter(m=>m.type==='image').length,7);assert.ok(sent.every(s=>s.messages.length<=5));
- const last=sent.at(-1).messages.at(-1);assert.equal(last.quickReply.items.length,11);assert.equal(last.quickReply.items.at(-1).action.label,'補充照護說明');assert.equal(last.quickReply.items.find(i=>i.action.label==='水').action.fillInText,'水');
+ const last=sent.at(-1).messages.at(-1);assert.equal(last.quickReply.items.length,11);assert.equal(last.quickReply.items.at(-1).action.label,'補充照護說明');assert.equal(last.quickReply.items.find(i=>i.action.label==='水').action.fillInText,'蚵仔 水');
  await post('reportPurpose',{purpose:'care'},async()=>{calls++;return [png,png];});assert.equal(calls,1);
 }));
 test('照護只補缺項；已填餵食保留，後台填完重讀，不用輸入出已有資料',()=>setup(async({db,env,event,sent,post,flow})=>{

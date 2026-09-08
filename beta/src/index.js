@@ -952,7 +952,7 @@ async function handlePending(env, event, { db, user, pet, pets, lineUserId, owne
 
   if (pending.startsWith('amount|')) {
     const [,base,boundPetId,startedAt] = pending.split('|');
-    if(startedAt && Date.now()-Number(startedAt)>PENDREC_TTL_MS){await clear();await replyOrPushQuick(env,event,'剛才的數量輸入已逾時，請重新選一個常用紀錄。',frequentRecordItems());return true;}
+    if(startedAt && Date.now()-Number(startedAt)>PENDREC_TTL_MS){await clear();await replyOrPushQuick(env,event,'剛才的數量輸入已逾時，請重新選一個常用紀錄。',frequentRecordItems(pet?.petId||'',pet?.petName||''));return true;}
     const m = text.match(/^([0-9]+(?:\.[0-9]+)?)\s*(?:g|克|公克|ml|毫升)?$/i);
     if (!m) {
       // 開頭是數字卻格式跑掉 → 保留情境、溫柔再問一次，不清空
@@ -1014,8 +1014,8 @@ export function parseUndoIds(raw) {
 }
 
 // 症狀類分類鈕（吃喝藥用一鍵捷徑，這裡只留較少用的狀況當安全網）
-function symptomCategoryQuick() {
-  return frequentRecordItems('','',ALL_RECORDS);
+function symptomCategoryQuick(pet) {
+  return frequentRecordItems(pet?.petId||'',pet?.petName||'',ALL_RECORDS);
 }
 // 找出這隻貓的預設貓 id（給一鍵捷徑用）
 async function defaultPetId(db, lineUserId, ownerId) {
@@ -1065,8 +1065,9 @@ async function tryCompletePendingRecord(env, event, { db, user, pet, lineUserId,
 }
 // 看不懂客戶輸入時的引導：不當死路，教打字 ＋ 這隻貓的一鍵捷徑，順手就能記
 export async function guideUnknown(env, event, petId) {
+  const pet=petId?await getPet(env.DB,petId):null;
   const items = [
-    ...frequentRecordItems()
+    ...frequentRecordItems(pet?.petId||'',pet?.petName||'')
   ];
   await replyOrPushQuick(env, event,
     '我還沒聽懂這句 🙏\n'
@@ -1081,7 +1082,8 @@ async function welcomeMsg(db, lineUserId, ownerId) {
   const w = welcomeFlex();
   try {
     const petId = await defaultPetId(db, lineUserId, ownerId);
-    w.quickReply = { items: frequentRecordItems(petId) };
+    const pet=petId?await getPet(db,petId):null;
+    w.quickReply = { items: frequentRecordItems(petId,pet?.petName||'') };
   } catch (error) { /* ignore */ }
   return w;
 }
@@ -1157,7 +1159,7 @@ async function handlePostback(event, env, baseUrl) {
       await replyOrPush(env, event, '目前還沒有共照夥伴。到「設定 → 邀請夥伴」把家人或幫手加進來，就能一鍵傳給大家。');
       return;
     }
-    const card = withFrequentRecords(handoffFlex(pet, dateLabel, data),'',{persistent:false});
+    const card = withFrequentRecords(handoffFlex(pet, dateLabel, data),pet.petId,{persistent:false,petName:pet.petName});
     let ok = 0;
     for (const rid of recipients) {
       try { await pushMessages(env, rid, [card]); ok += 1; } catch (error) { /* 個別失敗略過 */ }
@@ -1177,7 +1179,11 @@ async function handlePostback(event, env, baseUrl) {
       WHERE CAST(app_kv.v AS INTEGER) <= ?`)
       .bind(`msg:menu:recmore:${lineUserId}`,String(now+3000),new Date(now).toISOString(),now).run();
     if(!claim.meta?.changes)return;
-    await replyOrPushQuick(env, event, '選一個類別，接著填數字或情況 👇', symptomCategoryQuick());
+    const user=await getUser(db,lineUserId);
+    if(!isBetaAllowed(user)){await replyOrPush(env,event,gateText());return;}
+    const pets=await listPets(db,ownerId);
+    const pet=needsCatPick(user,pets)?null:await resolveDefaultPet(db,user,pets);
+    await replyOrPushQuick(env, event, '選一個類別，接著填數字或情況 👇', symptomCategoryQuick(pet));
     return;
   }
   // 教打字：熟了直接打指令最快
@@ -2288,7 +2294,7 @@ async function handleTextMessageInner(event, env, baseUrl) {
   const isTeaching = ['如何記錄','如何紀錄','如何記','怎麼記','怎麼記錄','記法','記錄方式','怎麼用',
     '更多紀錄範例','完整記法','完整記錄','所有記法','記法大全','如何記餵藥','如何記藥'].includes(text) || /^記法[:：]/.test(text);
   if (isTeaching && pet && isBetaAllowed(user) && env[LINE_EVENT]) {
-    env[LINE_EVENT].defaultQuickReply = {items:frequentRecordItems(pet.petId)};
+    env[LINE_EVENT].defaultQuickReply = {items:frequentRecordItems(pet.petId,pet.petName)};
   }
 
   // 說明選單卡的教學子頁
@@ -3376,10 +3382,10 @@ export async function handleRecord(env, event, pet, record, lineUserId, opts = {
       try {
         const who = opts.caregiverName || '共同照護者';
         const notifySiteUrl = await siteLink(env, opts.baseUrl, lineUserId);
-        await pushMessages(env, lineUserId, [withFrequentRecords(careNotifyFlex(who, pet.petName, description, savedLog.logId, notifySiteUrl, summary),'',{persistent:false})]);
+        await pushMessages(env, lineUserId, [withFrequentRecords(careNotifyFlex(who, pet.petName, description, savedLog.logId, notifySiteUrl, summary),pet.petId,{persistent:false,petName:pet.petName})]);
       } catch (error) {
         console.error('care notify failed:', error.message);
-        await pushMessages(env, lineUserId, [withFrequentRecords({type:'text',text:`📝 ${opts.caregiverName || '共同照護者'} 記錄了 ${pet.petName}：${description}`.slice(0,4900)})]);
+        await pushMessages(env, lineUserId, [withFrequentRecords({type:'text',text:`📝 ${opts.caregiverName || '共同照護者'} 記錄了 ${pet.petName}：${description}`.slice(0,4900)},pet.petId,{petName:pet.petName})]);
       }
     });
   }
@@ -3598,7 +3604,7 @@ async function handleQuery(env, event, user, pet, query, baseUrl, lineUserId, ow
   const db = env.DB;
   const today = taipeiToday();
   if (pet && isBetaAllowed(user) && env[LINE_EVENT] && query !== 'report') {
-    env[LINE_EVENT].defaultQuickReply = {items:frequentRecordItems(pet.petId)};
+    env[LINE_EVENT].defaultQuickReply = {items:frequentRecordItems(pet.petId,pet.petName)};
   }
 
   if (query === 'foodHistory') {

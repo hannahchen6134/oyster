@@ -112,7 +112,7 @@ async function askFeeding(env,event,flow,pet,draft={}) {
     body.splice(-1,0,{type:'button',style:'link',color:'#734921',action:{type:'postback',label:'已在網頁儲存，重新讀取',data:button(flow,'reportRecheck'),displayText:'重新讀取照護資料'}});
   }
   body.at(-1).style='link';
-  prompt.quickReply={items:frequentRecordItems()};
+  prompt.quickReply={items:frequentRecordItems(pet.petId,pet.petName)};
   await replyOrPushFlex(env,event,prompt,hint);
 }
 export async function handleLineReportText(env,event,owner,text) {
@@ -238,7 +238,7 @@ async function deliverReport(env,event,flow,render) {
     }
     const messages=Array.from({length:manifest.count},(_,i)=>({type:'image',originalContentUrl:`${base}${share.url}/image/${i}`,previewImageUrl:`${base}${share.url}/image/${i}`}));
     messages.push({type:'text',text:`${bundle.pet.petName}的${stored.snapshot.reportName}\n共 ${manifest.count-1} 張摘要＋1 張 QR Code，可直接儲存或轉傳。\n查看摘要（7 天內有效）：${base}${share.url}`,quickReply:{items:[
-      ...frequentRecordItems(),
+      ...frequentRecordItems(bundle.pet.petId,bundle.pet.petName),
       ...(flow.purpose==='care'?[{type:'action',action:{type:'postback',label:'補充照護說明',data:button(flow,'reportEdit'),displayText:'補充照護說明'}}]:[])
     ]}});
     if(env.LIFF_ID){

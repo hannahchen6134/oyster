@@ -27,7 +27,7 @@ export function frequentRecordItems(petId='',petName='',entries=FREQUENT_RECORDS
 // Reuse the same action factory in a persistent card grid and the transient quick
 // reply strip. The grid remains tappable when LINE hides the strip after a tap.
 export function withFrequentRecords(message,petId='',{persistent=true,petName=''}={}) {
-  const items=frequentRecordItems(petId);
+  const items=frequentRecordItems(petId,petName);
   const result={...message,quickReply:{items}};
   if(persistent&&message.type==='flex'&&message.contents?.type==='bubble'&&message.contents.body?.layout==='vertical') {
     // Old cards can be tapped after switching pets. Name the card's cat in filled
