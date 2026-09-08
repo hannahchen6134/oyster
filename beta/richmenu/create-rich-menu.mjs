@@ -40,7 +40,7 @@ const menu = {
   // 註：實際線上用的是 index.js 的「每人專屬選單」ensurePersonalRichMenu（會烤本人登入連結）；
   //     這支靜態版僅作備援／初始化，送出詞與標籤需與專屬版一致。
   areas: [
-    cell(0, 0, send('記一筆')),                  // 記一筆
+    cell(0, 0, {type:'postback',label:'記一筆｜主食＋水',data:'action=frequent&kind=wet&combo=wetWater&input=fill',inputOption:'openKeyboard',fillInText:'主食\n水'}),                  // 記一筆
     cell(1, 0, send('近七天記錄')),              // 近七天記錄（week 卡）
     cell(2, 0, {type:'postback',data:'action=reportStart'}), // 直接啟動摘要
     // 管家後台：直接開網站（回訪者已登入一點就進；新朋友會看到登入引導頁）

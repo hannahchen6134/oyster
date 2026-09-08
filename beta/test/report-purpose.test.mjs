@@ -55,9 +55,10 @@ test('LINE 出摘要先選貓；用途與圖片流程留在對話，不開後台
     await handleTextMessage({source:{type:'user',userId:'owner'},replyToken:'test',message:{id:'report1',text:'出摘要'}},{DB:db,LINE_CHANNEL_ACCESS_TOKEN:'test',LIFF_ID:'test-liff',ASSETS:{fetch:async()=>new Response('png')}},'https://local.test');
     assert.match(JSON.stringify(sent),/需要分享哪隻貓的摘要/); assert.match(JSON.stringify(sent),/action=reportPet/); assert.match(JSON.stringify(sent),/petId=p1/); assert.match(JSON.stringify(sent),/petId=p2/); assert.doesNotMatch(JSON.stringify(sent),/go=doctor|go=care|"type":"uri"/);
     assert.equal(menus.length,1);
-    assert.deepEqual(menus[0].areas.map((a)=>a.action.type),['message','message','postback','uri','message','message']);
+    assert.deepEqual(menus[0].areas.map((a)=>a.action.type),['postback','message','postback','uri','message','message']);
+    assert.equal(menus[0].areas[0].action.fillInText,'主食\n水');assert.equal(menus[0].areas[0].action.inputOption,'openKeyboard');assert.equal(menus[0].areas[0].action.displayText,undefined);
     assert.equal(menus[0].areas[2].action.data,'action=reportStart');
-    assert.deepEqual(menus[0].areas.filter((a)=>a.action.type==='message').map((a)=>a.action.text),['記一筆','近七天記錄','怎麼記','照護月曆']);
+    assert.deepEqual(menus[0].areas.filter((a)=>a.action.type==='message').map((a)=>a.action.text),['近七天記錄','怎麼記','照護月曆']);
     assert.equal(menus[0].areas[3].action.uri,'https://liff.line.me/test-liff');
   } finally { globalThis.fetch=old; }
 });

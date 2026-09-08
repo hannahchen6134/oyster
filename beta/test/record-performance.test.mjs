@@ -16,7 +16,7 @@ async function fixture(run, hooks = {}) {
   await ensureTaskSchema(DB);
   DB.sdb.exec("CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY AUTOINCREMENT,lineUserId TEXT,event TEXT,meta TEXT,createdAt TEXT)");
   for (const actor of ['single','owner','helper']) {
-    DB.prepare('INSERT INTO app_kv(k,v,updatedAt) VALUES(?,?,?)').bind(`menu:${actor}`, JSON.stringify({ v:10, menuId:'fake', token:`test${actor}` }), new Date().toISOString()).run();
+    DB.prepare('INSERT INTO app_kv(k,v,updatedAt) VALUES(?,?,?)').bind(`menu:${actor}`, JSON.stringify({ v:11, menuId:'fake', token:`test${actor}` }), new Date().toISOString()).run();
   }
   DB.prepare("UPDATE users SET defaultPetId='p1' WHERE lineUserId IN ('owner','helper')").run();
   DB.prepare('UPDATE pets SET goalWaterMl=200,goalKcal=220').run();

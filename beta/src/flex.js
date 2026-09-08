@@ -1261,7 +1261,7 @@ export function quickRecordCarousel(opts = {}) {
       ]},
       {type:'box',layout:'vertical',margin:'20px',paddingAll:'16px',backgroundColor:C.tint,cornerRadius:'12px',spacing:'12px',contents:[
         line('⚡ 常用快捷',{size:'18px',weight:'bold',color:C.brand}),
-        line('點「主食＋水」帶入兩行。\n在主食、水後補數量，再送出。'),
+        line('點六格「記一筆」直接帶入主食、水兩行。\n補數量再送出；其他類別點下方常用快捷。'),
         {type:'button',style:'primary',color:C.brand,action:{type:'message',label:'記一筆・常用快捷',text:'記一筆'}}
       ]},
       {type:'separator',margin:'24px',color:SEPARATOR},
@@ -1275,7 +1275,7 @@ export function quickRecordCarousel(opts = {}) {
 }
 
 export function howToUseText() {
-  return '🐱 喵喵管家怎麼用？\n平常直接在 LINE 告訴我就好，不用特別學格式。\n✏️ 直接記：主食31、水5、乾乾10、嘔吐 白沫\n⚡ 點「記一筆」→「主食＋水」→ 帶入兩行，在主食、水後補數量再送出。副食＋水也一樣；不要連點兩個快捷，以免覆蓋未送出的文字。\n📋 輸入「近七天記錄」看每天飲食、喝水。\n📄 輸入「出摘要」→ 選貓 → 給醫生看／給照護者 → 14 天／一個月，收到圖片與 QR Code；詳細資料再開後台，缺照護說明會先問你。\n⚙️ 完整紀錄、月曆與設定：輸入「管家後台」。\n更多例句：輸入「更多紀錄範例」。';
+  return '🐱 喵喵管家怎麼用？\n平常直接在 LINE 告訴我就好，不用特別學格式。\n✏️ 直接記：主食31、水5、乾乾10、嘔吐 白沫\n⚡ 點六格「記一筆」→ 直接帶入主食、水兩行，在主食、水後補數量再送出。副食＋水也一樣；不要連點兩個快捷，以免覆蓋未送出的文字。\n📋 輸入「近七天記錄」看每天飲食、喝水。\n📄 輸入「出摘要」→ 選貓 → 給醫生看／給照護者 → 14 天／一個月，收到圖片與 QR Code；詳細資料再開後台，缺照護說明會先問你。\n⚙️ 完整紀錄、月曆與設定：輸入「管家後台」。\n更多例句：輸入「更多紀錄範例」。';
 }
 
 export const HELP_EXAMPLES = [

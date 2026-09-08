@@ -3479,7 +3479,7 @@ export async function handleRecord(env, event, pet, record, lineUserId, opts = {
 //     今日記錄→近七天記錄（既有 week 卡）、給醫生看→出摘要（就醫／照護）、
 //     照護站→管家後台、拿掉與趨勢／後台重複的「記錄回顧」，右下改為「照護月曆」（在對話看）。
 // v9：重新綁定既有六格與 LIFF 直開；圖片與標籤不變。
-const RICHMENU_VERSION = 10;
+const RICHMENU_VERSION = 11;
 
 async function maintainPersonalMenu(env, baseUrl, lineUserId) {
   return afterEventReply(env, `menu:${lineUserId}`, () => ensurePersonalRichMenu(env, baseUrl, lineUserId));
@@ -3509,7 +3509,7 @@ async function ensurePersonalRichMenu(env, baseUrl, lineUserId) {
     // v8：上排＝每天要做的（留對話），下排＝查看與前往
     // 送出的字＝選單標籤（自動回覆一致）：記一筆／近七天記錄／出摘要 ・ 說明・怎麼記／照護月曆
     areas: [
-      cell(0, 0, send('記一筆')),                  // 記一筆 → 快速記錄選單
+      cell(0, 0, {type:'postback',label:'記一筆｜主食＋水',data:'action=frequent&kind=wet&combo=wetWater&input=fill',inputOption:'openKeyboard',fillInText:'主食\n水'}), // Direct keyboard; no intermediate reply
       cell(1, 0, send('近七天記錄')),              // 近七天記錄 → 近 7 天卡（week）
       cell(2, 0, {type:'postback',data:'action=reportStart'}), // 直接啟動摘要，不觸發文字關鍵字自動回覆
       cell(0, 1, { type: 'uri', uri: site }),      // 管家後台（網站）

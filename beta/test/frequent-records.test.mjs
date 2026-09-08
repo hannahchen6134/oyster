@@ -277,3 +277,10 @@ test('照護補問途中漏填的組合仍走補數量，不寫成照護安排',
  DB.prepare("INSERT OR REPLACE INTO app_kv(k,v,updatedAt) VALUES (?,?,?)").bind('lineReportFlow:single',JSON.stringify({owner:'single',petId:'s1',stage:'feeding',careQuestion:'feeding',expiresAt:Date.now()+60000}),new Date().toISOString()).run();
  await say('小花 主食31\n水');assert.equal(logs().length,0);assert.match(last().text,/水量還沒填/);assert.equal(last().quickReply.items[0].action.fillInText,'小花 主食31\n水');
 }));
+
+
+test('六格直填組合不等待回覆；切貓後送出沿用新對象',()=>setup(async({say,click,sent,logs})=>{
+ await say('蚵仔');await say('麵線');const n=sent.length;
+ await click('action=frequent&kind=wet&combo=wetWater&input=fill');assert.equal(sent.length,n);
+ await say('主食31\n水5');assert.equal(logs().length,2);assert.ok(logs().every(l=>l.petId==='p2'));
+},'owner'));
