@@ -483,7 +483,7 @@ export async function saveDataExport(db, ownerLineUserId, filename, csv) {
 }
 export async function getDataExport(db, id) {
   try {
-    return await db.prepare('SELECT filename, csv FROM data_exports WHERE id = ?').bind(String(id || '')).first();
+    return await db.prepare('SELECT ownerLineUserId, filename, csv FROM data_exports WHERE id = ?').bind(String(id || '')).first();
   } catch (error) { return null; }
 }
 export async function purgeOldExports(db, olderThanIso) {

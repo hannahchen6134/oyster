@@ -3921,6 +3921,7 @@
           link.textContent = '資料已整理好，點此下載 JSON';
           const previous = $('accountExportDownload');
           if (previous) { URL.revokeObjectURL(previous.href); previous.remove(); }
+          link.addEventListener('click',()=>{ api('export-download',{method:'POST',body:JSON.stringify({exportId:result.exportId})}).catch(()=>{}); });
           link.id = 'accountExportDownload'; link.className = 'btn btn-secondary';
           archiveButton.after(link);
           toast('已整理全部貓咪的紀錄、基本資料及照護設定');

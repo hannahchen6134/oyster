@@ -1,3 +1,4 @@
+import { customerPanel, touchCustomer, markDownload } from './customer-management.js';
 import { restoreCompletionShortcuts } from './completion-shortcuts.js';
 import { publicReport, purgeReports } from './report-sharing.js';
 import { startLineReport, handleLineReportPostback, handleLineReportText } from './line-reports.js';
@@ -143,7 +144,7 @@ export default {
       }
     }
     if (url.pathname.startsWith('/api/')) {
-      return handleApi(request, env, url);
+      return handleApi(request, env, url, ctx);
     }
     // 摘要截圖：POST 存 PNG（要登入）→ 回一個「真圖片」網址；GET 用長亂數 id 取圖，
     // 讓 LINE 內建瀏覽器能用「長按圖片 → 儲存到相簿」（data 網址在部分瀏覽器無法長按存）。
@@ -182,6 +183,7 @@ export default {
       const row = await getDataExport(env.DB, id);
       if (!row || row.csv === undefined || row.csv === null) return new Response('not found', { status: 404 });
       const filename = String(row.filename || 'export.csv');
+      ctx.waitUntil(markDownload(env.DB,row.ownerLineUserId,id,new Date().toISOString(),false).catch(()=>console.warn('download_audit_failed')));
       return new Response(row.csv, {
         headers: {
           'content-type': 'text/csv; charset=utf-8',
@@ -406,6 +408,7 @@ export default {
   <h1>🐾 測試者管理</h1>
   <div class="sub">留存數據、功能使用、共同照護一頁看完。下方可開通／關閉。只動存取權，看不到任何健康紀錄內容。</div>
   ${statsBar}
+  ${await customerPanel(db)}
   ${usageSections}
   <div class="sec-title">測試者名單</div>
   ${cards || '<div class="empty">還沒有任何使用者</div>'}
@@ -593,6 +596,7 @@ async function processWebhookEvents(events, originalEnv, baseUrl, timing) {
         } else if (event.type === 'postback') {
           await handlePostback(event, env, baseUrl);
         }
+        if (event.source?.type === 'user' && ['message','postback'].includes(event.type)) await afterEventReply(env, 'activity', () => touchCustomer(env.DB,event.source.userId,'line'));
       } catch (error) {
         env[LINE_EVENT].status = 'failed';
         console.error('event handling failed:', error);

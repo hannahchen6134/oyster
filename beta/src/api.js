@@ -1,3 +1,4 @@
+import { touchCustomer, auditExport, markDownload } from './customer-management.js';
 import { buildAccountExport } from './account-export.js';
 import { handleReportApi } from './report-sharing.js';
 // 照護站 REST API（Bearer session token 授權）
@@ -77,7 +78,7 @@ const RESOURCES = {
   }
 };
 
-export async function handleApi(request, env, url) {
+export async function handleApi(request, env, url, ctx) {
   const db = env.DB;
   const token = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
   const lineUserId = await getSessionUser(db, token);
@@ -89,6 +90,11 @@ export async function handleApi(request, env, url) {
   const resource = segments[0] || '';
   const resourceId = segments[1] || '';
   const method = request.method;
+
+  if (resource === 'me' && method === 'GET') {
+    const work=touchCustomer(db,lineUserId,'web').catch(()=>console.warn('activity_tracking_failed'));
+    if(ctx?.waitUntil) ctx.waitUntil(work); else await work;
+  }
 
   try {
     if (['care-template','care-organize','report-shares'].includes(resource)) return handleReportApi(request,env,url,lineUserId,dataOwnerId);
@@ -233,9 +239,16 @@ export async function handleApi(request, env, url) {
       return jsonResponse({ ok: true, from, to: today, logs: logs || [] });
     }
 
+    if (resource === 'export-download' && method === 'POST') {
+      const body=await request.json();
+      return jsonResponse({ok:await markDownload(db,lineUserId,String(body.exportId||''))});
+    }
     if (resource === 'account-export' && method === 'POST') {
       if (dataOwnerId !== lineUserId) return forbidden();
-      return jsonResponse({ ok:true, archive:await buildAccountExport(db, lineUserId) });
+      const archive=await buildAccountExport(db,lineUserId);
+      const exportId=crypto.randomUUID();
+      await auditExport(db,lineUserId,exportId,'JSON',archive.counts.logs,'全部貓咪');
+      return jsonResponse({ ok:true, archive, exportId });
     }
     if (resource === 'export' && method === 'POST') {
       const body = await request.json().catch(() => ({}));
@@ -247,6 +260,7 @@ export async function handleApi(request, env, url) {
       const safeName = String(pet?.petName || '貓咪').replace(/[\\/:*?"<>|\s]/g, '_');
       const filename = `喵喵照護紀錄_${safeName}_${taipeiToday()}.csv`;
       const id = await saveDataExport(db, dataOwnerId, filename, csv);
+      await auditExport(db,dataOwnerId,id,'CSV',logs.length,pet?.petName||petId);
       return jsonResponse({ ok: true, url: `/export/${id}`, filename, count: logs.length });
     }
 
