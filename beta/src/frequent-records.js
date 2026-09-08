@@ -16,10 +16,11 @@ export function frequentRecordItems(petId='',petName='',entries=FREQUENT_RECORDS
   return shortcutEntries(entries).map(([label,kind])=>{
     if(kind==='more')return {type:'action',action:{type:'postback',label:'更多紀錄',data:'action=recmore',displayText:'更多紀錄'}};
     const combo=['wetWater','sideWater'].includes(kind);
+    const input=combo?(kind==='wetWater'?'主食0水0':'副食0水0'):label;
     const fill=!['urine','stool'].includes(kind);
     return {type:'action',action:{
       type:'postback',label,data:`action=frequent&kind=${combo?'wet':kind}${combo?'&combo='+kind:''}${petId&&(!fill||petName)?'&petId='+encodeURIComponent(petId):''}${fill?'&input=fill':''}`,
-      ...(fill?{inputOption:'openKeyboard',fillInText:(petName?`${petName} ${label}`:label)+(combo?' ':'')}:{displayText:label})
+      ...(fill?{inputOption:'openKeyboard',fillInText:petName?`${petName} ${input}`:input}:{displayText:label})
     }};
   });
 }
@@ -36,7 +37,7 @@ export function withFrequentRecords(message,petId='',{persistent=true,petName=''
     const grid={type:'box',layout:'vertical',spacing:'sm',margin:'lg',contents:[
       {type:'box',layout:'vertical',spacing:'xs',contents:[
         {type:'text',text:petName?`再幫${petName}記一筆`:'再記一筆',size:'sm',weight:'bold',color:'#5C4A38',wrap:true},
-        {type:'text',text:'組合填兩個數字：食物克數、水量 ml',size:'xs',color:'#5C4A38',wrap:true}
+        {type:'text',text:'組合會帶入「主食0水0」，把 0 改成數量再送出',size:'xs',color:'#5C4A38',wrap:true}
       ]},...rows
     ]};
     result.contents={...message.contents,body:{...message.contents.body,contents:[...message.contents.body.contents,grid]}};
@@ -76,7 +77,7 @@ export function personalizeFrequentMessage(message,entries) {
     const contents=body.contents.map(grid=>{
       const cells=grid.contents?.slice(1).flatMap(row=>row.contents||[]).filter(cell=>cell.action);
       if(!cells||cells.filter(cell=>common(cell.action)).length!==7||!cells.every(cell=>common(cell.action)||combo(cell.action)||more(cell.action)))return grid;
-      const fill=cells.find(cell=>cell.action.fillInText)?.action;
+      const fill=cells.find(cell=>common(cell.action)&&cell.action.fillInText)?.action;
       const petName=fill?.fillInText.trimEnd().slice(0,-fill.label.length).trim()||'';
       const petId=new URLSearchParams(cells[0].action.data).get('petId')||'';
       return {...grid,contents:[grid.contents[0],...recordGridRows(frequentRecordItems(petId,petName,entries))]};
