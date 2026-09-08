@@ -1,3 +1,4 @@
+import { buildAccountExport } from './account-export.js';
 import { handleReportApi } from './report-sharing.js';
 // 照護站 REST API（Bearer session token 授權）
 // 所有資源都檢查擁有權：pet.ownerLineUserId 必須等於 session 使用者。
@@ -232,6 +233,10 @@ export async function handleApi(request, env, url) {
       return jsonResponse({ ok: true, from, to: today, logs: logs || [] });
     }
 
+    if (resource === 'account-export' && method === 'POST') {
+      if (dataOwnerId !== lineUserId) return forbidden();
+      return jsonResponse({ ok:true, archive:await buildAccountExport(db, lineUserId) });
+    }
     if (resource === 'export' && method === 'POST') {
       const body = await request.json().catch(() => ({}));
       const petId = String(body.petId || '');

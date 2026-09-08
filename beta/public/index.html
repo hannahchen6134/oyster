@@ -3904,6 +3904,29 @@
           <p class="muted" style="margin:0 0 16px;font-size:13px;line-height:1.7">把這隻貓目前的所有紀錄匯出成一份 CSV，用 Excel／Google 試算表就能打開。換醫院、想自己備份都不怕——你的紀錄永遠是你的。</p>
           <button class="btn btn-primary" id="exportBtn" type="button" style="width:100%">匯出資料（CSV）</button>
         </div>`;
+      const archiveButton = document.createElement('button');
+      archiveButton.className = 'btn btn-secondary';
+      archiveButton.type = 'button';
+      archiveButton.textContent = '爸媽下載全部貓咪資料（JSON）';
+      archiveButton.style.marginTop = '12px';
+      $('exportBtn').after(archiveButton);
+      archiveButton.addEventListener('click', async () => {
+        archiveButton.disabled = true;
+        try {
+          const result = await api('account-export', { method:'POST' });
+          const blob = new Blob([JSON.stringify(result.archive, null, 2)], {type:'application/json'});
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url; link.download = '喵喵全部照護資料.json';
+          link.textContent = '資料已整理好，點此下載 JSON';
+          const previous = $('accountExportDownload');
+          if (previous) { URL.revokeObjectURL(previous.href); previous.remove(); }
+          link.id = 'accountExportDownload'; link.className = 'btn btn-secondary';
+          archiveButton.after(link);
+          toast('已整理全部貓咪的紀錄、基本資料及照護設定');
+        } catch (error) { toast(error.message || '下載失敗，請稍後再試', true); }
+        finally { archiveButton.disabled = false; }
+      });
       $('exportBtn').addEventListener('click', async () => {
         trackEvent('export');
         const btn = $('exportBtn');
