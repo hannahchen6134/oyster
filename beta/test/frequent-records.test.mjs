@@ -119,7 +119,7 @@ test('快捷列收起後仍可重用卡片內主食與水按鈕，點擊不增�
  await say(food.fillInText+'12');assert.equal(logs().at(-1).amount,12);
  count=sent.length;await click(water.data);assert.equal(sent.length,count);assert.equal(logs().length,1);
  await say(water.fillInText+'2');assert.equal(logs().at(-1).amount,2);assert.equal(logs().at(-1).category,'water');
- assert.equal(last().contents.body.contents.at(-1).contents.slice(1).flatMap(r=>r.contents).filter(c=>c.action).length,10);
+ assert.doesNotMatch(JSON.stringify(last().contents.body),/再幫小花記一筆/);assert.match(JSON.stringify(last().contents.footer),/常用快捷/);
 }));
 
 test('查看今日、近七天、月曆、後台後最後回覆都有常用快捷，不需要重新開記一筆',()=>setup(async({say,last,logs})=>{
@@ -153,7 +153,7 @@ test('個人常用排序在記一筆及完成卡一致；更多可取回被收�
 }));
 
 test('切換貓後重用舊卡片，帶入卡片上的貓名，不會默默寫到另一隻',()=>setup(async({say,click,last,logs})=>{
- await say('蚵仔');await say('水2');
+ await say('蚵仔');await say('水2');await say('記一筆');
  const actions=last().contents.body.contents.at(-1).contents.slice(1).flatMap(r=>r.contents.map(c=>c.action)).filter(Boolean);
  const water=actions.find(a=>a.label==='水');assert.equal(water.fillInText,'蚵仔 水');
  await say('麵線');await click(water.data);await say(water.fillInText+'3');
@@ -199,7 +199,7 @@ test('照護補問卡顯示常用快捷，點組合後不把紀錄當照護安�
 }));
 
 test('舊卡片的組合帶貓名，換貓後仍記在原貓；多填數字不部分寫入',()=>setup(async({say,click,last,logs})=>{
- await say('蚵仔');await say('水2');const cells=last().contents.body.contents.at(-1).contents.slice(1).flatMap(r=>r.contents);const a=cells.find(c=>c.action?.label==='副食＋水').action;
+ await say('蚵仔');await say('水2');await say('記一筆');const cells=last().contents.body.contents.at(-1).contents.slice(1).flatMap(r=>r.contents);const a=cells.find(c=>c.action?.label==='副食＋水').action;
  assert.equal(a.fillInText,'蚵仔 副食\n水');await say('麵線');await click(a.data);const n=logs().length;await say(a.fillInText.replace('\n','20\n')+'3');assert.equal(logs().length,n+2);assert.ok(logs().slice(n).every(l=>l.petId==='p1'));
  const count=logs().length;await say('主食＋水 31 5 8');assert.equal(logs().length,count);
 },'owner'));
@@ -298,4 +298,12 @@ test('照護補問時直接記藥仍是日常紀錄，不當作餵藥方法',()=
  DB.prepare("INSERT OR REPLACE INTO app_kv(k,v,updatedAt) VALUES (?,?,?)").bind('lineReportFlow:single',JSON.stringify({owner:'single',petId:'s1',stage:'feeding',expiresAt:Date.now()+60000}),new Date().toISOString()).run();
  await say('小花 藥 晚 已吃');assert.equal(logs().length,1);assert.equal(logs()[0].category,'med');
  assert.equal(JSON.parse(DB.prepare("SELECT v FROM app_kv WHERE k='lineReportFlow:single'").first().v).careDraft,undefined);
+}));
+
+
+test('成功卡保留總計長條圖，只有底部快捷入口且不重複整組按鈕',()=>setup(async({say,last})=>{
+ await say('主食31 水5');const m=last();assert.ok(m.quickReply.items.length);assert.doesNotMatch(JSON.stringify(m.contents.body),/再幫.*記一筆|點快捷，在文字後/);
+ assert.match(JSON.stringify(m.contents.body),/今日累積/);
+ const footer=m.contents.footer;assert.equal(footer.contents.at(-1).contents[0].action.text,'記一筆');assert.equal(footer.contents.at(-1).contents[1].contents[0].text,'管家後台 ›');
+ assert.ok(footer.contents[0].contents[0].action.data.includes('action=undoOp'));
 }));

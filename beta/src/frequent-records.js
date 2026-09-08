@@ -29,6 +29,23 @@ export function frequentRecordItems(petId='',petName='',entries=FREQUENT_RECORDS
 export function withFrequentRecords(message,petId='',{persistent=true,petName=''}={}) {
   const items=frequentRecordItems(petId,petName);
   const result={...message,quickReply:{items}};
+  if(persistent&&message.type==='flex'&&message.contents?.type==='bubble'&&/^已(?:記錄|更新)/.test(message.altText||'')&&message.contents.footer){
+    const original=message.contents.footer;
+    const buttons=original.contents||[];
+    const site=buttons.find(b=>b.action?.label==='開啟管家後台');
+    const edits=buttons.filter(b=>/action=(?:editAmount|undoOp|delAsk)&/.test(b.action?.data||''));
+    const other=buttons.filter(b=>b!==site&&!edits.includes(b));
+    const link=(action,label)=>({type:'box',layout:'vertical',flex:1,paddingTop:'12px',paddingBottom:'12px',paddingStart:'4px',paddingEnd:'4px',action,
+      contents:[{type:'text',text:label,size:'sm',color:'#734921',align:'center',wrap:true}]});
+    const row=contents=>({type:'box',layout:'horizontal',spacing:'sm',contents});
+    const footer={...original,contents:[
+      ...(edits.length?[row(edits.map(b=>link(b.action,b.action.label.replace(/^[^\u4e00-\u9fff]+/,''))))]:[]),
+      ...other,
+      row([link({type:'message',label:'常用快捷',text:'記一筆'},'常用快捷 ›'),...(site?[link(site.action,'管家後台 ›')]:[])])
+    ]};
+    return {...result,contents:{...message.contents,footer}};
+  }
+
   if(persistent&&message.type==='flex'&&message.contents?.type==='bubble'&&message.contents.body?.layout==='vertical') {
     // Old cards can be tapped after switching pets. Name the card's cat in filled
     // text so reusing that card cannot silently write to the new default cat.
