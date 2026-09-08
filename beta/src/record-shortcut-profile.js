@@ -1,9 +1,9 @@
-import { ALL_RECORDS, FREQUENT_RECORDS } from './frequent-records.js';
+import { ALL_RECORDS, FREQUENT_RECORDS, COMBO_RECORDS } from './frequent-records.js';
 import { LINE_EVENT, afterEventReply } from './line-event.js';
 import { taipeiToday, addDays } from './util.js';
 
 export const shortcutProfileKey = actor => `recordShortcuts:${actor}`;
-const catalog = new Map(ALL_RECORDS.map(([label,kind])=>[kind,label]));
+const catalog = new Map([...ALL_RECORDS,...COMBO_RECORDS].map(([label,kind])=>[kind,label]));
 export function readShortcutProfile(raw,owner,now=Date.now()) {
   try {
     const p=typeof raw==='string'?JSON.parse(raw):raw;
@@ -19,9 +19,14 @@ function kindOf(log) {
 export function rankRecordShortcuts(logs,previous=[],dryLabel='乾乾') {
   const counts=new Map();
   for(const log of logs){const kind=kindOf(log);if(kind)counts.set(kind,(counts.get(kind)||0)+1);}
+  const groups=new Map();
+  for(const log of logs){if(!log.sourceMessageId)continue;const key=(log.petId||'')+':'+log.sourceMessageId;const group=groups.get(key)||[];group.push(log);groups.set(key,group);}
+  for(const group of groups.values())if(group.some(l=>l.category==='water')){
+    for(const [type,kind] of [['主食罐','wetWater'],['副食罐','sideWater']])if(group.some(l=>l.category==='food'&&l.foodType===type))counts.set(kind,(counts.get(kind)||0)+1);
+  }
   // Sparse history should not make the initial menu change after a single tap.
   if([...counts.values()].reduce((a,b)=>a+b,0)<10)return FREQUENT_RECORDS;
-  const order=ALL_RECORDS.map(([,kind])=>kind);
+  const order=[...ALL_RECORDS,...COMBO_RECORDS].map(([,kind])=>kind);
   const prior=previous.map(([,kind])=>kind);
   const tie=kind=>prior.includes(kind)?prior.indexOf(kind):prior.length+order.indexOf(kind);
   const frequent=order.filter(kind=>(counts.get(kind)||0)>=2).sort((a,b)=>(counts.get(b)-counts.get(a))||tie(a)-tie(b));
@@ -50,7 +55,7 @@ export async function prepareShortcutProfile(env,user,owner,pets,event) {
     // filtering by the actual recorder, not the family's data-owner ID.
     const logs=[];
     for(const pet of authorized){
-      const {results}=await env.DB.prepare(`SELECT category,foodType,sourceMessageId,eventDateTime,createdAt FROM logs
+      const {results}=await env.DB.prepare(`SELECT petId,category,foodType,sourceMessageId,eventDateTime,createdAt FROM logs
         WHERE petId=? AND lineUserId=? AND eventDateTime>=? AND eventDateTime<? AND isDeleted=0
           AND COALESCE(NULLIF(recordedBy,''),lineUserId)=? AND NOT(category='water' AND note='罐頭加水')
         ORDER BY eventDateTime DESC LIMIT 200`).bind(pet.petId,owner,from,to,actor).all();

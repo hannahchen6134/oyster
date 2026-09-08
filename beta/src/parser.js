@@ -446,6 +446,9 @@ export function parseLooseFoodReview(compact) {
 }
 
 export function parseMessage(rawText) {
+  const combo = String(rawText).trim().match(/^(主食|副食)\s*[＋+]\s*水\s*(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)$/);
+  if(combo)return parseMessage(combo[1]+combo[2]+' 水'+combo[3]);
+  if(/^(主食|副食)\s*[＋+]\s*水/.test(String(rawText).trim()))return {type:'unknown'};
   const text = normalizeText(rawText);
   if (!text) return { type: 'unknown' };
 

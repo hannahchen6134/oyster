@@ -29,7 +29,7 @@ test('LINE 選貓→選用途→摘要圖與QR；不建立登入連結，QR與�
  let snap,url;await post('reportPurpose',{purpose:'doctor'},async(e,s,u)=>{snap=s;url=u;return [png,png];});
  assert.equal(snap.petName,'麵線');assert.doesNotMatch(JSON.stringify(snap),/測試藥p1/);assert.match(JSON.stringify(snap),/4.27/);assert.equal((await flow()).stage,'done');
  const messages=sent.at(-1).messages;assert.equal(messages.filter(m=>m.type==='image').length,2);assert.equal(messages[0].originalContentUrl,url+'/image/0');assert.match(messages.at(-1).text,/QR Code/);
- assert.deepEqual(messages.at(-1).quickReply.items.map(i=>i.action.label),['主食','乾乾','零食','水','藥','尿尿','便便','更多紀錄']);
+ assert.deepEqual(messages.at(-1).quickReply.items.map(i=>i.action.label),['主食','主食＋水','乾乾','零食','水','藥','尿尿','便便','副食＋水','更多紀錄']);
  const page=await publicReport(new Request(url),env,new URL(url));assert.match(await page.text(),/麵線/);
  const imageUrl=messages[0].originalContentUrl;assert.equal((await publicReport(new Request(imageUrl),env,new URL(imageUrl))).headers.get('content-type'),'image/png');
  const id=url.split('/').at(-1),del=new Request('https://local.test/api/report-shares/'+id,{method:'DELETE'});await handleReportApi(del,env,new URL(del.url),'owner','owner');
@@ -46,7 +46,7 @@ test('現有照護範本直接出圖；多頁全數分批傳回，重點擊不�
  await appKvSet(db,'careTemplate:owner:p1',JSON.stringify({draft:{feeding:'依已確認安排餵食',medicine:'藥拌罐頭',notes:'喜歡摸下巴'},updatedAt:new Date().toISOString()}));
  await post('reportPet',{petId:'p1'});let calls=0;await post('reportPurpose',{purpose:'care'},async()=>{calls++;return Array(7).fill(png);});
  assert.equal(calls,1);assert.equal((await flow()).stage,'done');assert.equal(sent.flatMap(s=>s.messages).filter(m=>m.type==='image').length,7);assert.ok(sent.every(s=>s.messages.length<=5));
- const last=sent.at(-1).messages.at(-1);assert.equal(last.quickReply.items.length,9);assert.equal(last.quickReply.items.at(-1).action.label,'補充照護說明');assert.equal(last.quickReply.items.find(i=>i.action.label==='水').action.fillInText,'水');
+ const last=sent.at(-1).messages.at(-1);assert.equal(last.quickReply.items.length,11);assert.equal(last.quickReply.items.at(-1).action.label,'補充照護說明');assert.equal(last.quickReply.items.find(i=>i.action.label==='水').action.fillInText,'水');
  await post('reportPurpose',{purpose:'care'},async()=>{calls++;return [png,png];});assert.equal(calls,1);
 }));
 test('照護只補缺項；已填餵食保留，後台填完重讀，不用輸入出已有資料',()=>setup(async({db,env,event,sent,post,flow})=>{

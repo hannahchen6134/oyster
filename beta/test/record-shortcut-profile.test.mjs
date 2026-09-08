@@ -76,3 +76,10 @@ test('個人化卡片保留指定貓、同寬三欄與摘要補填選項，不�
   const choice={type:'text',text:'選貓',quickReply:{items:[{type:'action',action:{type:'message',label:'麵線',text:'麵線'}}]}};
   assert.deepEqual(personalizeFrequentMessage(choice,entries),choice);
 });
+
+test('同一貓同次主副食加水才算組合，常用副食加水可向前排',()=>{
+ const logs=Array.from({length:15},(_,i)=>[{petId:'p1',sourceMessageId:'m'+i,category:'food',foodType:'副食罐'},{petId:'p1',sourceMessageId:'m'+i,category:'water'}]).flat();
+ const ranked=rankRecordShortcuts(logs);assert.ok(ranked.findIndex(([,k])=>k==='sideWater')<3);
+ const separate=logs.map((l,i)=>({...l,sourceMessageId:'separate'+i}));assert.ok(!rankRecordShortcuts(separate).some(([,k])=>k==='sideWater'));
+ const cross=logs.map(l=>({...l,petId:l.category==='water'?'p2':'p1'}));assert.ok(!rankRecordShortcuts(cross).some(([,k])=>k==='sideWater'));
+});

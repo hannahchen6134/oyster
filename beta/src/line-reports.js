@@ -112,6 +112,7 @@ async function askFeeding(env,event,flow,pet,draft={}) {
     body.splice(-1,0,{type:'button',style:'link',color:'#734921',action:{type:'postback',label:'已在網頁儲存，重新讀取',data:button(flow,'reportRecheck'),displayText:'重新讀取照護資料'}});
   }
   body.at(-1).style='link';
+  prompt.quickReply={items:frequentRecordItems()};
   await replyOrPushFlex(env,event,prompt,hint);
 }
 export async function handleLineReportText(env,event,owner,text) {

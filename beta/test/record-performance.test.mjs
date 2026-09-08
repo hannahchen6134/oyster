@@ -69,7 +69,7 @@ test('喝水完成回覆前降為6讀3寫，保留總計、目標、差額與快
   assert.equal(metric.queries['after_reply:insert:text_inputs'].count,1);
   const card=calls.find(c=>c.path.endsWith('/message/reply')).body.messages[0];
   assert.match(JSON.stringify(card),/今日累積|今日目標/);
-  assert.match(JSON.stringify(card),/還差/); assert.equal(card.quickReply.items.length,8);
+  assert.match(JSON.stringify(card),/還差/); assert.equal(card.quickReply.items.length,10);
   assert.equal((await getLogsForDay(DB,'s1',taipeiToday())).length,6);
   assert.equal(metric.records,1); assert.ok(metric.server_ms<=metric.line_accepted_ms);
   assert.doesNotMatch(JSON.stringify(metric),/fake-secret|fake-reply|testsingle|喝水20ml|小花/);
@@ -129,8 +129,8 @@ test('共照推送失敗仍保留記錄者回覆，爸媽通知沿用文字備�
   const deliveries=calls.filter(c=>c.path.includes('/message/'));
   assert.deepEqual(deliveries.map(c=>c.path.split('/').at(-1)),['reply','push','push']);
   assert.equal(deliveries[2].body.messages[0].type,'text');
-  assert.equal(deliveries[1].body.messages[0].quickReply.items.length,8);
-  assert.equal(deliveries[2].body.messages[0].quickReply.items.length,8);
+  assert.equal(deliveries[1].body.messages[0].quickReply.items.length,10);
+  assert.equal(deliveries[2].body.messages[0].quickReply.items.length,10);
 },{line:async c=>{if(c.path.endsWith('/push')&&c.body.messages[0].type==='flex')return new Response('{}',{status:400});}}));
 
 test('多筆只回一張、事件重送只記一次；summary仍等於正式logs重算', () => fixture(async ({send,calls,DB,originalPrepare,timings})=>{
@@ -157,7 +157,7 @@ test('個人快捷統計慢或失敗仍先完成回覆，不增加回覆前D1往
     try{await started.promise;assert.equal(replied,true);const entries=Object.entries(timings.at(-1).queries);assert.equal(entries.filter(([k])=>k.startsWith('before_reply:select:')).reduce((n,[,v])=>n+v.count,0),6);}
     finally{blocked.release();await req.done;}
   },{
-    sql:async q=>{if(q.startsWith('SELECT category,foodType,sourceMessageId,eventDateTime,createdAt FROM logs')){assert.equal(replied,true);started.release();await blocked.promise;throw Error('cache unavailable');}},
+    sql:async q=>{if(q.startsWith('SELECT petId,category,foodType,sourceMessageId,eventDateTime,createdAt FROM logs')){assert.equal(replied,true);started.release();await blocked.promise;throw Error('cache unavailable');}},
     line:async c=>{if(c.path.endsWith('/message/reply'))replied=true;}
   });
 });
